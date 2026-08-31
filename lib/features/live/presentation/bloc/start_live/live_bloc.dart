@@ -11,9 +11,10 @@ class LiveBloc extends Bloc<LiveEvent, LiveState> {
   LiveBloc({
     required InitializeCamera initializeCamera,
     required DisposeCamera disposeCamera,
-  })  : _initializeCamera = initializeCamera, // ignore: prefer_initializing_formals
-        _disposeCamera = disposeCamera, // ignore: prefer_initializing_formals
-        super(const LiveInitial()) {
+  }) : _initializeCamera =
+           initializeCamera, // ignore: prefer_initializing_formals
+       _disposeCamera = disposeCamera, // ignore: prefer_initializing_formals
+       super(const LiveInitial()) {
     on<LiveInitializeRequested>(_onInitialize);
     on<LiveCameraSwitchRequested>(_onSwitchCamera);
     on<LiveToolsToggleRequested>(_onToggleTools);
@@ -89,10 +90,7 @@ class LiveBloc extends Bloc<LiveEvent, LiveState> {
     }
   }
 
-  void _onToggleTools(
-    LiveToolsToggleRequested event,
-    Emitter<LiveState> emit,
-  ) {
+  void _onToggleTools(LiveToolsToggleRequested event, Emitter<LiveState> emit) {
     final current = _ready(state);
     emit(current.copyWith(isToolsExpanded: !current.isToolsExpanded));
   }
@@ -137,17 +135,9 @@ class LiveBloc extends Bloc<LiveEvent, LiveState> {
 
   /// The live room took ownership of the running camera.
   /// Forget it here WITHOUT disposing — the room disposes it on handoff.
-  void _onCameraHandedOff(
-    LiveCameraHandedOff event,
-    Emitter<LiveState> emit,
-  ) {
+  void _onCameraHandedOff(LiveCameraHandedOff event, Emitter<LiveState> emit) {
     final current = _ready(state);
     if (current.controller == null && !current.isCameraInitialized) return;
-    emit(
-      current.copyWith(
-        controller: null,
-        isCameraInitialized: false,
-      ),
-    );
+    emit(current.copyWith(controller: null, isCameraInitialized: false));
   }
 }

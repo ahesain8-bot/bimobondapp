@@ -956,6 +956,14 @@ class CompositionSession {
       rotation: prev?.rotation ?? 0,
       scale: prev?.scale ?? 1,
       volume: prev?.volume ?? 1,
+      opacity: prev?.opacity ?? 1,
+      reversed: prev?.reversed ?? false,
+      freeze: prev?.freeze ?? false,
+      reduceNoise: prev?.reduceNoise ?? false,
+      beautify: prev?.beautify ?? false,
+      cutout: prev?.cutout ?? false,
+      maskType: prev?.maskType,
+      voiceEffect: prev?.voiceEffect,
     );
     fills = slotEngine.applyBeatSyncTrims(fills);
     _invalidateTimeline();
@@ -971,6 +979,49 @@ class CompositionSession {
       slotIndex: prev.slotIndex,
     );
     await _sources.remove(slotId)?.dispose();
+    _invalidateTimeline();
+  }
+
+  void patchSlotFill(
+    String slotId, {
+    double? speed,
+    double? rotation,
+    double? volume,
+    double? scale,
+    double? opacity,
+    double? trimStart,
+    double? trimEnd,
+    bool? reversed,
+    bool? freeze,
+    bool? reduceNoise,
+    bool? beautify,
+    bool? cutout,
+    String? maskType,
+    String? voiceEffect,
+    bool clearMask = false,
+    bool clearVoiceEffect = false,
+  }) {
+    final prev = fills[slotId];
+    if (prev == null) return;
+    _pushUndo();
+    fills[slotId] = prev.copyWith(
+      speed: speed,
+      rotation: rotation,
+      volume: volume,
+      scale: scale,
+      opacity: opacity,
+      trimStart: trimStart,
+      trimEnd: trimEnd,
+      reversed: reversed,
+      freeze: freeze,
+      reduceNoise: reduceNoise,
+      beautify: beautify,
+      cutout: cutout,
+      maskType: maskType,
+      voiceEffect: voiceEffect,
+      clearMask: clearMask,
+      clearVoiceEffect: clearVoiceEffect,
+    );
     _invalidateTimeline();
   }
 

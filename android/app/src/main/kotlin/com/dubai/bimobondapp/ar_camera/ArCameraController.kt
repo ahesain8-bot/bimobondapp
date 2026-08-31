@@ -112,11 +112,11 @@ object ArCameraController {
     private const val PREVIEW_EXPOSURE_BIAS = 0
 
     /**
-     * Front gets a mild positive EV so selfies open up toward TikTok brightness.
-     * Back stays slightly negative so the brighter rear sensor does not wash out.
+     * Mild positive EV so live preview opens toward TikTok brightness on both
+     * lenses. Back was previously negative EV (darker than the sensor default).
      */
     private const val PREVIEW_EXPOSURE_EV_STOPS = 0.55f
-    private const val PREVIEW_EXPOSURE_EV_STOPS_BACK = -0.35f
+    private const val PREVIEW_EXPOSURE_EV_STOPS_BACK = 0.45f
 
     /**
      * Front-camera zoom ratio applied on bind. Selfie lenses/HAL 1.0x defaults are
@@ -283,10 +283,23 @@ object ArCameraController {
      */
     private const val FACE_METERING_ENABLED = false
 
+    /**
+     * Back-camera face autofocus (TikTok-style). AF only — not AE/AWB — so we
+     * sharpen on the person without the exposure wash-out that [FACE_METERING_ENABLED]
+     * caused. Front stays on continuous AF alone (fixed/soft lenses hunt worse).
+     */
+    private const val BACK_FACE_AF_ENABLED = true
+
     private const val FACE_METER_MOVE_THRESHOLD = 0.08f
 
     /** Minimum gap between metering requests — AE needs time to converge. */
     private const val FACE_METER_INTERVAL_MS = 2_000L
+
+    /** Face AF re-triggers less often than AE would — avoids focus hunting. */
+    private const val BACK_FACE_AF_INTERVAL_MS = 2_800L
+
+    /** After a face AF pulse, CAF resumes (continuous picture). */
+    private const val BACK_FACE_AF_AUTO_CANCEL_SEC = 3L
 
     /**
      * Metering region size as a fraction of the frame. Wide enough to cover the
@@ -294,6 +307,9 @@ object ArCameraController {
      * and not, say, an eyebrow.
      */
     private const val FACE_METER_SIZE = 0.25f
+
+    /** Slightly tighter than AE face region — AF wants the face plane, not the room. */
+    private const val BACK_FACE_AF_SIZE = 0.22f
 
     /** Sample points per axis across the face when measuring skin tone. */
     private const val SKIN_TONE_GRID = 12
@@ -560,6 +576,12 @@ object ArCameraController {
         cachedSnapshot = null
         FaceLandmarkSmoother.reset()
         BackPersonPresence.reset()
+        lastFaceAfX = -1f
+        lastFaceAfY = -1f
+        lastFaceAfMs = 0L
+        lastMeterX = -1f
+        lastMeterY = -1f
+        lastMeterMs = 0L
         if (ArCameraBridge.isFrontCamera) {
             BackPersonPresence.clearForFrontCamera()
         }
@@ -622,6 +644,49 @@ object ArCameraController {
             onResult(true, null)
         } catch (e: Exception) {
             onResult(false, e.message ?: "zoom_failed")
+        }
+    }
+
+    /**
+     * TikTok-style tap-to-focus: AF + AE + AWB at [normalizedX]/[normalizedY]
+     * (0…1 in preview view space). Continuous AF ([CONTROL_AF_MODE_CONTINUOUS_PICTURE])
+     * stays the default; this one-shot action auto-cancels after a few seconds so CAF
+     * resumes.
+     */
+    fun tapToFocus(
+        normalizedX: Float,
+        normalizedY: Float,
+        onResult: ((Boolean, String?) -> Unit)? = null,
+    ) {
+        val cam = camera
+        val preview = ArCameraBridge.previewView
+        if (cam == null || preview == null) {
+            onResult?.invoke(false, "no_camera")
+            return
+        }
+        val w = preview.width
+        val h = preview.height
+        if (w <= 0 || h <= 0) {
+            onResult?.invoke(false, "no_preview")
+            return
+        }
+        try {
+            val x = normalizedX.coerceIn(0f, 1f) * w
+            val y = normalizedY.coerceIn(0f, 1f) * h
+            val point = preview.meteringPointFactory.createPoint(x, y)
+            val action = FocusMeteringAction.Builder(
+                point,
+                FocusMeteringAction.FLAG_AF or
+                    FocusMeteringAction.FLAG_AE or
+                    FocusMeteringAction.FLAG_AWB,
+            )
+                .setAutoCancelDuration(3, java.util.concurrent.TimeUnit.SECONDS)
+                .build()
+            cam.cameraControl.startFocusAndMetering(action)
+            onResult?.invoke(true, null)
+        } catch (e: Exception) {
+            Log.w(PREVIEW_QUALITY_TAG, "tapToFocus failed", e)
+            onResult?.invoke(false, e.message ?: "focus_failed")
         }
     }
 
@@ -3196,16 +3261,57 @@ object ArCameraController {
             val camera2 = Camera2CameraControl.from(bound.cameraControl)
             val fpsRange = bestPreviewFpsRange(bound.cameraInfo)
             Log.i(PREVIEW_QUALITY_TAG, "preview AE target fps range=$fpsRange")
-            camera2.addCaptureRequestOptions(
-                CaptureRequestOptions.Builder()
-                    .setCaptureRequestOption(
-                        CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE,
-                        fpsRange,
-                    )
-                    .build(),
-            )
+            val opts = CaptureRequestOptions.Builder()
+                .setCaptureRequestOption(
+                    CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE,
+                    fpsRange,
+                )
+            // Back camera: keep continuous AF active camera-wide so CAF survives
+            // ImageCapture / analysis binds and face AF pulses can resume into it.
+            if (!ArCameraBridge.isFrontCamera) {
+                opts.setCaptureRequestOption(
+                    CaptureRequest.CONTROL_AF_MODE,
+                    CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE,
+                )
+            }
+            camera2.addCaptureRequestOptions(opts.build())
         } catch (t: Throwable) {
             Log.w(PREVIEW_QUALITY_TAG, "fps range apply skipped", t)
+        }
+
+        if (!ArCameraBridge.isFrontCamera) {
+            kickBackCameraAutofocus(bound)
+        }
+    }
+
+    /**
+     * One-shot center AF when the rear camera binds so the first frames are sharp
+     * (CAF alone can sit soft until the subject moves). Auto-cancels back into
+     * [CONTROL_AF_MODE_CONTINUOUS_PICTURE].
+     */
+    private fun kickBackCameraAutofocus(bound: Camera) {
+        try {
+            val preview = ArCameraBridge.previewView
+            val factory = if (preview != null && preview.width > 0 && preview.height > 0) {
+                preview.meteringPointFactory
+            } else {
+                SurfaceOrientedMeteringPointFactory(1f, 1f)
+            }
+            val point = if (preview != null && preview.width > 0 && preview.height > 0) {
+                factory.createPoint(preview.width * 0.5f, preview.height * 0.5f)
+            } else {
+                factory.createPoint(0.5f, 0.5f)
+            }
+            val action = FocusMeteringAction.Builder(
+                point,
+                FocusMeteringAction.FLAG_AF,
+            )
+                .setAutoCancelDuration(BACK_FACE_AF_AUTO_CANCEL_SEC, java.util.concurrent.TimeUnit.SECONDS)
+                .build()
+            bound.cameraControl.startFocusAndMetering(action)
+            Log.i(PREVIEW_QUALITY_TAG, "back camera autofocus kick")
+        } catch (t: Throwable) {
+            Log.w(PREVIEW_QUALITY_TAG, "back autofocus kick failed", t)
         }
     }
 
@@ -4414,6 +4520,10 @@ object ArCameraController {
                     if (FACE_METERING_ENABLED) {
                         meterExposureOnFace(snapshot, oriented.width, oriented.height, rotation)
                     }
+                    @Suppress("ConstantConditionIf")
+                    if (BACK_FACE_AF_ENABLED && !ArCameraBridge.isFrontCamera) {
+                        meterFocusOnFace(snapshot, oriented.width, oriented.height, rotation)
+                    }
                     measureSkinTone(oriented, snapshot)
                     LiveRetouchState.updateNoseLandmarks(
                         snapshot,
@@ -4663,6 +4773,11 @@ object ArCameraController {
     private var lastMeterY = -1f
     private var lastMeterMs = 0L
 
+    /** Back-camera face AF tracking (separate from AE metering state). */
+    private var lastFaceAfX = -1f
+    private var lastFaceAfY = -1f
+    private var lastFaceAfMs = 0L
+
     /**
      * Points the camera's auto-exposure and white balance at the face.
      *
@@ -4750,6 +4865,78 @@ object ArCameraController {
             cam.cameraControl.startFocusAndMetering(action)
         } catch (t: Throwable) {
             Log.w(PREVIEW_QUALITY_TAG, "face metering failed", t)
+        }
+    }
+
+    /**
+     * Back-camera only: pulse AF on the face when it moves enough. Auto-cancels
+     * so continuous picture AF resumes — sharp subject without AE wash-out.
+     */
+    private fun meterFocusOnFace(
+        snapshot: FaceLandmarkSnapshot,
+        imageWidth: Int,
+        imageHeight: Int,
+        rotationDegrees: Int,
+    ) {
+        if (ArCameraBridge.isFrontCamera) return
+        if (!boundToOes || isRecordingActive() || previewSuspended) return
+        val cam = camera ?: return
+        val analysis = imageAnalysis ?: return
+        if (imageWidth <= 0 || imageHeight <= 0) return
+
+        val landmarks = snapshot.landmarks
+        if (landmarks.isEmpty()) return
+
+        var sumX = 0f
+        var sumY = 0f
+        var count = 0
+        for (index in MediaPipeLandmarkIndices.FACE_OVAL) {
+            val p = landmarks.getOrNull(index) ?: continue
+            sumX += p.x
+            sumY += p.y
+            count++
+        }
+        if (count == 0) return
+        val ox = (sumX / count) / snapshot.imageWidth.toFloat()
+        val oy = (sumY / count) / snapshot.imageHeight.toFloat()
+        if (ox.isNaN() || oy.isNaN()) return
+
+        val rot = ((rotationDegrees % 360) + 360) % 360
+        val sx: Float
+        val sy: Float
+        when (rot) {
+            90 -> { sx = oy; sy = 1f - ox }
+            180 -> { sx = 1f - ox; sy = 1f - oy }
+            270 -> { sx = 1f - oy; sy = ox }
+            else -> { sx = ox; sy = oy }
+        }
+        if (sx !in 0f..1f || sy !in 0f..1f) return
+
+        val now = android.os.SystemClock.elapsedRealtime()
+        val first = lastFaceAfMs == 0L
+        val moved = kotlin.math.abs(sx - lastFaceAfX) > FACE_METER_MOVE_THRESHOLD ||
+            kotlin.math.abs(sy - lastFaceAfY) > FACE_METER_MOVE_THRESHOLD
+        if (!first && !moved) return
+        if (!first && now - lastFaceAfMs < BACK_FACE_AF_INTERVAL_MS) return
+        lastFaceAfX = sx
+        lastFaceAfY = sy
+        lastFaceAfMs = now
+
+        try {
+            val factory = SurfaceOrientedMeteringPointFactory(1f, 1f, analysis)
+            val point = factory.createPoint(sx, sy, BACK_FACE_AF_SIZE)
+            val action = FocusMeteringAction.Builder(
+                point,
+                FocusMeteringAction.FLAG_AF,
+            )
+                .setAutoCancelDuration(
+                    BACK_FACE_AF_AUTO_CANCEL_SEC,
+                    java.util.concurrent.TimeUnit.SECONDS,
+                )
+                .build()
+            cam.cameraControl.startFocusAndMetering(action)
+        } catch (t: Throwable) {
+            Log.w(PREVIEW_QUALITY_TAG, "back face AF failed", t)
         }
     }
 

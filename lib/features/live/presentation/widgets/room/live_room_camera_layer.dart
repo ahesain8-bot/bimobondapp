@@ -57,9 +57,7 @@ class LiveRoomCameraLayer extends StatelessWidget {
           preview = Stack(
             fit: StackFit.expand,
             children: [
-              AspectPreservingCameraPreview(
-                controller: state.controller!,
-              ),
+              AspectPreservingCameraPreview(controller: state.controller!),
               const LiveRoomEffectsOverlay(),
             ],
           );
@@ -97,11 +95,7 @@ class _PausedOverlay extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.pause_circle_filled,
-              color: Colors.white,
-              size: 64,
-            ),
+            Icon(Icons.pause_circle_filled, color: Colors.white, size: 64),
             SizedBox(height: 8),
             Text(
               'البث متوقف مؤقتًا',

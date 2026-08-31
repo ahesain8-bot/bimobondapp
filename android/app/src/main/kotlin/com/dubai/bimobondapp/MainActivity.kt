@@ -522,6 +522,43 @@ class MainActivity : FlutterActivity() {
                             }
                         }
                     }
+                    "tapToFocus" -> {
+                        val nx = (call.argument<Double>("x") ?: 0.5).toFloat()
+                        val ny = (call.argument<Double>("y") ?: 0.5).toFloat()
+                        ArCameraController.tapToFocus(nx, ny) { ok, error ->
+                            if (ok) {
+                                result.success(null)
+                            } else {
+                                result.error("focus_failed", error ?: "unknown", null)
+                            }
+                        }
+                    }
+                    "setMakeup" -> {
+                        fun level(key: String): Float =
+                            when (val raw = call.argument<Any>(key)) {
+                                is Double -> raw.toFloat()
+                                is Int -> raw.toFloat()
+                                is Long -> raw.toFloat()
+                                is Float -> raw
+                                else -> 0f
+                            }.coerceIn(0f, 1f)
+                        LiveBeautyState.applyMakeup(
+                            lipstick = level("lipstick"),
+                            blush = level("blush"),
+                            eyeliner = level("eyeliner"),
+                            eyeshadow = level("eyeshadow"),
+                            foundation = level("foundation"),
+                            contour = level("contour"),
+                            underEye = level("underEye"),
+                            brightenEye = level("brightenEye"),
+                            lipTintHex = call.argument<String>("lipTint"),
+                            blushHex = call.argument<String>("blushTint"),
+                            eyelinerHex = call.argument<String>("eyelinerTint"),
+                            eyeshadowHex = call.argument<String>("eyeshadowTint"),
+                        )
+                        ArCameraBridge.warpGlView?.requestRender()
+                        result.success(null)
+                    }
                     "playCountdownTick" -> {
                         val isFinal = call.argument<Boolean>("isFinal") ?: false
                         CountdownTonePlayer.play(isFinal)

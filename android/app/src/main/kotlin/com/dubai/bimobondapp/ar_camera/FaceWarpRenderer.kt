@@ -76,6 +76,17 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
     private var uMouthRadius = 0
     private var uRetouchTooth = 0
     private var uToothRegion = 0
+    private var uMakeupLip = 0
+    private var uMakeupBlush = 0
+    private var uMakeupLiner = 0
+    private var uMakeupShadow = 0
+    private var uMakeupLipColor = 0
+    private var uMakeupBlushColor = 0
+    private var uMakeupLinerColor = 0
+    private var uMakeupShadowColor = 0
+    private var uBlushCheekL = 0
+    private var uBlushCheekR = 0
+    private var uBlushRadius = 0
 
     private var oesProgram = 0
     private var oesTextureId = 0
@@ -113,6 +124,17 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
     private var oesUMouthRadius = 0
     private var oesURetouchTooth = 0
     private var oesUToothRegion = 0
+    private var oesUMakeupLip = 0
+    private var oesUMakeupBlush = 0
+    private var oesUMakeupLiner = 0
+    private var oesUMakeupShadow = 0
+    private var oesUMakeupLipColor = 0
+    private var oesUMakeupBlushColor = 0
+    private var oesUMakeupLinerColor = 0
+    private var oesUMakeupShadowColor = 0
+    private var oesUBlushCheekL = 0
+    private var oesUBlushCheekR = 0
+    private var oesUBlushRadius = 0
     /** Beauty strengths as applied, eased toward [LiveBeautyState] to avoid flicker. */
     private var smoothedSharpen = SHARPEN_STRENGTH
     private var smoothedAutoLift = 0f
@@ -337,6 +359,17 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         uMouthRadius = GLES20.glGetUniformLocation(program, "uMouthRadius")
         uRetouchTooth = GLES20.glGetUniformLocation(program, "uRetouchTooth")
         uToothRegion = GLES20.glGetUniformLocation(program, "uToothRegion")
+        uMakeupLip = GLES20.glGetUniformLocation(program, "uMakeupLip")
+        uMakeupBlush = GLES20.glGetUniformLocation(program, "uMakeupBlush")
+        uMakeupLiner = GLES20.glGetUniformLocation(program, "uMakeupLiner")
+        uMakeupShadow = GLES20.glGetUniformLocation(program, "uMakeupShadow")
+        uMakeupLipColor = GLES20.glGetUniformLocation(program, "uMakeupLipColor")
+        uMakeupBlushColor = GLES20.glGetUniformLocation(program, "uMakeupBlushColor")
+        uMakeupLinerColor = GLES20.glGetUniformLocation(program, "uMakeupLinerColor")
+        uMakeupShadowColor = GLES20.glGetUniformLocation(program, "uMakeupShadowColor")
+        uBlushCheekL = GLES20.glGetUniformLocation(program, "uBlushCheekL")
+        uBlushCheekR = GLES20.glGetUniformLocation(program, "uBlushCheekR")
+        uBlushRadius = GLES20.glGetUniformLocation(program, "uBlushRadius")
 
         val textures = IntArray(2)
         GLES20.glGenTextures(2, textures, 0)
@@ -395,6 +428,17 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         oesUMouthRadius = GLES20.glGetUniformLocation(oesProgram, "uMouthRadius")
         oesURetouchTooth = GLES20.glGetUniformLocation(oesProgram, "uRetouchTooth")
         oesUToothRegion = GLES20.glGetUniformLocation(oesProgram, "uToothRegion")
+        oesUMakeupLip = GLES20.glGetUniformLocation(oesProgram, "uMakeupLip")
+        oesUMakeupBlush = GLES20.glGetUniformLocation(oesProgram, "uMakeupBlush")
+        oesUMakeupLiner = GLES20.glGetUniformLocation(oesProgram, "uMakeupLiner")
+        oesUMakeupShadow = GLES20.glGetUniformLocation(oesProgram, "uMakeupShadow")
+        oesUMakeupLipColor = GLES20.glGetUniformLocation(oesProgram, "uMakeupLipColor")
+        oesUMakeupBlushColor = GLES20.glGetUniformLocation(oesProgram, "uMakeupBlushColor")
+        oesUMakeupLinerColor = GLES20.glGetUniformLocation(oesProgram, "uMakeupLinerColor")
+        oesUMakeupShadowColor = GLES20.glGetUniformLocation(oesProgram, "uMakeupShadowColor")
+        oesUBlushCheekL = GLES20.glGetUniformLocation(oesProgram, "uBlushCheekL")
+        oesUBlushCheekR = GLES20.glGetUniformLocation(oesProgram, "uBlushCheekR")
+        oesUBlushRadius = GLES20.glGetUniformLocation(oesProgram, "uBlushRadius")
         oesUSmoothStrength = GLES20.glGetUniformLocation(oesProgram, "uSmoothStrength")
         oesUWhiten = GLES20.glGetUniformLocation(oesProgram, "uWhiten")
         oesUSkinLuma = GLES20.glGetUniformLocation(oesProgram, "uSkinLuma")
@@ -523,6 +567,19 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             uMouthRadius,
             uRetouchTooth,
             uToothRegion,
+        )
+        bindMakeupUniforms(
+            uMakeupLip,
+            uMakeupBlush,
+            uMakeupLiner,
+            uMakeupShadow,
+            uMakeupLipColor,
+            uMakeupBlushColor,
+            uMakeupLinerColor,
+            uMakeupShadowColor,
+            uBlushCheekL,
+            uBlushCheekR,
+            uBlushRadius,
         )
 
         GLES20.glEnableVertexAttribArray(aPosition)
@@ -801,6 +858,19 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             oesUToothRegion,
             diagnoseLivePath = true,
         )
+        bindMakeupUniforms(
+            oesUMakeupLip,
+            oesUMakeupBlush,
+            oesUMakeupLiner,
+            oesUMakeupShadow,
+            oesUMakeupLipColor,
+            oesUMakeupBlushColor,
+            oesUMakeupLinerColor,
+            oesUMakeupShadowColor,
+            oesUBlushCheekL,
+            oesUBlushCheekR,
+            oesUBlushRadius,
+        )
         // After retouch binds — drives −47→bright remap on skin.
         if (oesUBackPersonWeight >= 0) {
             GLES20.glUniform1f(oesUBackPersonWeight, smoothedBackPersonWeight)
@@ -921,17 +991,17 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         (beauty.brighten * (1f + lowLight * 0.20f)).coerceIn(0f, 1f)
 
     /**
-     * Back camera: don't add beauty brightness on top of the sensor — let the
-     * real room light (including warm/yellow) show through.
+     * Back camera: keep most of the beauty brighten so skin opens like TikTok.
+     * Slightly under 1.0 so outdoor highlight blowout stays milder than front.
      */
     private fun rearBrightnessScale(): Float =
-        if (ArCameraBridge.isFrontCamera) 1f else 0.25f
+        if (ArCameraBridge.isFrontCamera) 1f else 0.90f
 
     /** Same idea as [rearBrightnessScale], for [smoothedAutoLift]. */
     private fun rearLiftScale(): Float {
         if (ArCameraBridge.isFrontCamera) return 1f
         val personMix = smoothstep(0.30f, 0.55f, smoothedBackPersonWeight.coerceIn(0f, 1f))
-        return mix(0.25f, 1f, personMix)
+        return mix(0.70f, 1.0f, personMix)
     }
 
     private fun adaptedSharpen(lowLight: Float): Float =
@@ -1587,6 +1657,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
     private var stillUWhiten = 0
     private var stillUBrighten = 0
     private var stillRetouchLocs: IntArray? = null
+    private var stillMakeupLocs: IntArray? = null
     private var stillTexId = 0
     private var stillFboId = 0
     private var stillFboTexId = 0
@@ -1645,6 +1716,11 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                     l[0], l[1], l[2], l[3], l[4], l[5], l[6], l[7], l[8], l[9], l[10],
                     l[11], l[12], l[13], l[14], l[15], l[16], l[17], l[18],
                     l[19], l[20], l[21], l[22], l[23],
+                )
+            }
+            stillMakeupLocs?.let { m ->
+                bindMakeupUniforms(
+                    m[0], m[1], m[2], m[3], m[4], m[5], m[6], m[7], m[8], m[9], m[10],
                 )
             }
 
@@ -1718,6 +1794,19 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             GLES20.glGetUniformLocation(p, "uMouthRadius"),
             GLES20.glGetUniformLocation(p, "uRetouchTooth"),
             GLES20.glGetUniformLocation(p, "uToothRegion"),
+        )
+        stillMakeupLocs = intArrayOf(
+            GLES20.glGetUniformLocation(p, "uMakeupLip"),
+            GLES20.glGetUniformLocation(p, "uMakeupBlush"),
+            GLES20.glGetUniformLocation(p, "uMakeupLiner"),
+            GLES20.glGetUniformLocation(p, "uMakeupShadow"),
+            GLES20.glGetUniformLocation(p, "uMakeupLipColor"),
+            GLES20.glGetUniformLocation(p, "uMakeupBlushColor"),
+            GLES20.glGetUniformLocation(p, "uMakeupLinerColor"),
+            GLES20.glGetUniformLocation(p, "uMakeupShadowColor"),
+            GLES20.glGetUniformLocation(p, "uBlushCheekL"),
+            GLES20.glGetUniformLocation(p, "uBlushCheekR"),
+            GLES20.glGetUniformLocation(p, "uBlushRadius"),
         )
         return true
     }
@@ -2255,15 +2344,24 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                 )
             }
         }
-        // Live color baseline is back-camera only. On front with Magic Off,
-        // suppress that exact baseline so selfies stay natural; Magic On and
-        // non-baseline grades (filters / manual sliders) still apply.
+        // Live color baseline applies whenever Magic/Beauty is On (both cameras).
+        // Only suppress the baseline on front when Beauty is Off so selfies stay
+        // ungraded until the user enables Beauty.
         val color = if (
             ArCameraBridge.isFrontCamera &&
             !LiveBeautyState.magicOn &&
             adj.matchesLiveBaselineColors()
         ) {
             LiveRetouchAdjustments.neutral().copy(
+                nose = adj.nose,
+                shape = adj.shape,
+                eyes = adj.eyes,
+                tooth = adj.tooth,
+                mouth = adj.mouth,
+            )
+        } else if (LiveBeautyState.magicOn && !adj.hasColor) {
+            // Beauty On with unset colors → apply natural beauty color grade.
+            LiveRetouchAdjustments.liveBaseline().copy(
                 nose = adj.nose,
                 shape = adj.shape,
                 eyes = adj.eyes,
@@ -2280,55 +2378,117 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         } else {
             smoothstep(0.30f, 0.55f, smoothedBackPersonWeight.coerceIn(0f, 1f))
         }
+        // Back camera: softer contrast/sat/WB; lighting stays full strength.
+        val backGrade = if (!isFrontCamera && LiveBeautyState.magicOn) {
+            BACK_BEAUTY_GRADE_SCALE
+        } else {
+            1f
+        }
+        val backMorph = if (!isFrontCamera && LiveBeautyState.magicOn) {
+            BACK_BEAUTY_MORPH_SCALE
+        } else {
+            1f
+        }
         
-        fun fieldMix(value: Float, default: Float, backTarget: Float, frontTarget: Float): Float {
+        fun fieldMix(
+            value: Float,
+            default: Float,
+            backTarget: Float,
+            frontTarget: Float,
+            scale: Float = backGrade,
+        ): Float {
             val untouched = kotlin.math.abs(value - default) < 0.005f
-            if (!untouched) return value
-            return if (isFrontCamera) frontTarget else mix(value, backTarget, personMixBase)
+            val raw = if (!untouched) {
+                value
+            } else if (isFrontCamera) {
+                frontTarget
+            } else {
+                mix(value, backTarget, personMixBase)
+            }
+            return raw * scale
         }
         if (locSaturation >= 0) {
             GLES20.glUniform1f(
                 locSaturation,
-                fieldMix(color.saturation, LiveRetouchAdjustments.DEFAULT_SATURATION, 0.15f, -0.10f),
+                fieldMix(
+                    color.saturation,
+                    LiveRetouchAdjustments.DEFAULT_SATURATION,
+                    LiveRetouchAdjustments.DEFAULT_SATURATION,
+                    LiveRetouchAdjustments.DEFAULT_SATURATION,
+                ),
             )
         }
         if (locBrightness >= 0) {
             GLES20.glUniform1f(
                 locBrightness,
-                fieldMix(color.brightness, LiveRetouchAdjustments.DEFAULT_BRIGHTNESS, 1.0f, 1.0f),
+                fieldMix(
+                    color.brightness,
+                    LiveRetouchAdjustments.DEFAULT_BRIGHTNESS,
+                    0.08f,
+                    LiveRetouchAdjustments.DEFAULT_BRIGHTNESS,
+                    scale = 1f,
+                ),
             )
         }
         if (locContrast >= 0) {
             GLES20.glUniform1f(
                 locContrast,
-                fieldMix(color.contrast, LiveRetouchAdjustments.DEFAULT_CONTRAST, -1.0f, 0.0f),
+                fieldMix(
+                    color.contrast,
+                    LiveRetouchAdjustments.DEFAULT_CONTRAST,
+                    LiveRetouchAdjustments.DEFAULT_CONTRAST,
+                    LiveRetouchAdjustments.DEFAULT_CONTRAST,
+                ),
             )
         }
         if (locExposure >= 0) {
             GLES20.glUniform1f(
                 locExposure,
-                fieldMix(color.exposure, LiveRetouchAdjustments.DEFAULT_EXPOSURE, 0.70f, 0.30f),
+                fieldMix(
+                    color.exposure,
+                    LiveRetouchAdjustments.DEFAULT_EXPOSURE,
+                    0.06f,
+                    LiveRetouchAdjustments.DEFAULT_EXPOSURE,
+                    scale = 1f,
+                ),
             )
         }
         if (locWhiteBalance >= 0) {
             GLES20.glUniform1f(
                 locWhiteBalance,
-                fieldMix(color.whiteBalance, LiveRetouchAdjustments.DEFAULT_WHITE_BALANCE, -0.40f, -0.50f),
+                fieldMix(
+                    color.whiteBalance,
+                    LiveRetouchAdjustments.DEFAULT_WHITE_BALANCE,
+                    LiveRetouchAdjustments.DEFAULT_WHITE_BALANCE,
+                    LiveRetouchAdjustments.DEFAULT_WHITE_BALANCE,
+                ),
             )
         }
         if (locHighlights >= 0) {
             GLES20.glUniform1f(
                 locHighlights,
-                fieldMix(color.highlights, LiveRetouchAdjustments.DEFAULT_HIGHLIGHTS, 0.40f, -0.10f),
+                fieldMix(
+                    color.highlights,
+                    LiveRetouchAdjustments.DEFAULT_HIGHLIGHTS,
+                    -0.06f,
+                    LiveRetouchAdjustments.DEFAULT_HIGHLIGHTS,
+                    scale = 1f,
+                ),
             )
         }
         if (locShadows >= 0) {
             GLES20.glUniform1f(
                 locShadows,
-                fieldMix(color.shadows, LiveRetouchAdjustments.DEFAULT_SHADOWS, 0f, 0.25f),
+                fieldMix(
+                    color.shadows,
+                    LiveRetouchAdjustments.DEFAULT_SHADOWS,
+                    -0.12f,
+                    LiveRetouchAdjustments.DEFAULT_SHADOWS,
+                    scale = 1f,
+                ),
             )
         }
-        if (locNose >= 0) GLES20.glUniform1f(locNose, color.nose)
+        if (locNose >= 0) GLES20.glUniform1f(locNose, color.nose * backMorph)
         if (locWingL >= 0) {
             GLES20.glUniform2fv(locWingL, 1, LiveRetouchState.noseWingL, 0)
         }
@@ -2336,7 +2496,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             GLES20.glUniform2fv(locWingR, 1, LiveRetouchState.noseWingR, 0)
         }
         if (locRadius >= 0) GLES20.glUniform1f(locRadius, LiveRetouchState.noseRadius)
-        if (locShape >= 0) GLES20.glUniform1f(locShape, adj.shape)
+        if (locShape >= 0) GLES20.glUniform1f(locShape, adj.shape * backMorph)
         if (locJawL >= 0) {
             GLES20.glUniform2fv(locJawL, 1, LiveRetouchState.jawWingL, 0)
         }
@@ -2344,7 +2504,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             GLES20.glUniform2fv(locJawR, 1, LiveRetouchState.jawWingR, 0)
         }
         if (locJawRadius >= 0) GLES20.glUniform1f(locJawRadius, LiveRetouchState.jawRadius)
-        if (locEyes >= 0) GLES20.glUniform1f(locEyes, eyeWarpStrength(adj.eyes))
+        if (locEyes >= 0) GLES20.glUniform1f(locEyes, eyeWarpStrength(adj.eyes) * backMorph)
         if (locEyeL >= 0) {
             GLES20.glUniform2fv(locEyeL, 1, LiveRetouchState.eyeL, 0)
         }
@@ -2352,7 +2512,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             GLES20.glUniform2fv(locEyeR, 1, LiveRetouchState.eyeR, 0)
         }
         if (locEyeRadius >= 0) GLES20.glUniform1f(locEyeRadius, LiveRetouchState.eyeRadius)
-        if (locMouth >= 0) GLES20.glUniform1f(locMouth, adj.mouth)
+        if (locMouth >= 0) GLES20.glUniform1f(locMouth, adj.mouth * backMorph)
         if (locMouthCenter >= 0) {
             GLES20.glUniform2fv(locMouthCenter, 1, LiveRetouchState.mouthCenter, 0)
         }
@@ -2361,7 +2521,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             
             GLES20.glUniform1f(
                 locTooth,
-                adj.tooth * LiveRetouchState.toothVisibility,
+                adj.tooth * LiveRetouchState.toothVisibility * backMorph,
             )
         }
         if (locToothRegion >= 0) {
@@ -2369,9 +2529,65 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         }
     }
 
+    private fun bindMakeupUniforms(
+        locLip: Int,
+        locBlush: Int,
+        locLiner: Int,
+        locShadow: Int,
+        locLipColor: Int,
+        locBlushColor: Int,
+        locLinerColor: Int,
+        locShadowColor: Int,
+        locCheekL: Int,
+        locCheekR: Int,
+        locBlushRadius: Int,
+    ) {
+        val adj = LiveBeautyState.adjustments
+        if (locLip >= 0) GLES20.glUniform1f(locLip, adj.lipStrength)
+        if (locBlush >= 0) GLES20.glUniform1f(locBlush, adj.blush)
+        if (locLiner >= 0) GLES20.glUniform1f(locLiner, adj.eyeliner)
+        if (locShadow >= 0) GLES20.glUniform1f(locShadow, adj.eyeshadow)
+        if (locLipColor >= 0) {
+            GLES20.glUniform3fv(locLipColor, 1, adj.lipTintColor, 0)
+        }
+        if (locBlushColor >= 0) {
+            GLES20.glUniform3fv(locBlushColor, 1, adj.blushColor, 0)
+        }
+        if (locLinerColor >= 0) {
+            GLES20.glUniform3fv(locLinerColor, 1, adj.eyelinerColor, 0)
+        }
+        if (locShadowColor >= 0) {
+            GLES20.glUniform3fv(locShadowColor, 1, adj.eyeshadowColor, 0)
+        }
+        if (locCheekL >= 0) {
+            GLES20.glUniform2fv(locCheekL, 1, LiveRetouchState.blushCheekL, 0)
+        }
+        if (locCheekR >= 0) {
+            GLES20.glUniform2fv(locCheekR, 1, LiveRetouchState.blushCheekR, 0)
+        }
+        if (locBlushRadius >= 0) {
+            GLES20.glUniform1f(locBlushRadius, LiveRetouchState.blushRadius)
+        }
+        // Extra TikTok makeup floats — resolve on the active program each frame.
+        val prog = IntArray(1)
+        GLES20.glGetIntegerv(GLES20.GL_CURRENT_PROGRAM, prog, 0)
+        val p = prog[0]
+        if (p != 0) {
+            fun setF(name: String, value: Float) {
+                val loc = GLES20.glGetUniformLocation(p, name)
+                if (loc >= 0) GLES20.glUniform1f(loc, value)
+            }
+            setF("uMakeupFoundation", adj.foundation)
+            setF("uMakeupContour", adj.contour)
+            setF("uMakeupUnderEye", adj.underEye)
+            setF("uMakeupBrightEye", adj.brightenEye)
+        }
+    }
+
     private fun eyeWarpStrength(slider: Float): Float {
-        val value = slider.coerceIn(-1f, 1f)
-        return 0.36f * kotlin.math.sign(value) * kotlin.math.abs(value).pow(1.35f)
+        // Stronger TikTok-like eye open range (±1.5 → ~0.62 peak).
+        val value = slider.coerceIn(-1.5f, 1.5f)
+        return 0.55f * kotlin.math.sign(value) * kotlin.math.abs(value).pow(1.25f)
     }
 
     companion object {
@@ -2394,25 +2610,29 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         private const val SKIN_MASK_GRACE_MS = 2_500L
 
         
-        private const val AUTO_LIFT_MAX = 0.35f
+        private const val AUTO_LIFT_MAX = 0.42f
 
         private const val BLEMISH_OF_SMOOTH = 0.28f
 
         private const val NOISE_FLOOR_BRIGHT = 0.008f
         private const val NOISE_FLOOR_DARK = 0.032f
 
-        /** Target skin luminance for auto-lift. */
-        const val SKIN_LUMA_TARGET = 0.58f
+        /** Target skin luminance for auto-lift (TikTok-open midtones). */
+        const val SKIN_LUMA_TARGET = 0.64f
 
         
-        private const val BACK_PERSON_SMOOTH_NORMAL = 0.35f
+        private const val BACK_PERSON_SMOOTH_NORMAL = 0.20f
 
-        
-        private const val BACK_PERSON_SMOOTH_MAX = 0.65f
+        /** Soft cap — back beauty stays light, not plastic. */
+        private const val BACK_PERSON_SMOOTH_MAX = 0.38f
 
         
         private const val FRONT_SMOOTH_NORMAL = 0.80f
         private const val FRONT_SMOOTH_MAX = 0.80f
+
+        /** Scales retouch color + morph strength on the rear camera (Beauty On). */
+        private const val BACK_BEAUTY_GRADE_SCALE = 0.55f
+        private const val BACK_BEAUTY_MORPH_SCALE = 0.50f
 
         
         private const val ENCODER_RENDER_MAX_PIXELS = 1_200_000L
@@ -2498,6 +2718,21 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             uniform float uMouthRadius;
             uniform float uRetouchTooth;
             uniform vec4 uToothRegion;
+            uniform float uMakeupLip;
+            uniform float uMakeupBlush;
+            uniform float uMakeupLiner;
+            uniform float uMakeupShadow;
+            uniform float uMakeupFoundation;
+            uniform float uMakeupContour;
+            uniform float uMakeupUnderEye;
+            uniform float uMakeupBrightEye;
+            uniform vec3 uMakeupLipColor;
+            uniform vec3 uMakeupBlushColor;
+            uniform vec3 uMakeupLinerColor;
+            uniform vec3 uMakeupShadowColor;
+            uniform vec2 uBlushCheekL;
+            uniform vec2 uBlushCheekR;
+            uniform float uBlushRadius;
         """
 
         private const val RETOUCH_FUNCTIONS = """
@@ -2685,24 +2920,25 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                 return uv;
             }
 
-            // Mouth: + thicker lips, − thinner. Soft pad, vertical-biased plump.
+            // Mouth: + fuller & more open lips, − thinner. Soft pad, vertical-biased.
             vec2 applyRetouchMouthWarp(vec2 uv) {
                 if (abs(uRetouchMouth) < 0.01 || uMouthRadius <= 0.001) return uv;
                 float halfW = uMouthRadius;
-                float halfH = halfW * 0.55;
+                float halfH = halfW * 0.62;
                 vec2 d = uv - uMouthCenter;
                 float ax = abs(d.x) / max(halfW, 0.001);
                 float ay = abs(d.y) / max(halfH, 0.001);
                 if (ax >= 1.0 || ay >= 1.0) return uv;
                 float wx = 1.0 - smoothstep(0.40, 1.0, ax);
-                float wy = 1.0 - smoothstep(0.30, 1.0, ay);
+                float wy = 1.0 - smoothstep(0.28, 1.0, ay);
                 float w = wx * wy;
                 if (w < 0.01) return uv;
                 w = w * w * (3.0 - 2.0 * w);
-                float amount = 0.14 * uRetouchMouth;
-                // Vertical plump stronger; mild width so lips don't look stretched.
-                float sx = 1.0 - amount * w * 0.40;
-                float sy = 1.0 - amount * w;
+                // Stronger TikTok-like lip plump / open (was 0.14).
+                float amount = 0.32 * uRetouchMouth;
+                // Vertical open stronger; mild width so lips stay natural.
+                float sx = 1.0 - amount * w * 0.35;
+                float sy = 1.0 - amount * w * 1.25;
                 return uMouthCenter + vec2(d.x * sx, d.y * sy);
             }
 
@@ -2729,9 +2965,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                 float blueToGreen = col.b / max(col.g, 0.001);
                 // Enamel is substantially brighter than tongue/throat, with
                 // green close to red and enough blue even on warm teeth.
-                // The old 0.10 luma floor accepted the whole mouth cavity and
-                // neutralised it into the visible grey oval.
-                float tooth = smoothstep(0.22, 0.46, luma) *
+                float tooth = smoothstep(0.20, 0.44, luma) *
                     (1.0 - smoothstep(0.38, 0.62, saturation)) *
                     smoothstep(0.62, 0.82, greenToRed) *
                     smoothstep(0.40, 0.62, blueToGreen) *
@@ -2741,9 +2975,10 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
 
                 if (uRetouchTooth > 0.0) {
                     float k = uRetouchTooth * tooth;
-                    float lifted = luma + 0.62 * k * (1.0 - luma);
+                    // Cleaner / brighter enamel (was 0.62 lift).
+                    float lifted = luma + 0.78 * k * (1.0 - luma);
                     vec3 neutral = vec3(clamp(lifted, 0.0, 1.0));
-                    return clamp(mix(col, neutral, min(1.0, 0.95 * k)), 0.0, 1.0);
+                    return clamp(mix(col, neutral, min(1.0, 0.98 * k)), 0.0, 1.0);
                 }
 
                 float k = (-uRetouchTooth) * tooth;
@@ -2751,9 +2986,182 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                 dull *= 1.0 - 0.28 * k;
                 return clamp(mix(col, dull, min(1.0, 0.90 * k)), 0.0, 1.0);
             }
+
+            // TikTok-style makeup: lipstick / foundation / shadow / contour /
+            // blush / under-eye / brighten eye (+ optional liner).
+            float makeupSoftCircle(vec2 uv, vec2 c, float r) {
+                float d = length(uv - c) / max(r, 0.001);
+                return 1.0 - smoothstep(0.45, 1.15, d);
+            }
+
+            float makeupLidPad(vec2 uv, vec2 c, float r) {
+                vec2 d = uv - (c + vec2(0.0, -r * 0.35));
+                float ax = abs(d.x) / max(r * 1.15, 0.001);
+                float ay = abs(d.y) / max(r * 0.85, 0.001);
+                return 1.0 - smoothstep(0.40, 1.05, max(ax, ay));
+            }
+
+            float makeupEyeRing(vec2 uv, vec2 c, float r) {
+                float outer = length(uv - c) / max(r * 1.20, 0.001);
+                float inner = length(uv - c) / max(r * 0.78, 0.001);
+                float o = 1.0 - smoothstep(0.75, 1.15, outer);
+                float i = 1.0 - smoothstep(0.55, 1.05, inner);
+                return clamp(o - i, 0.0, 1.0);
+            }
+
+            float makeupUnderEyePad(vec2 uv, vec2 c, float r) {
+                vec2 d = uv - (c + vec2(0.0, r * 0.72));
+                float ax = abs(d.x) / max(r * 1.25, 0.001);
+                float ay = abs(d.y) / max(r * 0.70, 0.001);
+                return 1.0 - smoothstep(0.35, 1.05, max(ax, ay));
+            }
+
+            float makeupFaceOval(vec2 uv) {
+                vec2 midEyes = (uEyeL + uEyeR) * 0.5;
+                vec2 midCheeks = (uBlushCheekL + uBlushCheekR) * 0.5;
+                vec2 faceC = mix(midEyes, uMouthCenter, 0.42);
+                faceC = mix(faceC, midCheeks, 0.35);
+                float rx = max(length(uBlushCheekR - uBlushCheekL) * 0.62, uBlushRadius * 2.2);
+                float ry = max(rx * 1.22, distance(midEyes, uMouthCenter) * 1.35);
+                vec2 d = (uv - faceC) / max(vec2(rx, ry), vec2(0.001));
+                float r2 = dot(d, d);
+                return 1.0 - smoothstep(0.55, 1.12, r2);
+            }
+
+            vec3 applyMakeupColor(vec3 col, vec2 uv) {
+                if (uMakeupLip < 0.01 && uMakeupBlush < 0.01 &&
+                    uMakeupLiner < 0.01 && uMakeupShadow < 0.01 &&
+                    uMakeupFoundation < 0.01 && uMakeupContour < 0.01 &&
+                    uMakeupUnderEye < 0.01 && uMakeupBrightEye < 0.01) {
+                    return col;
+                }
+                vec3 outC = col;
+                float skin = retouchSkinConfidence(col);
+
+                // Foundation — even tone over face oval (skin-gated).
+                if (uMakeupFoundation > 0.01 && uBlushRadius > 0.001) {
+                    float face = makeupFaceOval(uv) * mix(0.35, 1.0, skin);
+                    float k = uMakeupFoundation * face * 0.62;
+                    vec3 even = mix(outC, vec3(dot(outC, vec3(0.33))), 0.28);
+                    even = mix(even, outC * vec3(1.04, 1.01, 0.98), 0.55);
+                    outC = mix(outC, even, k);
+                }
+
+                // Contour — soft hollows under outer cheeks + mild nose sides.
+                if (uMakeupContour > 0.01 && uBlushRadius > 0.001) {
+                    vec2 mid = (uBlushCheekL + uBlushCheekR) * 0.5;
+                    vec2 hollowL = mix(uBlushCheekL, mid, -0.18) + vec2(0.0, uBlushRadius * 0.55);
+                    vec2 hollowR = mix(uBlushCheekR, mid, -0.18) + vec2(0.0, uBlushRadius * 0.55);
+                    float hollow = max(
+                        makeupSoftCircle(uv, hollowL, uBlushRadius * 1.05),
+                        makeupSoftCircle(uv, hollowR, uBlushRadius * 1.05)
+                    );
+                    float noseSide = 0.0;
+                    if (uNoseRadius > 0.001) {
+                        noseSide = max(
+                            makeupSoftCircle(uv, uNoseWingL, uNoseRadius * 0.55),
+                            makeupSoftCircle(uv, uNoseWingR, uNoseRadius * 0.55)
+                        );
+                    }
+                    float k = uMakeupContour * max(hollow, noseSide * 0.65) * 0.72;
+                    vec3 shade = outC * vec3(0.68, 0.58, 0.54);
+                    outC = mix(outC, shade, k);
+                }
+
+                if (uMakeupLip > 0.01 && uMouthRadius > 0.001) {
+                    // Tight lip ellipse only (not cheeks / chin / teeth).
+                    vec2 d = uv - uMouthCenter;
+                    float halfW = uMouthRadius * 0.88;
+                    float halfH = uMouthRadius * 0.38;
+                    float ax = abs(d.x) / max(halfW, 0.001);
+                    float ay = abs(d.y) / max(halfH, 0.001);
+                    float ell = length(vec2(ax, ay));
+                    float lipShape = 1.0 - smoothstep(0.72, 1.0, ell);
+                    lipShape = lipShape * lipShape;
+                    // Punch out the open inner mouth so teeth stay unpainted.
+                    float inner = 0.0;
+                    if (uToothRegion.z > 0.0005 && uToothRegion.w > 0.0005) {
+                        vec2 ti = (uv - uToothRegion.xy) / uToothRegion.zw;
+                        float r2 = dot(ti, ti);
+                        inner = 1.0 - smoothstep(0.50, 1.0, r2);
+                    }
+                    // Prefer real lip chroma; keep a soft floor so pale lips still tint.
+                    float hi = max(outC.r, max(outC.g, outC.b));
+                    float lo = min(outC.r, min(outC.g, outC.b));
+                    float sat = (hi - lo) / max(hi, 0.001);
+                    float redBias = outC.r - max(outC.g, outC.b);
+                    float lipCol = clamp(
+                        smoothstep(0.010, 0.08, redBias) * smoothstep(0.08, 0.28, sat),
+                        0.0,
+                        1.0
+                    );
+                    float lip = lipShape * (1.0 - inner) * mix(0.45, 1.0, lipCol);
+                    float k = uMakeupLip * lip;
+                    // Rich saturated lip color (brilliant, not flat matte).
+                    vec3 vivid = clamp(uMakeupLipColor * 1.18, 0.0, 1.0);
+                    vec3 tinted = mix(outC, vivid, 0.88);
+                    float tl = dot(tinted, vec3(0.299, 0.587, 0.114));
+                    tinted = clamp(mix(vec3(tl), tinted, 1.35) * 1.08, 0.0, 1.0);
+                    outC = mix(outC, tinted, k * 0.92);
+                    // Gloss / wet highlight along the lip center for brilliance.
+                    float glossBand = exp(-pow((ay - 0.08) / 0.28, 2.0) * 2.4) *
+                        (1.0 - smoothstep(0.35, 0.95, ax));
+                    float gloss = glossBand * lip * uMakeupLip * 0.55;
+                    outC = mix(outC, vec3(1.0), gloss * 0.42);
+                    outC = clamp(outC + vivid * gloss * 0.18, 0.0, 1.0);
+                }
+                if (uMakeupBlush > 0.01 && uBlushRadius > 0.001) {
+                    float cheek = max(
+                        makeupSoftCircle(uv, uBlushCheekL, uBlushRadius),
+                        makeupSoftCircle(uv, uBlushCheekR, uBlushRadius)
+                    );
+                    float k = uMakeupBlush * cheek * 0.72;
+                    outC = mix(outC, mix(outC, uMakeupBlushColor, 0.70), k);
+                }
+                if (uMakeupShadow > 0.01 && uEyeRadius > 0.001) {
+                    float sh = max(
+                        makeupLidPad(uv, uEyeL, uEyeRadius),
+                        makeupLidPad(uv, uEyeR, uEyeRadius)
+                    );
+                    float k = uMakeupShadow * sh * 0.68;
+                    outC = mix(outC, mix(outC, uMakeupShadowColor, 0.78), k);
+                }
+                if (uMakeupLiner > 0.01 && uEyeRadius > 0.001) {
+                    float ln = max(
+                        makeupEyeRing(uv, uEyeL, uEyeRadius),
+                        makeupEyeRing(uv, uEyeR, uEyeRadius)
+                    );
+                    float k = uMakeupLiner * ln * 0.90;
+                    outC = mix(outC, uMakeupLinerColor, k);
+                }
+
+                // Under-eye — soft conceal / brighten bags.
+                if (uMakeupUnderEye > 0.01 && uEyeRadius > 0.001) {
+                    float bag = max(
+                        makeupUnderEyePad(uv, uEyeL, uEyeRadius),
+                        makeupUnderEyePad(uv, uEyeR, uEyeRadius)
+                    );
+                    float k = uMakeupUnderEye * bag * 0.75;
+                    vec3 lift = mix(outC, vec3(1.0), 0.22);
+                    lift = mix(lift, outC * vec3(1.12, 1.08, 1.04), 0.55);
+                    outC = mix(outC, lift, k);
+                }
+
+                // Brighten eye — open / lighten the eye socket whites.
+                if (uMakeupBrightEye > 0.01 && uEyeRadius > 0.001) {
+                    float el = makeupSoftCircle(uv, uEyeL, uEyeRadius * 0.92);
+                    float er = makeupSoftCircle(uv, uEyeR, uEyeRadius * 0.92);
+                    float eye = max(el, er);
+                    float k = uMakeupBrightEye * eye * 0.58;
+                    outC = mix(outC, clamp(outC * vec3(1.18, 1.15, 1.12) + 0.05, 0.0, 1.0), k);
+                }
+                return clamp(outC, 0.0, 1.0);
+            }
         """
 
-        private const val OES_FRAGMENT_SHADER = """
+        // Not const — interpolating RETOUCH_* at compile time exceeds the JVM
+        // 65535-byte UTF-8 string constant limit (ASM "UTF8 string too large").
+        private val OES_FRAGMENT_SHADER = """
             #extension GL_OES_EGL_image_external : require
             precision highp float;
             varying vec2 vTexCoord;
@@ -2775,7 +3183,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             // so Magic still works if the mask is weak/misaligned.
             uniform float uMagicOn;
             uniform float uMagicStrength;
-            const float SKIN_LUMA_TARGET = 0.58;
+            const float SKIN_LUMA_TARGET = 0.64;
 
             // Strength of the exposure lift per unit of deficit. Applied as a
             // gamma, so it opens shadows and midtones far more than highlights.
@@ -3577,6 +3985,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                 // from the original texture, which discarded an earlier tooth
                 // pass entirely.
                 col = applyRetouchToothColor(col, d);
+                col = applyMakeupColor(col, d);
                 gl_FragColor = vec4(col, 1.0);
             }
         """
@@ -3597,7 +4006,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
          * line up. The colour-based skin gate is framing-independent and is what
          * the preview shader itself falls back to when no mask is available.
          */
-        private const val STILL_FRAGMENT_SHADER = """
+        private val STILL_FRAGMENT_SHADER = """
             precision highp float;
             varying vec2 vTexCoord;
             uniform sampler2D uTexture;
@@ -3785,12 +4194,13 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                     }
                 }
                 col = applyRetouchToothColor(col, vTexCoord);
+                col = applyMakeupColor(col, vTexCoord);
                 gl_FragColor = vec4(col, 1.0);
             }
         """
 
 
-        private const val FRAGMENT_SHADER = """
+        private val FRAGMENT_SHADER = """
             precision highp float;
             varying vec2 vTexCoord;
             uniform sampler2D uTexture;
@@ -3887,6 +4297,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                 col = applyRetouchColor(col, stillSkinW);
                 col = applyRetouchSkinBrightness(col, stillSkinW, stillSkinW, 1.0);
                 col = applyRetouchToothColor(col, tc);
+                col = applyMakeupColor(col, tc);
 
                 gl_FragColor = vec4(col, sourceColor.a);
             }

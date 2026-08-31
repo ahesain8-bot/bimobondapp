@@ -29,28 +29,16 @@ class StatusBarArea extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  _StatusButton(
-                    iconPath: AppAssets.shield,
-                    onPressed: () {},
-                  ),
+                  _StatusButton(iconPath: AppAssets.shield, onPressed: () {}),
                   const SizedBox(width: AppSpacing.sm),
-                  _StatusButton(
-                    iconPath: AppAssets.home,
-                    onPressed: () {},
-                  ),
+                  _StatusButton(iconPath: AppAssets.home, onPressed: () {}),
                   const SizedBox(width: AppSpacing.sm),
-                  _StatusButton(
-                    iconPath: AppAssets.money,
-                    onPressed: () {},
-                  ),
+                  _StatusButton(iconPath: AppAssets.money, onPressed: () {}),
                   const SizedBox(width: AppSpacing.sm),
                   const _LiveRewardsButton(),
                 ],
               ),
-              _StatusButton(
-                iconData: Icons.close,
-                onPressed: onClose,
-              ),
+              _StatusButton(iconData: Icons.close, onPressed: onClose),
             ],
           ),
         ),
@@ -60,11 +48,7 @@ class StatusBarArea extends StatelessWidget {
 }
 
 class _StatusButton extends StatelessWidget {
-  const _StatusButton({
-    required this.onPressed,
-    this.iconPath,
-    this.iconData,
-  });
+  const _StatusButton({required this.onPressed, this.iconPath, this.iconData});
 
   final String? iconPath;
   final IconData? iconData;
@@ -83,11 +67,7 @@ class _StatusButton extends StatelessWidget {
           onTap: onPressed,
           child: Center(
             child: iconData != null
-                ? Icon(
-                    iconData,
-                    color: Colors.white,
-                    size: AppSizes.closeIcon,
-                  )
+                ? Icon(iconData, color: Colors.white, size: AppSizes.closeIcon)
                 : Image.asset(
                     iconPath!,
                     width: AppSizes.circularIcon,
@@ -124,7 +104,11 @@ class _LiveRewardsButtonState extends State<_LiveRewardsButton> {
       if (res is Map && res['wallet'] is Map) {
         final coins = res['wallet']['balanceCoins'];
         if (coins != null) {
-          setState(() => _balance = (coins is num) ? coins.toInt() : int.tryParse('$coins'));
+          setState(
+            () => _balance = (coins is num)
+                ? coins.toInt()
+                : int.tryParse('$coins'),
+          );
         }
       }
     } catch (_) {

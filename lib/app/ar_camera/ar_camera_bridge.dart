@@ -47,12 +47,13 @@ class ArCameraBridge {
     final overlay = ArFilterCatalog.overlayById(filter);
 
     // Mobile Rendering Decision Tree: Does video object/videoId exist & is360 == true?
-    final is360Video = filter == 'static_360_test' || (overlay != null && overlay.is360);
+    final is360Video =
+        filter == 'static_360_test' || (overlay != null && overlay.is360);
     final String? video360Url = is360Video
         ? (overlay?.video?.url ??
-            (filter == 'static_360_test'
-                ? 'https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4'
-                : null))
+              (filter == 'static_360_test'
+                  ? 'https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4'
+                  : null))
         : null;
 
     _channel.invokeMethod<void>('setFilter', {
@@ -64,7 +65,8 @@ class ArCameraBridge {
       'overlayMediaType': overlay?.isVideo == true ? 'video' : 'lottie',
       'is360': is360Video,
       'video360Url': video360Url,
-      'projection': overlay?.video?.projection.name.toUpperCase() ?? 'EQUIRECTANGULAR',
+      'projection':
+          overlay?.video?.projection.name.toUpperCase() ?? 'EQUIRECTANGULAR',
       'stereoMode': overlay?.video?.stereoMode.name.toUpperCase() ?? 'MONO',
     });
   }
@@ -236,7 +238,7 @@ class ArCameraBridge {
     });
   }
 
-  /// Live retouch preview on native camera (Face tab sliders, -1…1 → -100…100).
+  /// Live retouch preview on native camera (Face tab sliders, -1.5…1.5 → -150…150).
   static void setRetouchAdjustments({
     double saturation = 0,
     double brightness = 0,
@@ -251,7 +253,7 @@ class ArCameraBridge {
     double tooth = 0,
     double mouth = 0,
   }) {
-    int level(double v) => (v * 100).round().clamp(-100, 100);
+    int level(double v) => (v * 100).round().clamp(-150, 150);
     _channel.invokeMethod<void>('setRetouchAdjustments', {
       'saturationLevel': level(saturation),
       'brightnessLevel': level(brightness),
@@ -321,6 +323,50 @@ class ArCameraBridge {
     });
   }
 
+  /// TikTok-style tap-to-focus. [x]/[y] are normalized (0…1) in preview space.
+  static Future<void> tapToFocus({required double x, required double y}) async {
+    await _channel.invokeMethod<void>('tapToFocus', {
+      'x': x.clamp(0.0, 1.0),
+      'y': y.clamp(0.0, 1.0),
+    });
+  }
+
+  /// TikTok-style makeup (lipstick / foundation / shadow / contour / blush /
+  /// under-eye / brighten eye), intensities 0…1.
+  static void setMakeup({
+    double lipstick = 0,
+    double blush = 0,
+    double eyeliner = 0,
+    double eyeshadow = 0,
+    double foundation = 0,
+    double contour = 0,
+    double underEye = 0,
+    double brightenEye = 0,
+    String lipTint = '#DB4761',
+    String blushTint = '#F27A85',
+    String eyelinerTint = '#0F0D14',
+    String eyeshadowTint = '#8C5170',
+  }) {
+    _channel.invokeMethod<void>('setMakeup', {
+      'lipstick': lipstick.clamp(0.0, 1.0),
+      'blush': blush.clamp(0.0, 1.0),
+      'eyeliner': eyeliner.clamp(0.0, 1.0),
+      'eyeshadow': eyeshadow.clamp(0.0, 1.0),
+      'foundation': foundation.clamp(0.0, 1.0),
+      'contour': contour.clamp(0.0, 1.0),
+      'underEye': underEye.clamp(0.0, 1.0),
+      'brightenEye': brightenEye.clamp(0.0, 1.0),
+      'lipTint': lipTint,
+      'blushTint': blushTint,
+      'eyelinerTint': eyelinerTint,
+      'eyeshadowTint': eyeshadowTint,
+    });
+  }
+
+  static void clearMakeup() {
+    setMakeup();
+  }
+
   static void playCountdownTick({bool isFinal = false}) {
     unawaited(
       _channel
@@ -344,15 +390,15 @@ class ArCameraBridge {
   }) async {
     final out = await _channel.invokeMethod<String>('applyBeauty', {
       'path': path,
-      'saturationLevel': saturationLevel.clamp(-100, 100),
-      'brightnessLevel': brightnessLevel.clamp(-100, 100),
-      'contrastLevel': contrastLevel.clamp(-100, 100),
-      'exposureLevel': exposureLevel.clamp(-100, 100),
-      'whiteBalanceLevel': whiteBalanceLevel.clamp(-100, 100),
-      'highlightsLevel': highlightsLevel.clamp(-100, 100),
-      'shadowsLevel': shadowsLevel.clamp(-100, 100),
-      'noseLevel': noseLevel.clamp(-100, 100),
-      'jawLevel': jawLevel.clamp(-100, 100),
+      'saturationLevel': saturationLevel.clamp(-150, 150),
+      'brightnessLevel': brightnessLevel.clamp(-150, 150),
+      'contrastLevel': contrastLevel.clamp(-150, 150),
+      'exposureLevel': exposureLevel.clamp(-150, 150),
+      'whiteBalanceLevel': whiteBalanceLevel.clamp(-150, 150),
+      'highlightsLevel': highlightsLevel.clamp(-150, 150),
+      'shadowsLevel': shadowsLevel.clamp(-150, 150),
+      'noseLevel': noseLevel.clamp(-150, 150),
+      'jawLevel': jawLevel.clamp(-150, 150),
       if (maxEdge != null) 'maxEdge': maxEdge,
     });
     return out;

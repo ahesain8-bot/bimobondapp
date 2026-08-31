@@ -3701,10 +3701,34 @@ class AppLocalizationsAr extends AppLocalizations {
   String get mediaEditorDiscardTitle => 'تجاهل التغييرات؟';
 
   @override
-  String get mediaPhotoEditorFace => 'الوجه';
+  String get mediaPhotoEditorFace => 'الجمال';
 
   @override
   String get mediaPhotoEditorMakeup => 'مكياج';
+
+  @override
+  String get mediaPhotoEditorLipstick => 'أحمر شفاه';
+
+  @override
+  String get mediaPhotoEditorBlush => 'بلاشر';
+
+  @override
+  String get mediaPhotoEditorEyeliner => 'كحل';
+
+  @override
+  String get mediaPhotoEditorEyeshadow => 'ظلال';
+
+  @override
+  String get mediaPhotoEditorFoundation => 'فاونديشن';
+
+  @override
+  String get mediaPhotoEditorContour => 'كنتور';
+
+  @override
+  String get mediaPhotoEditorUnderEye => 'تحت العين';
+
+  @override
+  String get mediaPhotoEditorBrightenEye => 'تفتيح العين';
 
   @override
   String get mediaPhotoEditorMagic => 'سحر';
@@ -4897,4 +4921,55 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get templateEditorPresetFilmBurn => 'حرق فيلم';
+
+  @override
+  String get templateEditorClipReplace => 'استبدال';
+
+  @override
+  String get templateEditorClipVolume => 'الصوت';
+
+  @override
+  String get templateEditorClipReduceNoise => 'تقليل الضوضاء';
+
+  @override
+  String get templateEditorClipRotate => 'تدوير';
+
+  @override
+  String get templateEditorClipBeautify => 'تجميل';
+
+  @override
+  String get templateEditorClipAdjust => 'ضبط';
+
+  @override
+  String get templateEditorClipOverlay => 'تراكب';
+
+  @override
+  String get templateEditorClipReverse => 'عكس';
+
+  @override
+  String get templateEditorClipFreeze => 'تجميد';
+
+  @override
+  String get templateEditorClipMask => 'قناع';
+
+  @override
+  String get templateEditorClipOpacity => 'الشفافية';
+
+  @override
+  String get templateEditorClipVoiceEffect => 'تأثير صوت';
+
+  @override
+  String get templateEditorClipAnimation => 'رسوم متحركة';
+
+  @override
+  String get templateEditorClipCutout => 'قص';
+
+  @override
+  String get templateEditorClipBackground => 'خلفية';
+
+  @override
+  String get templateEditorClipMagic => 'سحر';
+
+  @override
+  String get templateEditorClipComingSoon => 'قريباً';
 }

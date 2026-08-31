@@ -119,7 +119,10 @@ class LiveHudHourlyRankEvent extends LiveHudEvent {
 /// avatar row in the header of a plain live. Carries the whole ordered list;
 /// the stage takes the first three (mobile-api.md §19).
 class LiveHudTopGiftersEvent extends LiveHudEvent {
-  const LiveHudTopGiftersEvent({required this.liveId, required this.avatarUrls});
+  const LiveHudTopGiftersEvent({
+    required this.liveId,
+    required this.avatarUrls,
+  });
   final String liveId;
   final List<String> avatarUrls;
 }

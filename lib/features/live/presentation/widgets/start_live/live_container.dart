@@ -32,9 +32,7 @@ class LiveContainer extends StatelessWidget {
         ? liveBloc.state as LiveReady
         : null;
     final CameraController? runningCamera =
-        (ready != null && ready.isCameraInitialized)
-            ? ready.controller
-            : null;
+        (ready != null && ready.isCameraInitialized) ? ready.controller : null;
 
     if (runningCamera != null) {
       liveBloc.add(const LiveCameraHandedOff());

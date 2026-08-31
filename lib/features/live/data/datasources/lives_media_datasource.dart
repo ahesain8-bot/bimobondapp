@@ -171,23 +171,19 @@ class LivesMediaDataSource {
   }) {
     final generation = _battleConnectionGeneration;
     unawaited(
-      _serializeBattleOperation(
-        () async {
-          await _recoverBattleRoom(
-            room: room,
-            url: url,
-            token: token,
-            generation: generation,
-          );
-          if (
-            generation == _battleConnectionGeneration &&
+      _serializeBattleOperation(() async {
+        await _recoverBattleRoom(
+          room: room,
+          url: url,
+          token: token,
+          generation: generation,
+        );
+        if (generation == _battleConnectionGeneration &&
             _battleRoom == room &&
-            room.connectionState == ConnectionState.disconnected
-          ) {
-            onRoomEvent?.call('battle', 'failed');
-          }
-        },
-      ),
+            room.connectionState == ConnectionState.disconnected) {
+          onRoomEvent?.call('battle', 'failed');
+        }
+      }),
     );
   }
 
@@ -765,10 +761,7 @@ class LivesMediaDataSource {
     );
     room.events
       ..on<RoomDisconnectedEvent>((_) {
-        if (
-          _battleRoom != room ||
-          generation != _battleConnectionGeneration
-        ) {
+        if (_battleRoom != room || generation != _battleConnectionGeneration) {
           return;
         }
         debugPrint('🔴 [Host] opponent battle room disconnected');
@@ -776,19 +769,13 @@ class LivesMediaDataSource {
         _queueBattleRecovery(room: room, url: url, token: token);
       })
       ..on<ReconnectingEvent>((_) {
-        if (
-          _battleRoom != room ||
-          generation != _battleConnectionGeneration
-        ) {
+        if (_battleRoom != room || generation != _battleConnectionGeneration) {
           return;
         }
         onRoomEvent?.call('battle', 'reconnecting');
       })
       ..on<RoomReconnectedEvent>((_) {
-        if (
-          _battleRoom != room ||
-          generation != _battleConnectionGeneration
-        ) {
+        if (_battleRoom != room || generation != _battleConnectionGeneration) {
           return;
         }
         onRoomEvent?.call('battle', 'reconnected');
@@ -801,16 +788,13 @@ class LivesMediaDataSource {
         unawaited(_retryBattleSubscription(room, event, generation));
       })
       ..on<TrackSubscribedEvent>((event) {
-        if (
-          _battleRoom != room ||
-          generation != _battleConnectionGeneration
-        ) {
+        if (_battleRoom != room || generation != _battleConnectionGeneration) {
           return;
         }
         if (event.track is RemoteAudioTrack) {
           unawaited(_preferMediaSpeaker());
         }
-    });
+      });
     await room.connect(url, token);
     if (generation != _battleConnectionGeneration) {
       try {
@@ -844,10 +828,7 @@ class LivesMediaDataSource {
     int generation,
   ) async {
     await Future<void>.delayed(const Duration(milliseconds: 350));
-    if (
-      _battleRoom != room ||
-      generation != _battleConnectionGeneration
-    ) {
+    if (_battleRoom != room || generation != _battleConnectionGeneration) {
       return;
     }
     final participant = event.participant;
@@ -914,10 +895,7 @@ class LivesMediaDataSource {
     final generation = _battleConnectionGeneration;
     try {
       final track = _firstBattleVideoTrack(room);
-      if (
-        _battleRoom != room ||
-        generation != _battleConnectionGeneration
-      ) {
+      if (_battleRoom != room || generation != _battleConnectionGeneration) {
         return;
       }
       if (track == null) {
@@ -930,11 +908,9 @@ class LivesMediaDataSource {
             stats?.framesReceived ??
             stats?.packetsReceived ??
             stats?.bytesReceived;
-        if (
-          _battleRoom != room ||
-          generation != _battleConnectionGeneration ||
-          !_battleVideoProgress.addSample(progress)
-        ) {
+        if (_battleRoom != room ||
+            generation != _battleConnectionGeneration ||
+            !_battleVideoProgress.addSample(progress)) {
           return;
         }
       }
@@ -943,23 +919,15 @@ class LivesMediaDataSource {
         '🔴 [Host] opponent video stalled while battle room stayed up',
       );
       _stopBattleVideoWatchdog();
-      await _serializeBattleOperation(
-        () async {
-          if (
-            _battleRoom != room ||
-            generation != _battleConnectionGeneration
-          ) {
-            return;
-          }
-          await room.disconnect();
-          if (
-            _battleRoom == room &&
-            generation == _battleConnectionGeneration
-          ) {
-            _queueBattleRecovery(room: room, url: url, token: token);
-          }
-        },
-      );
+      await _serializeBattleOperation(() async {
+        if (_battleRoom != room || generation != _battleConnectionGeneration) {
+          return;
+        }
+        await room.disconnect();
+        if (_battleRoom == room && generation == _battleConnectionGeneration) {
+          _queueBattleRecovery(room: room, url: url, token: token);
+        }
+      });
     } catch (error) {
       debugPrint('[Host] opponent video health sample unavailable: $error');
     }
@@ -977,11 +945,9 @@ class LivesMediaDataSource {
     required String token,
     required int generation,
   }) async {
-    if (
-      _battleRoom != room ||
-      _battleRecoveryRoom == room ||
-      generation != _battleConnectionGeneration
-    ) {
+    if (_battleRoom != room ||
+        _battleRecoveryRoom == room ||
+        generation != _battleConnectionGeneration) {
       return;
     }
     _battleRecoveryRoom = room;
@@ -993,10 +959,7 @@ class LivesMediaDataSource {
     try {
       for (var attempt = 0; attempt < retryDelays.length; attempt++) {
         await Future<void>.delayed(retryDelays[attempt]);
-        if (
-          _battleRoom != room ||
-          generation != _battleConnectionGeneration
-        ) {
+        if (_battleRoom != room || generation != _battleConnectionGeneration) {
           return;
         }
         if (room.connectionState == ConnectionState.connected) {
@@ -1010,10 +973,8 @@ class LivesMediaDataSource {
             '${attempt + 1}/${retryDelays.length}',
           );
           await room.connect(url, token);
-          if (
-            _battleRoom != room ||
-            generation != _battleConnectionGeneration
-          ) {
+          if (_battleRoom != room ||
+              generation != _battleConnectionGeneration) {
             await room.disconnect();
             return;
           }

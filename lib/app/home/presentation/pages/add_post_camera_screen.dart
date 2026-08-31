@@ -103,68 +103,69 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   /// Auto Smooth level when Retouch Off→On (0..1). Slider can go lower/higher.
   static const double _kMagicAutoSmooth = 0.50;
 
-  /// Face color sliders (label = value×100) applied on live camera even when
-  /// Retouch/Magic is Off.
-  /// Live color defaults (empty-frame / Retouch-Off baseline).
+  /// Back-camera beauty colors — open/bright like TikTok (not crushed).
   static const Map<MediaPhotoEditorTool, double> _kLiveColorDefaults = {
-    MediaPhotoEditorTool.contrast: 1.0, // max (+100)
-    MediaPhotoEditorTool.saturation: 0.10, // +10
-    MediaPhotoEditorTool.brightness: -0.47, // -47
-    MediaPhotoEditorTool.exposure: 0.06, // +6
-    MediaPhotoEditorTool.whiteBalance: -0.08, // warmth -8
-    MediaPhotoEditorTool.highlights: 0.08, // +8
-    MediaPhotoEditorTool.shadows: 0.10, // +10
+    MediaPhotoEditorTool.contrast: 0.18, // +18
+    MediaPhotoEditorTool.saturation: -0.03, // -3
+    MediaPhotoEditorTool.brightness: 0.08, // +8 open midtones
+    MediaPhotoEditorTool.exposure: 0.06, // +6 lift overall
+    MediaPhotoEditorTool.whiteBalance: -0.02, // -2
+    MediaPhotoEditorTool.highlights: -0.06, // -6 soft highlight hold
+    MediaPhotoEditorTool.shadows: -0.12, // -12 gentle shadow lift
   };
 
-  /// Front-camera live color defaults — must match the front-camera target
-  /// values in FaceWarpRenderer.bindRetouchUniforms (the "frontTarget"
-  /// argument of each fieldMix call). Kept in sync manually: previously this
-  /// screen sent [_kLiveColorDefaults] (the back-camera baseline) or zeros for
-  /// front, so the slider thumbs showed a value (e.g. contrast +100) that
-  /// didn't match what the native override actually rendered, and flipping to
-  /// front camera reset the look instead of reapplying it. Sending the real
-  /// front values here means the slider position and the rendered look agree,
-  /// on cold open and after every camera flip.
+  /// Front-camera live color defaults — fuller beauty look for Magic On.
   static const Map<MediaPhotoEditorTool, double> _kFrontLiveColorDefaults = {
-    MediaPhotoEditorTool.contrast: 0.0, // 0
-    MediaPhotoEditorTool.saturation: -0.10, // -10
-    MediaPhotoEditorTool.brightness: 1.0, // +100
-    MediaPhotoEditorTool.exposure: 0.30, // +30
-    MediaPhotoEditorTool.whiteBalance: -0.50, // warmth -50
-    MediaPhotoEditorTool.highlights: -0.10, // -10
-    MediaPhotoEditorTool.shadows: 0.25, // +25
+    MediaPhotoEditorTool.contrast: 0.39,
+    MediaPhotoEditorTool.saturation: -0.07,
+    MediaPhotoEditorTool.brightness: -0.15,
+    MediaPhotoEditorTool.exposure: -0.53,
+    MediaPhotoEditorTool.whiteBalance: -0.04,
+    MediaPhotoEditorTool.highlights: -0.22,
+    MediaPhotoEditorTool.shadows: -0.50,
   };
-  // Beauty/morph fields only — deliberately no colour-grade keys (contrast,
-  // saturation, brightness, exposure, whiteBalance, highlights, shadows).
-  // They used to be here, hardcoded to the back-camera baseline, and every
-  // Magic-on toggle overwrote whatever colour values were actually correct
-  // for the current camera (e.g. front's brightness) with those stale
-  // numbers — reported as "slider shows -47 even though we set 100".
-  // _restoreLiveColorDefaults() already owns colour grade per-camera;
-  // touching it here duplicated that and went out of sync.
+
+  /// Full Magic/beauty preset applied when Retouch turns On (front-leaning).
+  /// Back camera uses lighter [_kLiveColorDefaults] for color fields via restore.
   static const Map<MediaPhotoEditorTool, double> _kMagicBeautyDefaults = {
-    MediaPhotoEditorTool.smooth: _kMagicAutoSmooth,
-    MediaPhotoEditorTool.shape: 0.08,
-    MediaPhotoEditorTool.nose: 0.05,
-    MediaPhotoEditorTool.eyes: 0.05,
-    MediaPhotoEditorTool.tooth: 0.12,
-    MediaPhotoEditorTool.mouth: 0.05,
+    MediaPhotoEditorTool.smooth: _kMagicAutoSmooth, // 50
+    MediaPhotoEditorTool.contrast: 0.39, // 39
+    MediaPhotoEditorTool.shape: -0.83, // -83
+    MediaPhotoEditorTool.nose: 0.05, // 5
+    MediaPhotoEditorTool.eyes: 0.05, // 5
+    MediaPhotoEditorTool.tooth: 0.42, // cleaner teeth/lips
+    MediaPhotoEditorTool.mouth: 0.28, // fuller / more open lips
+    MediaPhotoEditorTool.saturation: -0.07, // -7
+    MediaPhotoEditorTool.brightness: -0.15, // -15
+    MediaPhotoEditorTool.exposure: -0.53, // -53
+    MediaPhotoEditorTool.whiteBalance: -0.04, // -4
+    MediaPhotoEditorTool.highlights: -0.22, // -22
+    MediaPhotoEditorTool.shadows: -0.50, // -50
   };
   final Map<MediaPhotoEditorTool, double> _photoAdjustments = {
     MediaPhotoEditorTool.smooth: _kMagicAutoSmooth,
-    MediaPhotoEditorTool.contrast: 1.0,
-    MediaPhotoEditorTool.shape: 0.08,
+    MediaPhotoEditorTool.contrast: 0.39,
+    MediaPhotoEditorTool.shape: -0.83,
     MediaPhotoEditorTool.nose: 0.05,
     MediaPhotoEditorTool.eyes: 0.05,
-    MediaPhotoEditorTool.tooth: 0.12,
-    MediaPhotoEditorTool.mouth: 0.05,
-    MediaPhotoEditorTool.saturation: 0.10,
-    MediaPhotoEditorTool.brightness: -0.47,
-    MediaPhotoEditorTool.exposure: 0.06,
-    MediaPhotoEditorTool.whiteBalance: -0.08,
-    MediaPhotoEditorTool.highlights: 0.08,
-    MediaPhotoEditorTool.shadows: 0.10,
+    MediaPhotoEditorTool.tooth: 0.42,
+    MediaPhotoEditorTool.mouth: 0.28,
+    MediaPhotoEditorTool.saturation: -0.07,
+    MediaPhotoEditorTool.brightness: -0.15,
+    MediaPhotoEditorTool.exposure: -0.53,
+    MediaPhotoEditorTool.whiteBalance: -0.04,
+    MediaPhotoEditorTool.highlights: -0.22,
+    MediaPhotoEditorTool.shadows: -0.50,
+    MediaPhotoEditorTool.lipstick: 0.0,
+    MediaPhotoEditorTool.foundation: 0.0,
+    MediaPhotoEditorTool.eyeshadow: 0.0,
+    MediaPhotoEditorTool.contour: 0.0,
+    MediaPhotoEditorTool.blush: 0.0,
+    MediaPhotoEditorTool.underEye: 0.0,
+    MediaPhotoEditorTool.brightenEye: 0.0,
+    MediaPhotoEditorTool.eyeliner: 0.0,
   };
+  String _selectedLipColor = kMakeupLipColors.first;
   bool _catalogLoading = true;
   bool _filtersReady = false;
   bool _beautyEnabled = false;
@@ -242,6 +243,8 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   double _arSwipeDrag = 0;
   double _pinchBaseZoom = CameraStudioConstants.zoomSteps.first.value;
   bool _isPinchingZoom = false;
+  Offset? _focusRingCenter;
+  Timer? _focusRingTimer;
   static const double _pinchZoomSensitivity = 0.9;
 
   /// Android uses native MediaPipe/GPU AR stack from `ar_camera`.
@@ -286,6 +289,14 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       _applyArFilter(ArFilterCatalog.items[_arFilterIndex].id);
       // Retouch/Magic On by default on camera open.
       ArCameraBridge.setMagicEnabled(true, strength: _kMagicAutoSmooth);
+      ArCameraBridge.clearMakeup();
+      _preserveNeutralAdjustments = false;
+      _photoAdjustments.addAll(_kMagicBeautyDefaults);
+      if (!_isFrontCamera) {
+        _photoAdjustments.addAll(_kLiveColorDefaults);
+      } else {
+        _photoAdjustments.addAll(_kFrontLiveColorDefaults);
+      }
       _syncRetouchToNative();
     }
     unawaited(CameraStudioPermissions.ensureCameraAndMicrophone());
@@ -371,6 +382,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   void dispose() {
     _recordTimer?.cancel();
     _countdownTimer?.cancel();
+    _focusRingTimer?.cancel();
     _arFilterIntensityDebounce?.cancel();
     _smoothAdjustDebounce?.cancel();
     _retouchAdjustDebounce?.cancel();
@@ -575,6 +587,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       tooth: _photoAdj(MediaPhotoEditorTool.tooth),
       mouth: _photoAdj(MediaPhotoEditorTool.mouth),
     );
+    _syncMakeupToNative();
   }
 
   void _togglePhotoEditor() {
@@ -602,13 +615,17 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     final next = !_photoEditorMagicOn;
     _photoEditorMagicOn = next;
     if (next) {
-      if (!_preserveNeutralAdjustments) {
-        _photoAdjustments.addAll(_kMagicBeautyDefaults);
+      // Beauty On always restores the natural color grade (+ morph defaults).
+      _preserveNeutralAdjustments = false;
+      _photoAdjustments.addAll(_kMagicBeautyDefaults);
+      // Back camera keeps a lighter color grade than the front selfie look.
+      if (!_isFrontCamera) {
+        _photoAdjustments.addAll(_kLiveColorDefaults);
       }
       _photoEditorTool = MediaPhotoEditorTool.smooth;
     } else {
       _photoEditorTool = MediaPhotoEditorTool.magic;
-      // Retouch Off → restore live color baseline (keep morphs cleared via sync).
+      // Retouch Off → neutral colors on both cameras.
       _restoreLiveColorDefaults();
     }
     setState(() {});
@@ -633,6 +650,30 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   Timer? _smoothAdjustDebounce;
   Timer? _retouchAdjustDebounce;
 
+  /// Ensures natural beauty color grade is present and pushed with Magic On.
+  void _ensureNaturalBeautyColorsApplied() {
+    if (!_photoEditorMagicOn) return;
+    _preserveNeutralAdjustments = false;
+    _photoAdjustments.addAll(
+      _isFrontCamera ? _kFrontLiveColorDefaults : _kLiveColorDefaults,
+    );
+    // Keep morph defaults when still at zero (e.g. after Reset then lipstick).
+    void seedIfZero(MediaPhotoEditorTool tool, double value) {
+      if ((_photoAdjustments[tool] ?? 0).abs() < 0.01) {
+        _photoAdjustments[tool] = value;
+      }
+    }
+
+    seedIfZero(MediaPhotoEditorTool.shape, -0.83);
+    seedIfZero(MediaPhotoEditorTool.nose, 0.05);
+    seedIfZero(MediaPhotoEditorTool.eyes, 0.05);
+    seedIfZero(MediaPhotoEditorTool.tooth, 0.42);
+    seedIfZero(MediaPhotoEditorTool.mouth, 0.28);
+    if ((_photoAdjustments[MediaPhotoEditorTool.smooth] ?? 0) < 0.01) {
+      _photoAdjustments[MediaPhotoEditorTool.smooth] = _kMagicAutoSmooth;
+    }
+  }
+
   void _onPhotoEditorAdjustmentChanged(
     MediaPhotoEditorTool tool,
     double value,
@@ -644,22 +685,50 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
         // Dragging Smooth turns Retouch On if it was Off.
         if (!_photoEditorMagicOn && strength > 0.01) {
           _photoEditorMagicOn = true;
+          _ensureNaturalBeautyColorsApplied();
         }
       });
       if (_useNativeArFilters) {
-        // Slider fires on every pixel of drag movement — keep the visible
-        // thumb instant (setState above), but debounce the native push.
-        // Same fix already applied to the filter-intensity slider (see
-        // _onArFilterIntensityChanged) for the identical "spamming native
-        // calls on every tick during drag" freeze — this one was missed.
         _smoothAdjustDebounce?.cancel();
         _smoothAdjustDebounce = Timer(const Duration(milliseconds: 40), () {
           if (_photoEditorMagicOn) {
             ArCameraBridge.setMagicEnabled(true, strength: strength);
+            _syncRetouchToNative();
           } else {
             ArCameraBridge.setMagicEnabled(false);
+            _syncRetouchToNative();
           }
         });
+      }
+      return;
+    }
+    if (kMakeupTools.contains(tool)) {
+      final level = value.clamp(0.0, 1.0);
+      setState(() {
+        _photoAdjustments[tool] = level;
+        // Beauty makeup needs Retouch/Magic on — same as Smooth.
+        if (!_photoEditorMagicOn && level > 0.01) {
+          _photoEditorMagicOn = true;
+          _ensureNaturalBeautyColorsApplied();
+        }
+      });
+      if (_useNativeArFilters) {
+        if (_photoEditorMagicOn) {
+          ArCameraBridge.setMagicEnabled(
+            true,
+            strength:
+                _photoAdjustments[MediaPhotoEditorTool.smooth] ??
+                _kMagicAutoSmooth,
+          );
+          // Push natural color grade together with makeup.
+          _syncRetouchToNative();
+        }
+        _syncMakeupToNative();
+        _retouchAdjustDebounce?.cancel();
+        _retouchAdjustDebounce = Timer(
+          const Duration(milliseconds: 40),
+          _syncMakeupToNative,
+        );
       }
       return;
     }
@@ -673,6 +742,30 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
         _syncRetouchToNative,
       );
     }
+  }
+
+  void _syncMakeupToNative() {
+    if (!_useNativeArFilters) return;
+    if (!_photoEditorMagicOn) {
+      ArCameraBridge.clearMakeup();
+      return;
+    }
+    ArCameraBridge.setMakeup(
+      lipstick: _photoAdjustments[MediaPhotoEditorTool.lipstick] ?? 0,
+      blush: _photoAdjustments[MediaPhotoEditorTool.blush] ?? 0,
+      eyeliner: _photoAdjustments[MediaPhotoEditorTool.eyeliner] ?? 0,
+      eyeshadow: _photoAdjustments[MediaPhotoEditorTool.eyeshadow] ?? 0,
+      foundation: _photoAdjustments[MediaPhotoEditorTool.foundation] ?? 0,
+      contour: _photoAdjustments[MediaPhotoEditorTool.contour] ?? 0,
+      underEye: _photoAdjustments[MediaPhotoEditorTool.underEye] ?? 0,
+      brightenEye: _photoAdjustments[MediaPhotoEditorTool.brightenEye] ?? 0,
+      lipTint: _selectedLipColor,
+    );
+  }
+
+  void _onLipColorSelected(String hex) {
+    setState(() => _selectedLipColor = hex);
+    if (_useNativeArFilters) _syncMakeupToNative();
   }
 
   void _resetPhotoEditor() {
@@ -710,6 +803,8 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
         lipStrength: 0,
         intensity: 0,
       );
+      ArCameraBridge.clearMakeup();
+      _selectedLipColor = kMakeupLipColors.first;
     } else {
       unawaited(_applyBeauty(false));
     }
@@ -1988,13 +2083,58 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     );
   }
 
+  void _onPreviewTapUp(TapUpDetails details, Size previewSize) {
+    if (_isBusy || _isRecording || _isCapturingPhoto || _isPinchingZoom) return;
+    if (_showFilters ||
+        _showPhotoEditor ||
+        _layoutPickerOpen ||
+        _speedPickerOpen) {
+      return;
+    }
+    if (previewSize.width <= 0 || previewSize.height <= 0) return;
+
+    final local = details.localPosition;
+    final nx = (local.dx / previewSize.width).clamp(0.0, 1.0);
+    final ny = (local.dy / previewSize.height).clamp(0.0, 1.0);
+
+    setState(() => _focusRingCenter = local);
+    _focusRingTimer?.cancel();
+    _focusRingTimer = Timer(const Duration(milliseconds: 900), () {
+      if (!mounted) return;
+      setState(() => _focusRingCenter = null);
+    });
+
+    if (_useNativeArFilters) {
+      unawaited(ArCameraBridge.tapToFocus(x: nx, y: ny).catchError((_) {}));
+    }
+  }
+
   Widget _wrapPreviewGestures(Widget child) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onScaleStart: _onPreviewScaleStart,
-      onScaleUpdate: _onPreviewScaleUpdate,
-      onScaleEnd: _onPreviewScaleEnd,
-      child: child,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final size = Size(constraints.maxWidth, constraints.maxHeight);
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onScaleStart: _onPreviewScaleStart,
+          onScaleUpdate: _onPreviewScaleUpdate,
+          onScaleEnd: _onPreviewScaleEnd,
+          onTapUp: (details) => _onPreviewTapUp(details, size),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              child,
+              if (_focusRingCenter != null)
+                Positioned(
+                  left: _focusRingCenter!.dx - 36,
+                  top: _focusRingCenter!.dy - 36,
+                  child: IgnorePointer(
+                    child: _TapFocusRing(key: ValueKey(_focusRingCenter)),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -2659,20 +2799,12 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
                 Offset(screen.width / 2, screen.height / 2);
           }
 
-          final isPhoto = _studioMode == CameraStudioMode.photo;
+          // Same chrome as video — photo mode must not shrink preview height.
           final videoTop = CameraRatioLetterbox.tikTokTopChromeHeight(
             media.padding.top,
           );
-          final photoTop = CameraRatioLetterbox.tikTokTopChromeHeight(
-            media.padding.top,
-            photoMode: true,
-          );
           final videoBottom = CameraRatioLetterbox.tikTokBottomChromeHeight(
             media.padding.bottom,
-          );
-          final photoBottom = CameraRatioLetterbox.tikTokBottomChromeHeight(
-            media.padding.bottom,
-            photoMode: true,
           );
           final letterboxTop = CameraRatioLetterbox.topHeight(
             media.padding.top,
@@ -2687,9 +2819,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
           return TweenAnimationBuilder<double>(
             duration: CameraRatioLetterbox.chromeAnimDuration,
             curve: CameraRatioLetterbox.chromeAnimCurve,
-            tween: Tween<double>(
-              end: _ratioLetterboxed ? 0.0 : (isPhoto ? 1.0 : 0.0),
-            ),
+            tween: Tween<double>(end: _ratioLetterboxed ? 1.0 : 0.0),
             builder: (context, t, child) {
               if (layoutFrame != null) {
                 return ClipPath(
@@ -2697,12 +2827,8 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
                   child: Transform.translate(offset: layoutShift, child: child),
                 );
               }
-              final top = _ratioLetterboxed
-                  ? letterboxTop
-                  : (videoTop + (photoTop - videoTop) * t);
-              final bottom = _ratioLetterboxed
-                  ? letterboxBottom
-                  : (videoBottom + (photoBottom - videoBottom) * t);
+              final top = videoTop + (letterboxTop - videoTop) * t;
+              final bottom = videoBottom + (letterboxBottom - videoBottom) * t;
               return ClipPath(
                 clipper: TikTokPreviewClipper(top: top, bottom: bottom),
                 child: child,
@@ -2772,6 +2898,8 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
           photoEditorColorFilterIntensity: _arFilterIntensity,
           onPhotoEditorColorFilterSelected: _onMakeupFilmFilterSelected,
           onPhotoEditorColorFilterIntensityChanged: _onArFilterIntensityChanged,
+          photoEditorLipColor: _selectedLipColor,
+          onPhotoEditorLipColorSelected: _onLipColorSelected,
           timerEnabled: _timerEnabled,
           flashEnabled: _flashEnabled,
           isRecording: _isRecording,
@@ -2944,6 +3072,8 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
                 onPhotoEditorColorFilterSelected: _onMakeupFilmFilterSelected,
                 onPhotoEditorColorFilterIntensityChanged:
                     _onArFilterIntensityChanged,
+                photoEditorLipColor: _selectedLipColor,
+                onPhotoEditorLipColorSelected: _onLipColorSelected,
                 timerEnabled: _timerEnabled,
                 flashEnabled: _flashEnabled,
                 isRecording: _isRecording,
@@ -3027,5 +3157,66 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   Future<void> _onImageForAnalysis(AnalysisImage image) async {
     if (!CameraEffectsCatalog.needsFaceDetection(_selectedEffectSlug)) return;
     await _faceDetectorService.analyze(image);
+  }
+}
+
+/// Brief TikTok-style focus square shown at the tap point.
+class _TapFocusRing extends StatefulWidget {
+  const _TapFocusRing({super.key});
+
+  @override
+  State<_TapFocusRing> createState() => _TapFocusRingState();
+}
+
+class _TapFocusRingState extends State<_TapFocusRing>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 450),
+  )..forward();
+
+  late final Animation<double> _scale = Tween<double>(
+    begin: 1.25,
+    end: 1.0,
+  ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutBack));
+  late final Animation<double> _opacity = Tween<double>(begin: 1.0, end: 0.0)
+      .animate(
+        CurvedAnimation(
+          parent: _controller,
+          curve: const Interval(0.55, 1.0, curve: Curves.easeOut),
+        ),
+      );
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Opacity(
+          opacity: _opacity.value.clamp(0.0, 1.0),
+          child: Transform.scale(scale: _scale.value, child: child),
+        );
+      },
+      child: Container(
+        width: 72,
+        height: 72,
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.white, width: 1.6),
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.35),
+              blurRadius: 6,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

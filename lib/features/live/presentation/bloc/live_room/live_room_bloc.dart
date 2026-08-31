@@ -419,11 +419,9 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     if (startedOnServer && session.id.isNotEmpty) {
       _giftJoinedLiveId = session.id;
       unawaited(
-        _giftSocketService
-            .ensureJoined(liveId: session.id)
-            .catchError((error) {
-              debugPrint('Canonical gift socket join failed: $error');
-            }),
+        _giftSocketService.ensureJoined(liveId: session.id).catchError((error) {
+          debugPrint('Canonical gift socket join failed: $error');
+        }),
       );
     }
 
@@ -1127,11 +1125,9 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     if (battle?.isActive != true) {
       _battleRoomRecoveryInFlight = false;
       await _sessionRepository.disconnectBattleOpponentMedia();
-      if (
-        isClosed ||
-        _closing ||
-        operationGeneration != _battleOperationGeneration
-      ) {
+      if (isClosed ||
+          _closing ||
+          operationGeneration != _battleOperationGeneration) {
         return;
       }
       final ended = _readyOrNull;
@@ -1150,11 +1146,9 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     try {
       await _sessionRepository.connectBattleOpponentMedia(opponentId);
       _battleRoomRecoveryInFlight = false;
-      if (
-        isClosed ||
-        _closing ||
-        operationGeneration != _battleOperationGeneration
-      ) {
+      if (isClosed ||
+          _closing ||
+          operationGeneration != _battleOperationGeneration) {
         return;
       }
       final ready = _readyOrNull;
@@ -1170,11 +1164,9 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         emit(ready.copyWith(battleMediaRoom: room is Room ? room : null));
       }
     } catch (e) {
-      if (
-        isClosed ||
-        _closing ||
-        operationGeneration != _battleOperationGeneration
-      ) {
+      if (isClosed ||
+          _closing ||
+          operationGeneration != _battleOperationGeneration) {
         return;
       }
       final ready = _readyOrNull;
