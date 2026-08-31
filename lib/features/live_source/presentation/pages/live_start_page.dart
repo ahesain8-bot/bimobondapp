@@ -110,6 +110,20 @@ class _LiveStartPageState extends State<LiveStartPage>
     });
   }
 
+  bool get _hasOpenPanel =>
+      _isBeautifyPanelVisible ||
+      _isEffectsPanelVisible ||
+      _isSettingsPanelVisible;
+
+  void _dismissPanels() {
+    if (!_hasOpenPanel) return;
+    setState(() {
+      _isBeautifyPanelVisible = false;
+      _isEffectsPanelVisible = false;
+      _isSettingsPanelVisible = false;
+    });
+  }
+
   void _closeToMainPage() {
     Navigator.of(context).pop();
   }
@@ -138,10 +152,15 @@ class _LiveStartPageState extends State<LiveStartPage>
   Widget build(BuildContext context) {
     return BlocProvider.value(
       value: _liveBloc,
-      child: Scaffold(
-        body: Stack(
-          fit: StackFit.expand,
-          children: [
+      child: PopScope(
+        canPop: !_hasOpenPanel,
+        onPopInvokedWithResult: (didPop, result) {
+          if (!didPop) _dismissPanels();
+        },
+        child: Scaffold(
+          body: Stack(
+            fit: StackFit.expand,
+            children: [
             const CameraPreviewLayer(),
             const VignetteLayer(),
             StatusBarArea(onClose: _closeToMainPage),
@@ -170,6 +189,14 @@ class _LiveStartPageState extends State<LiveStartPage>
                 ],
               ),
             ),
+            if (_isBeautifyPanelVisible || _isEffectsPanelVisible)
+              Positioned.fill(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onTap: _dismissPanels,
+                  child: const SizedBox.expand(),
+                ),
+              ),
             if (_isBeautifyPanelVisible)
               const Positioned(
                 left: 0,
@@ -178,17 +205,18 @@ class _LiveStartPageState extends State<LiveStartPage>
                 child: BeautifyPanel(),
               ),
             if (_isEffectsPanelVisible)
-              const Positioned(
+              Positioned(
                 left: 0,
                 right: 0,
                 bottom: 0,
-                child: EffectsPanel(),
+                child: EffectsPanel(onClose: _dismissPanels),
               ),
             if (_isSettingsPanelVisible)
               Positioned.fill(
-                child: SettingsPanel(onDismiss: _toggleSettingsPanel),
+                child: SettingsPanel(onDismiss: _dismissPanels),
               ),
-          ],
+            ],
+          ),
         ),
       ),
     );
