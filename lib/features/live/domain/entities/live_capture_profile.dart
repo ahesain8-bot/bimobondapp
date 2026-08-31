@@ -66,11 +66,22 @@ class LiveCaptureProfile {
 
   /// Stable default for live publishing.
   ///
-  /// 1080p stays available in the quality picker, but it must be an explicit
-  /// choice. A number of Android Camera2 implementations report 1080p as
-  /// supported and then fail asynchronously while configuring the capture
-  /// session, leaving a valid-looking LiveKit track that produces no frames.
-  static const LiveCaptureProfile preferred = hd;
+  /// The host already *captures* at 1080x1920 — that is what CameraX binds the
+  /// preview to (`PREVIEW_TARGET_WIDTH/HEIGHT` in `ArCameraController`) and
+  /// what the AR renderer draws. Publishing at 720p threw that away by
+  /// downscaling a 1080p source, which is what made the broadcast look soft
+  /// next to TikTok.
+  ///
+  /// The old default was 720p because some Android Camera2 implementations
+  /// report 1080p as supported and then fail asynchronously while configuring
+  /// the capture session, leaving a valid-looking track that produces no
+  /// frames. That risk is real but it is now covered rather than avoided:
+  /// `_waitForOutboundVideo` refuses a profile that yields no frames, and the
+  /// publish walks [ladder] down to 720p and 480p — on the AR path too, where
+  /// resizing the renderer's output surface costs nothing like reopening a
+  /// lens does. A handset that cannot hold 1080p still goes live, one tier
+  /// lower, instead of the whole ladder starting one tier low for everyone.
+  static const LiveCaptureProfile preferred = fullHd;
 
   /// The profiles at or below [this], highest first.
   ///

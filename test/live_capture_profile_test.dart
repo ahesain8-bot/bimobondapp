@@ -56,10 +56,10 @@ void main() {
       LiveVideoQualityPreference.instance.select(LiveCaptureProfile.preferred);
     });
 
-    test('defaults to the stable 720p profile', () {
+    test('defaults to 1080p, matching what the host actually captures', () {
       expect(
         LiveVideoQualityPreference.instance.profile,
-        LiveCaptureProfile.hd,
+        LiveCaptureProfile.fullHd,
       );
     });
 
@@ -69,12 +69,14 @@ void main() {
       void listener() => notifications++;
 
       preference.addListener(listener);
-      preference.select(LiveCaptureProfile.fullHd);
-      preference.select(LiveCaptureProfile.fullHd);
+      // Must differ from the default, or the first select is a no-op and
+      // there is nothing to notify about.
+      preference.select(LiveCaptureProfile.hd);
+      preference.select(LiveCaptureProfile.hd);
       preference.removeListener(listener);
 
       expect(notifications, 1);
-      expect(preference.profile, LiveCaptureProfile.fullHd);
+      expect(preference.profile, LiveCaptureProfile.hd);
     });
   });
 }

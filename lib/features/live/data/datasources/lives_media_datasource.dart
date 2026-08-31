@@ -521,11 +521,14 @@ class LivesMediaDataSource {
         requestedProfile,
         ...fallbacks.skip(1),
       ];
-      // The native AR renderer is one stable source, not a Camera2 mode that
-      // should be closed and reopened at progressively lower presets.
-      final attemptCount = useExistingArCamera
-          ? 1
-          : maxAttempts.clamp(1, ladder.length);
+      // The AR renderer is one stable source, so a retry here is not the
+      // Camera2 "reopen the lens at a lower preset" dance — the lens stays
+      // open and only the size of the output surface it draws into changes.
+      // That is cheap, and it is the difference between a handset that cannot
+      // sustain 1080p going live at 720p and it not going live at all. The
+      // failure path below already detaches the track and waits before the
+      // next attempt, so the walk is safe on this path too.
+      final attemptCount = maxAttempts.clamp(1, ladder.length);
       final local = room.localParticipant;
       if (local == null) {
         throw StateError('LiveKit local participant unavailable');
