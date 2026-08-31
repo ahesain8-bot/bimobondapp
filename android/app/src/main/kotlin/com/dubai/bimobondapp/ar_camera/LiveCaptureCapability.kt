@@ -78,6 +78,37 @@ object LiveCaptureCapability {
     }
 
     /**
+     * Cached SoC-tier answer, so the preview bind does not re-probe MediaCodec.
+     *
+     * Separate from [allowsFullHd] on purpose: that one also weighs free
+     * memory, which moves minute to minute, and a preview resolution that
+     * flapped with memory pressure would rebind the camera mid-broadcast.
+     */
+    private var sustainsFullHdCache: Boolean? = null
+
+    /**
+     * Preview size the AR pipeline should bind, in portrait orientation.
+     *
+     * Every frame goes through the face-warp shader before it reaches either
+     * the screen or WebRTC, so this is the single biggest lever on how smooth
+     * a broadcast feels: 1080x1920 is 2.25x the fragment work of 720x1280.
+     * On an Adreno 610 that difference is the gap between a broadcast that
+     * moves and one measured at a 101ms median frame — and since the publish
+     * ladder starts at 720p on exactly those devices, the extra pixels were
+     * being rendered and then discarded by the scaler.
+     *
+     * Devices that pass the tier check keep 1080p, where the ceiling on
+     * recording and photo quality still matters.
+     */
+    fun previewTargetPortrait(): Pair<Int, Int> {
+        val sustains = sustainsFullHdCache ?: encoderSustains1080p30().also {
+            sustainsFullHdCache = it
+            Log.i(TAG, "preview tier probe: sustainsFullHd=$it")
+        }
+        return if (sustains) 1080 to 1920 else 720 to 1280
+    }
+
+    /**
      * Whether the host may *start* at 1080p.
      *
      * A false answer is not a failure: the publish ladder starts at 720p and
@@ -88,7 +119,9 @@ object LiveCaptureCapability {
     fun allowsFullHd(context: Context): Boolean {
         val lowRam = isLowRam(context)
         val free = freeBytes(context)
-        val encoder = encoderSustains1080p30()
+        val encoder = sustainsFullHdCache ?: encoderSustains1080p30().also {
+            sustainsFullHdCache = it
+        }
         val allowed = !lowRam && free >= REQUIRED_FREE_BYTES && encoder
         Log.i(
             TAG,

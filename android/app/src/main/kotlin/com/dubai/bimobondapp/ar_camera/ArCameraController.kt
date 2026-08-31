@@ -98,8 +98,11 @@ object ArCameraController {
      * Note this is passed to CameraX in sensor/landscape order (see
      * [buildLivePreview]) — width/height here are the portrait orientation.
      */
-    private const val PREVIEW_TARGET_WIDTH = 1080
-    private const val PREVIEW_TARGET_HEIGHT = 1920
+    // The size itself now comes from LiveCaptureCapability.previewTargetPortrait():
+    // 1080x1920 where the SoC sustains it, 720x1280 where it does not. The
+    // multi-stream ceiling described above still holds for the capable tier —
+    // asking above 1080p with the skin-mask stream bound only buys a resolution
+    // search CameraX discards.
 
     /** Landmarks / distortion only — keep low so Preview stream stays sharp. */
     private const val ANALYSIS_WIDTH = 640
@@ -203,7 +206,7 @@ object ArCameraController {
      * past the camera's real bound size does not add detail, it just upscales
      * (confirmed twice: 2560 and 3072 both got silently downgraded to 1920x1080
      * by the camera itself once a second stream was bound — see
-     * PREVIEW_TARGET_WIDTH/HEIGHT's comment — so the encoder recorded an
+     * the preview-target comment above — so the encoder recorded an
      * upscale from a 1080p source instead of genuine extra detail, costing GPU
      * time and file size for nothing). 1920 matches this device's real
      * multi-stream ceiling.
@@ -3036,7 +3039,12 @@ object ArCameraController {
                     // Swapping to landscape order (1920x1080) matches CameraX's
                     // expected convention; AspectRatioStrategy above still locks
                     // it to 16:9, and setTargetRotation handles final rotation.
-                    Size(PREVIEW_TARGET_HEIGHT, PREVIEW_TARGET_WIDTH),
+                    // Tier-aware: 1080p where the SoC can carry it, 720p where
+                    // it cannot. Every frame crosses the face-warp shader, so
+                    // this is the largest single lever on live smoothness.
+                    LiveCaptureCapability.previewTargetPortrait().let { (w, h) ->
+                        Size(h, w)
+                    },
                     ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER,
                 ),
             )
