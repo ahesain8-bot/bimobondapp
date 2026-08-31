@@ -3,6 +3,9 @@ import 'dart:math' as math;
 
 import 'package:bimobondapp/app/ar_camera/ar_camera_live_track.dart';
 import 'package:flutter/foundation.dart';
+// Only the binding and lifecycle enum — a bare widgets import would
+// collide with livekit_client over `ConnectionState`.
+import 'package:flutter/widgets.dart' show WidgetsBinding, AppLifecycleState;
 import 'package:livekit_client/livekit_client.dart';
 
 import '../../../../core/services/live_audio_session.dart';
@@ -17,6 +20,21 @@ import '../../domain/entities/live_capture_profile.dart';
 /// Never mints JWTs or stores `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET`.
 /// How often the room health watchdogs sample media counters.
 const Duration _kMediaHealthTick = Duration(seconds: 2);
+
+/// True while the app is not in the foreground.
+///
+/// Android suspends the camera for a backgrounded app, so `framesSent` stops
+/// advancing the moment the host switches away or the screen locks. That is
+/// not a stalled broadcast, but it is indistinguishable from one at the stats
+/// layer — and at a 2s tick with a 3-sample limit the watchdogs were tearing
+/// a healthy live down about six seconds after it went to the background,
+/// reported as `outbound_video_stalled`. A null state means the binding has
+/// not seen a lifecycle event yet; treat that as foreground rather than
+/// suppressing a watchdog that may be the only thing watching.
+bool get _appBackgrounded {
+  final state = WidgetsBinding.instance.lifecycleState;
+  return state != null && state != AppLifecycleState.resumed;
+}
 
 class LivesMediaDataSource {
   Room? _room;
@@ -278,6 +296,13 @@ class LivesMediaDataSource {
       // Without this the watchdog read that as a stall and forced a full
       // reconnect, which republished the camera the host had just closed.
       if (track.muted || room.localParticipant?.isCameraEnabled() == false) {
+        _videoProgress.reset();
+        return;
+      }
+      // Backgrounded: the camera is stopped by the platform, not stalled.
+      // Reset so the host does not come back to a broadcast this watchdog
+      // ended while they were reading a notification.
+      if (_appBackgrounded) {
         _videoProgress.reset();
         return;
       }
@@ -934,6 +959,10 @@ class LivesMediaDataSource {
     _battleVideoProgress.reset();
     _battleVideoHealthTimer = Timer.periodic(_kMediaHealthTick, (_) {
       if (_battleVideoHealthCheckInFlight || _battleRoom != room) return;
+      if (_appBackgrounded) {
+        _battleVideoProgress.reset();
+        return;
+      }
       _battleVideoHealthCheckInFlight = true;
       unawaited(
         _sampleBattleVideo(room: room, url: url, token: token).whenComplete(() {

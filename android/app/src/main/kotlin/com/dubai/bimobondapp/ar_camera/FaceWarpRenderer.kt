@@ -634,7 +634,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             smoothedSmooth = easeToward(smoothedSmooth, targetSmooth)
         }
         beautyDebugCounter++
-        if (beautyDebugCounter % 12 == 0) {
+        if (VERBOSE_FRAME_LOGS && beautyDebugCounter % 12 == 0) {
             Log.i(
                 "FaceWarpBeautyDbg",
                 "front=$isFrontSmooth magic=$magic magicStrength=$magicStrength " +
@@ -958,6 +958,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
 
     /** Throttled log while moving the phone — filter logcat: FaceWarpExposure */
     private fun logExposureDebug(autoLiftTarget: Float, lowLight: Float) {
+        if (!VERBOSE_FRAME_LOGS) return
         exposureDebugCounter++
         if (exposureDebugCounter % 12 != 0) return
         val backlight = (measuredSceneLuma - measuredSkinLuma).coerceIn(-1f, 1f)
@@ -1050,7 +1051,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         // strength would visibly flicker.
         measuredNoiseFloor =
             measuredNoiseFloor + (estimate - measuredNoiseFloor) * 0.08f
-        Log.d(TAG, "measuredNoiseFloor=$measuredNoiseFloor")
+        if (VERBOSE_FRAME_LOGS) Log.d(TAG, "measuredNoiseFloor=$measuredNoiseFloor")
     }
 
     /** Same curve as GLSL smoothstep, for the strength maths above. */
@@ -2463,6 +2464,17 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
 
         private const val TAG = "FaceWarpRenderer"
         private const val FACE_PIPELINE_TAG = "ArFacePipeline"
+
+        /**
+         * Diagnostic logging for the per-frame beauty/exposure/noise values.
+         *
+         * These run on the GL thread, and the exposure and beauty lines each
+         * build their message from six or more `String.format` calls. That is
+         * real work inside the frame, repeated for the whole broadcast, for
+         * output nobody reads outside a tuning session. Off unless someone
+         * is actually tuning.
+         */
+        private const val VERBOSE_FRAME_LOGS = false
 
         /** Consecutive camera-texture update failures before giving up on GL. */
         private const val MAX_OES_UPDATE_FAILURES = 30
