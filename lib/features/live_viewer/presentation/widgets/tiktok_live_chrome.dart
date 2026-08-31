@@ -574,14 +574,10 @@ class PkBattleBar extends StatelessWidget {
   final int scoreLeft;
   final int scoreRight;
 
-  /// Marker that rides the seam between the two sides.
-  final String seamMarker;
-
   const PkBattleBar({
     super.key,
     required this.scoreLeft,
     required this.scoreRight,
-    this.seamMarker = '😘',
   });
 
   static const double _height = 18;
@@ -592,97 +588,34 @@ class PkBattleBar extends StatelessWidget {
     // Each side keeps a sliver even in a blowout so both scores stay readable.
     final ratio = (scoreLeft / total).clamp(0.08, 0.92);
 
-    // `seamX` is measured from the left edge, so the two sides must be laid
-    // out from the left edge too. Under Arabic the Row mirrored while the
-    // seam glow did not, and the bar came apart.
-    return Directionality(
-      textDirection: TextDirection.ltr,
-      child: SizedBox(
-        height: _height,
-        // A score arriving as a socket event should slide the seam, not snap it.
-        child: TweenAnimationBuilder<double>(
-          tween: Tween<double>(end: ratio),
-          duration: const Duration(milliseconds: 420),
-          curve: Curves.easeOutCubic,
-          builder: (context, ratio, _) {
-            return LayoutBuilder(
-              builder: (context, constraints) {
-                final seamX = constraints.maxWidth * ratio;
-                return Stack(
-                  clipBehavior: Clip.none,
+    return SizedBox(
+      width: double.infinity,
+      height: _height,
+      child: TweenAnimationBuilder<double>(
+        tween: Tween<double>(end: ratio),
+        duration: const Duration(milliseconds: 420),
+        curve: Curves.easeOutCubic,
+        builder: (context, value, _) {
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              CustomPaint(painter: _PkSplitPainter(ratio: value)),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 9),
+                child: Row(
+                  textDirection: TextDirection.ltr,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          flex: (ratio * 1000).round(),
-                          child: _Side(
-                            score: scoreLeft,
-                            alignment: Alignment.centerLeft,
-                            padding: const EdgeInsets.only(left: 10),
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFFFF2D55), Color(0xFFFF5C8A)],
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          flex: ((1 - ratio) * 1000).round(),
-                          child: _Side(
-                            score: scoreRight,
-                            alignment: Alignment.centerRight,
-                            padding: const EdgeInsets.only(right: 10),
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFF20E0F0), Color(0xFF25F4EE)],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    // Soft joint glow, the way the two colours meet on TikTok.
-                    Positioned(
-                      left: seamX - 9,
-                      top: 0,
-                      bottom: 0,
-                      width: 18,
-                      child: const DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              Color(0x00FFFFFF),
-                              Color(0x66FFFFFF),
-                              Color(0x00FFFFFF),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      left: seamX - 10,
-                      top: -4,
-                      width: 20,
-                      child: Text(
-                        seamMarker,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(fontSize: 16),
-                      ),
-                    ),
+                    Text(_fmt(scoreLeft), style: _scoreStyle),
+                    Text(_fmt(scoreRight), style: _scoreStyle),
                   ],
-                );
-              },
-            );
-          },
-        ),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
-  }
-
-  static String _fmt(int value) {
-    if (value >= 1000000) {
-      return '${(value / 1000000).toStringAsFixed(1)}M';
-    }
-    if (value >= 1000) {
-      return '${(value / 1000).toStringAsFixed(1)}K';
-    }
-    return '$value';
   }
 
   static const TextStyle _scoreStyle = TextStyle(
@@ -694,40 +627,77 @@ class PkBattleBar extends StatelessWidget {
       Shadow(color: Color(0x73000000), blurRadius: 2, offset: Offset(0, 0.5)),
     ],
   );
-}
 
-class _Side extends StatelessWidget {
-  final int score;
-  final Alignment alignment;
-  final EdgeInsets padding;
-  final Gradient gradient;
-
-  const _Side({
-    required this.score,
-    required this.alignment,
-    required this.padding,
-    required this.gradient,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      alignment: alignment,
-      padding: padding,
-      decoration: BoxDecoration(gradient: gradient),
-      child: Text(
-        PkBattleBar._fmt(score),
-        maxLines: 1,
-        overflow: TextOverflow.clip,
-        style: PkBattleBar._scoreStyle,
-      ),
-    );
+  static String _fmt(int n) {
+    if (n >= 1000) {
+      return n.toString().replaceAllMapped(
+        RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
+        (m) => '${m[1]},',
+      );
+    }
+    return '$n';
   }
 }
 
-/// TikTok LIVE viewer bottom bar (LTR):
-/// TikTok LIVE viewer bottom bar (LTR):
-/// [Write…] [emoji] [multi-guest] [rose] [gift] [share]
+class _PkSplitPainter extends CustomPainter {
+  const _PkSplitPainter({required this.ratio});
+
+  final double ratio;
+
+  static const List<Color> _left = [Color(0xFFFF2D55), Color(0xFFFF6E9C)];
+  static const List<Color> _right = [Color(0xFF2BE7F2), Color(0xFF11B4D2)];
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final bounds = Offset.zero & size;
+    final split = size.width * ratio;
+    final slant = size.height * 0.6;
+
+    canvas.save();
+    canvas.clipRect(bounds);
+
+    canvas.drawRect(
+      bounds,
+      Paint()
+        ..shader = const LinearGradient(
+          colors: _right,
+        ).createShader(bounds),
+    );
+
+    final leftEdge = Path()
+      ..moveTo(0, 0)
+      ..lineTo(split + slant / 2, 0)
+      ..lineTo(split - slant / 2, size.height)
+      ..lineTo(0, size.height)
+      ..close();
+    canvas.drawPath(
+      leftEdge,
+      Paint()
+        ..shader = const LinearGradient(colors: _left).createShader(bounds),
+    );
+
+    canvas.drawLine(
+      Offset(split + slant / 2, 0),
+      Offset(split - slant / 2, size.height),
+      Paint()
+        ..color = Colors.white
+        ..strokeWidth = 2
+        ..style = PaintingStyle.stroke,
+    );
+
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(_PkSplitPainter oldDelegate) =>
+      oldDelegate.ratio != ratio;
+}
+
+/// TikTok LIVE viewer bottom bar.
+///
+/// The composer owns the emoji affordance. Keeping it in the input gives the
+/// text field the same width as the reference while the supported actions stay
+/// in their fixed physical order: share, gift, rose, guest.
 class TikTokLiveBottomBar extends StatelessWidget {
   final VoidCallback onTypeTap;
   final VoidCallback onGiftTap;

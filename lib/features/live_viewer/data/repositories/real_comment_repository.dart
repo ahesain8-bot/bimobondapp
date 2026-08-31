@@ -258,7 +258,11 @@ class RealCommentRepository implements CommentRepository {
     final user = c['user'];
     final userMap = user is Map ? Map<String, dynamic>.from(user) : null;
     final userId = userMap?['id']?.toString() ?? c['userId']?.toString() ?? '';
-    final username = userMap?['username']?.toString() ?? c['username']?.toString() ?? 'User';
+    final fullName = userMap?['fullName']?.toString();
+    final handle = userMap?['username']?.toString() ?? c['username']?.toString();
+    final username = (fullName != null && fullName.trim().isNotEmpty)
+        ? fullName.trim()
+        : (handle ?? 'User');
     final avatar = userMap?['avatarUrl']?.toString() ?? userMap?['profilePicture']?.toString() ?? c['avatarUrl']?.toString() ?? c['userAvatar']?.toString();
     final content = c['content']?.toString() ?? '';
     if (content.isEmpty) return null;
