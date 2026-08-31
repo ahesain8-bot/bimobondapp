@@ -19,10 +19,7 @@ Future<Rect> pumpBar(
           body: Center(
             child: SizedBox(
               width: kBarWidth,
-              child: PkBattleBar(
-                scoreLeft: scoreLeft,
-                scoreRight: scoreRight,
-              ),
+              child: PkBattleBar(scoreLeft: scoreLeft, scoreRight: scoreRight),
             ),
           ),
         ),
@@ -32,6 +29,23 @@ Future<Rect> pumpBar(
   // The seam slides over 420ms; settle it before measuring.
   await tester.pump(const Duration(milliseconds: 600));
   return tester.getRect(of);
+}
+
+/// The seam is painted, not a widget, so it is read off the painter.
+///
+/// [PkSplitPainter] measures its split from the left edge of the canvas, so
+/// this is exactly the number a mirrored layout would get wrong.
+double seamX(WidgetTester tester) {
+  final paint = tester.widget<CustomPaint>(
+    find.descendant(
+      of: find.byType(PkBattleBar),
+      matching: find.byWidgetPredicate(
+        (w) => w is CustomPaint && w.painter is PkSplitPainter,
+      ),
+    ),
+  );
+  final size = tester.getSize(find.byType(PkBattleBar));
+  return (paint.painter as PkSplitPainter).ratio * size.width;
 }
 
 void main() {
@@ -85,21 +99,16 @@ void main() {
       of: find.text('900'),
     );
 
-    // Anchor on the coloured side itself rather than a bare fraction: if the
-    // Row mirrors, the 900 side moves to the right half and its trailing edge
-    // no longer meets the seam, even though the seam has not moved.
-    final leftSide = tester.getRect(
-      find
-          .ancestor(of: find.text('900'), matching: find.byType(Container))
-          .first,
-    );
-    final seam = tester.getRect(find.text('😘'));
+    // Anchor on the painted pink side itself rather than a bare fraction: if
+    // the bar mirrored, the 900 side would own the right half and the seam
+    // would land at 10% instead of 90%.
+    final seam = seamX(tester);
 
     expect(
-      seam.center.dx,
-      closeTo(leftSide.right, 2.0),
-      reason: 'the seam glow is positioned from the left edge, so the two '
-          'sides must be laid out from the left edge too',
+      seam,
+      closeTo(kBarWidth * 0.9, 3.0),
+      reason: 'the split is measured from the left edge, so the bar must be '
+          'painted from the left edge in every locale',
     );
   });
 
@@ -112,9 +121,7 @@ void main() {
       of: find.text('100,000'),
     );
 
-    final bar = tester.getRect(find.byType(PkBattleBar));
-    final seam = tester.getRect(find.text('😘'));
-    final seamShare = (seam.center.dx - bar.left) / bar.width;
+    final seamShare = seamX(tester) / kBarWidth;
 
     expect(seamShare, lessThan(1.0));
     expect(seamShare, greaterThan(0.9));

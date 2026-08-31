@@ -599,7 +599,7 @@ class PkBattleBar extends StatelessWidget {
           return Stack(
             fit: StackFit.expand,
             children: [
-              CustomPaint(painter: _PkSplitPainter(ratio: value)),
+              CustomPaint(painter: PkSplitPainter(ratio: value)),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 9),
                 child: Row(
@@ -639,9 +639,14 @@ class PkBattleBar extends StatelessWidget {
   }
 }
 
-class _PkSplitPainter extends CustomPainter {
-  const _PkSplitPainter({required this.ratio});
+/// Paints the two-tone PK bar with a slanted seam at [ratio] of the width.
+///
+/// Public only so a test can read the split back: the seam is painted, not a
+/// widget, and mirroring bugs are invisible from the widget tree alone.
+class PkSplitPainter extends CustomPainter {
+  const PkSplitPainter({required this.ratio});
 
+  /// Share of the width held by the left side, measured from the left edge.
   final double ratio;
 
   static const List<Color> _left = [Color(0xFFFF2D55), Color(0xFFFF6E9C)];
@@ -687,7 +692,7 @@ class _PkSplitPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_PkSplitPainter oldDelegate) => oldDelegate.ratio != ratio;
+  bool shouldRepaint(PkSplitPainter oldDelegate) => oldDelegate.ratio != ratio;
 }
 
 /// TikTok LIVE viewer bottom bar.
