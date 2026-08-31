@@ -153,12 +153,16 @@ class RealCommentRepository implements CommentRepository {
     String? details,
   }) async {
     try {
-      final liveEntry = _cache.entries.cast<MapEntry<String, List<CommentEntity>>?>().firstWhere(
-        (entry) => entry!.value.any((comment) => comment.id == commentId),
-        orElse: () => null,
-      );
+      final liveEntry = _cache.entries
+          .cast<MapEntry<String, List<CommentEntity>>?>()
+          .firstWhere(
+            (entry) => entry!.value.any((comment) => comment.id == commentId),
+            orElse: () => null,
+          );
       if (liveEntry == null) {
-        return Left(ServerFailure('Comment $commentId is not available locally'));
+        return Left(
+          ServerFailure('Comment $commentId is not available locally'),
+        );
       }
       await _api.post(
         '${ApiEndpoints.liveCommentById(liveEntry.key, commentId)}/report',
@@ -188,53 +192,65 @@ class RealCommentRepository implements CommentRepository {
     _controllers[liveId] = StreamController<List<CommentEntity>>.broadcast();
     final socket = _socket;
     final sub = socket.events.listen((event) {
-        if (event is LiveCommentEvent && event.liveId == liveId) {
-          final current = List<CommentEntity>.from(_cache[liveId] ?? const <CommentEntity>[]);
-          // Silently drop duplicates (both local echo and socket can deliver).
-          if (!current.any((c) => c.id == event.comment.id)) {
-            current.add(event.comment);
-            final trimmed = current.length > 80 ? current.sublist(current.length - 80) : current;
-            _cache[liveId] = trimmed;
-            _controllers[liveId]?.add(List.unmodifiable(trimmed));
-          }
-        } else if (event is LiveCommentDeletedEvent && event.liveId == liveId) {
-          final current = List<CommentEntity>.from(_cache[liveId] ?? const <CommentEntity>[]);
-          current.removeWhere((c) => c.id == event.commentId);
-          _cache[liveId] = current;
-          _controllers[liveId]?.add(List.unmodifiable(current));
-        } else if (event is LiveCommentPinnedEvent && event.liveId == liveId) {
-          final current = List<CommentEntity>.from(_cache[liveId] ?? const <CommentEntity>[]);
-          final pinned = event.comment.copyWith(isPinned: true);
-          var replaced = false;
-          for (var i = 0; i < current.length; i++) {
-            if (current[i].isPinned) {
-              current[i] = current[i].copyWith(isPinned: false);
-            }
-            if (current[i].id == pinned.id) {
-              current[i] = pinned;
-              replaced = true;
-            }
-          }
-          if (!replaced) current.insert(0, pinned);
-          _cache[liveId] = current;
-          _controllers[liveId]?.add(List.unmodifiable(current));
-        } else if (event is LiveCommentUnpinnedEvent && event.liveId == liveId) {
-          final current = List<CommentEntity>.from(_cache[liveId] ?? const <CommentEntity>[]);
-          for (var i = 0; i < current.length; i++) {
-            if (current[i].id == event.commentId) {
-              current[i] = current[i].copyWith(isPinned: false);
-            }
-          }
-          _cache[liveId] = current;
-          _controllers[liveId]?.add(List.unmodifiable(current));
+      if (event is LiveCommentEvent && event.liveId == liveId) {
+        final current = List<CommentEntity>.from(
+          _cache[liveId] ?? const <CommentEntity>[],
+        );
+        // Silently drop duplicates (both local echo and socket can deliver).
+        if (!current.any((c) => c.id == event.comment.id)) {
+          current.add(event.comment);
+          final trimmed = current.length > 80
+              ? current.sublist(current.length - 80)
+              : current;
+          _cache[liveId] = trimmed;
+          _controllers[liveId]?.add(List.unmodifiable(trimmed));
         }
+      } else if (event is LiveCommentDeletedEvent && event.liveId == liveId) {
+        final current = List<CommentEntity>.from(
+          _cache[liveId] ?? const <CommentEntity>[],
+        );
+        current.removeWhere((c) => c.id == event.commentId);
+        _cache[liveId] = current;
+        _controllers[liveId]?.add(List.unmodifiable(current));
+      } else if (event is LiveCommentPinnedEvent && event.liveId == liveId) {
+        final current = List<CommentEntity>.from(
+          _cache[liveId] ?? const <CommentEntity>[],
+        );
+        final pinned = event.comment.copyWith(isPinned: true);
+        var replaced = false;
+        for (var i = 0; i < current.length; i++) {
+          if (current[i].isPinned) {
+            current[i] = current[i].copyWith(isPinned: false);
+          }
+          if (current[i].id == pinned.id) {
+            current[i] = pinned;
+            replaced = true;
+          }
+        }
+        if (!replaced) current.insert(0, pinned);
+        _cache[liveId] = current;
+        _controllers[liveId]?.add(List.unmodifiable(current));
+      } else if (event is LiveCommentUnpinnedEvent && event.liveId == liveId) {
+        final current = List<CommentEntity>.from(
+          _cache[liveId] ?? const <CommentEntity>[],
+        );
+        for (var i = 0; i < current.length; i++) {
+          if (current[i].id == event.commentId) {
+            current[i] = current[i].copyWith(isPinned: false);
+          }
+        }
+        _cache[liveId] = current;
+        _controllers[liveId]?.add(List.unmodifiable(current));
+      }
     });
     _subs[liveId] = sub;
   }
 
   void _append(String liveId, CommentEntity comment) {
     _ensureRoom(liveId);
-    final list = List<CommentEntity>.from(_cache[liveId] ?? const <CommentEntity>[]);
+    final list = List<CommentEntity>.from(
+      _cache[liveId] ?? const <CommentEntity>[],
+    );
     list.add(comment);
     final trimmed = list.length > 80 ? list.sublist(list.length - 80) : list;
     _cache[liveId] = trimmed;
@@ -258,8 +274,17 @@ class RealCommentRepository implements CommentRepository {
     final user = c['user'];
     final userMap = user is Map ? Map<String, dynamic>.from(user) : null;
     final userId = userMap?['id']?.toString() ?? c['userId']?.toString() ?? '';
-    final username = userMap?['username']?.toString() ?? c['username']?.toString() ?? 'User';
-    final avatar = userMap?['avatarUrl']?.toString() ?? userMap?['profilePicture']?.toString() ?? c['avatarUrl']?.toString() ?? c['userAvatar']?.toString();
+    final fullName = userMap?['fullName']?.toString();
+    final handle =
+        userMap?['username']?.toString() ?? c['username']?.toString();
+    final username = (fullName != null && fullName.trim().isNotEmpty)
+        ? fullName.trim()
+        : (handle ?? 'User');
+    final avatar =
+        userMap?['avatarUrl']?.toString() ??
+        userMap?['profilePicture']?.toString() ??
+        c['avatarUrl']?.toString() ??
+        c['userAvatar']?.toString();
     final content = c['content']?.toString() ?? '';
     if (content.isEmpty) return null;
 
@@ -267,8 +292,8 @@ class RealCommentRepository implements CommentRepository {
     final gifterLevel = gifterLevelRaw is int
         ? gifterLevelRaw
         : gifterLevelRaw is String
-            ? int.tryParse(gifterLevelRaw)
-            : null;
+        ? int.tryParse(gifterLevelRaw)
+        : null;
 
     final createdAtRaw = c['createdAt'] ?? c['created_at'] ?? c['timestamp'];
     final DateTime createdAt;
@@ -282,7 +307,10 @@ class RealCommentRepository implements CommentRepository {
       createdAt = DateTime.now();
     }
 
-    final replyTo = c['replyToUserId']?.toString() ?? c['replyTo']?.toString() ?? c['replyToUser']?['id']?.toString();
+    final replyTo =
+        c['replyToUserId']?.toString() ??
+        c['replyTo']?.toString() ??
+        c['replyToUser']?['id']?.toString();
     final isPinned = c['isPinned'] == true || c['pinned'] == true;
 
     return CommentEntity(

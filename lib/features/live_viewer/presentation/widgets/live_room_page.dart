@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:cached_network_image/cached_network_image.dart';
@@ -6,7 +7,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/live_gift_sheet.dart';
+import '../../../../core/utils/app_media_cache_manager.dart';
 import '../../../../core/utils/build_safe_notifier.dart';
+import '../../../../core/widgets/safe_network_image.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../domain/entities/live_entity.dart';
@@ -55,11 +58,16 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   bool _showComposer = false;
   bool _giftGoalDismissed = false;
   final List<FloatingHeart> _tapHearts = [];
+  final Set<String> _preloadedImageUrls = <String>{};
 
   @override
   void initState() {
     super.initState();
     _scheduleActivate();
+    _scheduleImagePreload(<String?>[
+      widget.live.hostAvatar,
+      widget.live.thumbnailUrl,
+    ]);
   }
 
   @override
@@ -92,6 +100,24 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !widget.isActive) return;
       context.read<LiveViewerBloc>().add(LiveViewerActivated(widget.live));
+    });
+  }
+
+  void _scheduleImagePreload(Iterable<String?> urls) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final screenWidth = MediaQuery.sizeOf(context).width;
+      for (final raw in urls) {
+        final url = raw?.trim() ?? '';
+        if (url.isEmpty || !_preloadedImageUrls.add(url)) continue;
+        unawaited(
+          precacheSafeNetworkImage(
+            context,
+            url,
+            width: screenWidth,
+          ).catchError((_) {}),
+        );
+      }
     });
   }
 
@@ -289,7 +315,19 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<LiveViewerBloc, LiveViewerState>(
+    return BlocConsumer<LiveViewerBloc, LiveViewerState>(
+      listenWhen: (previous, current) =>
+          previous.battleOpponentLive != current.battleOpponentLive ||
+          previous.topViewerAvatars != current.topViewerAvatars ||
+          previous.opponentTopGifterAvatars != current.opponentTopGifterAvatars,
+      listener: (context, state) {
+        _scheduleImagePreload(<String?>[
+          state.battleOpponentLive?.hostAvatar,
+          state.battleOpponentLive?.thumbnailUrl,
+          ...state.topViewerAvatars,
+          ...state.opponentTopGifterAvatars,
+        ]);
+      },
       buildWhen: (prev, curr) {
         final prevLive = prev.live;
         final currLive = curr.live;
@@ -450,9 +488,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                               live: live,
                               opponentLive: state.battleOpponentLive,
                               isActive: widget.isActive && connected,
-                              battleRoom: isThisRoom
-                                  ? state.battleRoom
-                                  : null,
+                              battleRoom: isThisRoom ? state.battleRoom : null,
                             ),
                             if (isThisRoom)
                               Positioned(
@@ -471,15 +507,6 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                                               curr.pkScoreRight ||
                                           prev.battle != curr.battle,
                                       builder: (context, state) {
-                                        final battle = state.battle;
-                                        final winner = battle?.winnerLiveId;
-                                        final decided =
-                                            battle != null &&
-                                            winner != null &&
-                                            winner.isNotEmpty;
-                                        final leftWon =
-                                            decided && winner == live.id;
-
                                         return Stack(
                                           alignment: Alignment.topCenter,
                                           clipBehavior: Clip.none,
@@ -488,31 +515,13 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                                               scoreLeft: state.pkScoreLeft,
                                               scoreRight: state.pkScoreRight,
                                             ),
-                                            // TikTok calls the round on the
-                                            // panels themselves, not only in
-                                            // the score numbers.
-                                            if (decided) ...[
-                                              Positioned(
-                                                top: 28,
-                                                left: 8,
-                                                child: _PkResultBadge(
-                                                  won: leftWon,
-                                                ),
-                                              ),
-                                              Positioned(
-                                                top: 28,
-                                                right: 8,
-                                                child: _PkResultBadge(
-                                                  won: !leftWon,
-                                                ),
-                                              ),
-                                            ],
                                             Positioned(
-                                              top: 26,
+                                              top: 22,
                                               child: _PkBattleTimer(
-                                                endTime: battle?.endTime,
+                                                endTime: state.battle?.endTime,
                                                 multiplier:
-                                                    battle?.multiplier ?? 1,
+                                                    state.battle?.multiplier ??
+                                                    1,
                                               ),
                                             ),
                                           ],
@@ -526,38 +535,33 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                       const SizedBox(height: 6),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 12),
-                        // Follows the tiles above it: left cluster under the
-                        // left feed in every locale.
-                        child: Directionality(
-                          textDirection: TextDirection.ltr,
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: _PkContributors(
-                                  avatars: isThisRoom
-                                      ? state.topViewerAvatars
-                                      : (live.metadata?['pkContributorsLeft']
-                                                    as List?)
-                                                ?.map((item) => item.toString())
-                                                .toList() ??
-                                            const <String>[],
-                                  isLeft: true,
-                                ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: _PkContributors(
+                                avatars: isThisRoom
+                                    ? state.topViewerAvatars
+                                    : (live.metadata?['pkContributorsLeft']
+                                                  as List?)
+                                              ?.map((item) => item.toString())
+                                              .toList() ??
+                                          const <String>[],
+                                isLeft: true,
                               ),
-                              Expanded(
-                                child: _PkContributors(
-                                  avatars: isThisRoom
-                                      ? state.opponentTopGifterAvatars
-                                      : (live.metadata?['pkContributorsRight']
-                                                    as List?)
-                                                ?.map((item) => item.toString())
-                                                .toList() ??
-                                            const <String>[],
-                                  isLeft: false,
-                                ),
+                            ),
+                            Expanded(
+                              child: _PkContributors(
+                                avatars: isThisRoom
+                                    ? state.opponentTopGifterAvatars
+                                    : (live.metadata?['pkContributorsRight']
+                                                  as List?)
+                                              ?.map((item) => item.toString())
+                                              .toList() ??
+                                          const <String>[],
+                                isLeft: false,
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ),
                       if (widget.isActive && isThisRoom)
@@ -687,6 +691,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                 LiveVideoPlayer(
                   live: live,
                   isActive: widget.isActive && connected,
+                  liveKitOnly: true,
                 ),
               IgnorePointer(
                 child: Align(
@@ -1217,14 +1222,15 @@ class _PkVideoLayout extends StatelessWidget {
         'Guest';
     final guestAvatar =
         opponentLive?.hostAvatar ?? live.metadata?['guestAvatar'] as String?;
+    // Only the host's own tier is known here; the opponent's side stays bare
+    // rather than showing a placeholder league.
+    final hostTier = (live.metadata?['hostLeagueTier'] as String?)?.trim();
     const badgeTop = 38.0;
 
-    // This viewer's live is the B2 tile and holds the LEFT half, matching the
-    // host stage and the TikTok reference. Left to itself the Row mirrors in
-    // Arabic and the two feeds swap sides, which is what made the opponent
-    // look like it had failed to arrive.
     return ClipRect(
       child: Directionality(
+        // Keep the host on the physical left and the opponent on the physical
+        // right in Arabic too. Ambient RTL must not swap the two live tracks.
         textDirection: TextDirection.ltr,
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1236,13 +1242,16 @@ class _PkVideoLayout extends StatelessWidget {
                   LiveVideoPlayer(
                     live: live,
                     isActive: isActive,
-                    fit: BoxFit.fitWidth,
+                    fit: BoxFit.cover,
+                    compact: true,
+                    liveKitOnly: true,
                   ),
-                  const Positioned(
-                    left: 8,
-                    top: badgeTop,
-                    child: _PkCornerBadge(label: 'B2'),
-                  ),
+                  if (hostTier != null && hostTier.isNotEmpty)
+                    Positioned(
+                      left: 8,
+                      top: badgeTop,
+                      child: _PkCornerBadge(label: hostTier),
+                    ),
                 ],
               ),
             ),
@@ -1256,12 +1265,7 @@ class _PkVideoLayout extends StatelessWidget {
                     guestName: guestName,
                     guestAvatar: guestAvatar,
                     room: battleRoom,
-                    fit: BoxFit.fitWidth,
-                  ),
-                  const Positioned(
-                    right: 8,
-                    top: badgeTop,
-                    child: _PkCornerBadge(label: 'B1'),
+                    fit: BoxFit.cover,
                   ),
                   Positioned(
                     right: 8,
@@ -1282,7 +1286,7 @@ class _PkVideoLayout extends StatelessWidget {
   }
 }
 
-class _PkGuestFeed extends StatelessWidget {
+class _PkGuestFeed extends StatefulWidget {
   final String liveId;
   final String guestName;
   final String? guestAvatar;
@@ -1298,58 +1302,111 @@ class _PkGuestFeed extends StatelessWidget {
   });
 
   @override
+  State<_PkGuestFeed> createState() => _PkGuestFeedState();
+}
+
+class _PkGuestFeedState extends State<_PkGuestFeed> {
+  String? _requestedTrackSid;
+
+  @override
+  void didUpdateWidget(covariant _PkGuestFeed oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.room != widget.room) _requestedTrackSid = null;
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final currentRoom = room;
+    final currentRoom = widget.room;
     if (currentRoom != null) {
       return BuildSafeListenableBuilder(
         listenable: currentRoom,
         builder: (_, _) {
-          final track = _remoteVideoTrack(currentRoom);
-          return track == null
-              ? _fallback()
-              : VideoTrackRenderer(track, fit: VideoViewFit.cover);
+          final publication = _remoteVideoPublication(currentRoom);
+          final track = publication?.track;
+          if (publication != null && track != null) {
+            unawaited(_requestCompactLayer(publication));
+            return VideoTrackRenderer(
+              track,
+              fit: VideoViewFit.cover,
+              placeholderBuilder: (_) => _fallback(context),
+            );
+          }
+          return _fallback(context);
         },
       );
     }
-    return _fallback();
+    return _fallback(context);
   }
 
-  VideoTrack? _remoteVideoTrack(Room room) {
+  RemoteTrackPublication<RemoteVideoTrack>? _remoteVideoPublication(Room room) {
     for (final participant in room.remoteParticipants.values) {
       for (final publication in participant.videoTrackPublications) {
         final track = publication.track;
         if (publication.subscribed && !publication.muted && track != null) {
-          return track;
+          return publication;
         }
       }
     }
     return null;
   }
 
-  Widget _fallback() {
-    final url = guestAvatar?.trim();
-    if (url == null || url.isEmpty) {
-      return ColoredBox(
-        color: const Color(0xFF2A1A3A),
-        child: Center(
-          child: FallbackAvatar(seed: liveId, name: guestName, radius: 36),
-        ),
-      );
+  Future<void> _requestCompactLayer(
+    RemoteTrackPublication<RemoteVideoTrack> publication,
+  ) async {
+    final sid = publication.sid;
+    if (_requestedTrackSid == sid) return;
+    _requestedTrackSid = sid;
+    try {
+      await publication.setVideoDimensions(const VideoDimensions(640, 960));
+      await publication.setVideoQuality(VideoQuality.MEDIUM);
+    } catch (_) {
+      if (_requestedTrackSid == sid) _requestedTrackSid = null;
     }
+  }
+
+  Widget _fallback(BuildContext context) {
+    final url = widget.guestAvatar?.trim();
+    final placeholder = Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFF2A2A31), Color(0xFF121216)],
+        ),
+      ),
+      alignment: Alignment.center,
+      child: ClipOval(
+        child: SizedBox(
+          width: 72,
+          height: 72,
+          child: FallbackAvatar(
+            seed: widget.liveId,
+            name: widget.guestName,
+            radius: 36,
+          ),
+        ),
+      ),
+    );
+    if (url == null || url.isEmpty) return placeholder;
+
+    final memCacheWidth =
+        (MediaQuery.sizeOf(context).width *
+                MediaQuery.devicePixelRatioOf(context))
+            .ceil()
+            .clamp(1, 4096)
+            .toInt();
     return ColoredBox(
       color: Colors.black,
       child: CachedNetworkImage(
         imageUrl: url,
-        fit: fit,
+        cacheManager: AppMediaCacheManager.instance,
+        memCacheWidth: memCacheWidth,
+        fit: widget.fit,
         width: double.infinity,
         height: double.infinity,
         alignment: Alignment.center,
-        placeholder: (_, _) => Center(
-          child: FallbackAvatar(seed: liveId, name: guestName, radius: 36),
-        ),
-        errorWidget: (_, _, _) => Center(
-          child: FallbackAvatar(seed: liveId, name: guestName, radius: 36),
-        ),
+        placeholder: (_, _) => placeholder,
+        errorWidget: (_, _, _) => placeholder,
       ),
     );
   }
@@ -1376,87 +1433,22 @@ class _PkBattleTimer extends StatelessWidget {
         final time =
             '${(seconds ~/ 60).toString().padLeft(2, '0')}:'
             '${(seconds % 60).toString().padLeft(2, '0')}';
-        // TikTok's round clock: a dark capsule under the seam, the time in
-        // tabular figures so the digits do not jitter every second, and the
-        // speed-boost multiplier as its own pink chip beside it rather than
-        // crammed into the same string.
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (multiplier > 1) ...[
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFFFF2D55), Color(0xFFFF5C8A)],
-                  ),
-                  borderRadius: BorderRadius.circular(11),
-                ),
-                child: Text(
-                  '×${multiplier.toStringAsFixed(multiplier % 1 == 0 ? 0 : 1)}',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    height: 1.1,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 4),
-            ],
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-              decoration: BoxDecoration(
-                color: const Color(0xE60A2430),
-                borderRadius: BorderRadius.circular(11),
-              ),
-              child: Text(
-                time,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                  height: 1.1,
-                  fontFeatures: [FontFeature.tabularFigures()],
-                ),
-              ),
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+          decoration: BoxDecoration(
+            color: const Color(0xE60A2430),
+            borderRadius: BorderRadius.circular(11),
+          ),
+          child: Text(
+            '${multiplier > 1 ? '×${multiplier.toStringAsFixed(1)}  ' : ''}$time',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
             ),
-          ],
+          ),
         );
       },
-    );
-  }
-}
-
-/// WIN / LOSE capsule shown on a panel once the round has a winner.
-class _PkResultBadge extends StatelessWidget {
-  const _PkResultBadge({required this.won});
-
-  final bool won;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        gradient: won
-            ? const LinearGradient(
-                colors: [Color(0xFFFFC93C), Color(0xFFFFA000)],
-              )
-            : null,
-        color: won ? null : const Color(0xCC4A4A4A),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Text(
-        won ? 'WIN' : 'LOSE',
-        style: TextStyle(
-          color: won ? const Color(0xFF4A2800) : Colors.white,
-          fontSize: 11,
-          fontWeight: FontWeight.w900,
-          height: 1.1,
-          letterSpacing: 0.4,
-        ),
-      ),
     );
   }
 }
@@ -1531,6 +1523,8 @@ class _PkContributors extends StatelessWidget {
                 child: ClipOval(
                   child: CachedNetworkImage(
                     imageUrl: list[i].url,
+                    cacheManager: AppMediaCacheManager.instance,
+                    memCacheWidth: 128,
                     fit: BoxFit.cover,
                     errorWidget: (_, _, _) => Container(
                       color: AppColors.surface,
@@ -1599,6 +1593,8 @@ class _GuestChip extends StatelessWidget {
                 height: 18,
                 child: CachedNetworkImage(
                   imageUrl: avatar!,
+                  cacheManager: AppMediaCacheManager.instance,
+                  memCacheWidth: 72,
                   fit: BoxFit.cover,
                   errorWidget: (_, _, _) =>
                       FallbackAvatar(seed: name, name: name, radius: 9),

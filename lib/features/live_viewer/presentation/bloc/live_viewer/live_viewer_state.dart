@@ -19,6 +19,7 @@ class LiveViewerState extends Equatable {
   final int floatingHeartBurst;
   final int coinDelta;
   final bool showJoinSuccess;
+
   /// Supporter avatars for THIS live, highest rank first.
   ///
   /// Named for the header slot it fills, not its contents: it used to hold
@@ -104,7 +105,7 @@ class LiveViewerState extends Equatable {
 
   /// PK is server-authoritative. A stale `isPk`/`battle` field in live
   /// metadata must never turn an accepted guest into the battle UI.
-  bool get isPk => battle?.isActive == true;
+  bool get isPk => battle?.isActive == true && battleOpponentLive != null;
 
   LiveViewerState copyWith({
     LiveSessionEntity? session,

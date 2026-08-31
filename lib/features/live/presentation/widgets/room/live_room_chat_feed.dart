@@ -13,9 +13,8 @@ import '../../bloc/live_room/live_room_bloc.dart';
 import '../../bloc/live_room/live_room_event.dart';
 import '../../bloc/live_room/live_room_state.dart';
 
-/// Activity feed anchored to the bottom start edge, the way TikTok anchors it
-/// — which in Arabic means the right edge, with the avatar on the right, as in
-/// the reference screenshots.
+/// Activity feed pinned to the bottom-left, the way TikTok anchors it, and
+/// held there in Arabic too rather than following the RTL start edge.
 class LiveRoomChatFeed extends StatelessWidget {
   const LiveRoomChatFeed({super.key});
 
@@ -25,7 +24,8 @@ class LiveRoomChatFeed extends StatelessWidget {
       buildWhen: (previous, current) =>
           current is LiveRoomReady &&
           (previous is! LiveRoomReady ||
-              previous.session.messages != current.session.messages),
+              previous.session.messages != current.session.messages ||
+              previous.isBattleActive != current.isBattleActive),
       builder: (context, state) {
         if (state is! LiveRoomReady) {
           return const SizedBox.shrink();
@@ -51,48 +51,58 @@ class LiveRoomChatFeed extends StatelessWidget {
                 ? math.min(constraints.maxHeight, cap)
                 : cap;
 
-            return Align(
-              alignment: AlignmentDirectional.bottomStart,
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: maxWidth),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (pinned != null) ...[
-                      _PinnedCommentBar(message: pinned),
-                      const SizedBox(height: AppSpacing.roomChatGap),
-                    ],
-                    // Laid out bottom-up so the newest line sits just above
-                    // the composer, and scrollable so the backlog above it is
-                    // reachable rather than clipped away for good.
-                    Flexible(
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(maxHeight: listMaxHeight),
-                        child: ShaderMask(
-                          shaderCallback: (rect) => liveFeedFadeShader(
-                            rect,
-                            scrollableHeight: listMaxHeight,
-                          ),
-                          blendMode: BlendMode.dstIn,
-                          child: ListView.separated(
-                            reverse: true,
-                            shrinkWrap: true,
-                            physics: const ClampingScrollPhysics(),
-                            padding: EdgeInsets.zero,
-                            itemCount: messages.length,
-                            separatorBuilder: (_, _) =>
-                                const SizedBox(height: AppSpacing.roomChatGap),
-                            itemBuilder: (context, index) {
-                              final message =
-                                  messages[messages.length - 1 - index];
-                              return _ChatMessageTile(message: message);
-                            },
+            return Directionality(
+              // Local override only: Arabic still shapes right-to-left inside
+              // each line, but the run itself hugs the left edge like the
+              // reference.
+              textDirection: TextDirection.ltr,
+              child: Align(
+                alignment: Alignment.bottomLeft,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: maxWidth),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (pinned != null) ...[
+                        _PinnedCommentBar(message: pinned),
+                        const SizedBox(height: AppSpacing.roomChatGap),
+                      ],
+                      // Laid out bottom-up so the newest line sits just above
+                      // the composer, and scrollable so the backlog above it is
+                      // reachable rather than clipped away for good.
+                      Flexible(
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(maxHeight: listMaxHeight),
+                          child: ShaderMask(
+                            shaderCallback: (rect) => liveFeedFadeShader(
+                              rect,
+                              scrollableHeight: listMaxHeight,
+                            ),
+                            blendMode: BlendMode.dstIn,
+                            child: ListView.separated(
+                              reverse: true,
+                              shrinkWrap: true,
+                              physics: const ClampingScrollPhysics(),
+                              padding: EdgeInsets.zero,
+                              itemCount: messages.length,
+                              separatorBuilder: (_, _) => const SizedBox(
+                                height: AppSpacing.roomChatGap,
+                              ),
+                              itemBuilder: (context, index) {
+                                final message =
+                                    messages[messages.length - 1 - index];
+                                return _ChatMessageTile(
+                                  message: message,
+                                  highContrast: state.isBattleActive,
+                                );
+                              },
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             );
@@ -104,9 +114,10 @@ class LiveRoomChatFeed extends StatelessWidget {
 }
 
 class _ChatMessageTile extends StatelessWidget {
-  const _ChatMessageTile({required this.message});
+  const _ChatMessageTile({required this.message, required this.highContrast});
 
   final LiveChatMessage message;
+  final bool highContrast;
 
   Future<void> _showModeration(BuildContext context) async {
     final action = await showModalBottomSheet<LiveRoomModerationAction>(
@@ -220,10 +231,14 @@ class _ChatMessageTile extends StatelessWidget {
     return GestureDetector(
       onLongPress: () => _showModeration(context),
       child: Container(
-        // No surface and no border, during a battle too. TikTok carries its
-        // comments on the shadow baked into the text styles; the opaque pill
-        // this used to draw over PK is the thing that read as "not TikTok".
-        padding: const EdgeInsetsDirectional.fromSTEB(5, 4, 9, 4),
+        padding: const EdgeInsets.fromLTRB(5, 4, 9, 4),
+        decoration: BoxDecoration(
+          color: highContrast ? const Color(0xD90B0B0D) : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+          border: highContrast
+              ? Border.all(color: const Color(0x24FFFFFF), width: 0.5)
+              : null,
+        ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -331,7 +346,7 @@ class _MessageText extends StatelessWidget {
       return Text(
         '$pin${message.text}',
         style: AppTextStyles.roomChat,
-        textAlign: TextAlign.start,
+        textAlign: TextAlign.left,
         maxLines: maxLines,
         overflow: maxLines == null ? null : TextOverflow.ellipsis,
       );
@@ -344,7 +359,7 @@ class _MessageText extends StatelessWidget {
           TextSpan(text: body, style: AppTextStyles.roomChat),
         ],
       ),
-      textAlign: TextAlign.start,
+      textAlign: TextAlign.left,
       maxLines: maxLines,
       overflow: maxLines == null ? null : TextOverflow.ellipsis,
     );

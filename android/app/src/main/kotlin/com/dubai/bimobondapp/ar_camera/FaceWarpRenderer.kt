@@ -851,6 +851,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
 
     private var encoderEglSurface: AndroidEglSurface? = null
     private var lastEncoderSwapMs = 0L
+    private var encoderDiagnosticReported = false
     private val encoderMinIntervalMs = 33L
     private val encoderRestoreViewport = IntArray(4)
 
@@ -860,6 +861,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         encoderWidth = width.coerceAtLeast(2)
         encoderHeight = height.coerceAtLeast(2)
         lastEncoderSwapMs = 0L
+        encoderDiagnosticReported = false
     }
 
     private fun destroyEncoderEglSurface() {
@@ -1136,8 +1138,17 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         )
         val configs = arrayOfNulls<AndroidEglConfig>(1)
         val numConfigs = IntArray(1)
-        if (!EGL14.eglChooseConfig(display, attribList, 0, configs, 0, 1, numConfigs, 0)) {
-
+        val foundRecordable = EGL14.eglChooseConfig(
+            display,
+            attribList,
+            0,
+            configs,
+            0,
+            1,
+            numConfigs,
+            0,
+        ) && numConfigs[0] > 0 && configs[0] != null
+        if (!foundRecordable) {
             val fallback = intArrayOf(
                 EGL14.EGL_RED_SIZE, 8,
                 EGL14.EGL_GREEN_SIZE, 8,
@@ -1146,7 +1157,10 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                 EGL14.EGL_RENDERABLE_TYPE, EGL14.EGL_OPENGL_ES2_BIT,
                 EGL14.EGL_NONE,
             )
-            if (!EGL14.eglChooseConfig(display, fallback, 0, configs, 0, 1, numConfigs, 0)) {
+            if (!EGL14.eglChooseConfig(display, fallback, 0, configs, 0, 1, numConfigs, 0) ||
+                numConfigs[0] <= 0 ||
+                configs[0] == null
+            ) {
                 return null
             }
         }
@@ -1221,7 +1235,10 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         // Rendered before touching the encoder's own EGL surface — this is plain
         // FBO rendering, unrelated to which window surface happens to be current.
         val renderedTex = renderShaderAtBudget(draw, encW, encH)
-        if (renderedTex == 0) return
+        if (renderedTex == 0) {
+            reportEncoderDiagnostic("encoder FBO unavailable")
+            return
+        }
 
         val eglDisplay = EGL14.eglGetCurrentDisplay()
         val eglContext = EGL14.eglGetCurrentContext()
@@ -1231,6 +1248,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             eglContext == EGL14.EGL_NO_CONTEXT ||
             backupDraw == EGL14.EGL_NO_SURFACE
         ) {
+            reportEncoderDiagnostic("encoder has no current EGL context/surface")
             return
         }
 
@@ -1246,7 +1264,10 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             // context's config makes a match structural rather than a coincidence.
             val config = contextConfig(eglDisplay, eglContext)
                 ?: chooseRecordableConfig(eglDisplay)
-                ?: return
+                ?: run {
+                    reportEncoderDiagnostic("encoder EGL config unavailable")
+                    return
+                }
             val surfaceAttribs = intArrayOf(EGL14.EGL_NONE)
             eglSurf = try {
                 EGL14.eglCreateWindowSurface(
@@ -1260,7 +1281,13 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                 Log.w(TAG, "encoder EGL surface creation failed", t)
                 null
             }
-            if (eglSurf == null || eglSurf == EGL14.EGL_NO_SURFACE) return
+            if (eglSurf == null || eglSurf == EGL14.EGL_NO_SURFACE) {
+                reportEncoderDiagnostic(
+                    "encoder EGL window surface unavailable " +
+                        "(0x${Integer.toHexString(EGL14.eglGetError())})",
+                )
+                return
+            }
             encoderEglSurface = eglSurf
         }
 
@@ -1287,8 +1314,15 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                 eglSurf,
                 now * 1_000_000L,
             )
-            EGL14.eglSwapBuffers(eglDisplay, eglSurf)
+            if (!EGL14.eglSwapBuffers(eglDisplay, eglSurf)) {
+                reportEncoderDiagnostic(
+                    "encoder eglSwapBuffers failed " +
+                        "(0x${Integer.toHexString(EGL14.eglGetError())})",
+                )
+                return
+            }
             lastEncoderSwapMs = now
+            reportEncoderDiagnostic("encoder presented first WebRTC frame", success = true)
         } catch (t: Throwable) {
             Log.e(TAG, "encoder frame present failed", t)
         } finally {
@@ -1299,6 +1333,16 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                 encoderRestoreViewport[2],
                 encoderRestoreViewport[3],
             )
+        }
+    }
+
+    private fun reportEncoderDiagnostic(message: String, success: Boolean = false) {
+        if (encoderDiagnosticReported) return
+        encoderDiagnosticReported = true
+        if (success) {
+            Log.i(TAG, message)
+        } else {
+            Log.e(TAG, message)
         }
     }
 

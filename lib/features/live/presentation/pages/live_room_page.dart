@@ -1,4 +1,5 @@
 import 'package:camera/camera.dart';
+import 'package:bimobondapp/app/camera_engine/native_camera_controller.dart';
 import 'package:bimobondapp/app/auctions/data/datasources/auction_socket_service.dart';
 import 'package:bimobondapp/app/auctions/presentation/di/auctions_injector.dart'
     as auctions_di;
@@ -31,7 +32,6 @@ import '../bloc/live_room/live_room_state.dart';
 import '../effects/live_face_tracker.dart';
 import '../effects/live_face_tracker_scope.dart';
 import '../widgets/room/live_room_bottom_bar.dart';
-import '../widgets/room/live_room_camera_layer.dart';
 import '../widgets/room/live_room_chat_composer.dart';
 import '../widgets/room/live_room_chat_feed.dart';
 import '../widgets/room/live_room_competition_request_prompt.dart';
@@ -41,6 +41,7 @@ import '../widgets/room/live_room_stage.dart';
 import '../widgets/room/live_room_effects_panel.dart';
 import '../widgets/room/live_room_header.dart';
 import '../widgets/room/live_room_info_row.dart';
+import '../widgets/live_countdown_overlay.dart';
 import '../widgets/room/live_starting_indicator.dart';
 import '../widgets/vignette_layer.dart';
 import '../utils/live_screen_wakelock.dart';
@@ -49,7 +50,12 @@ import '../../../live_viewer/presentation/widgets/floating_gifts.dart';
 
 /// Host live-room screen: full-screen camera with TikTok-style Arabic overlays.
 class LiveRoomPage extends StatefulWidget {
-  const LiveRoomPage({super.key, this.title, this.initialCamera});
+  const LiveRoomPage({
+    super.key,
+    this.title,
+    this.initialCamera,
+    this.initialNativeCamera,
+  });
 
   /// Optional title entered on the start screen.
   final String? title;
@@ -57,6 +63,9 @@ class LiveRoomPage extends StatefulWidget {
   /// The camera that was ALREADY running on the start screen.
   /// Handed over so the room reuses the same lens (no reopen, no flicker).
   final CameraController? initialCamera;
+
+  /// CameraX/GPU camera already running on Android's start-live screen.
+  final NativeCameraController? initialNativeCamera;
 
   @override
   State<LiveRoomPage> createState() => _LiveRoomPageState();
@@ -70,6 +79,7 @@ class _LiveRoomPageState extends State<LiveRoomPage>
   late final LiveFaceTracker _faceTracker;
   late final DateTime _startIndicatorDeadline;
   var _depsReady = false;
+  var _showStartCountdown = true;
 
   @override
   void initState() {
@@ -125,6 +135,7 @@ class _LiveRoomPageState extends State<LiveRoomPage>
           LiveRoomStarted(
             title: widget.title,
             initialCamera: widget.initialCamera,
+            initialNativeCamera: widget.initialNativeCamera,
           ),
         );
   }
@@ -223,6 +234,7 @@ class _LiveRoomPageState extends State<LiveRoomPage>
                     if (current is! LiveRoomReady) return true;
                     if (previous is! LiveRoomReady) return true;
                     return previous.controller != current.controller ||
+                        previous.nativeController != current.nativeController ||
                         previous.selectedEffectId != current.selectedEffectId ||
                         previous.isCameraInitialized !=
                             current.isCameraInitialized ||
@@ -255,8 +267,20 @@ class _LiveRoomPageState extends State<LiveRoomPage>
                 // Keep the camera canvas fixed; the bottom chrome follows the
                 // keyboard through the view inset instead of resizing video.
                 resizeToAvoidBottomInset: false,
-                body: _LiveRoomBody(
-                  startIndicatorDeadline: _startIndicatorDeadline,
+                body: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    _LiveRoomBody(
+                      startIndicatorDeadline: _startIndicatorDeadline,
+                    ),
+                    if (_showStartCountdown)
+                      LiveCountdownLayer(
+                        onFinished: () {
+                          if (!mounted) return;
+                          setState(() => _showStartCountdown = false);
+                        },
+                      ),
+                  ],
                 ),
               ),
             ),
@@ -359,12 +383,19 @@ class _LiveRoomBody extends StatelessWidget {
           );
         }
 
-        // Opening: local preview as soon as the camera is ready (API still in flight).
+        // Keep the exact same stage subtree mounted while Opening becomes
+        // Ready.  ArCameraPreview is an Android PlatformView; replacing its
+        // parent with LiveRoomStage used to dispose/recreate the Kotlin GL
+        // surface in the middle of LiveKit publication, so the custom track
+        // was attached successfully but produced no frames.
         if (state is LiveRoomOpening) {
           return Stack(
             fit: StackFit.expand,
             children: [
-              const LiveRoomCameraLayer(),
+              LiveRoomStage(
+                topInset:
+                    MediaQuery.paddingOf(context).top + AppSpacing.roomStageTop,
+              ),
               const VignetteLayer(),
               LiveStartingIndicator(
                 deadline: startIndicatorDeadline,

@@ -112,6 +112,28 @@ void main() {
     expect(state.isPk, isFalse);
   });
 
+  test('PK layout waits until opponent media metadata is preloaded', () {
+    final battle = LiveBattle.fromJson({
+      'id': 'battle-1',
+      'live1Id': 'live-a',
+      'live2Id': 'live-b',
+      'status': 'ACTIVE',
+    });
+    final waiting = LiveViewerState(battle: battle);
+    final opponent = LiveEntity(
+      id: 'live-b',
+      hostId: 'host-b',
+      hostName: 'Opponent',
+      hostAvatar: 'https://example.test/opponent.jpg',
+      title: 'PK',
+      category: 'General',
+      startTime: DateTime(2026, 8, 24),
+    );
+
+    expect(waiting.isPk, isFalse);
+    expect(waiting.copyWith(battleOpponentLive: opponent).isPk, isTrue);
+  });
+
   test('battle opponent maps the documented live/user shape', () {
     final opponent = LiveBattleOpponent.fromJson({
       'live': {

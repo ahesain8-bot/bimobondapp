@@ -153,9 +153,6 @@ class _BattleStage extends StatelessWidget {
   final String currentLiveId;
   final double topInset;
   final Room? battleMediaRoom;
-
-  /// Top-gifter avatars for this host's side and the opponent's, newest
-  /// snapshot first. Empty until the leaderboard answers.
   final List<String> supporters;
   final List<String> opponentSupporters;
 
@@ -170,11 +167,8 @@ class _BattleStage extends StatelessWidget {
       alignment: Alignment.topCenter,
       child: Padding(
         padding: EdgeInsets.only(top: topInset),
-        // Same local override [StageTiles] makes: this host holds the first
-        // tile on the LEFT. Left to itself the Row mirrors in Arabic, so the
-        // host and the opponent swapped sides — and so did the score bar and
-        // the supporter rings that have to line up under them.
         child: Directionality(
+          // PK sides are physical positions and must not swap in Arabic.
           textDirection: TextDirection.ltr,
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -214,9 +208,6 @@ class _BattleStage extends StatelessWidget {
                   ],
                 ),
               ),
-              // Under the tiles rather than over them: the supporter ring is
-              // what TikTok shows there, and drawing it inside the video would
-              // cover the two faces the battle is about.
               SizedBox(
                 width: width,
                 child: Padding(
@@ -247,21 +238,11 @@ class _BattleStage extends StatelessWidget {
   }
 }
 
-/// The top-three supporter ring under one side of a PK battle.
-///
-/// Rank 1 sits nearest the centre line on both sides, so the two leaders face
-/// each other across the split — that is the arrangement TikTok uses, and it
-/// survives an RTL locale because the order is expressed against the row's
-/// own start/end rather than against screen left/right.
 class _BattleSupporters extends StatelessWidget {
   const _BattleSupporters({required this.avatars, required this.isOwnSide});
 
   final List<String> avatars;
-
-  /// This host's own side. Picks the ring colour and which end rank 1 takes.
   final bool isOwnSide;
-
-  static const double _diameter = 30;
 
   @override
   Widget build(BuildContext context) {
@@ -270,13 +251,10 @@ class _BattleSupporters extends StatelessWidget {
         .indexed
         .map((item) => (url: item.$2, rank: item.$1 + 1))
         .toList(growable: false);
-    // Reserve the strip's height even when empty, so the stage does not jump
-    // the moment the first gift lands.
-    if (ranked.isEmpty) return const SizedBox(height: _diameter + 4);
-
     final ordered = isOwnSide
         ? ranked.reversed.toList(growable: false)
         : ranked;
+    if (ordered.isEmpty) return const SizedBox(height: 34);
     final ring = isOwnSide ? const Color(0xFFFF5A8A) : const Color(0xFF25F4EE);
 
     return Row(
@@ -284,13 +262,12 @@ class _BattleSupporters extends StatelessWidget {
           ? MainAxisAlignment.start
           : MainAxisAlignment.end,
       children: [
-        for (var i = 0; i < ordered.length; i++) ...[
-          if (i > 0) const SizedBox(width: 8),
+        for (var index = 0; index < ordered.length; index++) ...[
+          if (index > 0) const SizedBox(width: 8),
           _SupporterAvatar(
-            url: ordered[i].url,
-            rank: ordered[i].rank,
+            url: ordered[index].url,
+            rank: ordered[index].rank,
             ring: ring,
-            diameter: _diameter,
           ),
         ],
       ],
@@ -303,25 +280,23 @@ class _SupporterAvatar extends StatelessWidget {
     required this.url,
     required this.rank,
     required this.ring,
-    required this.diameter,
   });
 
   final String url;
   final int rank;
   final Color ring;
-  final double diameter;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: diameter,
-      height: diameter + 4,
+      width: 30,
+      height: 34,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
           Container(
-            width: diameter,
-            height: diameter,
+            width: 30,
+            height: 30,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(color: ring, width: 1.6),
@@ -329,8 +304,8 @@ class _SupporterAvatar extends StatelessWidget {
             child: ClipOval(
               child: SafeNetworkImage(
                 imageUrl: url,
-                width: diameter,
-                height: diameter,
+                width: 30,
+                height: 30,
                 blankOnError: true,
                 showLoadingIndicator: false,
               ),
@@ -338,26 +313,23 @@ class _SupporterAvatar extends StatelessWidget {
           ),
           Positioned(
             bottom: -2,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: Container(
-                width: 14,
-                height: 14,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: ring,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.black, width: 1),
-                ),
-                child: Text(
-                  '$rank',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 8,
-                    fontWeight: FontWeight.w700,
-                    height: 1,
-                  ),
+            left: 8,
+            child: Container(
+              width: 14,
+              height: 14,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: ring,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.black, width: 1),
+              ),
+              child: Text(
+                '$rank',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 8,
+                  fontWeight: FontWeight.w700,
+                  height: 1,
                 ),
               ),
             ),

@@ -1,4 +1,6 @@
 import 'package:camera/camera.dart';
+import 'package:bimobondapp/app/camera_engine/native_camera_controller.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -10,7 +12,6 @@ import '../../bloc/start_live/live_bloc.dart';
 import '../../bloc/start_live/live_event.dart';
 import '../../bloc/start_live/live_state.dart';
 import '../../pages/live_room_page.dart';
-import '../live_countdown_overlay.dart';
 
 /// Live setup card: title input + image picker + LIVE start button.
 class LiveContainer extends StatelessWidget {
@@ -19,12 +20,10 @@ class LiveContainer extends StatelessWidget {
   final TextEditingController titleController;
 
   Future<void> _openLiveRoom(BuildContext context) async {
-    // Pre-live countdown (3 → 2 → 1) shown over the camera preview.
-    await LiveCountdownOverlay.run(context);
-    if (!context.mounted) return;
-
     final title = titleController.text.trim();
     final liveBloc = context.read<LiveBloc>();
+    final useExistingArCamera =
+        !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
 
     // REUSE the camera that is already running on the start screen: hand the
     // SAME controller to the room (no close/reopen -> no black flicker).
@@ -32,11 +31,22 @@ class LiveContainer extends StatelessWidget {
         ? liveBloc.state as LiveReady
         : null;
     final CameraController? runningCamera =
+        (ready != null && ready.isCameraInitialized) ? ready.controller : null;
+    final NativeCameraController? runningNativeCamera =
         (ready != null && ready.isCameraInitialized)
-            ? ready.controller
-            : null;
+        ? ready.nativeController
+        : null;
 
-    if (runningCamera != null) {
+    if (useExistingArCamera) {
+      final unmounted = liveBloc.stream.firstWhere(
+        (state) => state is LiveReady && !state.isCameraInitialized,
+      );
+      liveBloc.add(const LiveCameraHandedOff());
+      try {
+        await unmounted.timeout(const Duration(seconds: 1));
+      } catch (_) {}
+      await WidgetsBinding.instance.endOfFrame;
+    } else if (runningCamera != null || runningNativeCamera != null) {
       liveBloc.add(const LiveCameraHandedOff());
     } else {
       liveBloc.add(const LiveAppPaused());
@@ -47,7 +57,8 @@ class LiveContainer extends StatelessWidget {
       MaterialPageRoute<void>(
         builder: (_) => LiveRoomPage(
           title: title.isEmpty ? null : title,
-          initialCamera: runningCamera,
+          initialCamera: useExistingArCamera ? null : runningCamera,
+          initialNativeCamera: useExistingArCamera ? null : runningNativeCamera,
         ),
       ),
     );

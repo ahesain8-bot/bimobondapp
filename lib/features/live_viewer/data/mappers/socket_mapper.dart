@@ -18,6 +18,8 @@ class SocketMapper {
 
     final content =
         nested['content']?.toString() ?? nested['text']?.toString() ?? '';
+    final fullName = user?['fullName']?.toString();
+    final handle = user?['username']?.toString();
 
     final comment = CommentEntity(
       id:
@@ -29,10 +31,9 @@ class SocketMapper {
           fallbackLiveId ??
           '',
       userId: user?['id']?.toString() ?? nested['userId']?.toString() ?? '',
-      username:
-          user?['username']?.toString() ??
-          user?['fullName']?.toString() ??
-          'User',
+      username: (fullName != null && fullName.trim().isNotEmpty)
+          ? fullName.trim()
+          : (handle ?? 'User'),
       userAvatar: user?['avatarUrl']?.toString(),
       content: content,
       createdAt: _parseDate(nested['createdAt']) ?? DateTime.now(),

@@ -1,4 +1,5 @@
 import 'package:camera/camera.dart';
+import 'package:bimobondapp/app/camera_engine/native_camera_controller.dart';
 import 'package:bimobondapp/app/auctions/data/datasources/auction_socket_service.dart';
 import '../../../../../core/models/live_battle.dart';
 
@@ -12,12 +13,19 @@ sealed class LiveRoomEvent {
 
 /// Requests creating/starting the live-room session and camera / media.
 class LiveRoomStarted extends LiveRoomEvent {
-  const LiveRoomStarted({this.title, this.initialCamera});
+  const LiveRoomStarted({
+    this.title,
+    this.initialCamera,
+    this.initialNativeCamera,
+  });
 
   final String? title;
 
   /// Reuses the camera already running on the start screen.
   final CameraController? initialCamera;
+
+  /// Reuses the Android CameraX/GPU camera from the start screen.
+  final NativeCameraController? initialNativeCamera;
 }
 
 /// Ends the stuck active live (`GET /lives/mine` → `POST …/end`) then retries start.

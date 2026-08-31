@@ -88,6 +88,7 @@ class ArCameraPlatformView(
         warpGlView.visibility = View.INVISIBLE
 
         warpGlView.ensureGlInitialized()
+        ArCameraLivePublisher.bindRenderer(warpGlView)
 
         confettiOverlay.visibility = View.GONE
         videoOverlay.visibility = View.GONE
@@ -115,6 +116,8 @@ class ArCameraPlatformView(
     override fun getView(): View = root
 
     override fun dispose() {
+        ArCameraLivePublisher.unbindRenderer(warpGlView)
+        val ownsActiveBridge = ArCameraBridge.warpGlView === warpGlView
         try {
             activity.lifecycle.removeObserver(lifecycleObserver)
         } catch (_: Throwable) {
@@ -123,11 +126,17 @@ class ArCameraPlatformView(
             confettiOverlay.cancelAnimation()
         } catch (_: Throwable) {
         }
-        try {
-            ArCameraBridge.ensureVideoHelper()?.release()
-        } catch (_: Throwable) {
+        if (ownsActiveBridge) {
+            try {
+                ArCameraBridge.ensureVideoHelper()?.release()
+            } catch (_: Throwable) {
+            }
+            ArCameraController.stop()
+            ArCameraBridge.clear(warpGlView)
+        } else {
+            // A newer PlatformView already owns the shared controller/bridge.
+            // Release only this stale view's private GL resources.
+            warpGlView.releaseGl()
         }
-        ArCameraController.stop()
-        ArCameraBridge.clear()
     }
 }

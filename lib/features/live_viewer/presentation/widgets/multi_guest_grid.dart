@@ -135,7 +135,7 @@ class _HostTile extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          LiveVideoPlayer(live: live, isActive: isActive),
+          LiveVideoPlayer(live: live, isActive: isActive, liveKitOnly: true),
           // Host badge — top-right (LTR)
           Positioned(
             top: 6,

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../../core/utils/app_colors.dart';
 import '../../../../../core/utils/app_sizes.dart';
 import '../../../../../core/constants/app_spacing.dart';
+import '../../../../live/presentation/widgets/room/live_beauty_sheet.dart';
 import '../../../../live/presentation/widgets/room/live_video_quality_sheet.dart';
 import 'live_room_option_tile.dart';
 
@@ -182,6 +183,12 @@ class _SettingsCards extends StatelessWidget {
               icon: Icons.person_add_alt_1_outlined,
               title: 'إعداد البث لاكتساب عملاء',
               trailing: LiveRoomOptionTrailing.chevron,
+            ),
+            LiveRoomOptionTile(
+              icon: Icons.auto_awesome_outlined,
+              title: 'تجميل',
+              trailing: LiveRoomOptionTrailing.chevron,
+              onTap: () => LiveBeautySheet.show(context),
             ),
             LiveRoomOptionTile(
               icon: Icons.high_quality_outlined,

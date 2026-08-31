@@ -298,12 +298,16 @@ class NativeCameraController extends ChangeNotifier {
   static const _channel = MethodChannel(NativeCameraConstants.channelName);
 
   NativeCameraState _state = const NativeCameraState(ok: false);
+  bool _released = false;
   NativeCameraState get state => _state;
 
   bool get isAndroid => defaultTargetPlatform == TargetPlatform.android;
 
   Future<NativeCameraState> start() async {
     _ensureAndroid();
+    if (_released) {
+      throw StateError('NativeCameraController has been released');
+    }
     final raw = await _channel.invokeMethod<Map<dynamic, dynamic>>('start');
     _state = NativeCameraState.fromMap(raw);
     notifyListeners();
@@ -342,10 +346,9 @@ class NativeCameraController extends ChangeNotifier {
 
   Future<NativeCameraState> setFlash(bool enabled) async {
     _ensureAndroid();
-    final raw = await _channel.invokeMethod<Map<dynamic, dynamic>>(
-      'setFlash',
-      {'enabled': enabled},
-    );
+    final raw = await _channel.invokeMethod<Map<dynamic, dynamic>>('setFlash', {
+      'enabled': enabled,
+    });
     _state = NativeCameraState.fromMap(raw);
     notifyListeners();
     if (!_state.ok) {
@@ -365,10 +368,7 @@ class NativeCameraController extends ChangeNotifier {
     _ensureAndroid();
     final raw = await _channel.invokeMethod<Map<dynamic, dynamic>>(
       'setColorFilter',
-      {
-        'enabled': enabled,
-        'intensity': intensity.clamp(0.0, 1.0),
-      },
+      {'enabled': enabled, 'intensity': intensity.clamp(0.0, 1.0)},
     );
     _state = NativeCameraState.fromMap(raw);
     // Optimistic local update for smooth slider (avoids waiting on channel).
@@ -415,10 +415,7 @@ class NativeCameraController extends ChangeNotifier {
     _ensureAndroid();
     final raw = await _channel.invokeMethod<Map<dynamic, dynamic>>(
       'setFaceTracking',
-      {
-        'enabled': enabled,
-        'landmarkDebug': landmarkDebug,
-      },
+      {'enabled': enabled, 'landmarkDebug': landmarkDebug},
     );
     _state = NativeCameraState.fromMap(raw);
     notifyListeners();
@@ -453,21 +450,24 @@ class NativeCameraController extends ChangeNotifier {
     _ensureAndroid();
     final raw = await _channel.invokeMethod<List<dynamic>>('listFaceEffects');
     if (raw == null) return const [];
-    return raw.map((e) {
-      final map = Map<dynamic, dynamic>.from(e as Map);
-      final versionRaw = map['version'];
-      final version = versionRaw is int
-          ? versionRaw
-          : versionRaw is num
+    return raw
+        .map((e) {
+          final map = Map<dynamic, dynamic>.from(e as Map);
+          final versionRaw = map['version'];
+          final version = versionRaw is int
+              ? versionRaw
+              : versionRaw is num
               ? versionRaw.toInt()
               : int.tryParse(versionRaw?.toString() ?? '') ?? 1;
-      return NativeFaceEffectInfo(
-        id: map['id']?.toString() ?? '',
-        name: map['name']?.toString() ?? '',
-        version: version,
-        remote: map['remote'] == true,
-      );
-    }).where((e) => e.id.isNotEmpty).toList();
+          return NativeFaceEffectInfo(
+            id: map['id']?.toString() ?? '',
+            name: map['name']?.toString() ?? '',
+            version: version,
+            remote: map['remote'] == true,
+          );
+        })
+        .where((e) => e.id.isNotEmpty)
+        .toList();
   }
 
   /// Phase 8: install a downloaded remote face effect on native GPU.
@@ -479,26 +479,22 @@ class NativeCameraController extends ChangeNotifier {
     bool force = false,
   }) async {
     _ensureAndroid();
-    await _channel.invokeMethod<Map<dynamic, dynamic>>(
-      'installFaceEffect',
-      {
-        'id': id,
-        'name': name,
-        'version': version,
-        'force': force,
-        'layers': layers,
-      },
-    );
+    await _channel.invokeMethod<Map<dynamic, dynamic>>('installFaceEffect', {
+      'id': id,
+      'name': name,
+      'version': version,
+      'force': force,
+      'layers': layers,
+    });
   }
 
   /// Phase 8: release native resources for remote effect ids.
   Future<void> unloadFaceEffects(List<String> ids) async {
     _ensureAndroid();
     if (ids.isEmpty) return;
-    await _channel.invokeMethod<Map<dynamic, dynamic>>(
-      'unloadFaceEffects',
-      {'ids': ids},
-    );
+    await _channel.invokeMethod<Map<dynamic, dynamic>>('unloadFaceEffects', {
+      'ids': ids,
+    });
   }
 
   /// Phase 5: masked GPU beauty. Intensities are 0.0–1.0.
@@ -511,17 +507,15 @@ class NativeCameraController extends ChangeNotifier {
     bool enabled = true,
   }) async {
     _ensureAndroid();
-    final raw = await _channel.invokeMethod<Map<dynamic, dynamic>>(
-      'setBeauty',
-      {
-        'skinSmooth': skinSmooth.clamp(0.0, 1.0),
-        'brightness': brightness.clamp(0.0, 1.0),
-        'skinTone': skinTone.clamp(0.0, 1.0),
-        'sharpen': sharpen.clamp(0.0, 1.0),
-        'eyeEnhancement': eyeEnhancement.clamp(0.0, 1.0),
-        'enabled': enabled,
-      },
-    );
+    final raw = await _channel
+        .invokeMethod<Map<dynamic, dynamic>>('setBeauty', {
+          'skinSmooth': skinSmooth.clamp(0.0, 1.0),
+          'brightness': brightness.clamp(0.0, 1.0),
+          'skinTone': skinTone.clamp(0.0, 1.0),
+          'sharpen': sharpen.clamp(0.0, 1.0),
+          'eyeEnhancement': eyeEnhancement.clamp(0.0, 1.0),
+          'enabled': enabled,
+        });
     _state = NativeCameraState.fromMap(raw);
     _state = _state.copyWith(
       beautyEnabled: enabled,
@@ -580,18 +574,15 @@ class NativeCameraController extends ChangeNotifier {
     bool enabled = true,
   }) async {
     _ensureAndroid();
-    final raw = await _channel.invokeMethod<Map<dynamic, dynamic>>(
-      'setWarp',
-      {
-        'faceSlim': faceSlim.clamp(0.0, 1.0),
-        'bigEyes': bigEyes.clamp(0.0, 1.0),
-        'smallNose': smallNose.clamp(0.0, 1.0),
-        'bigLips': bigLips.clamp(0.0, 1.0),
-        'jaw': jaw.clamp(0.0, 1.0),
-        'chin': chin.clamp(0.0, 1.0),
-        'enabled': enabled,
-      },
-    );
+    final raw = await _channel.invokeMethod<Map<dynamic, dynamic>>('setWarp', {
+      'faceSlim': faceSlim.clamp(0.0, 1.0),
+      'bigEyes': bigEyes.clamp(0.0, 1.0),
+      'smallNose': smallNose.clamp(0.0, 1.0),
+      'bigLips': bigLips.clamp(0.0, 1.0),
+      'jaw': jaw.clamp(0.0, 1.0),
+      'chin': chin.clamp(0.0, 1.0),
+      'enabled': enabled,
+    });
     _state = NativeCameraState.fromMap(raw);
     _state = _state.copyWith(
       warpEnabled: enabled,
@@ -655,20 +646,18 @@ class NativeCameraController extends ChangeNotifier {
     bool enabled = true,
   }) async {
     _ensureAndroid();
-    final raw = await _channel.invokeMethod<Map<dynamic, dynamic>>(
-      'setMakeup',
-      {
-        'lipstick': lipstick.clamp(0.0, 1.0),
-        'blush': blush.clamp(0.0, 1.0),
-        'eyeliner': eyeliner.clamp(0.0, 1.0),
-        'eyeshadow': eyeshadow.clamp(0.0, 1.0),
-        'lipstickColor': ?lipstickColor,
-        'blushColor': ?blushColor,
-        'eyelinerColor': ?eyelinerColor,
-        'eyeshadowColor': ?eyeshadowColor,
-        'enabled': enabled,
-      },
-    );
+    final raw = await _channel
+        .invokeMethod<Map<dynamic, dynamic>>('setMakeup', {
+          'lipstick': lipstick.clamp(0.0, 1.0),
+          'blush': blush.clamp(0.0, 1.0),
+          'eyeliner': eyeliner.clamp(0.0, 1.0),
+          'eyeshadow': eyeshadow.clamp(0.0, 1.0),
+          'lipstickColor': ?lipstickColor,
+          'blushColor': ?blushColor,
+          'eyelinerColor': ?eyelinerColor,
+          'eyeshadowColor': ?eyeshadowColor,
+          'enabled': enabled,
+        });
     _state = NativeCameraState.fromMap(raw);
     _state = _state.copyWith(
       makeupEnabled: enabled,
@@ -768,15 +757,12 @@ class NativeCameraController extends ChangeNotifier {
     double originalVolume = 0.2,
   }) async {
     _ensureAndroid();
-    final raw = await _channel.invokeMethod<Map<dynamic, dynamic>>(
-      'setMusic',
-      {
-        'path': path,
-        'offsetMs': offsetMs,
-        'musicVolume': musicVolume.clamp(0.0, 1.0),
-        'originalVolume': originalVolume.clamp(0.0, 1.0),
-      },
-    );
+    final raw = await _channel.invokeMethod<Map<dynamic, dynamic>>('setMusic', {
+      'path': path,
+      'offsetMs': offsetMs,
+      'musicVolume': musicVolume.clamp(0.0, 1.0),
+      'originalVolume': originalVolume.clamp(0.0, 1.0),
+    });
     _state = NativeCameraState.fromMap(raw);
     notifyListeners();
     return _state;
@@ -820,10 +806,7 @@ class NativeCameraController extends ChangeNotifier {
     _ensureAndroid();
     final raw = await _channel.invokeMethod<Map<dynamic, dynamic>>(
       'exportVideo',
-      {
-        'path': path,
-        'force': force,
-      },
+      {'path': path, 'force': force},
     );
     _state = NativeCameraState.fromMap(raw);
     notifyListeners();
@@ -855,7 +838,8 @@ class NativeCameraController extends ChangeNotifier {
   }
 
   Future<void> releaseNative() async {
-    if (!isAndroid) return;
+    if (!isAndroid || _released) return;
+    _released = true;
     try {
       await _channel.invokeMethod<void>('dispose');
     } catch (_) {}
@@ -864,7 +848,8 @@ class NativeCameraController extends ChangeNotifier {
 
   @override
   void dispose() {
-    if (isAndroid) {
+    if (isAndroid && !_released) {
+      _released = true;
       _channel.invokeMethod<void>('dispose');
     }
     _state = const NativeCameraState(ok: false);

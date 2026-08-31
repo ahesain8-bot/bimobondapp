@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:bimobondapp/app/ar_camera/ar_camera_live_track.dart';
 import 'package:flutter/foundation.dart';
 import 'package:livekit_client/livekit_client.dart';
 
 import '../../../../core/services/live_audio_session.dart';
+import '../../../../core/services/live_beauty_preference.dart';
 import '../../../../core/services/media_progress_watchdog.dart';
 import '../../../../core/services/live_video_quality_preference.dart';
 import '../../../../core/models/live_media_hints.dart';
@@ -29,6 +31,7 @@ class LivesMediaDataSource {
   LocalVideoTrack? _videoTrack;
   LocalAudioTrack? _audioTrack;
   var _videoPublished = false;
+  var _arCameraTrackActive = false;
   Timer? _videoHealthTimer;
   var _videoHealthCheckInFlight = false;
   // 3 samples at 2s: about six seconds of a stream that decodes no frames
@@ -90,11 +93,17 @@ class LivesMediaDataSource {
   /// Every tier at or below the capture profile is declared so the SFU always
   /// has a lower layer to hand a viewer on a weak connection, and the walk
   /// stops at 480p — nothing below that is ever published.
-  List<VideoParameters> _simulcastLayersFor(LiveCaptureProfile profile) {
+  List<VideoParameters> _simulcastLayersFor(
+    LiveCaptureProfile profile, {
+    bool portrait = false,
+  }) {
     return [
       for (final tier in profile.fallbacks)
         VideoParameters(
-          dimensions: VideoDimensions(tier.width, tier.height),
+          dimensions: VideoDimensions(
+            portrait ? tier.height : tier.width,
+            portrait ? tier.width : tier.height,
+          ),
           encoding: VideoEncoding(
             maxBitrate: tier == profile
                 ? profile.maxBitrate
@@ -105,7 +114,10 @@ class LivesMediaDataSource {
     ];
   }
 
-  VideoPublishOptions _publishOptionsFor(LiveCaptureProfile profile) {
+  VideoPublishOptions _publishOptionsFor(
+    LiveCaptureProfile profile, {
+    bool portrait = false,
+  }) {
     return VideoPublishOptions(
       // This is the proven stable Android publishing path used before the
       // regression: one codec negotiation with fixed simulcast layers.
@@ -115,7 +127,7 @@ class LivesMediaDataSource {
         maxBitrate: profile.maxBitrate,
         maxFramerate: profile.maxFps,
       ),
-      videoSimulcastLayers: _simulcastLayersFor(profile),
+      videoSimulcastLayers: _simulcastLayersFor(profile, portrait: portrait),
     );
   }
 
@@ -160,7 +172,7 @@ class LivesMediaDataSource {
     final result = previous.then((_) => operation());
     // A failed reconnect must not prevent a later battle-end/disconnect from
     // running, while the original caller still receives its error.
-    _battleOperationQueue = result.then<void>((_) {}, onError: (_, __) {});
+    _battleOperationQueue = result.then<void>((_) {}, onError: (_, _) {});
     return result;
   }
 
@@ -171,23 +183,19 @@ class LivesMediaDataSource {
   }) {
     final generation = _battleConnectionGeneration;
     unawaited(
-      _serializeBattleOperation(
-        () async {
-          await _recoverBattleRoom(
-            room: room,
-            url: url,
-            token: token,
-            generation: generation,
-          );
-          if (
-            generation == _battleConnectionGeneration &&
+      _serializeBattleOperation(() async {
+        await _recoverBattleRoom(
+          room: room,
+          url: url,
+          token: token,
+          generation: generation,
+        );
+        if (generation == _battleConnectionGeneration &&
             _battleRoom == room &&
-            room.connectionState == ConnectionState.disconnected
-          ) {
-            onRoomEvent?.call('battle', 'failed');
-          }
-        },
-      ),
+            room.connectionState == ConnectionState.disconnected) {
+          onRoomEvent?.call('battle', 'failed');
+        }
+      }),
     );
   }
 
@@ -206,8 +214,11 @@ class LivesMediaDataSource {
   /// A successful `publishVideoTrack` only proves signalling succeeded. On
   /// some Android Camera2 devices the capture session fails asynchronously,
   /// so the publication exists but its counters remain at zero forever.
-  Future<bool> _waitForOutboundVideo(LocalVideoTrack track) async {
-    final deadline = DateTime.now().add(const Duration(milliseconds: 2200));
+  Future<bool> _waitForOutboundVideo(
+    LocalVideoTrack track, {
+    Duration timeout = const Duration(milliseconds: 2200),
+  }) async {
+    final deadline = DateTime.now().add(timeout);
     var sawFrameCounter = false;
     var sawAnyStats = false;
     num lastFrames = 0;
@@ -504,12 +515,17 @@ class LivesMediaDataSource {
 
     try {
       Object? lastError;
+      final useExistingArCamera = await ArCameraLiveTrack.isAvailable();
       final fallbacks = requestedProfile.fallbacks;
       final ladder = <LiveCaptureProfile>[
         requestedProfile,
         ...fallbacks.skip(1),
       ];
-      final attemptCount = maxAttempts.clamp(1, ladder.length);
+      // The native AR renderer is one stable source, not a Camera2 mode that
+      // should be closed and reopened at progressively lower presets.
+      final attemptCount = useExistingArCamera
+          ? 1
+          : maxAttempts.clamp(1, ladder.length);
       final local = room.localParticipant;
       if (local == null) {
         throw StateError('LiveKit local participant unavailable');
@@ -525,9 +541,22 @@ class LivesMediaDataSource {
             'camera/publish attempt ${attempt + 1}/$attemptCount '
             'at ${profile.label}...',
           );
-          candidate = await LocalVideoTrack.createCameraTrack(
-            _captureOptionsFor(profile, cameraPosition),
-          );
+          if (useExistingArCamera) {
+            candidate = await ArCameraLiveTrack.create(
+              width: profile.height,
+              height: profile.width,
+              fps: profile.maxFps,
+              maxBitrate: profile.maxBitrate,
+              cameraPosition: cameraPosition,
+            );
+          } else {
+            candidate = await LocalVideoTrack.createCameraTrack(
+              _captureOptionsFor(profile, cameraPosition),
+            );
+            await LiveBeautyPreference.instance.attachTo(
+              candidate.mediaStreamTrack.id,
+            );
+          }
 
           final opts = candidate.currentOptions;
           final params = opts.params;
@@ -545,7 +574,10 @@ class LivesMediaDataSource {
 
           final publication = await local.publishVideoTrack(
             candidate,
-            publishOptions: _publishOptionsFor(profile),
+            publishOptions: _publishOptionsFor(
+              profile,
+              portrait: useExistingArCamera,
+            ),
           );
           publicationSid = publication.sid;
 
@@ -553,7 +585,16 @@ class LivesMediaDataSource {
           // few milliseconds later. Do not replace the visible camera with a
           // LiveKit texture until RTC proves that real frames are leaving the
           // handset. This specifically prevents "published but black" lives.
-          final hasFrames = await _waitForOutboundVideo(candidate);
+          final hasFrames = await _waitForOutboundVideo(
+            candidate,
+            // The native Kotlin renderer has to create one additional shared
+            // EGL output surface on first publish. A slow device/emulator can
+            // present its first valid frame after ~3 seconds; the old 2.2s
+            // Camera2-oriented guard detached that healthy track immediately.
+            timeout: useExistingArCamera
+                ? const Duration(seconds: 8)
+                : const Duration(milliseconds: 2200),
+          );
           if (!hasFrames) {
             throw StateError(
               'camera opened at ${profile.label} but produced no video frames',
@@ -561,6 +602,7 @@ class LivesMediaDataSource {
           }
 
           _videoTrack = candidate;
+          _arCameraTrackActive = useExistingArCamera;
           _activeProfile = profile;
           _videoPublished = true;
           lastError = null;
@@ -585,6 +627,10 @@ class LivesMediaDataSource {
           try {
             await candidate?.dispose();
           } catch (_) {}
+          if (useExistingArCamera) {
+            await ArCameraLiveTrack.detach();
+            _arCameraTrackActive = false;
+          }
           if (attempt < attemptCount - 1) {
             await Future<void>.delayed(const Duration(milliseconds: 300));
           }
@@ -765,10 +811,7 @@ class LivesMediaDataSource {
     );
     room.events
       ..on<RoomDisconnectedEvent>((_) {
-        if (
-          _battleRoom != room ||
-          generation != _battleConnectionGeneration
-        ) {
+        if (_battleRoom != room || generation != _battleConnectionGeneration) {
           return;
         }
         debugPrint('🔴 [Host] opponent battle room disconnected');
@@ -776,19 +819,13 @@ class LivesMediaDataSource {
         _queueBattleRecovery(room: room, url: url, token: token);
       })
       ..on<ReconnectingEvent>((_) {
-        if (
-          _battleRoom != room ||
-          generation != _battleConnectionGeneration
-        ) {
+        if (_battleRoom != room || generation != _battleConnectionGeneration) {
           return;
         }
         onRoomEvent?.call('battle', 'reconnecting');
       })
       ..on<RoomReconnectedEvent>((_) {
-        if (
-          _battleRoom != room ||
-          generation != _battleConnectionGeneration
-        ) {
+        if (_battleRoom != room || generation != _battleConnectionGeneration) {
           return;
         }
         onRoomEvent?.call('battle', 'reconnected');
@@ -801,16 +838,13 @@ class LivesMediaDataSource {
         unawaited(_retryBattleSubscription(room, event, generation));
       })
       ..on<TrackSubscribedEvent>((event) {
-        if (
-          _battleRoom != room ||
-          generation != _battleConnectionGeneration
-        ) {
+        if (_battleRoom != room || generation != _battleConnectionGeneration) {
           return;
         }
         if (event.track is RemoteAudioTrack) {
           unawaited(_preferMediaSpeaker());
         }
-    });
+      });
     await room.connect(url, token);
     if (generation != _battleConnectionGeneration) {
       try {
@@ -844,10 +878,7 @@ class LivesMediaDataSource {
     int generation,
   ) async {
     await Future<void>.delayed(const Duration(milliseconds: 350));
-    if (
-      _battleRoom != room ||
-      generation != _battleConnectionGeneration
-    ) {
+    if (_battleRoom != room || generation != _battleConnectionGeneration) {
       return;
     }
     final participant = event.participant;
@@ -914,10 +945,7 @@ class LivesMediaDataSource {
     final generation = _battleConnectionGeneration;
     try {
       final track = _firstBattleVideoTrack(room);
-      if (
-        _battleRoom != room ||
-        generation != _battleConnectionGeneration
-      ) {
+      if (_battleRoom != room || generation != _battleConnectionGeneration) {
         return;
       }
       if (track == null) {
@@ -930,11 +958,9 @@ class LivesMediaDataSource {
             stats?.framesReceived ??
             stats?.packetsReceived ??
             stats?.bytesReceived;
-        if (
-          _battleRoom != room ||
-          generation != _battleConnectionGeneration ||
-          !_battleVideoProgress.addSample(progress)
-        ) {
+        if (_battleRoom != room ||
+            generation != _battleConnectionGeneration ||
+            !_battleVideoProgress.addSample(progress)) {
           return;
         }
       }
@@ -943,23 +969,15 @@ class LivesMediaDataSource {
         '🔴 [Host] opponent video stalled while battle room stayed up',
       );
       _stopBattleVideoWatchdog();
-      await _serializeBattleOperation(
-        () async {
-          if (
-            _battleRoom != room ||
-            generation != _battleConnectionGeneration
-          ) {
-            return;
-          }
-          await room.disconnect();
-          if (
-            _battleRoom == room &&
-            generation == _battleConnectionGeneration
-          ) {
-            _queueBattleRecovery(room: room, url: url, token: token);
-          }
-        },
-      );
+      await _serializeBattleOperation(() async {
+        if (_battleRoom != room || generation != _battleConnectionGeneration) {
+          return;
+        }
+        await room.disconnect();
+        if (_battleRoom == room && generation == _battleConnectionGeneration) {
+          _queueBattleRecovery(room: room, url: url, token: token);
+        }
+      });
     } catch (error) {
       debugPrint('[Host] opponent video health sample unavailable: $error');
     }
@@ -977,11 +995,9 @@ class LivesMediaDataSource {
     required String token,
     required int generation,
   }) async {
-    if (
-      _battleRoom != room ||
-      _battleRecoveryRoom == room ||
-      generation != _battleConnectionGeneration
-    ) {
+    if (_battleRoom != room ||
+        _battleRecoveryRoom == room ||
+        generation != _battleConnectionGeneration) {
       return;
     }
     _battleRecoveryRoom = room;
@@ -993,10 +1009,7 @@ class LivesMediaDataSource {
     try {
       for (var attempt = 0; attempt < retryDelays.length; attempt++) {
         await Future<void>.delayed(retryDelays[attempt]);
-        if (
-          _battleRoom != room ||
-          generation != _battleConnectionGeneration
-        ) {
+        if (_battleRoom != room || generation != _battleConnectionGeneration) {
           return;
         }
         if (room.connectionState == ConnectionState.connected) {
@@ -1010,10 +1023,8 @@ class LivesMediaDataSource {
             '${attempt + 1}/${retryDelays.length}',
           );
           await room.connect(url, token);
-          if (
-            _battleRoom != room ||
-            generation != _battleConnectionGeneration
-          ) {
+          if (_battleRoom != room ||
+              generation != _battleConnectionGeneration) {
             await room.disconnect();
             return;
           }
@@ -1059,6 +1070,10 @@ class LivesMediaDataSource {
 
   /// Flip between front/back by restarting the camera capturer when possible.
   Future<LocalVideoTrack?> flipCamera({required bool useFront}) async {
+    // Android live uses the existing Kotlin AR preview as its sole source.
+    // The host flips that preview through ArCameraBridge; opening a LiveKit
+    // CameraX capturer here would compete for the same physical camera.
+    if (_arCameraTrackActive) return _videoTrack;
     final room = _room;
     final old = _videoTrack;
     if (room == null || old == null || !_videoPublished) return _videoTrack;
@@ -1107,6 +1122,7 @@ class LivesMediaDataSource {
         track = await LocalVideoTrack.createCameraTrack(
           _captureOptionsFor(_activeProfile, at),
         );
+        await LiveBeautyPreference.instance.attachTo(track.mediaStreamTrack.id);
         await local.publishVideoTrack(
           track,
           publishOptions: _publishOptionsFor(_activeProfile),
@@ -1151,6 +1167,11 @@ class LivesMediaDataSource {
       '_audioTrack=${_audioTrack != null ? "SET" : "NULL"}',
     );
     _stopOutboundVideoWatchdog();
+    if (!_arCameraTrackActive) {
+      // Non-Android fallback only. Android publishes the already-rendered
+      // Kotlin AR frame and does not install this second processor.
+      await LiveBeautyPreference.instance.detach();
+    }
     if (!keepBattleRoom) {
       await disconnectBattle();
     }
@@ -1169,6 +1190,10 @@ class LivesMediaDataSource {
       // VideoSource") which breaks the NEXT live with a dead video source.
       await _videoTrack?.dispose();
       _videoTrack = null;
+      if (_arCameraTrackActive) {
+        await ArCameraLiveTrack.detach();
+        _arCameraTrackActive = false;
+      }
       await _audioTrack?.dispose();
       _audioTrack = null;
       await room?.disconnect();
@@ -1180,6 +1205,10 @@ class LivesMediaDataSource {
       _audioTrack = null;
       _room = null;
       _videoPublished = false;
+      if (_arCameraTrackActive) {
+        await ArCameraLiveTrack.detach();
+        _arCameraTrackActive = false;
+      }
     }
   }
 }
