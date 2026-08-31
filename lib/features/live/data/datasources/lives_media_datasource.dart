@@ -522,6 +522,20 @@ class LivesMediaDataSource {
         try {
           await candidate?.dispose();
         } catch (_) {}
+        // Once the room is gone there is nothing left to publish to, and
+        // retrying only replaces the real failure with a misleading one: the
+        // logs showed attempt 1 failing with TrackPublishException and then
+        // attempts 2 and 3 reporting "local participant unavailable", which
+        // reads as a different bug entirely. Stop and keep the first error,
+        // which is the one that explains the broadcast.
+        if (room.localParticipant == null ||
+            room.connectionState != ConnectionState.connected) {
+          debugPrint(
+            '🔴 [Host] room no longer connected after audio attempt $attempt; '
+            'keeping first error and stopping retries',
+          );
+          break;
+        }
         if (attempt < 3) {
           await Future<void>.delayed(Duration(milliseconds: 180 * attempt));
         }

@@ -2175,7 +2175,14 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
   ) {
     final current = _readyOrNull;
     if (current == null) return;
-    if (current.isMediaConnected && current.controller == null) {
+    final isOpen = current.effectsPanelMode != LiveEffectsPanelMode.hidden;
+
+    // Closing always works. This guard used to run before the toggle for every
+    // tap, so once the panel was open during a LiveKit broadcast the button
+    // that opened it could no longer close it — the tap hit this branch and
+    // returned, leaving the user stuck behind a panel with no way out. Only
+    // *opening* depends on a local camera preview.
+    if (!isOpen && current.isMediaConnected && current.controller == null) {
       emit(
         current.copyWith(
           actionMessage:
@@ -2184,10 +2191,13 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
       );
       return;
     }
-    final next = current.effectsPanelMode == LiveEffectsPanelMode.hidden
-        ? LiveEffectsPanelMode.tray
-        : LiveEffectsPanelMode.hidden;
-    emit(current.copyWith(effectsPanelMode: next));
+    emit(
+      current.copyWith(
+        effectsPanelMode: isOpen
+            ? LiveEffectsPanelMode.hidden
+            : LiveEffectsPanelMode.tray,
+      ),
+    );
   }
 
   void _onEffectsPanelModeChanged(
