@@ -1990,14 +1990,15 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     final userMap = user is Map ? Map<String, dynamic>.from(user) : null;
     final content = map['content']?.toString() ?? map['text']?.toString() ?? '';
     if (content.isEmpty && map['id'] == null) return null;
+    final fullName = userMap?['fullName']?.toString();
+    final handle = userMap?['username']?.toString();
     return CommentEntity(
       id: map['id']?.toString() ?? 'pinned',
       liveId: live.id,
       userId: userMap?['id']?.toString() ?? map['userId']?.toString() ?? '',
-      username:
-          userMap?['username']?.toString() ??
-          userMap?['fullName']?.toString() ??
-          'User',
+      username: (fullName != null && fullName.trim().isNotEmpty)
+          ? fullName.trim()
+          : (handle ?? 'User'),
       userAvatar: userMap?['avatarUrl']?.toString(),
       content: content,
       createdAt:
