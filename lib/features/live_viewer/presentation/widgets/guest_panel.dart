@@ -137,7 +137,7 @@ class _GuestSlotTile extends StatelessWidget {
                   child: CachedNetworkImage(
                     imageUrl: slot.avatarUrl ?? '',
                     fit: BoxFit.cover,
-                    errorWidget: (_, __, ___) => FallbackAvatar(
+                    errorWidget: (_, _, _) => FallbackAvatar(
                       seed: slot.userId ?? 'g',
                       name: slot.name,
                       radius: size * 0.31,
@@ -284,7 +284,7 @@ Future<bool?> showGuestRequestSheet(
                             ? CachedNetworkImage(
                                 imageUrl: viewerAvatar,
                                 fit: BoxFit.cover,
-                                errorWidget: (_, __, ___) => const Icon(
+                                errorWidget: (_, _, _) => const Icon(
                                   Icons.person,
                                   size: 32,
                                   color: Colors.black38,
@@ -317,7 +317,7 @@ Future<bool?> showGuestRequestSheet(
                         child: CachedNetworkImage(
                           imageUrl: hostAvatar ?? '',
                           fit: BoxFit.cover,
-                          errorWidget: (_, __, ___) => FallbackAvatar(
+                          errorWidget: (_, _, _) => FallbackAvatar(
                             seed: hostName,
                             name: hostName,
                             radius: 32,

@@ -82,7 +82,17 @@ object ArCameraLivePublisher {
 
     /** Called by the existing platform view whenever its renderer is mounted. */
     fun bindRenderer(next: FaceWarpGlView) {
+        // A route transition can keep the start-live PlatformView alive for a
+        // few frames after the live-room PlatformView has mounted. Only the
+        // view currently owned by ArCameraBridge may become the publisher;
+        // otherwise WebRTC is attached to the hidden, stale GL thread and sees
+        // zero frames while the visible Kotlin preview keeps drawing normally.
+        if (ArCameraBridge.warpGlView !== next) {
+            Log.i(TAG, "ignored stale renderer bind id=${System.identityHashCode(next)}")
+            return
+        }
         renderer = next
+        Log.i(TAG, "bound active renderer id=${System.identityHashCode(next)}")
         bindOutputSurface()
     }
 
@@ -159,10 +169,18 @@ object ArCameraLivePublisher {
     }
 
     private fun bindOutputSurface() {
-        val gl = renderer ?: ArCameraBridge.warpGlView ?: return
+        // The bridge is the source of truth for PlatformView ownership. The
+        // cached renderer can briefly refer to the setup route during the
+        // setup -> room hand-off.
+        val gl = ArCameraBridge.warpGlView ?: renderer ?: return
         val surface = outputSurface ?: return
         if (!surface.isValid || outputWidth < 2 || outputHeight < 2) return
         renderer = gl
+        Log.i(
+            TAG,
+            "binding WebRTC surface to active renderer " +
+                "id=${System.identityHashCode(gl)} ${outputWidth}x$outputHeight",
+        )
         gl.setEncoderSurface(surface, outputWidth, outputHeight)
     }
 

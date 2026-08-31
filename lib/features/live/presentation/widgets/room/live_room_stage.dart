@@ -8,6 +8,7 @@ import '../../../../../core/utils/build_safe_notifier.dart';
 import '../../../../../core/utils/livekit_participant_match.dart';
 import '../../../../../core/models/live_battle.dart';
 import '../../../../../core/widgets/stage_tiles.dart';
+import '../../../../../core/widgets/safe_network_image.dart';
 import '../../../domain/entities/live_guest.dart';
 import '../../../domain/repositories/live_session_repository.dart';
 import '../../bloc/live_room/live_room_bloc.dart';
@@ -34,7 +35,10 @@ class LiveRoomStage extends StatelessWidget {
               (previous is! LiveRoomReady ||
                   previous.guests != current.guests ||
                   previous.battle != current.battle ||
-                  previous.battleMediaRoom != current.battleMediaRoom)),
+                  previous.battleMediaRoom != current.battleMediaRoom ||
+                  previous.topGifterAvatars != current.topGifterAvatars ||
+                  previous.opponentTopGifterAvatars !=
+                      current.opponentTopGifterAvatars)),
       builder: (context, state) {
         final guests = state is LiveRoomReady
             ? state.activeGuests
@@ -46,6 +50,8 @@ class LiveRoomStage extends StatelessWidget {
             currentLiveId: state.session.id,
             topInset: topInset,
             battleMediaRoom: state.battleMediaRoom,
+            supporters: state.topGifterAvatars,
+            opponentSupporters: state.opponentTopGifterAvatars,
           );
         }
 
@@ -139,12 +145,16 @@ class _BattleStage extends StatelessWidget {
     required this.currentLiveId,
     required this.topInset,
     required this.battleMediaRoom,
+    required this.supporters,
+    required this.opponentSupporters,
   });
 
   final LiveBattle battle;
   final String currentLiveId;
   final double topInset;
   final Room? battleMediaRoom;
+  final List<String> supporters;
+  final List<String> opponentSupporters;
 
   @override
   Widget build(BuildContext context) {
@@ -157,39 +167,174 @@ class _BattleStage extends StatelessWidget {
       alignment: Alignment.topCenter,
       child: Padding(
         padding: EdgeInsets.only(top: topInset),
-        child: SizedBox(
-          width: width,
-          height: height,
-          child: Stack(
+        child: Directionality(
+          // PK sides are physical positions and must not swap in Arabic.
+          textDirection: TextDirection.ltr,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Expanded(
-                    child: _StageTile(child: LiveRoomCameraLayer()),
-                  ),
-                  const SizedBox(width: kStageTileGap),
-                  Expanded(
-                    child: _StageTile(
-                      child: _OpponentVideo(room: room is Room ? room : null),
+              SizedBox(
+                width: width,
+                height: height,
+                child: Stack(
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const Expanded(
+                          child: _StageTile(child: LiveRoomCameraLayer()),
+                        ),
+                        const SizedBox(width: kStageTileGap),
+                        Expanded(
+                          child: _StageTile(
+                            child: _OpponentVideo(
+                              room: room is Room ? room : null,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                ],
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      top: 0,
+                      child: _HostBattleBar(
+                        leftScore: battle.scoreFor(currentLiveId),
+                        rightScore: battle.opponentScoreFor(currentLiveId),
+                        endTime: battle.endTime,
+                        multiplier: battle.multiplier,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              Positioned(
-                left: 0,
-                right: 0,
-                top: 0,
-                child: _HostBattleBar(
-                  leftScore: battle.scoreFor(currentLiveId),
-                  rightScore: battle.opponentScoreFor(currentLiveId),
-                  endTime: battle.endTime,
-                  multiplier: battle.multiplier,
+              SizedBox(
+                width: width,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _BattleSupporters(
+                          avatars: supporters,
+                          isOwnSide: true,
+                        ),
+                      ),
+                      Expanded(
+                        child: _BattleSupporters(
+                          avatars: opponentSupporters,
+                          isOwnSide: false,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _BattleSupporters extends StatelessWidget {
+  const _BattleSupporters({required this.avatars, required this.isOwnSide});
+
+  final List<String> avatars;
+  final bool isOwnSide;
+
+  @override
+  Widget build(BuildContext context) {
+    final ranked = avatars
+        .take(3)
+        .indexed
+        .map((item) => (url: item.$2, rank: item.$1 + 1))
+        .toList(growable: false);
+    final ordered = isOwnSide
+        ? ranked.reversed.toList(growable: false)
+        : ranked;
+    if (ordered.isEmpty) return const SizedBox(height: 34);
+    final ring = isOwnSide ? const Color(0xFFFF5A8A) : const Color(0xFF25F4EE);
+
+    return Row(
+      mainAxisAlignment: isOwnSide
+          ? MainAxisAlignment.start
+          : MainAxisAlignment.end,
+      children: [
+        for (var index = 0; index < ordered.length; index++) ...[
+          if (index > 0) const SizedBox(width: 8),
+          _SupporterAvatar(
+            url: ordered[index].url,
+            rank: ordered[index].rank,
+            ring: ring,
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _SupporterAvatar extends StatelessWidget {
+  const _SupporterAvatar({
+    required this.url,
+    required this.rank,
+    required this.ring,
+  });
+
+  final String url;
+  final int rank;
+  final Color ring;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 30,
+      height: 34,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            width: 30,
+            height: 30,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: ring, width: 1.6),
+            ),
+            child: ClipOval(
+              child: SafeNetworkImage(
+                imageUrl: url,
+                width: 30,
+                height: 30,
+                blankOnError: true,
+                showLoadingIndicator: false,
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: -2,
+            left: 8,
+            child: Container(
+              width: 14,
+              height: 14,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: ring,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.black, width: 1),
+              ),
+              child: Text(
+                '$rank',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 8,
+                  fontWeight: FontWeight.w700,
+                  height: 1,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

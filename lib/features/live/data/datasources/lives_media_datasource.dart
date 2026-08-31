@@ -214,8 +214,11 @@ class LivesMediaDataSource {
   /// A successful `publishVideoTrack` only proves signalling succeeded. On
   /// some Android Camera2 devices the capture session fails asynchronously,
   /// so the publication exists but its counters remain at zero forever.
-  Future<bool> _waitForOutboundVideo(LocalVideoTrack track) async {
-    final deadline = DateTime.now().add(const Duration(milliseconds: 2200));
+  Future<bool> _waitForOutboundVideo(
+    LocalVideoTrack track, {
+    Duration timeout = const Duration(milliseconds: 2200),
+  }) async {
+    final deadline = DateTime.now().add(timeout);
     var sawFrameCounter = false;
     var sawAnyStats = false;
     num lastFrames = 0;
@@ -582,7 +585,16 @@ class LivesMediaDataSource {
           // few milliseconds later. Do not replace the visible camera with a
           // LiveKit texture until RTC proves that real frames are leaving the
           // handset. This specifically prevents "published but black" lives.
-          final hasFrames = await _waitForOutboundVideo(candidate);
+          final hasFrames = await _waitForOutboundVideo(
+            candidate,
+            // The native Kotlin renderer has to create one additional shared
+            // EGL output surface on first publish. A slow device/emulator can
+            // present its first valid frame after ~3 seconds; the old 2.2s
+            // Camera2-oriented guard detached that healthy track immediately.
+            timeout: useExistingArCamera
+                ? const Duration(seconds: 8)
+                : const Duration(milliseconds: 2200),
+          );
           if (!hasFrames) {
             throw StateError(
               'camera opened at ${profile.label} but produced no video frames',

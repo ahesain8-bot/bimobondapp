@@ -204,6 +204,10 @@ object ArCameraBridge {
     @Volatile
     private var oesTransitionPending = false
 
+    /** PlatformView that owns the asynchronous OES transition. */
+    @Volatile
+    private var oesTransitionOwner: FaceWarpGlView? = null
+
     /** True only after CameraX provided the OES Surface — ignore empty pre-bind GL frames. */
     @Volatile
     private var oesSurfaceLive = false
@@ -241,6 +245,7 @@ object ArCameraBridge {
         )
         awaitFirstGlFrame = false
         oesTransitionPending = false
+        oesTransitionOwner = null
         oesSurfaceLive = false
         oesRevealFramesLeft = 0
         oesDiagStartMs = 0L
@@ -401,16 +406,29 @@ object ArCameraBridge {
             android.util.Log.i("ArFilterTap", "beginOes: alreadyOnOes")
             return
         }
-        if (oesTransitionPending) {
+        val gl = warpGlView ?: run {
+            android.util.Log.e("ArFilterTap", "beginOes: warpGlView null")
+            return
+        }
+        if (oesTransitionPending && oesTransitionOwner === gl) {
             android.util.Log.i("ArFilterTap", "beginOes: transitionPending")
             return
         }
+        if (oesTransitionPending) {
+            // The start-live route may still be finishing its PixelCopy/timeout
+            // after the live-room PlatformView has taken ownership. Never let
+            // that stale callback hide or rebind the new Kotlin camera surface.
+            android.util.Log.i("ArFilterTap", "beginOes: superseding stale PlatformView transition")
+            awaitFirstGlFrame = false
+            oesTransitionPending = false
+            oesTransitionOwner = null
+            oesSurfaceLive = false
+            oesRevealFramesLeft = 0
+            clearApplyingOverlay()
+            clearFreezeOverlay()
+        }
         if (!ArCameraController.canRebindCamera()) {
             android.util.Log.w("ArFilterTap", "beginOes: canRebind=false — skip OES")
-            return
-        }
-        val gl = warpGlView ?: run {
-            android.util.Log.e("ArFilterTap", "beginOes: warpGlView null")
             return
         }
         oesDiagStartMs = SystemClock.elapsedRealtime()
@@ -423,6 +441,7 @@ object ArCameraBridge {
         )
         diagVis("beginOes.START")
         oesTransitionPending = true
+        oesTransitionOwner = gl
         // No "Applying filter..." spinner here (or in finishAttach below). The
         // freeze frame already covers this transition with the last live frame,
         // so the camera reads as still running; layering a spinner and label on
@@ -432,7 +451,19 @@ object ArCameraBridge {
         gl.ensureGlInitialized()
         gl.setOesEnabled(true)
 
+        // An INVISIBLE GLSurfaceView may not receive surfaceCreated on slower
+        // devices/virtual displays. Warm it invisibly while PreviewView remains
+        // on top, instead of starting the 2.2s timeout before EGL even exists.
+        gl.alpha = 0f
+        gl.visibility = View.VISIBLE
+        previewView?.visibility = View.VISIBLE
+        previewView?.bringToFront()
+
         showFreezeFromPreview { hasFreezeFrame ->
+            if (warpGlView !== gl || oesTransitionOwner !== gl) {
+                android.util.Log.i("ArFilterTap", "beginOes: ignored stale freeze callback")
+                return@showFreezeFromPreview
+            }
             android.util.Log.i(
                 "ArFilterTap",
                 "beginOes: freezeReady=$hasFreezeFrame +${oesDiagElapsedMs()}ms",
@@ -458,11 +489,11 @@ object ArCameraBridge {
                 )
             }
             gl.visibility = View.VISIBLE
-            previewView?.visibility = View.INVISIBLE
             diagVis("beginOes.afterHidePreview")
             ArCameraController.setPreferOesBinding(true)
 
             fun bindWhenSurfaceReady() {
+                if (warpGlView !== gl || oesTransitionOwner !== gl) return
                 val ready = gl.cameraSurfaceTexture() != null
                 android.util.Log.i(
                     "ArFilterTap",
@@ -472,6 +503,13 @@ object ArCameraBridge {
                     ArCameraController.ensureOesPreviewBound()
                 } else {
                     gl.awaitCameraSurface {
+                        if (warpGlView !== gl || oesTransitionOwner !== gl) {
+                            android.util.Log.i(
+                                "ArFilterTap",
+                                "beginOes: ignored stale camera-surface callback",
+                            )
+                            return@awaitCameraSurface
+                        }
                         android.util.Log.i(
                             "ArFilterTap",
                             "beginOes: onCameraSurfaceReady → ensureOes +${oesDiagElapsedMs()}ms",
@@ -483,14 +521,20 @@ object ArCameraBridge {
             }
             mainHandler.post { bindWhenSurfaceReady() }
             mainHandler.postDelayed({
+                if (warpGlView !== gl || oesTransitionOwner !== gl) {
+                    android.util.Log.i("ArFilterTap", "beginOes: ignored stale timeout")
+                    return@postDelayed
+                }
                 if (!awaitFirstGlFrame) {
                     oesTransitionPending = false
+                    oesTransitionOwner = null
                     android.util.Log.i("ArFilterTap", "beginOes: timeout skipped (already revealed)")
                     return@postDelayed
                 }
                 awaitFirstGlFrame = false
                 oesRevealFramesLeft = 0
                 oesTransitionPending = false
+                oesTransitionOwner = null
                 val onOes = ArCameraController.isBoundToOes()
                 android.util.Log.w(
                     "ArFilterTap",
@@ -502,6 +546,7 @@ object ArCameraBridge {
                 } else {
                     ArCameraController.setPreferOesBinding(false)
                     gl.setOesEnabled(false)
+                    gl.alpha = 1f
                     gl.visibility = View.INVISIBLE
                     previewView?.visibility = View.VISIBLE
                     previewView?.bringToFront()
@@ -882,6 +927,7 @@ object ArCameraBridge {
             awaitFirstGlFrame = false
             oesRevealFramesLeft = 0
             oesTransitionPending = false
+            oesTransitionOwner = null
             android.util.Log.i(
                 "ArFilterTap",
                 "onGlFramePresented REVEAL +${oesDiagElapsedMs()}ms " +
@@ -1176,6 +1222,7 @@ object ArCameraBridge {
     private fun showGlHidePreview() {
         val gl = warpGlView
         val preview = previewView
+        gl?.alpha = 1f
         gl?.visibility = View.VISIBLE
         gl?.bringToFront()
         preview?.visibility = View.INVISIBLE
@@ -1198,6 +1245,7 @@ object ArCameraBridge {
         diagVis("reveal.start")
         clearApplyingOverlay()
         clearRebindCover()
+        gl?.alpha = 1f
         gl?.visibility = View.VISIBLE
         preview?.visibility = View.INVISIBLE
         if (freeze == null) {
@@ -1228,7 +1276,18 @@ object ArCameraBridge {
             .start()
     }
 
-    fun clear() {
+    fun clear(expectedWarpGlView: FaceWarpGlView? = null) {
+        // Flutter can create the next Android PlatformView before disposing the
+        // previous one.  The old dispose callback must never clear the new
+        // view's global bridge or release its GL renderer during LiveKit
+        // publication.
+        if (expectedWarpGlView != null && warpGlView !== expectedWarpGlView) {
+            android.util.Log.i(
+                "ArCameraLifecycle",
+                "Bridge.clear ignored for stale PlatformView",
+            )
+            return
+        }
         ArCameraController.abortCapture()
         coldStartBindDone = false
         warpGlView?.releaseGl()
@@ -1258,6 +1317,7 @@ object ArCameraBridge {
         filterIntensity = 1f
         awaitFirstGlFrame = false
         oesTransitionPending = false
+        oesTransitionOwner = null
         oesSurfaceLive = false
         oesDiagStartMs = 0L
         coldStartBindDone = false

@@ -32,7 +32,6 @@ import '../bloc/live_room/live_room_state.dart';
 import '../effects/live_face_tracker.dart';
 import '../effects/live_face_tracker_scope.dart';
 import '../widgets/room/live_room_bottom_bar.dart';
-import '../widgets/room/live_room_camera_layer.dart';
 import '../widgets/room/live_room_chat_composer.dart';
 import '../widgets/room/live_room_chat_feed.dart';
 import '../widgets/room/live_room_competition_request_prompt.dart';
@@ -384,12 +383,19 @@ class _LiveRoomBody extends StatelessWidget {
           );
         }
 
-        // Opening: local preview as soon as the camera is ready (API still in flight).
+        // Keep the exact same stage subtree mounted while Opening becomes
+        // Ready.  ArCameraPreview is an Android PlatformView; replacing its
+        // parent with LiveRoomStage used to dispose/recreate the Kotlin GL
+        // surface in the middle of LiveKit publication, so the custom track
+        // was attached successfully but produced no frames.
         if (state is LiveRoomOpening) {
           return Stack(
             fit: StackFit.expand,
             children: [
-              const LiveRoomCameraLayer(),
+              LiveRoomStage(
+                topInset:
+                    MediaQuery.paddingOf(context).top + AppSpacing.roomStageTop,
+              ),
               const VignetteLayer(),
               LiveStartingIndicator(
                 deadline: startIndicatorDeadline,

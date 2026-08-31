@@ -432,6 +432,35 @@ object ArCameraController {
         return ArCameraBridge.isFrontCamera
     }
 
+    /**
+     * Keep the selected lens on real devices, but do not fail a live session
+     * when an emulator (or a legacy device) exposes only one camera.  CameraX
+     * otherwise accepts the request late and the AR/WebRTC path receives no
+     * frames, which used to make the app leave the live room.
+     */
+    private fun availableCameraSelector(cameraProvider: ProcessCameraProvider): CameraSelector {
+        val requested = if (ArCameraBridge.isFrontCamera) {
+            CameraSelector.DEFAULT_FRONT_CAMERA
+        } else {
+            CameraSelector.DEFAULT_BACK_CAMERA
+        }
+        val fallback = if (ArCameraBridge.isFrontCamera) {
+            CameraSelector.DEFAULT_BACK_CAMERA
+        } else {
+            CameraSelector.DEFAULT_FRONT_CAMERA
+        }
+        return try {
+            if (requested.filter(cameraProvider.availableCameraInfos).isNotEmpty()) {
+                requested
+            } else {
+                Log.w(PREVIEW_QUALITY_TAG, "requested camera unavailable; using available fallback lens")
+                fallback
+            }
+        } catch (_: Throwable) {
+            fallback
+        }
+    }
+
     private fun notifyBackPersonPresence(faceFill: Float) {
         if (isBoundFrontLens()) {
             BackPersonPresence.clearForFrontCamera()
@@ -476,7 +505,28 @@ object ArCameraController {
         previewView: PreviewView,
         faceOverlay: FaceOverlayView,
     ) {
-        if (started) return
+        if (started) {
+            // Flutter may replace its Android PlatformView while the Activity
+            // and CameraX controller stay alive (notably Opening -> Ready).
+            // Rebind the running camera to the new owner instead of leaving it
+            // attached to the disposed PreviewView/GL surface.
+            previewView.implementationMode = PreviewView.ImplementationMode.PERFORMANCE
+            previewView.scaleType = PreviewView.ScaleType.FILL_CENTER
+            previewView.visibility = View.VISIBLE
+            previewView.post {
+                if (started &&
+                    ArCameraBridge.previewView === previewView &&
+                    ArCameraBridge.faceOverlay === faceOverlay
+                ) {
+                    Log.i("ArCameraLifecycle", "Controller.start HANDOFF to current PlatformView")
+                    bindCamera(lifecycleOwner, previewView, faceOverlay)
+                    ArCameraBridge.applyCurrentFilter()
+                } else {
+                    Log.i("ArCameraLifecycle", "Controller.start ignored stale PlatformView handoff")
+                }
+            }
+            return
+        }
         started = true
 
         // SurfaceView path — sharper live preview than TextureView (COMPATIBLE).
@@ -2976,11 +3026,7 @@ object ArCameraController {
             .setResolutionSelector(resolutionSelector)
             .setTargetRotation(displayRotation)
 
-        val selector = if (ArCameraBridge.isFrontCamera) {
-            CameraSelector.DEFAULT_FRONT_CAMERA
-        } else {
-            CameraSelector.DEFAULT_BACK_CAMERA
-        }
+        val selector = availableCameraSelector(cameraProvider)
         val previewCameraInfo = try {
             selector.filter(cameraProvider.availableCameraInfos).firstOrNull()
         } catch (t: Throwable) {
@@ -3865,11 +3911,7 @@ object ArCameraController {
             videoCapture = null
             simpleHardwareRecorder.attach(null)
 
-            val selector = if (ArCameraBridge.isFrontCamera) {
-                CameraSelector.DEFAULT_FRONT_CAMERA
-            } else {
-                CameraSelector.DEFAULT_BACK_CAMERA
-            }
+            val selector = availableCameraSelector(cameraProvider)
 
             fun applyTorchAfterBind(bound: Camera?) {
                 camera = bound
