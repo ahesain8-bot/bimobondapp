@@ -1,5 +1,7 @@
 package com.dubai.bimobondapp.ar_camera
 
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.view.Surface
 import com.cloudwebrtc.webrtc.FlutterWebRTCPlugin
@@ -40,6 +42,25 @@ object ArCameraLivePublisher {
     private var outputWidth = 0
     private var outputHeight = 0
 
+    /**
+     * Retry plumbing for [bindOutputSurface].
+     *
+     * `attach()` runs when Dart decides to publish, which is not necessarily
+     * after the live-room PlatformView has mounted its GL view. When it ran
+     * first, every guard in [bindOutputSurface] returned silently and nothing
+     * ever tried again: the track existed, `onCapturerStarted` had been called
+     * and `getSenderStats()` answered with real stats — reporting framesSent=0
+     * forever, because the renderer had never been handed a surface to draw
+     * into. That is the "camera opened but produced no video frames" failure.
+     * The bind is now retried until a renderer appears or the attach is torn
+     * down, and every failure says which guard rejected it.
+     */
+    private val bindHandler = Handler(Looper.getMainLooper())
+    private var bindAttempts = 0
+    private var surfaceBound = false
+    private const val BIND_RETRY_MS = 150L
+    private const val BIND_MAX_ATTEMPTS = 80
+
     fun register(flutterEngine: FlutterEngine) {
         flutterWebRtcPlugin = flutterEngine.plugins
             .get(FlutterWebRTCPlugin::class.java) as? FlutterWebRTCPlugin
@@ -75,6 +96,11 @@ object ArCameraLivePublisher {
                     renderer != null || ArCameraBridge.warpGlView != null,
                 )
                 "isAttached" -> result.success(activeTrackId != null)
+
+                // Per-stage state of the native half of the pipeline, so a
+                // frameless publish can name the stage that broke instead of
+                // only reporting framesSent=0 from the far end.
+                "diagnostics" -> result.success(diagnostics())
                 else -> result.notImplemented()
             }
         }
@@ -93,7 +119,7 @@ object ArCameraLivePublisher {
         }
         renderer = next
         Log.i(TAG, "bound active renderer id=${System.identityHashCode(next)}")
-        bindOutputSurface()
+        if (!bindOutputSurface() && activeTrackId != null) scheduleSurfaceBind()
     }
 
     /** Called before the existing platform view releases its EGL resources. */
@@ -157,7 +183,9 @@ object ArCameraLivePublisher {
         outputHeight = height
 
         capturerObserver.onCapturerStarted(true)
-        bindOutputSurface()
+        // The renderer may not be mounted yet; keep trying rather than
+        // publishing a track that can never carry a frame.
+        if (!bindOutputSurface()) scheduleSurfaceBind()
         Log.i(TAG, "attached existing AR camera to WebRTC track=$trackId ${width}x$height@$fps")
 
         return mapOf(
@@ -168,25 +196,78 @@ object ArCameraLivePublisher {
         )
     }
 
-    private fun bindOutputSurface() {
+    /**
+     * Hands the WebRTC output surface to the live renderer.
+     *
+     * Returns true once the renderer has actually been given the surface. A
+     * false answer is not fatal on its own — the GL view may simply not be
+     * mounted yet — but it must never be silent, because until this succeeds
+     * the published track produces no frames at all.
+     */
+    private fun bindOutputSurface(): Boolean {
         // The bridge is the source of truth for PlatformView ownership. The
         // cached renderer can briefly refer to the setup route during the
         // setup -> room hand-off.
-        val gl = ArCameraBridge.warpGlView ?: renderer ?: return
-        val surface = outputSurface ?: return
-        if (!surface.isValid || outputWidth < 2 || outputHeight < 2) return
+        val gl = ArCameraBridge.warpGlView ?: renderer
+        val surface = outputSurface
+        val reason = when {
+            activeTrackId == null -> "no active attach"
+            gl == null -> "no GL renderer mounted yet"
+            surface == null -> "no output surface"
+            !surface.isValid -> "output surface is not valid"
+            outputWidth < 2 || outputHeight < 2 ->
+                "output size not set (${outputWidth}x$outputHeight)"
+            else -> null
+        }
+        if (reason != null || gl == null || surface == null) {
+            Log.w(TAG, "surface bind deferred (attempt $bindAttempts): $reason")
+            return false
+        }
         renderer = gl
+        surfaceBound = true
         Log.i(
             TAG,
             "binding WebRTC surface to active renderer " +
                 "id=${System.identityHashCode(gl)} ${outputWidth}x$outputHeight",
         )
         gl.setEncoderSurface(surface, outputWidth, outputHeight)
+        return true
+    }
+
+    /**
+     * Keeps retrying [bindOutputSurface] until a renderer shows up.
+     *
+     * The window that used to lose broadcasts is short — a route transition
+     * between the start-live and live-room PlatformViews — so a fast poll for
+     * a bounded time covers it without leaving a timer running for the life of
+     * the app. It stops on success, on detach, or when the budget runs out,
+     * and the exhausted case is logged as an error because at that point the
+     * broadcast genuinely cannot produce frames.
+     */
+    private fun scheduleSurfaceBind() {
+        bindHandler.removeCallbacksAndMessages(null)
+        if (surfaceBound || activeTrackId == null) return
+        if (bindAttempts >= BIND_MAX_ATTEMPTS) {
+            Log.e(
+                TAG,
+                "surface never bound after $BIND_MAX_ATTEMPTS attempts — " +
+                    "the published track will not produce frames",
+            )
+            return
+        }
+        bindAttempts++
+        bindHandler.postDelayed({
+            if (surfaceBound || activeTrackId == null) return@postDelayed
+            if (!bindOutputSurface()) scheduleSurfaceBind()
+        }, BIND_RETRY_MS)
     }
 
     private fun detach() {
         val oldTrackId = activeTrackId
         activeTrackId = null
+        bindHandler.removeCallbacksAndMessages(null)
+        bindAttempts = 0
+        surfaceBound = false
 
         renderer?.clearEncoderSurface()
         try {
@@ -227,6 +308,33 @@ object ArCameraLivePublisher {
         outputWidth = 0
         outputHeight = 0
         if (oldTrackId != null) Log.i(TAG, "detached WebRTC track=$oldTrackId")
+    }
+
+    /**
+     * Native-side view of the frame path, stage by stage.
+     *
+     * Camera -> renderer -> encoder surface -> SurfaceTexture -> WebRTC track.
+     * `surfaceBound` is the one that used to fail silently; if it is false
+     * while `trackId` is set, the renderer never received the surface and no
+     * amount of waiting on sender stats will help.
+     */
+    private fun diagnostics(): Map<String, Any?> {
+        val gl = ArCameraBridge.warpGlView ?: renderer
+        return mapOf(
+            "trackId" to activeTrackId,
+            "rendererMounted" to (ArCameraBridge.warpGlView != null),
+            "rendererBound" to (renderer != null),
+            "rendererIsActive" to (gl != null && ArCameraBridge.warpGlView === gl),
+            "surfaceBound" to surfaceBound,
+            "surfaceValid" to (outputSurface?.isValid == true),
+            "bindAttempts" to bindAttempts,
+            "outputWidth" to outputWidth,
+            "outputHeight" to outputHeight,
+            "hasVideoSource" to (source != null),
+            "hasVideoTrack" to (track != null),
+            "hasTextureHelper" to (textureHelper != null),
+            "hasStream" to (stream != null),
+        )
     }
 
     private fun stateProvider(plugin: FlutterWebRTCPlugin): StateProvider? {

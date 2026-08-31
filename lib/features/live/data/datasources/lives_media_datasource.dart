@@ -185,6 +185,15 @@ class LivesMediaDataSource {
         maxFramerate: profile.maxFps,
       ),
       videoSimulcastLayers: _simulcastLayersFor(profile, portrait: portrait),
+      // Under congestion, give up sharpness before smoothness.
+      //
+      // This was unset, which left the choice to WebRTC's default and is why a
+      // weak network showed up as the picture freezing rather than softening:
+      // holding resolution means the encoder starves the frame rate to pay for
+      // it. A live broadcast is a person talking, so a soft moving picture is
+      // worth far more than a sharp frozen one, and the simulcast ladder below
+      // already gives the SFU 720p/480p rungs to drop a struggling viewer onto.
+      degradationPreference: DegradationPreference.maintainFramerate,
     );
   }
 
@@ -303,9 +312,15 @@ class LivesMediaDataSource {
       }
     }
 
+    // Sender stats alone cannot say *why* nothing arrived. Ask the native
+    // pipeline which stage is broken, so this reports a cause instead of only
+    // a symptom — `surfaceBound: false` with a trackId means the renderer was
+    // never handed the encoder surface.
+    final native = await ArCameraLiveTrack.diagnostics();
     debugPrint(
       '🔴 [Host] no outbound camera frames '
-      '(stats=$sawAnyStats frames=$lastFrames packets=$lastPackets)',
+      '(stats=$sawAnyStats frames=$lastFrames packets=$lastPackets)'
+      '${native.isEmpty ? '' : '\n           native pipeline: $native'}',
     );
     return false;
   }

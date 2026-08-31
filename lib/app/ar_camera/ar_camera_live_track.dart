@@ -72,6 +72,22 @@ class ArCameraLiveTrack {
     }
   }
 
+  /// Native, stage-by-stage state of the frame path.
+  ///
+  /// Camera -> renderer -> encoder surface -> SurfaceTexture -> WebRTC track.
+  /// Read this when a publish reports no frames: `surfaceBound == false` with
+  /// a `trackId` set means the renderer never received the output surface, so
+  /// waiting longer on sender stats cannot help.
+  static Future<Map<String, dynamic>> diagnostics() async {
+    if (!isSupported) return const {};
+    try {
+      return await _channel.invokeMapMethod<String, dynamic>('diagnostics') ??
+          const {};
+    } catch (_) {
+      return const {};
+    }
+  }
+
   static Future<void> detach() async {
     if (!isSupported) return;
     try {
