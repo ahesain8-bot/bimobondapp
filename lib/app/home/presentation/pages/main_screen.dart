@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:bimobondapp/app/ar_camera/ios_ar_camera_screen.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
 import 'package:bimobondapp/app/auth/presentation/pages/login_screen.dart';
@@ -67,6 +70,13 @@ class _MainScreenState extends State<MainScreen> {
 
   void _openAddPostCamera() {
     FeedPlaybackGate.instance.setBlocked(true);
+    if (Platform.isIOS) {
+      // iOS (Phase 1): the Swift-only AR camera, not the filters camera.
+      Navigator.of(
+        context,
+      ).push(MaterialPageRoute(builder: (_) => const IosArCameraScreen()));
+      return;
+    }
     context.pushNamed('add_post_camera');
   }
 
