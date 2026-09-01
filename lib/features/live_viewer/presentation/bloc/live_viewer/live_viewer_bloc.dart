@@ -115,6 +115,9 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
   bool _busy = false;
   LiveEntity? _pendingActivate;
   bool _deactivateRequested = false;
+  /// Bumped on every deactivate/close so an in-flight join cannot keep
+  /// LiveKit/socket alive after the viewer leaves the feed.
+  int _sessionGeneration = 0;
   String? _currentUserId;
   Timer? _bannerClearTimer;
   Timer? _joinSuccessClearTimer;
@@ -134,6 +137,22 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
 
   String? get activeLiveId => _activeLiveId;
 
+  bool _isCurrentSession(String liveId, int generation) =>
+      !isClosed &&
+      !_tearingDown &&
+      !_deactivateRequested &&
+      _activeLiveId == liveId &&
+      _sessionGeneration == generation;
+
+  Future<void> _abandonStaleSession() async {
+    try {
+      await liveKitService.disconnect();
+    } catch (_) {}
+    try {
+      await socketService.disconnect();
+    } catch (_) {}
+  }
+
   // ---------- Event handlers ----------
 
   Future<void> _onActivated(
@@ -141,9 +160,10 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     Emitter<LiveViewerState> emit,
   ) async {
     if (_busy) {
+      // A leave/close is already pending — do not queue another join that
+      // would revive LiveKit after the feed route is gone.
+      if (_deactivateRequested) return;
       _pendingActivate = event.live;
-      // The newest visible page wins over an older close/deactivate request.
-      _deactivateRequested = false;
       return;
     }
     if (_activeLiveId == event.live.id &&
@@ -153,8 +173,10 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
 
     _busy = true;
     _pendingActivate = null;
+    final sessionGen = ++_sessionGeneration;
     try {
       await _teardown(silent: true, emit: emit);
+      if (isClosed || _sessionGeneration != sessionGen) return;
       _activeLiveId = event.live.id;
       final live = event.live;
 
@@ -202,7 +224,10 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
       }
 
       final joinResult = await joinLiveUseCase(live.id);
-      if (_activeLiveId != live.id) return;
+      if (!_isCurrentSession(live.id, sessionGen)) {
+        await _abandonStaleSession();
+        return;
+      }
 
       await joinResult.fold(
         (failure) async {
@@ -253,7 +278,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
               mediaHints: result.mediaHints,
             );
           } catch (_) {
-            if (_activeLiveId != live.id) return;
+            if (!_isCurrentSession(live.id, sessionGen)) return;
             emit(
               state.copyWith(
                 session: state.session!.copyWith(
@@ -264,7 +289,10 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
             );
             return;
           }
-          if (_activeLiveId != live.id) return;
+          if (!_isCurrentSession(live.id, sessionGen)) {
+            await _abandonStaleSession();
+            return;
+          }
 
           final joinedAvatars = _avatarsFromLive(result.live);
           emit(
@@ -304,10 +332,22 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
           unawaited(
             socketService
                 .connect(liveId: result.liveId, token: result.socketToken)
+                .then((_) {
+                  if (!_isCurrentSession(live.id, sessionGen)) {
+                    unawaited(socketService.disconnect());
+                  }
+                })
                 .catchError((_) {}),
           );
           unawaited(
-            giftSocketService.ensureJoined(liveId: live.id).catchError((_) {}),
+            giftSocketService
+                .ensureJoined(liveId: live.id)
+                .then((_) {
+                  if (!_isCurrentSession(live.id, sessionGen)) {
+                    giftSocketService.leaveLive(live.id);
+                  }
+                })
+                .catchError((_) {}),
           );
           final coinsFuture = giftRepository.getCoinBalance();
           final commentsFuture = commentRepository.getComments(
@@ -373,10 +413,12 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
         await _teardown(silent: false, emit: emit);
       }
       _busy = false;
-      final pending = _pendingActivate;
-      _pendingActivate = null;
-      if (pending != null && pending.id != _activeLiveId) {
-        add(LiveViewerActivated(pending));
+      if (!shouldDeactivate) {
+        final pending = _pendingActivate;
+        _pendingActivate = null;
+        if (pending != null && pending.id != _activeLiveId) {
+          add(LiveViewerActivated(pending));
+        }
       }
     }
   }
@@ -388,8 +430,9 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     // Activated/Deactivated have separate BLoC event types and can otherwise
     // run concurrently. A late teardown from the previous PageView page would
     // then disconnect the brand-new room opened by the visible page.
+    _sessionGeneration++;
+    _pendingActivate = null;
     if (_busy) {
-      _pendingActivate = null;
       _deactivateRequested = true;
       return;
     }
@@ -1977,9 +2020,11 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
       liveId: live.id,
       userId: userMap?['id']?.toString() ?? map['userId']?.toString() ?? '',
       username:
-          userMap?['username']?.toString() ??
-          userMap?['fullName']?.toString() ??
-          'User',
+          (() {
+            final full = userMap?['fullName']?.toString().trim();
+            if (full != null && full.isNotEmpty) return full;
+            return userMap?['username']?.toString() ?? 'User';
+          })(),
       userAvatar: userMap?['avatarUrl']?.toString(),
       content: content,
       createdAt:
@@ -2034,6 +2079,9 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
   @override
   Future<void> close() async {
     _tearingDown = true;
+    _sessionGeneration++;
+    _pendingActivate = null;
+    _deactivateRequested = true;
     _battleOperationGeneration++;
     _battleConnectKeys.clear();
     await _liveKitSub?.cancel();

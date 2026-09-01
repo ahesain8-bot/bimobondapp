@@ -92,10 +92,12 @@ class _LiveFeedViewState extends State<LiveFeedScreen>
     WidgetsBinding.instance.removeObserver(this);
     _refreshTimer?.cancel();
     LiveFeedRefreshBus.instance.removeListener(_onLiveEndedSignal);
+    // Tear down media before closing the bloc so audio cannot linger after
+    // this route is gone.
     _viewerBloc.add(const LiveViewerDeactivated());
     _pageController.dispose();
     _feedBloc.close();
-    _viewerBloc.close();
+    unawaited(_viewerBloc.close());
     LiveScreenWakelock.disable();
     super.dispose();
   }
@@ -271,12 +273,9 @@ class _LiveFeedViewState extends State<LiveFeedScreen>
                 live: live,
                 isActive: index == _currentIndex,
                 onClose: () {
-                  if (_currentIndex + 1 < feed.lives.length) {
-                    _pageController.nextPage(
-                      duration: const Duration(milliseconds: 280),
-                      curve: Curves.easeOutCubic,
-                    );
-                  }
+                  // Explicit leave before the route pops so in-flight joins
+                  // cannot reconnect LiveKit after this screen is gone.
+                  _viewerBloc.add(const LiveViewerDeactivated());
                 },
               );
             },

@@ -567,6 +567,12 @@ object ArCameraController {
             return
         }
 
+        // Stop publishing into LiveKit while CameraX rebinds — otherwise viewers
+        // get sideways/scrambled frames with rotation=0 until transform arrives.
+        if (ArLiveBeautyPublisher.isLivePublishingExclusive()) {
+            ArLiveBeautyPublisher.pauseForCameraSwitch()
+        }
+
         switchingCamera = true
         imageAnalysis?.clearAnalyzer()
 
@@ -596,6 +602,9 @@ object ArCameraController {
             }
             bindCamera(lifecycleOwner, previewView, faceOverlay)
             ArCameraBridge.applyCurrentFilter()
+            if (ArLiveBeautyPublisher.isLivePublishingExclusive()) {
+                ArLiveBeautyPublisher.resumeAfterCameraSwitch()
+            }
             onResult?.invoke(true)
         }
     }
@@ -865,6 +874,13 @@ object ArCameraController {
     }
 
     fun stop() {
+        if (ArLiveBeautyPublisher.isLivePublishingExclusive()) {
+            Log.w(
+                "ArCameraLifecycle",
+                "Controller.stop ignored — live beauty publish owns CameraX",
+            )
+            return
+        }
         abortCapture()
         ArCameraWatchdog.onDegrade = null
         ArCameraWatchdog.isPaused = null
@@ -2917,6 +2933,14 @@ object ArCameraController {
         }
     }
 
+    private fun surfaceRotationToDegrees(rotation: Int): Int = when (rotation) {
+        Surface.ROTATION_0 -> 0
+        Surface.ROTATION_90 -> 90
+        Surface.ROTATION_180 -> 180
+        Surface.ROTATION_270 -> 270
+        else -> 0
+    }
+
     private fun hasCameraPermission(activity: Activity): Boolean {
         return ContextCompat.checkSelfPermission(activity, Manifest.permission.CAMERA) ==
             PackageManager.PERMISSION_GRANTED
@@ -3377,7 +3401,19 @@ object ArCameraController {
                     "+${ArCameraBridge.oesDiagElapsedMs()}ms",
             )
 
-            glView.setCameraTransform(0, frontMirror = false, bufW, bufH)
+            // Prefer display-relative sensor rotation over 0 so the first frames
+            // after a flip are upright (beauty LiveKit publish reads these).
+            val initialRot = try {
+                camera?.cameraInfo?.sensorRotationDegrees
+                    ?: glView.display?.rotation?.let { surfaceRotationToDegrees(it) }
+                    ?: ArCameraBridge.previewView?.display?.rotation?.let {
+                        surfaceRotationToDegrees(it)
+                    }
+                    ?: 0
+            } catch (_: Throwable) {
+                0
+            }
+            glView.setCameraTransform(initialRot, frontMirror = false, bufW, bufH)
             request.setTransformationInfoListener(executor) { info ->
                 android.util.Log.i(
                     "ArCameraOES",
@@ -3561,9 +3597,20 @@ object ArCameraController {
             "Controller.onHostPause started=$started recording=${isRecordingActive()} " +
                 "suspended=$previewSuspended boundOes=$boundToOes " +
                 "preferOes=$preferOesBinding filter=${ArCameraBridge.currentFilter} " +
-                "glSurface=${ArCameraBridge.warpGlView?.cameraSurfaceTexture() != null}",
+                "glSurface=${ArCameraBridge.warpGlView?.cameraSurfaceTexture() != null} " +
+                "liveExclusive=${ArLiveBeautyPublisher.isLivePublishingExclusive()}",
         )
         if (!started) return
+        // Live beauty publish must keep CameraX open. Activity onPause fires for
+        // dialogs / brief inactive transitions and previously unbound the lens,
+        // leaving viewers with audio-only streams.
+        if (ArLiveBeautyPublisher.isLivePublishingExclusive()) {
+            Log.w(
+                "ArCameraLifecycle",
+                "Controller.onHostPause skipped unbind — live beauty publish owns CameraX",
+            )
+            return
+        }
         hostWasPaused = true
         hostResumeGeneration++
         // Do not leave lifecycle-bound use cases around for CameraX to

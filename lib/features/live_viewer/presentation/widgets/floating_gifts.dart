@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:bimobondapp/app/auctions/data/datasources/auction_socket_service.dart';
 import 'package:bimobondapp/app/gifts/presentation/utils/auction_audio_gift_chip_session.dart';
+import 'package:bimobondapp/app/gifts/presentation/utils/gift_lottie_cache.dart';
+import 'package:bimobondapp/app/gifts/presentation/utils/gift_media_cache.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/live_details/auction_price_with_audio_badge.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/live_details/gift_animation_overlay.dart';
 
@@ -46,6 +48,7 @@ class _FloatingGiftsLayerState extends State<FloatingGiftsLayer> {
   final Map<String, GiftComboItem> _activeCombos = {};
   final Map<String, Timer> _comboTimers = {};
   final Set<String> _playedAnimations = {};
+  DateTime? _lastOverlayAt;
   final _audioSession = AuctionAudioGiftChipSession();
   String? _audioLabel;
   String? _audioColor;
@@ -114,8 +117,8 @@ class _FloatingGiftsLayerState extends State<FloatingGiftsLayer> {
     final giftName =
         _readString(payload.giftName) ?? _readString(gift['name']) ?? 'Gift';
     final senderName =
-        _readString(payload.senderName) ??
         _readString(sender['fullName']) ??
+        _readString(payload.senderName) ??
         _readString(sender['username']) ??
         'User';
     final senderAvatar =
@@ -151,6 +154,12 @@ class _FloatingGiftsLayerState extends State<FloatingGiftsLayer> {
     final mediaUrl = animationUrl ?? thumbnailUrl ?? '';
     final size = _readString(gift['size'] ?? gift['giftSize']);
     final normalizedSize = size?.toUpperCase();
+
+    // Cache as soon as the gift arrives — before overlay / combo UI work.
+    GiftMediaCache.instance.prefetchGiftUrls(
+      animationUrl: animationUrl,
+      thumbnailUrl: thumbnailUrl,
+    );
 
     // A payload the catalog could not hydrate still has a sender, a gift name
     // and a combo count, so announce it as a combo badge. Dropping it here is
@@ -192,21 +201,32 @@ class _FloatingGiftsLayerState extends State<FloatingGiftsLayer> {
         _playedAnimations.remove(comboKey);
       });
     }
-    if (shouldPlay && mounted) {
-      unawaited(
-        GiftAnimationOverlay.show(
-          context,
-          animationUrl: mediaUrl,
-          thumbnailUrl: thumbnailUrl,
-          senderName: senderName,
-          giftName: giftName,
-          size: size,
-          owner: this,
-          // Shared with auction stack — key so neither restarts the other.
-          dedupeKey: comboKey,
-        ),
-      );
+    if (!shouldPlay || !mounted) return;
+
+    // Serialize MP4 overlays — rapid replace churns ExoPlayer and can kill
+    // the process over a live / battle texture.
+    final isVideo = GiftLottieCache.looksLikeVideoUrl(mediaUrl);
+    final now = DateTime.now();
+    if (isVideo &&
+        _lastOverlayAt != null &&
+        now.difference(_lastOverlayAt!) < const Duration(milliseconds: 700)) {
+      return;
     }
+    _lastOverlayAt = now;
+
+    unawaited(
+      GiftAnimationOverlay.show(
+        context,
+        animationUrl: mediaUrl,
+        thumbnailUrl: thumbnailUrl,
+        senderName: senderName,
+        giftName: giftName,
+        size: size,
+        owner: this,
+        // Shared with auction stack — key so neither restarts the other.
+        dedupeKey: comboKey,
+      ),
+    );
   }
 
   void _restartComboTimer(String key) {

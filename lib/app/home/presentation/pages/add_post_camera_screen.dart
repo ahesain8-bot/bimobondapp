@@ -41,7 +41,8 @@ import 'package:bimobondapp/app/video_templates/presentation/widgets/video_templ
 import 'package:bimobondapp/core/services/feed_playback_gate.dart';
 import 'package:bimobondapp/core/utils/native_video_processor.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
-import 'package:bimobondapp/features/live_source/presentation/pages/live_start_page.dart';
+import 'package:bimobondapp/features/live/presentation/pages/live_start_page.dart';
+import 'package:bimobondapp/features/live/presentation/utils/ar_live_beauty_defaults.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:camerawesome/camerawesome_plugin.dart';
 import 'package:flutter/foundation.dart';
@@ -100,69 +101,70 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   bool _photoEditorMagicOn = true;
   bool _preserveNeutralAdjustments = false;
 
-  /// Auto Smooth level when Retouch Off→On (0..1). Slider can go lower/higher.
-  static const double _kMagicAutoSmooth = 0.50;
+  /// Auto Smooth level when Retouch Off→On (0..1). TikTok ≈ 40.
+  static const double _kMagicAutoSmooth = 0.40;
 
-  /// Back-camera beauty colors — open/bright like TikTok (not crushed).
+  /// Back-camera beauty colors — lighter open grade than front.
   static const Map<MediaPhotoEditorTool, double> _kLiveColorDefaults = {
-    MediaPhotoEditorTool.contrast: 0.18, // +18
-    MediaPhotoEditorTool.saturation: -0.03, // -3
-    MediaPhotoEditorTool.brightness: 0.08, // +8 open midtones
-    MediaPhotoEditorTool.exposure: 0.06, // +6 lift overall
-    MediaPhotoEditorTool.whiteBalance: -0.02, // -2
-    MediaPhotoEditorTool.highlights: -0.06, // -6 soft highlight hold
-    MediaPhotoEditorTool.shadows: -0.12, // -12 gentle shadow lift
+    MediaPhotoEditorTool.contrast: -0.02,
+    MediaPhotoEditorTool.saturation: 0.01,
+    MediaPhotoEditorTool.brightness: 0.05, // gamma-ish open
+    MediaPhotoEditorTool.exposure: 0.09,
+    MediaPhotoEditorTool.whiteBalance: -0.02,
+    MediaPhotoEditorTool.highlights: -0.04,
+    MediaPhotoEditorTool.shadows: -0.08,
   };
 
-  /// Front-camera live color defaults — fuller beauty look for Magic On.
+  /// Front-camera live color — Exposure/Gamma lift (TikTok open look).
   static const Map<MediaPhotoEditorTool, double> _kFrontLiveColorDefaults = {
-    MediaPhotoEditorTool.contrast: 0.39,
-    MediaPhotoEditorTool.saturation: -0.07,
-    MediaPhotoEditorTool.brightness: -0.15,
-    MediaPhotoEditorTool.exposure: -0.53,
-    MediaPhotoEditorTool.whiteBalance: -0.04,
-    MediaPhotoEditorTool.highlights: -0.22,
-    MediaPhotoEditorTool.shadows: -0.50,
+    MediaPhotoEditorTool.contrast: -0.03, // -3
+    MediaPhotoEditorTool.saturation: 0.02, // +2
+    MediaPhotoEditorTool.brightness: 0.07, // ≈ gamma +0.07
+    MediaPhotoEditorTool.exposure: 0.12, // +0.12
+    MediaPhotoEditorTool.whiteBalance: -0.02,
+    MediaPhotoEditorTool.highlights: -0.05, // -5
+    MediaPhotoEditorTool.shadows: -0.10,
   };
 
-  /// Full Magic/beauty preset applied when Retouch turns On (front-leaning).
+  /// Full Magic/beauty preset — TikTok open grade (whiten stays ~10).
   /// Back camera uses lighter [_kLiveColorDefaults] for color fields via restore.
   static const Map<MediaPhotoEditorTool, double> _kMagicBeautyDefaults = {
-    MediaPhotoEditorTool.smooth: _kMagicAutoSmooth, // 50
-    MediaPhotoEditorTool.contrast: 0.39, // 39
-    MediaPhotoEditorTool.shape: -0.83, // -83
-    MediaPhotoEditorTool.nose: 0.05, // 5
-    MediaPhotoEditorTool.eyes: 0.05, // 5
-    MediaPhotoEditorTool.tooth: 0.42, // cleaner teeth/lips
-    MediaPhotoEditorTool.mouth: 0.28, // fuller / more open lips
-    MediaPhotoEditorTool.saturation: -0.07, // -7
-    MediaPhotoEditorTool.brightness: -0.15, // -15
-    MediaPhotoEditorTool.exposure: -0.53, // -53
-    MediaPhotoEditorTool.whiteBalance: -0.04, // -4
-    MediaPhotoEditorTool.highlights: -0.22, // -22
-    MediaPhotoEditorTool.shadows: -0.50, // -50
+    MediaPhotoEditorTool.smooth: _kMagicAutoSmooth, // 40
+    MediaPhotoEditorTool.contrast: -0.03, // -3
+    MediaPhotoEditorTool.shape: -0.08, // face slim ~8
+    MediaPhotoEditorTool.nose: 0.06, // ~6
+    MediaPhotoEditorTool.eyes: 0.07, // ~7
+    MediaPhotoEditorTool.tooth: 0.08, // ~8
+    MediaPhotoEditorTool.mouth: 0.02, // ~2
+    MediaPhotoEditorTool.saturation: 0.02, // +2
+    MediaPhotoEditorTool.brightness: 0.07, // ≈ gamma +0.07
+    MediaPhotoEditorTool.exposure: 0.12, // +0.12
+    MediaPhotoEditorTool.whiteBalance: -0.02,
+    MediaPhotoEditorTool.highlights: -0.05, // -5
+    MediaPhotoEditorTool.shadows: -0.10,
+    MediaPhotoEditorTool.brightenEye: 0.08, // ~8
   };
   final Map<MediaPhotoEditorTool, double> _photoAdjustments = {
     MediaPhotoEditorTool.smooth: _kMagicAutoSmooth,
-    MediaPhotoEditorTool.contrast: 0.39,
-    MediaPhotoEditorTool.shape: -0.83,
-    MediaPhotoEditorTool.nose: 0.05,
-    MediaPhotoEditorTool.eyes: 0.05,
-    MediaPhotoEditorTool.tooth: 0.42,
-    MediaPhotoEditorTool.mouth: 0.28,
-    MediaPhotoEditorTool.saturation: -0.07,
-    MediaPhotoEditorTool.brightness: -0.15,
-    MediaPhotoEditorTool.exposure: -0.53,
-    MediaPhotoEditorTool.whiteBalance: -0.04,
-    MediaPhotoEditorTool.highlights: -0.22,
-    MediaPhotoEditorTool.shadows: -0.50,
+    MediaPhotoEditorTool.contrast: -0.03,
+    MediaPhotoEditorTool.shape: -0.08,
+    MediaPhotoEditorTool.nose: 0.06,
+    MediaPhotoEditorTool.eyes: 0.07,
+    MediaPhotoEditorTool.tooth: 0.08,
+    MediaPhotoEditorTool.mouth: 0.02,
+    MediaPhotoEditorTool.saturation: 0.02,
+    MediaPhotoEditorTool.brightness: 0.07,
+    MediaPhotoEditorTool.exposure: 0.12,
+    MediaPhotoEditorTool.whiteBalance: -0.02,
+    MediaPhotoEditorTool.highlights: -0.05,
+    MediaPhotoEditorTool.shadows: -0.10,
     MediaPhotoEditorTool.lipstick: 0.0,
     MediaPhotoEditorTool.foundation: 0.0,
     MediaPhotoEditorTool.eyeshadow: 0.0,
     MediaPhotoEditorTool.contour: 0.0,
     MediaPhotoEditorTool.blush: 0.0,
     MediaPhotoEditorTool.underEye: 0.0,
-    MediaPhotoEditorTool.brightenEye: 0.0,
+    MediaPhotoEditorTool.brightenEye: 0.08,
     MediaPhotoEditorTool.eyeliner: 0.0,
   };
   String _selectedLipColor = kMakeupLipColors.first;
@@ -664,11 +666,11 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       }
     }
 
-    seedIfZero(MediaPhotoEditorTool.shape, -0.83);
-    seedIfZero(MediaPhotoEditorTool.nose, 0.05);
-    seedIfZero(MediaPhotoEditorTool.eyes, 0.05);
-    seedIfZero(MediaPhotoEditorTool.tooth, 0.42);
-    seedIfZero(MediaPhotoEditorTool.mouth, 0.28);
+    seedIfZero(MediaPhotoEditorTool.shape, -0.08);
+    seedIfZero(MediaPhotoEditorTool.nose, 0.06);
+    seedIfZero(MediaPhotoEditorTool.eyes, 0.07);
+    seedIfZero(MediaPhotoEditorTool.tooth, 0.08);
+    seedIfZero(MediaPhotoEditorTool.mouth, 0.02);
     if ((_photoAdjustments[MediaPhotoEditorTool.smooth] ?? 0) < 0.01) {
       _photoAdjustments[MediaPhotoEditorTool.smooth] = _kMagicAutoSmooth;
     }
@@ -1948,34 +1950,37 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     unawaited(_beginVideoRecording());
   }
 
-  /// Opens the LiveStartPage from lib/features/live_source/.
+  /// Opens live start UI over the already-running Kotlin beauty camera.
   Future<void> _handleGoLiveTap() async {
     if (_isRecording || _isBusy || _isProcessingCapture) return;
     try {
-      // Remove the preview from the widget tree for BOTH camera engines. On
-      // Android, calling stopCamera() while leaving the platform view mounted
-      // lets its visibility callbacks bind CameraX again during the next route
-      // transition. That races the Flutter/LiveKit cameras and is the source of
-      // the several-second freeze seen at the start of a live.
-      setState(() => _liveHandoffActive = true);
       if (_useNativeArFilters) {
-        await ArCameraBridge.stopCamera();
+        // Keep PlatformView mounted — remounting caused a black live start.
+        // Only hide photo/video chrome so the live UI can sit on top.
+        setState(() => _liveHandoffActive = true);
+        ArLiveBeautyDefaults.apply(isFrontCamera: _isFrontCamera);
+        await Navigator.of(context).push(
+          PageRouteBuilder<void>(
+            opaque: false,
+            barrierColor: Colors.transparent,
+            pageBuilder: (_, __, ___) => const LiveStartPage(
+              reuseHostArCamera: true,
+            ),
+          ),
+        );
+      } else {
+        setState(() => _liveHandoffActive = true);
+        await Future<void>.delayed(const Duration(milliseconds: 160));
+        if (!mounted) return;
+        await Navigator.of(context).push(
+          MaterialPageRoute<void>(builder: (_) => const LiveStartPage()),
+        );
       }
-      // Let AndroidView/CameraX (or CamerAwesome on iOS) finish unmounting
-      // before the live start page asks the operating system for the lens.
-      await Future<void>.delayed(const Duration(milliseconds: 160));
-      if (!mounted) return;
-      await Navigator.of(
-        context,
-      ).push(MaterialPageRoute<void>(builder: (_) => const LiveStartPage()));
     } catch (_) {
       // Never leave a frozen preview.
     } finally {
       if (mounted) setState(() => _liveHandoffActive = false);
-      // Back from the live start page: bring the camera preview back.
       if (_useNativeArFilters && mounted) {
-        // The AndroidView is created asynchronously after setState. Give its
-        // platform controller one frame to attach before asking it to start.
         await Future<void>.delayed(const Duration(milliseconds: 120));
         if (mounted) {
           await ArCameraBridge.startCamera();
@@ -2549,6 +2554,11 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   void _onStudioModeSelected(CameraStudioMode mode) {
     if (_isRecording) return;
     if (widget.isStory && mode == CameraStudioMode.live) return;
+    // Live opens the start-live screen — do not stay on empty in-camera live mode.
+    if (mode == CameraStudioMode.live) {
+      unawaited(_handleGoLiveTap());
+      return;
+    }
     if (mode == _studioMode) {
       if (_showPhotoEditor || _showFilters) {
         setState(() {
@@ -2560,12 +2570,9 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     }
 
     _cancelCountdown();
-    // Live cannot use grid cells — clear layout. Photo↔video keeps layout
-    // but resets cell media so a grid is not mixed photos+videos.
-    if (mode == CameraStudioMode.live && _layoutMode != CameraLayoutMode.off) {
-      _clearLayoutCapture();
-      setState(() => _layoutMode = CameraLayoutMode.off);
-    } else if (_layoutMode != CameraLayoutMode.off &&
+    // Photo↔video keeps layout but resets cell media so a grid is not
+    // mixed photos+videos.
+    if (_layoutMode != CameraLayoutMode.off &&
         mode != _studioMode &&
         (mode == CameraStudioMode.photo || mode == CameraStudioMode.video)) {
       final layoutMode = _layoutMode;
@@ -2752,10 +2759,14 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
         child: Stack(
           fit: StackFit.expand,
           children: [
-            if (_liveHandoffActive)
+            if (_useNativeArFilters)
+              _buildNativeArCameraBody(
+                l10n,
+                filters,
+                hideStudioChrome: _liveHandoffActive,
+              )
+            else if (_liveHandoffActive)
               const ColoredBox(color: Colors.black)
-            else if (_useNativeArFilters)
-              _buildNativeArCameraBody(l10n, filters)
             else
               _buildCamerAwesomeBody(l10n, filters),
             if (_showShutterFlash)
@@ -2847,8 +2858,9 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
 
   Widget _buildNativeArCameraBody(
     AppLocalizations l10n,
-    List<CameraFilterPreset> filters,
-  ) {
+    List<CameraFilterPreset> filters, {
+    bool hideStudioChrome = false,
+  }) {
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -2857,7 +2869,8 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
         ),
         if (_flashEnabled && _isFrontCamera)
           const Positioned.fill(child: FrontScreenFlashOverlay()),
-        CameraStudioOverlay(
+        if (!hideStudioChrome)
+          CameraStudioOverlay(
           l10n: l10n,
           isStoryMode: widget.isStory,
           showGalleryUpload: !widget.returnMediaOnDone,

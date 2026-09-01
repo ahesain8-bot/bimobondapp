@@ -214,6 +214,8 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         if (bufH > 0) cameraBufH = bufH
     }
 
+    fun cameraRotationDegrees(): Int = cameraRotationDegrees
+
     /**
      * Display-oriented camera buffer size (after 90/270 swap) — same aspect the
      * OES shader uses for FIT/FILL. Used so recorded MP4s match preview FOV
@@ -2071,16 +2073,24 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         val screenH = captureViewport[3]
         if (screenW <= 1 || screenH <= 1) return
 
-        val maxEdge = captureMaxEdge.coerceAtLeast(2)
-        val largest = maxOf(screenW, screenH)
-    
         val useFbo = redraw != null
         val readW: Int
         val readH: Int
         if (useFbo) {
-            val s = maxEdge.toFloat() / largest
-            readW = ((screenW * s).toInt() and 1.inv()).coerceAtLeast(2)
-            readH = ((screenH * s).toInt() and 1.inv()).coerceAtLeast(2)
+            val maxEdge = captureMaxEdge.coerceAtLeast(2)
+            val largest = maxOf(screenW, screenH)
+            val aspect = screenW.toFloat() / screenH.toFloat()
+            // Transparent live routes can shrink the PlatformView viewport to
+            // ~320px wide. Force a 9:16 FBO so beauty publish is not muddy.
+            val brokenViewport = aspect < 0.48f || aspect > 0.72f || screenW < 480
+            if (brokenViewport) {
+                readH = maxEdge and 1.inv()
+                readW = ((readH * 9f / 16f).toInt() and 1.inv()).coerceAtLeast(2)
+            } else {
+                val s = maxEdge.toFloat() / largest
+                readW = ((screenW * s).toInt() and 1.inv()).coerceAtLeast(2)
+                readH = ((screenH * s).toInt() and 1.inv()).coerceAtLeast(2)
+            }
             if (!ensureCaptureFbo(readW, readH)) {
                 // No usable framebuffer here — skip the readback rather than draw
                 // into an incomplete one and "capture" nothing. Callers already
@@ -2137,6 +2147,8 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         }
         scratch.copyPixelsFromBuffer(flipped)
 
+        val maxEdge = captureMaxEdge.coerceAtLeast(2)
+        val largest = maxOf(screenW, screenH)
         val out: Bitmap = if (!useFbo && largest > maxEdge) {
             val s = maxEdge.toFloat() / largest
             val sw = ((readW * s).toInt() and 1.inv()).coerceAtLeast(2)

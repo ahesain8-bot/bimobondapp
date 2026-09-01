@@ -47,8 +47,10 @@ data class LiveBeautyAdjustments(
         const val MAGIC_SMOOTH_MAX = 0.99f
 
         /** Camera Magic-On defaults without dedicated Flutter sliders. */
+        /** ≈ TikTok Whiten 10 — keep low; lift comes from exposure/brightness. */
         const val MAGIC_DEFAULT_WHITEN = 0.10f
-        const val MAGIC_DEFAULT_SHARPEN = 0.0f
+        /** Slightly soft (TikTok sharpness ~-2); avoid crunchy skin. */
+        const val MAGIC_DEFAULT_SHARPEN = 0.03f
 
         /** Wide blemish pull stops growing above default to avoid blurry patches. */
         const val MAGIC_BLEMISH_MIN = 0.48f

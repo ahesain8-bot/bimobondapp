@@ -4,16 +4,25 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:livekit_client/livekit_client.dart';
 
+import '../../../../../app/ar_camera/ar_camera_bridge.dart';
 import '../../../../../core/utils/build_safe_notifier.dart';
 import '../../../../../core/utils/livekit_participant_match.dart';
 import '../../../../../core/models/live_battle.dart';
-import '../../../../../core/widgets/stage_tiles.dart';
+import '../../../../../core/widgets/pk_battle_start_overlay.dart';
 import '../../../../../core/widgets/safe_network_image.dart';
 import '../../../domain/entities/live_guest.dart';
 import '../../../domain/repositories/live_session_repository.dart';
 import '../../bloc/live_room/live_room_bloc.dart';
 import '../../bloc/live_room/live_room_state.dart';
+import '../../../../live_viewer/presentation/widgets/tiktok_live_chrome.dart';
+import '../start_live/ar_live_camera_preview.dart';
+import '../start_live/aspect_preserving_camera_preview.dart';
 import 'live_room_camera_layer.dart';
+
+/// TikTok PK box: slightly wider than tall, claims more of the screen than
+/// multi-guest so both faces stay large like the Match reference.
+const double _kBattleAspect = 1.05;
+const double _kBattleMaxHeightFactor = 0.58;
 
 /// The video area of the host room.
 ///
@@ -52,6 +61,8 @@ class LiveRoomStage extends StatelessWidget {
             battleMediaRoom: state.battleMediaRoom,
             supporters: state.topGifterAvatars,
             opponentSupporters: state.opponentTopGifterAvatars,
+            hostAvatarUrl: state.session.host.avatarUrl,
+            opponentAvatarUrl: state.pendingCompetitionRequest?.avatarUrl,
           );
         }
 
@@ -139,7 +150,7 @@ class LiveRoomStage extends StatelessWidget {
   }
 }
 
-class _BattleStage extends StatelessWidget {
+class _BattleStage extends StatefulWidget {
   const _BattleStage({
     required this.battle,
     required this.currentLiveId,
@@ -147,100 +158,427 @@ class _BattleStage extends StatelessWidget {
     required this.battleMediaRoom,
     required this.supporters,
     required this.opponentSupporters,
+    this.hostAvatarUrl,
+    this.opponentAvatarUrl,
   });
 
   final LiveBattle battle;
   final String currentLiveId;
   final double topInset;
   final Room? battleMediaRoom;
-
-  /// Top-gifter avatars for this host's side and the opponent's, newest
-  /// snapshot first. Empty until the leaderboard answers.
   final List<String> supporters;
   final List<String> opponentSupporters;
+  final String? hostAvatarUrl;
+  final String? opponentAvatarUrl;
+
+  @override
+  State<_BattleStage> createState() => _BattleStageState();
+}
+
+class _BattleStageState extends State<_BattleStage> {
+  String? _playedStartForBattleId;
+  var _showStartOverlay = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _maybePlayStart(widget.battle, notify: false);
+    _syncArPreviewHidden(true);
+  }
+
+  @override
+  void dispose() {
+    _syncArPreviewHidden(false);
+    super.dispose();
+  }
+
+  void _syncArPreviewHidden(bool hidden) {
+    if (!ArLiveCameraPreview.isSupported) return;
+    ArCameraBridge.setLocalPreviewHidden(hidden);
+  }
+
+  @override
+  void didUpdateWidget(covariant _BattleStage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.battle.id != widget.battle.id) {
+      _maybePlayStart(widget.battle, notify: true);
+    }
+  }
+
+  void _maybePlayStart(LiveBattle battle, {required bool notify}) {
+    if (!battle.isActive) return;
+    if (_playedStartForBattleId == battle.id) return;
+    final startedAt = battle.startTime;
+    // Skip replay when rejoining a battle that has already been running.
+    if (startedAt != null &&
+        DateTime.now().difference(startedAt).inSeconds > 10) {
+      _playedStartForBattleId = battle.id;
+      return;
+    }
+    _playedStartForBattleId = battle.id;
+    _showStartOverlay = true;
+    if (notify) setState(() {});
+  }
 
   @override
   Widget build(BuildContext context) {
+    final battle = widget.battle;
+    final currentLiveId = widget.currentLiveId;
+    final topInset = widget.topInset;
     final size = MediaQuery.sizeOf(context);
-    final maxHeight = (size.height - topInset) * kStageMaxHeightFactor;
-    final height = math.min(size.width / kStageAspect, maxHeight);
-    final width = math.min(size.width, height * kStageAspect);
-    final room = battleMediaRoom;
-    return Align(
-      alignment: Alignment.topCenter,
-      child: Padding(
-        padding: EdgeInsets.only(top: topInset),
-        // Same local override [StageTiles] makes: this host holds the first
-        // tile on the LEFT. Left to itself the Row mirrors in Arabic, so the
-        // host and the opponent swapped sides — and so did the score bar and
-        // the supporter rings that have to line up under them.
-        child: Directionality(
-          textDirection: TextDirection.ltr,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SizedBox(
-                width: width,
-                height: height,
-                child: Stack(
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
+    final maxHeight = (size.height - topInset) * _kBattleMaxHeightFactor;
+    final height = math.min(size.width / _kBattleAspect, maxHeight);
+    final width = math.min(size.width, height * _kBattleAspect);
+    final room = widget.battleMediaRoom;
+
+    // Opaque fill hides the full-screen Android FaceWarp surface outside the
+    // PK box so "my camera" only appears inside the left battle frame.
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        const ColoredBox(color: Color(0xFF0B0B0D)),
+        Align(
+          alignment: Alignment.topCenter,
+          child: Padding(
+            padding: EdgeInsets.only(top: topInset),
+            child: Directionality(
+              textDirection: TextDirection.ltr,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: width,
+                    height: height,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      clipBehavior: Clip.hardEdge,
                       children: [
-                        const Expanded(
-                          child: _StageTile(child: LiveRoomCameraLayer()),
-                        ),
-                        const SizedBox(width: kStageTileGap),
-                        Expanded(
-                          child: _StageTile(
-                            child: _OpponentVideo(
-                              room: room is Room ? room : null,
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Expanded(
+                              child: _BattleFeedTile(
+                                child: _HostBattleVideo(
+                                  avatarUrl: widget.hostAvatarUrl,
+                                ),
+                              ),
                             ),
+                            Container(width: 1.5, color: Colors.black),
+                            Expanded(
+                              child: _BattleFeedTile(
+                                child: _OpponentVideo(
+                                  room: room is Room ? room : null,
+                                  avatarUrl: widget.opponentAvatarUrl,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        Positioned(
+                          left: 0,
+                          right: 0,
+                          top: 0,
+                          child: _HostBattleChrome(
+                            leftScore: battle.scoreFor(currentLiveId),
+                            rightScore: battle.opponentScoreFor(currentLiveId),
+                            endTime: battle.endTime,
+                            multiplier: battle.multiplier,
+                            winnerLiveId: battle.winnerLiveId,
+                            currentLiveId: currentLiveId,
                           ),
                         ),
+                        if (_showStartOverlay)
+                          Positioned.fill(
+                            child: PkBattleStartOverlay(
+                              leftAvatarUrl: widget.hostAvatarUrl,
+                              rightAvatarUrl: widget.opponentAvatarUrl,
+                              onFinished: () {
+                                if (!mounted) return;
+                                setState(() => _showStartOverlay = false);
+                              },
+                            ),
+                          ),
                       ],
                     ),
-                    Positioned(
-                      left: 0,
-                      right: 0,
-                      top: 0,
-                      child: _HostBattleBar(
-                        leftScore: battle.scoreFor(currentLiveId),
-                        rightScore: battle.opponentScoreFor(currentLiveId),
-                        endTime: battle.endTime,
-                        multiplier: battle.multiplier,
+                  ),
+                  SizedBox(
+                    width: width,
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: _BattleSupporters(
+                              avatars: widget.supporters,
+                              isOwnSide: true,
+                            ),
+                          ),
+                          Expanded(
+                            child: _BattleSupporters(
+                              avatars: widget.opponentSupporters,
+                              isOwnSide: false,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Host half of a PK battle — clipped live camera (LiveKit local / beauty
+/// track). Avatar only if the track is not published yet.
+class _HostBattleVideo extends StatelessWidget {
+  const _HostBattleVideo({this.avatarUrl});
+
+  final String? avatarUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<LiveRoomBloc, LiveRoomState>(
+      buildWhen: (previous, current) {
+        if (previous is! LiveRoomReady || current is! LiveRoomReady) {
+          return previous.runtimeType != current.runtimeType;
+        }
+        return previous.localVideoTrack != current.localVideoTrack ||
+            previous.isMediaConnected != current.isMediaConnected ||
+            previous.isMirrorEnabled != current.isMirrorEnabled ||
+            previous.isLivePaused != current.isLivePaused ||
+            previous.isFrontCamera != current.isFrontCamera;
+      },
+      builder: (context, state) {
+        if (state is! LiveRoomReady) {
+          return _BattleAvatarFallback(avatarUrl: avatarUrl);
+        }
+
+        // Prefer state track; fall back to the media datasource (AR beauty
+        // used to keep state.localVideoTrack null for full-screen FaceWarp).
+        final track =
+            state.localVideoTrack ??
+            context.read<LiveSessionRepository>().localPreviewTrack
+                as VideoTrack?;
+
+        Widget child;
+        if (track != null) {
+          // Stable key keeps the LiveKit texture attached across parent
+          // rebuilds — recreating it every score tick is the PK stutter.
+          child = RepaintBoundary(
+            child: VideoTrackRenderer(
+              track,
+              key: ValueKey('pk-host-${track.sid ?? track.hashCode}'),
+              fit: VideoViewFit.cover,
+            ),
+          );
+          // Front camera preview matches the host's mirrored full-screen look.
+          if (state.isMirrorEnabled || state.isFrontCamera) {
+            child = Transform.flip(flipX: true, child: child);
+          }
+        } else if (state.isCameraInitialized && state.controller != null) {
+          child = AspectPreservingCameraPreview(controller: state.controller!);
+          if (state.isMirrorEnabled || state.isFrontCamera) {
+            child = Transform.flip(flipX: true, child: child);
+          }
+        } else {
+          child = _BattleAvatarFallback(avatarUrl: avatarUrl);
+        }
+
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            ClipRect(child: child),
+            if (state.isLivePaused)
+              ColoredBox(
+                color: Colors.black.withValues(alpha: 0.55),
+                child: const Center(
+                  child: Icon(Icons.pause_circle_filled, color: Colors.white70, size: 40),
                 ),
               ),
-              // Under the tiles rather than over them: the supporter ring is
-              // what TikTok shows there, and drawing it inside the video would
-              // cover the two faces the battle is about.
-              SizedBox(
-                width: width,
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: _BattleSupporters(
-                          avatars: supporters,
-                          isOwnSide: true,
-                        ),
-                      ),
-                      Expanded(
-                        child: _BattleSupporters(
-                          avatars: opponentSupporters,
-                          isOwnSide: false,
-                        ),
-                      ),
-                    ],
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _BattleAvatarFallback extends StatelessWidget {
+  const _BattleAvatarFallback({this.avatarUrl});
+
+  final String? avatarUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    if (isValidNetworkImageUrl(avatarUrl)) {
+      return SafeNetworkImage(
+        imageUrl: avatarUrl,
+        fit: BoxFit.cover,
+        blankOnError: true,
+        showLoadingIndicator: false,
+      );
+    }
+    return const ColoredBox(
+      color: Color(0xFF17171A),
+      child: Center(
+        child: Icon(Icons.person, size: 48, color: Colors.white38),
+      ),
+    );
+  }
+}
+
+/// Full-bleed feed tile (no rounded card) — TikTok Match style.
+class _BattleFeedTile extends StatelessWidget {
+  const _BattleFeedTile({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: const Color(0xFF121214),
+      child: SizedBox.expand(child: child),
+    );
+  }
+}
+
+class _HostBattleChrome extends StatelessWidget {
+  const _HostBattleChrome({
+    required this.leftScore,
+    required this.rightScore,
+    required this.endTime,
+    required this.multiplier,
+    required this.winnerLiveId,
+    required this.currentLiveId,
+  });
+
+  final int leftScore;
+  final int rightScore;
+  final DateTime? endTime;
+  final double multiplier;
+  final String? winnerLiveId;
+  final String currentLiveId;
+
+  @override
+  Widget build(BuildContext context) {
+    final winner = winnerLiveId;
+    final decided = winner != null && winner.isNotEmpty;
+    final leftWon = decided && winner == currentLiveId;
+
+    return Stack(
+      alignment: Alignment.topCenter,
+      clipBehavior: Clip.none,
+      children: [
+        PkBattleBar(scoreLeft: leftScore, scoreRight: rightScore),
+        if (decided) ...[
+          Positioned(
+            top: 26,
+            left: 8,
+            child: _PkResultBadge(won: leftWon),
+          ),
+          Positioned(
+            top: 26,
+            right: 8,
+            child: _PkResultBadge(won: !leftWon),
+          ),
+        ],
+        Positioned(
+          top: 22,
+          child: _PkBattleTimer(endTime: endTime, multiplier: multiplier),
+        ),
+      ],
+    );
+  }
+}
+
+class _PkBattleTimer extends StatelessWidget {
+  const _PkBattleTimer({required this.endTime, required this.multiplier});
+
+  final DateTime? endTime;
+  final double multiplier;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<int>(
+      stream: Stream<int>.periodic(
+        const Duration(seconds: 1),
+        (value) => value,
+      ),
+      builder: (_, _) {
+        final seconds = math.max(
+          0,
+          endTime?.difference(DateTime.now()).inSeconds ?? 0,
+        );
+        final time =
+            '${(seconds ~/ 60).toString().padLeft(2, '0')}:'
+            '${(seconds % 60).toString().padLeft(2, '0')}';
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (multiplier > 1) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xE6FF2D55),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '×${multiplier.toStringAsFixed(multiplier % 1 == 0 ? 0 : 1)}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
               ),
+              const SizedBox(width: 6),
             ],
-          ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+              decoration: BoxDecoration(
+                color: const Color(0xE614202A),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                time,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.4,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _PkResultBadge extends StatelessWidget {
+  const _PkResultBadge({required this.won});
+
+  final bool won;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: won ? const Color(0xE6FF2D55) : const Color(0xE6222226),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        won ? 'WIN' : 'LOSE',
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 11,
+          fontWeight: FontWeight.w900,
         ),
       ),
     );
@@ -368,29 +706,108 @@ class _SupporterAvatar extends StatelessWidget {
   }
 }
 
-class _OpponentVideo extends StatelessWidget {
-  const _OpponentVideo({required this.room});
+class _OpponentVideo extends StatefulWidget {
+  const _OpponentVideo({required this.room, this.avatarUrl});
 
   final Room? room;
+  final String? avatarUrl;
 
-  VideoTrack? get _track {
-    final participants = room?.remoteParticipants.values;
-    if (participants == null) return null;
-    for (final participant in participants) {
-      for (final publication in participant.videoTrackPublications) {
-        final track = publication.track;
-        if (publication.subscribed && !publication.muted && track != null) {
-          return track;
-        }
-      }
-    }
-    return null;
+  @override
+  State<_OpponentVideo> createState() => _OpponentVideoState();
+}
+
+class _OpponentVideoState extends State<_OpponentVideo> {
+  EventsListener<RoomEvent>? _listener;
+  VideoTrack? _track;
+  String? _trackKey;
+
+  @override
+  void initState() {
+    super.initState();
+    _attach(widget.room);
   }
 
-  Widget _content() {
+  @override
+  void didUpdateWidget(covariant _OpponentVideo oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.room, widget.room)) {
+      _detach();
+      _attach(widget.room);
+    }
+  }
+
+  @override
+  void dispose() {
+    _detach();
+    super.dispose();
+  }
+
+  void _detach() {
+    _listener?.dispose();
+    _listener = null;
+  }
+
+  void _attach(Room? room) {
+    _refreshTrack(room);
+    if (room == null) return;
+    final listener = room.createListener();
+    _listener = listener;
+    listener
+      ..on<TrackSubscribedEvent>((_) => _refreshTrack(room))
+      ..on<TrackUnsubscribedEvent>((_) => _refreshTrack(room))
+      ..on<TrackMutedEvent>((_) => _refreshTrack(room))
+      ..on<TrackUnmutedEvent>((_) => _refreshTrack(room))
+      ..on<ParticipantConnectedEvent>((_) => _refreshTrack(room))
+      ..on<ParticipantDisconnectedEvent>((_) => _refreshTrack(room));
+  }
+
+  void _refreshTrack(Room? room) {
+    VideoTrack? next;
+    final participants = room?.remoteParticipants.values;
+    if (participants != null) {
+      for (final participant in participants) {
+        for (final publication in participant.videoTrackPublications) {
+          final track = publication.track;
+          if (publication.subscribed && !publication.muted && track != null) {
+            next = track;
+            break;
+          }
+        }
+        if (next != null) break;
+      }
+    }
+    final key = next == null ? null : (next.sid ?? '${next.hashCode}');
+    if (!mounted) {
+      _track = next;
+      _trackKey = key;
+      return;
+    }
+    if (key == _trackKey && identical(next, _track)) return;
+    setState(() {
+      _track = next;
+      _trackKey = key;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final track = _track;
     if (track != null) {
-      return VideoTrackRenderer(track, fit: VideoViewFit.cover);
+      return RepaintBoundary(
+        child: VideoTrackRenderer(
+          track,
+          key: ValueKey('pk-opponent-$_trackKey'),
+          fit: VideoViewFit.cover,
+        ),
+      );
+    }
+    if (isValidNetworkImageUrl(widget.avatarUrl)) {
+      return SafeNetworkImage(
+        imageUrl: widget.avatarUrl,
+        fit: BoxFit.cover,
+        blankOnError: true,
+        showLoadingIndicator: false,
+      );
     }
     return const ColoredBox(
       color: Color(0xFF17171A),
@@ -409,110 +826,6 @@ class _OpponentVideo extends StatelessWidget {
       ),
     );
   }
-
-  @override
-  Widget build(BuildContext context) {
-    final value = room;
-    if (value == null) return _content();
-    return BuildSafeListenableBuilder(
-      listenable: value,
-      builder: (_, _) => _content(),
-    );
-  }
-}
-
-class _HostBattleBar extends StatefulWidget {
-  const _HostBattleBar({
-    required this.leftScore,
-    required this.rightScore,
-    required this.endTime,
-    required this.multiplier,
-  });
-
-  final int leftScore;
-  final int rightScore;
-  final DateTime? endTime;
-  final double multiplier;
-
-  @override
-  State<_HostBattleBar> createState() => _HostBattleBarState();
-}
-
-class _HostBattleBarState extends State<_HostBattleBar> {
-  late final Stream<int> _ticks = Stream<int>.periodic(
-    const Duration(seconds: 1),
-    (value) => value,
-  );
-
-  String get _remaining {
-    final end = widget.endTime;
-    if (end == null) return '--:--';
-    final seconds = math.max(0, end.difference(DateTime.now()).inSeconds);
-    return '${(seconds ~/ 60).toString().padLeft(2, '0')}:'
-        '${(seconds % 60).toString().padLeft(2, '0')}';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final total = math.max(1, widget.leftScore + widget.rightScore);
-    final left = (widget.leftScore / total * 1000).round().clamp(80, 920);
-    return SizedBox(
-      height: 42,
-      child: Stack(
-        alignment: Alignment.topCenter,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                flex: left,
-                child: _score(Color(0xFFFF2D6F), widget.leftScore, false),
-              ),
-              Expanded(
-                flex: 1000 - left,
-                child: _score(Color(0xFF22CEDA), widget.rightScore, true),
-              ),
-            ],
-          ),
-          Positioned(
-            top: 18,
-            child: StreamBuilder<int>(
-              stream: _ticks,
-              builder: (_, _) => Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
-                decoration: BoxDecoration(
-                  color: const Color(0xDD14202A),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  '${widget.multiplier > 1 ? '×${widget.multiplier.toStringAsFixed(1)}  ' : ''}$_remaining',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _score(Color color, int value, bool right) => Container(
-    height: 18,
-    color: color,
-    padding: const EdgeInsets.symmetric(horizontal: 8),
-    alignment: right ? Alignment.centerRight : Alignment.centerLeft,
-    child: Text(
-      '$value',
-      style: const TextStyle(
-        color: Colors.white,
-        fontSize: 12,
-        fontWeight: FontWeight.w800,
-      ),
-    ),
-  );
 }
 
 class _StageTile extends StatelessWidget {

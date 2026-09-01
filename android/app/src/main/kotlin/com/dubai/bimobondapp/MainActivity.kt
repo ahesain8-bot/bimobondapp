@@ -8,6 +8,8 @@ import com.dubai.bimobondapp.ar_camera.ArCameraBridge
 import com.dubai.bimobondapp.ar_camera.ArCameraController
 import com.dubai.bimobondapp.ar_camera.ArCameraOverlayPrefetcher
 import com.dubai.bimobondapp.ar_camera.ArCameraPlatformViewFactory
+import com.dubai.bimobondapp.ar_camera.ArLiveBeautyPublisher
+import com.dubai.bimobondapp.ar_camera.ArLiveStartPopup
 import com.dubai.bimobondapp.ar_camera.ScreenOverlaySource
 import com.dubai.bimobondapp.ar_camera.parseOverlayMediaType
 import com.dubai.bimobondapp.ar_camera.FaceLandmarkerHolder
@@ -397,8 +399,16 @@ class MainActivity : FlutterActivity() {
                     // before pushing a route that opens its own camera (live
                     // room) so the lens is never held twice at once.
                     "stopCamera" -> {
-                        ArCameraController.stop()
-                        result.success(null)
+                        if (ArLiveBeautyPublisher.isLivePublishingExclusive()) {
+                            android.util.Log.w(
+                                "ArCamera",
+                                "stopCamera ignored — live beauty publish owns CameraX",
+                            )
+                            result.success(null)
+                        } else {
+                            ArCameraController.stop()
+                            result.success(null)
+                        }
                     }
                     // Re-initialises the native camera after [stopCamera] when
                     // the camera screen becomes visible again.
@@ -419,10 +429,68 @@ class MainActivity : FlutterActivity() {
                         }
                         result.success(null)
                     }
+                    "attachBeautyVideoTrack" -> {
+                        val streamId = call.argument<String>("streamId")
+                        if (streamId.isNullOrBlank()) {
+                            result.error("bad_args", "streamId required", null)
+                            return@setMethodCallHandler
+                        }
+                        val width = call.argument<Int>("width") ?: 720
+                        val height = call.argument<Int>("height") ?: 1280
+                        val fps = call.argument<Int>("fps") ?: 24
+                        try {
+                            val map = ArLiveBeautyPublisher.attachBeautyTrack(
+                                this@MainActivity,
+                                streamId,
+                                width,
+                                height,
+                                fps,
+                                flutterEngine,
+                            )
+                            if (map == null) {
+                                result.error(
+                                    "beauty_track_failed",
+                                    "Could not attach AR beauty track",
+                                    null,
+                                )
+                            } else {
+                                result.success(map)
+                            }
+                        } catch (t: Throwable) {
+                            result.error(
+                                "beauty_track_failed",
+                                t.message ?: "unknown",
+                                null,
+                            )
+                        }
+                    }
+                    "releaseBeautyVideoTrack" -> {
+                        ArLiveBeautyPublisher.release()
+                        ArLiveBeautyPublisher.setLivePublishingExclusive(false)
+                        result.success(null)
+                    }
+                    "setLivePublishingExclusive" -> {
+                        val exclusive = call.argument<Boolean>("exclusive") ?: false
+                        ArLiveBeautyPublisher.setLivePublishingExclusive(exclusive)
+                        result.success(null)
+                    }
+                    "beautyPushedFrameCount" -> {
+                        result.success(ArLiveBeautyPublisher.pushedFrameCount())
+                    }
                     "setPreviewLetterbox" -> {
                         val top = call.argument<Int>("topPx") ?: 0
                         val bottom = call.argument<Int>("bottomPx") ?: 0
                         ArCameraBridge.setPreviewLetterbox(top, bottom)
+                        result.success(null)
+                    }
+                    "setLocalPreviewHidden" -> {
+                        val hidden = call.argument<Boolean>("hidden") ?: false
+                        ArCameraBridge.setLocalPreviewHidden(hidden)
+                        result.success(null)
+                    }
+                    "setLiveStartChrome" -> {
+                        val visible = call.argument<Boolean>("visible") ?: false
+                        ArLiveStartPopup.setVisible(this@MainActivity, visible)
                         result.success(null)
                     }
                     "setRetouchAdjustments" -> {
@@ -573,6 +641,11 @@ class MainActivity : FlutterActivity() {
                 arCameraChannel?.invokeMethod("onRecordingAutoStopped", path)
             }
         }
+        ArCameraBridge.liveStartEventSink = { method, args ->
+            runOnUiThread {
+                arCameraChannel?.invokeMethod(method, args)
+            }
+        }
     }
 
     /** Prefetch CameraX provider + MediaPipe so + → camera isn't cold-starting. */
@@ -631,6 +704,9 @@ class MainActivity : FlutterActivity() {
 
     override fun onDestroy() {
         ArCameraController.onRecordingAutoStopped = null
+        ArCameraBridge.liveStartEventSink = null
+        ArLiveStartPopup.dismiss()
+        ArLiveBeautyPublisher.release()
         NativeCameraPlugin.dispose()
         CountdownTonePlayer.release()
         super.onDestroy()

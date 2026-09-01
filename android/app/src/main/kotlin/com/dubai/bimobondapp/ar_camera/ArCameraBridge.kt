@@ -32,6 +32,12 @@ object ArCameraBridge {
     var confettiOverlay: LottieAnimationView? = null
     var videoOverlay: TextureView? = null
 
+    /**
+     * Host activity posts live-start chrome events to Flutter via MethodChannel
+     * (Dialog sits above FaceWarp GLSurfaceView; Flutter overlays cannot).
+     */
+    var liveStartEventSink: ((method: String, args: Any?) -> Unit)? = null
+
     /** Source currently loaded into the screen overlay views — see [applyRenderMode]. */
     private var loadedOverlayKey: String? = null
     private var screenOverlayVideoHelper: ScreenOverlayVideoHelper? = null
@@ -158,6 +164,9 @@ object ArCameraBridge {
     @Volatile
     private var letterboxBottomPx: Int = 0
 
+    @Volatile
+    private var localPreviewHidden: Boolean = false
+
     fun isPreviewLetterboxed(): Boolean = letterboxTopPx > 0 || letterboxBottomPx > 0
 
     fun letterboxTopPx(): Int = letterboxTopPx
@@ -272,6 +281,50 @@ object ArCameraBridge {
         letterboxTopPx = topPx.coerceAtLeast(0)
         letterboxBottomPx = bottomPx.coerceAtLeast(0)
         mainHandler.post { applyPreviewLetterbox() }
+    }
+
+    /**
+     * PK battle: tuck full-screen FaceWarp under Flutter so each host sees
+     * clipped LiveKit tiles — but keep the GLSurfaceView **visible and
+     * rendering**. Setting it [View.INVISIBLE] pauses the GL loop, starves
+     * [ArBeautyVideoCapturer], and freezes both PK videos (audio-only).
+     */
+    fun setLocalPreviewHidden(hidden: Boolean) {
+        mainHandler.post {
+            localPreviewHidden = hidden
+            val gl = warpGlView
+            val preview = previewView
+            val root = platformRoot
+            if (hidden) {
+                // Transparent root + no media-overlay z-order so Flutter's
+                // opaque battle chrome covers the camera. Capture keeps running.
+                root?.setBackgroundColor(Color.TRANSPARENT)
+                preview?.visibility = View.INVISIBLE
+                if (gl != null) {
+                    gl.visibility = View.VISIBLE
+                    gl.alpha = 1f
+                    gl.setZOrderOnTop(false)
+                    gl.setZOrderMediaOverlay(false)
+                    // Continuous draws keep beauty frames flowing into LiveKit
+                    // while the surface is covered by Flutter PK tiles.
+                    gl.setRenderModeSafe(GLSurfaceView.RENDERMODE_CONTINUOUSLY)
+                    gl.requestRender()
+                }
+            } else {
+                if (gl != null) {
+                    gl.alpha = 1f
+                    gl.visibility = View.VISIBLE
+                    gl.setZOrderOnTop(false)
+                    gl.setZOrderMediaOverlay(true)
+                    gl.setRenderModeSafe(GLSurfaceView.RENDERMODE_WHEN_DIRTY)
+                    preview?.visibility = View.INVISIBLE
+                } else {
+                    preview?.visibility = View.VISIBLE
+                }
+                root?.setBackgroundColor(Color.BLACK)
+                applyPreviewLetterbox()
+            }
+        }
     }
 
     fun reapplyPreviewLetterbox() {
@@ -1176,6 +1229,21 @@ object ArCameraBridge {
     private fun showGlHidePreview() {
         val gl = warpGlView
         val preview = previewView
+        // PK battle owns the on-screen present — do not bring FaceWarp back
+        // above Flutter tiles, but keep GL alive for beauty publish.
+        if (localPreviewHidden) {
+            preview?.visibility = View.INVISIBLE
+            if (gl != null) {
+                gl.visibility = View.VISIBLE
+                gl.setZOrderOnTop(false)
+                gl.setZOrderMediaOverlay(false)
+                gl.setRenderModeSafe(GLSurfaceView.RENDERMODE_CONTINUOUSLY)
+            }
+            clearApplyingOverlay()
+            clearFreezeOverlay()
+            clearRebindCover()
+            return
+        }
         gl?.visibility = View.VISIBLE
         gl?.bringToFront()
         preview?.visibility = View.INVISIBLE
@@ -1200,6 +1268,15 @@ object ArCameraBridge {
         clearRebindCover()
         gl?.visibility = View.VISIBLE
         preview?.visibility = View.INVISIBLE
+        if (localPreviewHidden) {
+            gl?.setZOrderOnTop(false)
+            gl?.setZOrderMediaOverlay(false)
+            gl?.setRenderModeSafe(GLSurfaceView.RENDERMODE_CONTINUOUSLY)
+            clearFreezeOverlay()
+            oesDiagStartMs = 0L
+            oesSurfaceLive = false
+            return
+        }
         if (freeze == null) {
             gl?.bringToFront()
             bringDecorOverlaysToFront()
@@ -1219,8 +1296,13 @@ object ArCameraBridge {
                     "revealGlDropFreeze fadeDone +${oesDiagElapsedMs()}ms",
                 )
                 clearFreezeOverlay()
-                gl?.bringToFront()
-                bringDecorOverlaysToFront()
+                if (localPreviewHidden) {
+                    gl?.setZOrderOnTop(false)
+                    gl?.setZOrderMediaOverlay(false)
+                } else {
+                    gl?.bringToFront()
+                    bringDecorOverlaysToFront()
+                }
                 diagVis("reveal.done")
                 oesDiagStartMs = 0L
                 oesSurfaceLive = false

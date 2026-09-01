@@ -49,7 +49,12 @@ import '../../../live_viewer/presentation/widgets/floating_gifts.dart';
 
 /// Host live-room screen: full-screen camera with TikTok-style Arabic overlays.
 class LiveRoomPage extends StatefulWidget {
-  const LiveRoomPage({super.key, this.title, this.initialCamera});
+  const LiveRoomPage({
+    super.key,
+    this.title,
+    this.initialCamera,
+    this.useArBeautyCamera = false,
+  });
 
   /// Optional title entered on the start screen.
   final String? title;
@@ -57,6 +62,9 @@ class LiveRoomPage extends StatefulWidget {
   /// The camera that was ALREADY running on the start screen.
   /// Handed over so the room reuses the same lens (no reopen, no flicker).
   final CameraController? initialCamera;
+
+  /// Android: stream FaceWarp beauty frames via LiveKit (no raw camera track).
+  final bool useArBeautyCamera;
 
   @override
   State<LiveRoomPage> createState() => _LiveRoomPageState();
@@ -125,6 +133,7 @@ class _LiveRoomPageState extends State<LiveRoomPage>
           LiveRoomStarted(
             title: widget.title,
             initialCamera: widget.initialCamera,
+            useArBeautyCamera: widget.useArBeautyCamera,
           ),
         );
   }
@@ -251,7 +260,9 @@ class _LiveRoomPageState extends State<LiveRoomPage>
                 ),
               ],
               child: Scaffold(
-                backgroundColor: Colors.black,
+                backgroundColor: widget.useArBeautyCamera
+                    ? Colors.transparent
+                    : Colors.black,
                 // Keep the camera canvas fixed; the bottom chrome follows the
                 // keyboard through the view inset instead of resizing video.
                 resizeToAvoidBottomInset: false,
@@ -462,12 +473,16 @@ class _LiveRoomBody extends StatelessWidget {
                           SizedBox(height: AppSpacing.xs),
                           Flexible(
                             child: Padding(
-                              padding: EdgeInsetsDirectional.only(
-                                start: AppSpacing.xl,
-                                end: AppSpacing.roomHorizontal,
+                              // TikTok creator: activity feed bottom-left.
+                              padding: EdgeInsets.only(
+                                left: AppSpacing.xl,
+                                right: AppSpacing.roomHorizontal,
                                 bottom: AppSpacing.xs,
                               ),
-                              child: LiveRoomChatFeed(),
+                              child: Directionality(
+                                textDirection: TextDirection.ltr,
+                                child: LiveRoomChatFeed(),
+                              ),
                             ),
                           ),
                         ],

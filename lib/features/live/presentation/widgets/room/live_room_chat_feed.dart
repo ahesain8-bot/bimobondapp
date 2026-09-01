@@ -13,9 +13,7 @@ import '../../bloc/live_room/live_room_bloc.dart';
 import '../../bloc/live_room/live_room_event.dart';
 import '../../bloc/live_room/live_room_state.dart';
 
-/// Activity feed anchored to the bottom start edge, the way TikTok anchors it
-/// — which in Arabic means the right edge, with the avatar on the right, as in
-/// the reference screenshots.
+/// Activity feed anchored bottom-left for the TikTok creator LIVE chrome.
 class LiveRoomChatFeed extends StatelessWidget {
   const LiveRoomChatFeed({super.key});
 

@@ -13,8 +13,8 @@ import 'live_room_ranking_sheet.dart';
 import 'live_room_pill.dart';
 import 'live_room_profile_pill.dart';
 
-/// Top overlay matching the reference: identity on the right, exit/viewers on
-/// the left.
+/// TikTok **creator** LIVE top chrome (LTR):
+/// `[avatar · name · ♥ · likes chip]  ……  [supporters] [viewers] [X]`
 class LiveRoomHeader extends StatelessWidget {
   const LiveRoomHeader({super.key});
 
@@ -34,77 +34,63 @@ class LiveRoomHeader extends StatelessWidget {
         final session = state.session;
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Row(
+          child: Directionality(
             textDirection: TextDirection.ltr,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // Keep the exit control and viewer cluster on the left, with
-              // the broadcaster identity anchored to the opposite edge like
-              // the viewer chrome.
-              _PowerButton(
-                onTap: () => context.read<LiveRoomBloc>().add(
-                  const LiveRoomEndRequested(),
-                ),
-              ),
-              const SizedBox(width: 6),
-              GestureDetector(
-                onTap: () => context.read<LiveRoomBloc>().add(
-                  const LiveRoomLikeTapped(),
-                ),
-                child: LiveRoomLikesPill(likeCount: session.likeCount),
-              ),
-              const Spacer(),
-              // The supporter faces TikTok puts beside the viewer count. Tap
-              // opens the ranking sheet, which is where the full leaderboard
-              // already lives.
-              if (state.topGifterAvatars.isNotEmpty) ...[
-                GestureDetector(
-                  onTap: () => LiveRoomRankingSheet.show(context),
-                  child: _SupporterCluster(avatars: state.topGifterAvatars),
-                ),
-                const SizedBox(width: 6),
-              ],
-              GestureDetector(
-                onTap: () {
-                  context.read<LiveRoomBloc>().add(
-                    const LiveRoomViewersTapped(),
-                  );
-                  LiveRoomPeopleSheet.show(context);
-                },
-                child: LiveRoomPill(
-                  height: 30,
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      SvgPicture.asset(
-                        AppAssets.roomPerson,
-                        width: 14,
-                        height: 14,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        session.viewerCount.toString().padLeft(2, '0'),
-                        style: AppTextStyles.roomCounter.copyWith(fontSize: 12),
-                      ),
-                    ],
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: LiveRoomProfilePill(
+                    host: session.host,
+                    followerCount: session.host.hostHeartCount,
+                    likeCount: session.likeCount,
                   ),
                 ),
-              ),
-              const SizedBox(width: 6),
-              const Spacer(),
-              GestureDetector(
-                onTap: () => context.read<LiveRoomBloc>().add(
-                  const LiveRoomLikeTapped(),
+                const SizedBox(width: 8),
+                if (state.topGifterAvatars.isNotEmpty) ...[
+                  GestureDetector(
+                    onTap: () => LiveRoomRankingSheet.show(context),
+                    child: _SupporterCluster(avatars: state.topGifterAvatars),
+                  ),
+                  const SizedBox(width: 6),
+                ],
+                GestureDetector(
+                  onTap: () {
+                    context.read<LiveRoomBloc>().add(
+                      const LiveRoomViewersTapped(),
+                    );
+                    LiveRoomPeopleSheet.show(context);
+                  },
+                  child: LiveRoomPill(
+                    height: 30,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SvgPicture.asset(
+                          AppAssets.roomPerson,
+                          width: 14,
+                          height: 14,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${session.viewerCount}',
+                          style: AppTextStyles.roomCounter.copyWith(
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-                child: LiveRoomLikesPill(likeCount: session.likeCount),
-              ),
-              const SizedBox(width: 6),
-              LiveRoomProfilePill(
-                host: session.host,
-                followerCount: session.host.hostHeartCount,
-              ),
-            ],
+                const SizedBox(width: 4),
+                _CloseButton(
+                  onTap: () => context.read<LiveRoomBloc>().add(
+                    const LiveRoomEndRequested(),
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -112,8 +98,7 @@ class LiveRoomHeader extends StatelessWidget {
   }
 }
 
-/// Overlapping top-supporter faces, highest rank on top — the row TikTok
-/// draws next to the viewer count.
+/// Overlapping top-supporter faces — TikTok row beside the viewer count.
 class _SupporterCluster extends StatelessWidget {
   const _SupporterCluster({required this.avatars});
 
@@ -133,7 +118,6 @@ class _SupporterCluster extends StatelessWidget {
       height: _size,
       child: Stack(
         children: [
-          // Painted in reverse so rank 1 ends up on top of the pile.
           for (var i = shown.length - 1; i >= 0; i--)
             Positioned(
               left: i * (_size - _overlap),
@@ -165,8 +149,8 @@ class _SupporterCluster extends StatelessWidget {
   }
 }
 
-class _PowerButton extends StatelessWidget {
-  const _PowerButton({required this.onTap});
+class _CloseButton extends StatelessWidget {
+  const _CloseButton({required this.onTap});
 
   final VoidCallback onTap;
 
@@ -174,6 +158,7 @@ class _PowerButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
+      behavior: HitTestBehavior.opaque,
       child: const SizedBox(
         width: 34,
         height: 34,

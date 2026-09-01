@@ -1,156 +1,138 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../../../core/utils/app_assets.dart';
-import '../../../../../core/utils/app_sizes.dart';
-import '../../../../../core/constants/app_spacing.dart';
 import '../../bloc/start_live/live_bloc.dart';
 import '../../bloc/start_live/live_event.dart';
-import '../../bloc/start_live/live_state.dart';
-import 'tool_button.dart';
 
-/// Tools row: expand/collapse toggle, primary tools and optional share row.
+/// TikTok Go LIVE tool row:
+/// Flip · Enhance · Effects · Settings · More
 class ToolsRow extends StatelessWidget {
   const ToolsRow({
     super.key,
     this.onBeautifyTap,
     this.onEffectsTap,
     this.onSettingsTap,
-    this.onServiceTap,
-    this.onFansTap,
-    this.onShareTap,
-    this.onInteractionTap,
+    this.onMoreTap,
   });
 
   final VoidCallback? onBeautifyTap;
   final VoidCallback? onEffectsTap;
   final VoidCallback? onSettingsTap;
-  final VoidCallback? onServiceTap;
-  final VoidCallback? onFansTap;
-  final VoidCallback? onShareTap;
-  final VoidCallback? onInteractionTap;
+  final VoidCallback? onMoreTap;
 
   @override
   Widget build(BuildContext context) {
     final liveBloc = context.read<LiveBloc>();
 
-    return Align(
-      alignment: Alignment.center,
-      child: Container(
-        padding: const EdgeInsets.only(
-          left: AppSpacing.xxxl,
-          right: AppSpacing.xxxl,
-          top: AppSpacing.toolsRowVertical,
-          bottom: AppSpacing.toolsRowVertical,
-        ),
+    final tools = <_ToolSpec>[
+      _ToolSpec(
+        icon: Icons.cameraswitch_outlined,
+        label: 'Flip',
+        onTap: () => liveBloc.add(const LiveCameraSwitchRequested()),
+      ),
+      _ToolSpec(
+        icon: Icons.auto_awesome,
+        label: 'Enhance',
+        onTap: onBeautifyTap,
+      ),
+      _ToolSpec(
+        icon: Icons.face_retouching_natural,
+        label: 'Effects',
+        onTap: onEffectsTap,
+      ),
+      _ToolSpec(
+        icon: Icons.settings_outlined,
+        label: 'Settings',
+        onTap: onSettingsTap,
+        showDot: true,
+      ),
+      _ToolSpec(
+        icon: Icons.keyboard_arrow_down_rounded,
+        label: 'More',
+        onTap: onMoreTap,
+      ),
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: Row(
+        children: [
+          for (final tool in tools) Expanded(child: _ToolCell(tool: tool)),
+        ],
+      ),
+    );
+  }
+}
+
+class _ToolSpec {
+  const _ToolSpec({
+    required this.icon,
+    required this.label,
+    this.onTap,
+    this.showDot = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback? onTap;
+  final bool showDot;
+}
+
+class _ToolCell extends StatelessWidget {
+  const _ToolCell({required this.tool});
+
+  final _ToolSpec tool;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: tool.onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Expand / collapse toggle.
-            BlocBuilder<LiveBloc, LiveState>(
-              buildWhen: (previous, current) =>
-                  _expandedOf(previous) != _expandedOf(current),
-              builder: (context, state) {
-                final isExpanded = _expandedOf(state);
-                return GestureDetector(
-                  onTap: () => liveBloc.add(const LiveToolsToggleRequested()),
-                  child: Padding(
-                    padding: const EdgeInsets.only(
-                      bottom: AppSpacing.toolsToggleGap,
-                    ),
-                    child: Image.asset(
-                      isExpanded
-                          ? AppAssets.toolsExpanded
-                          : AppAssets.toolsCollapsed,
-                      width: AppSizes.toggleArrow,
-                      height: AppSizes.toggleArrow,
-                      fit: BoxFit.contain,
-                    ),
-                  ),
-                );
-              },
-            ),
-            // Both rows scale as one unit. Five 48px buttons with 8px gaps
-            // need 320px, and a 360dp phone leaves only 300 after the 30px
-            // side padding — which is exactly the 20px this row used to
-            // overflow by. Scaling keeps the design and fits any width.
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
+            SizedBox(
+              width: 28,
+              height: 28,
+              child: Stack(
+                clipBehavior: Clip.none,
                 children: [
-                  // Primary tools.
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      ToolButton(
-                        asset: AppAssets.service,
-                        label: 'Services+',
-                        onTap: onServiceTap,
-                      ),
-                      ToolButton(
-                        asset: AppAssets.settings,
-                        label: 'الإعدادات',
-                        onTap: onSettingsTap,
-                      ),
-                      ToolButton(
-                        asset: AppAssets.guests,
-                        label: 'المؤثرات',
-                        onTap: onEffectsTap,
-                      ),
-                      ToolButton(
-                        asset: AppAssets.edit,
-                        label: 'تجميل',
-                        onTap: onBeautifyTap,
-                      ),
-                      ToolButton(
-                        asset: AppAssets.heart,
-                        label: 'قلب',
-                        onTap: () =>
-                            liveBloc.add(const LiveCameraSwitchRequested()),
-                      ),
-                    ],
+                  Center(
+                    child: Icon(tool.icon, color: Colors.white, size: 26),
                   ),
-                  // Secondary tools are visible only while the tools panel
-                  // is expanded.
-                  BlocBuilder<LiveBloc, LiveState>(
-                    buildWhen: (previous, current) =>
-                        _expandedOf(previous) != _expandedOf(current),
-                    builder: (_, state) {
-                      if (!_expandedOf(state)) return const SizedBox.shrink();
-
-                      return Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          ToolButton(
-                            asset: AppAssets.share,
-                            label: 'مشاركة',
-                            onTap: onShareTap,
-                          ),
-                          ToolButton(
-                            asset: AppAssets.interaction,
-                            label: 'تفاعل',
-                            onTap: onInteractionTap,
-                          ),
-                          ToolButton(
-                            asset: AppAssets.followHosts,
-                            label: 'مجتمع المعجبين',
-                            onTap: onFansTap,
-                          ),
-                        ],
-                      );
-                    },
-                  ),
+                  if (tool.showDot)
+                    Positioned(
+                      right: -2,
+                      top: -2,
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFFE2C55),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
                 ],
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              tool.label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.92),
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ],
         ),
       ),
     );
-  }
-
-  bool _expandedOf(LiveState state) {
-    return state is LiveReady ? state.isToolsExpanded : true;
   }
 }

@@ -4,13 +4,15 @@ import 'package:livekit_client/livekit_client.dart';
 
 import '../../bloc/live_room/live_room_bloc.dart';
 import '../../bloc/live_room/live_room_state.dart';
+import '../start_live/ar_live_camera_preview.dart';
 import '../start_live/aspect_preserving_camera_preview.dart';
 import 'live_room_effects_overlay.dart';
 
 /// Full-bleed preview for the live-room host screen.
 ///
-/// Shows Flutter [CameraController] as soon as [LiveRoomOpening] / early
-/// [LiveRoomReady], then switches to LiveKit [VideoTrackRenderer] after publish.
+/// Android AR beauty: keep host FaceWarp visible (transparent) until LiveKit
+/// publishes, then show [VideoTrackRenderer] of the same beautified frames.
+/// Elsewhere: Flutter camera → LiveKit renderer after publish.
 class LiveRoomCameraLayer extends StatelessWidget {
   const LiveRoomCameraLayer({super.key});
 
@@ -36,7 +38,13 @@ class LiveRoomCameraLayer extends StatelessWidget {
             previous.isMediaConnected != current.isMediaConnected;
       },
       builder: (context, state) {
+        final arBeauty = ArLiveCameraPreview.isSupported;
+
         if (state is LiveRoomOpening) {
+          if (arBeauty) {
+            // Host / start-live PlatformView stays underneath (transparent route).
+            return const ColoredBox(color: Colors.transparent);
+          }
           if (state.isCameraInitialized && state.controller != null) {
             return AspectPreservingCameraPreview(controller: state.controller!);
           }
@@ -44,11 +52,16 @@ class LiveRoomCameraLayer extends StatelessWidget {
         }
 
         if (state is! LiveRoomReady) {
-          return const ColoredBox(color: Colors.black);
+          return ColoredBox(color: arBeauty ? Colors.transparent : Colors.black);
         }
 
         Widget? preview;
-        if (state.localVideoTrack != null && state.isMediaConnected) {
+        // Android beauty: always keep host FaceWarp visible (transparent route
+        // over the start/post camera). Never switch to a Flutter/LiveKit texture
+        // that looks like a second camera.
+        if (arBeauty) {
+          preview = const ColoredBox(color: Colors.transparent);
+        } else if (state.localVideoTrack != null && state.isMediaConnected) {
           preview = VideoTrackRenderer(
             state.localVideoTrack!,
             fit: VideoViewFit.cover,
@@ -64,7 +77,7 @@ class LiveRoomCameraLayer extends StatelessWidget {
         }
 
         if (preview == null) {
-          return const ColoredBox(color: Colors.black);
+          return ColoredBox(color: arBeauty ? Colors.transparent : Colors.black);
         }
 
         if (state.isMirrorEnabled) {

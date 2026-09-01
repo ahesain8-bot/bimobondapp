@@ -430,6 +430,7 @@ abstract class LiveSessionRepository {
     int maxAttempts = 3,
     Future<void> Function()? beforeVideoCapture,
     LiveMediaHints? mediaHints,
+    bool useArBeautyCamera = false,
   });
 
   /// Viewer subscribe-only LiveKit connect.

@@ -12,12 +12,19 @@ sealed class LiveRoomEvent {
 
 /// Requests creating/starting the live-room session and camera / media.
 class LiveRoomStarted extends LiveRoomEvent {
-  const LiveRoomStarted({this.title, this.initialCamera});
+  const LiveRoomStarted({
+    this.title,
+    this.initialCamera,
+    this.useArBeautyCamera = false,
+  });
 
   final String? title;
 
   /// Reuses the camera already running on the start screen.
   final CameraController? initialCamera;
+
+  /// Android: publish FaceWarp beauty frames instead of raw LiveKit camera.
+  final bool useArBeautyCamera;
 }
 
 /// Ends the stuck active live (`GET /lives/mine` → `POST …/end`) then retries start.

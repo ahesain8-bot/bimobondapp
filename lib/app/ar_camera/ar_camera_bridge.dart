@@ -12,6 +12,14 @@ class ArCameraBridge {
 
   static void Function(String path)? onRecordingAutoStopped;
 
+  /// Native live-start chrome (above beauty GL) → Flutter.
+  static void Function(String title)? onLiveStartGoLive;
+  static void Function()? onLiveStartClose;
+  static void Function()? onLiveStartBeautify;
+  static void Function()? onLiveStartEffects;
+  static void Function()? onLiveStartSettings;
+  static void Function()? onLiveStartFlip;
+
   /// Registers platform → Dart callbacks (e.g. layout max-duration auto-stop).
   static void installPlatformCallbacks() {
     _channel.setMethodCallHandler((call) async {
@@ -20,12 +28,30 @@ class ArCameraBridge {
         if (path != null && path.isNotEmpty) {
           onRecordingAutoStopped?.call(path);
         }
+      } else if (call.method == 'onLiveStartGoLive') {
+        onLiveStartGoLive?.call(call.arguments?.toString() ?? '');
+      } else if (call.method == 'onLiveStartClose') {
+        onLiveStartClose?.call();
+      } else if (call.method == 'onLiveStartBeautify') {
+        onLiveStartBeautify?.call();
+      } else if (call.method == 'onLiveStartEffects') {
+        onLiveStartEffects?.call();
+      } else if (call.method == 'onLiveStartSettings') {
+        onLiveStartSettings?.call();
+      } else if (call.method == 'onLiveStartFlip') {
+        onLiveStartFlip?.call();
       }
     });
   }
 
   static void clearPlatformCallbacks() {
     onRecordingAutoStopped = null;
+    onLiveStartGoLive = null;
+    onLiveStartClose = null;
+    onLiveStartBeautify = null;
+    onLiveStartEffects = null;
+    onLiveStartSettings = null;
+    onLiveStartFlip = null;
     _channel.setMethodCallHandler(null);
   }
 
@@ -238,6 +264,23 @@ class ArCameraBridge {
     });
   }
 
+  /// Hides the full-screen FaceWarp GL preview (PK battle). Capture/publish
+  /// keeps running; Flutter shows the clipped LiveKit local track instead.
+  static Future<void> setLocalPreviewHidden(bool hidden) async {
+    try {
+      await _channel.invokeMethod<void>('setLocalPreviewHidden', {
+        'hidden': hidden,
+      });
+    } catch (_) {}
+  }
+
+  /// Shows/hides native live-start chrome drawn above the beauty GLSurfaceView.
+  static Future<void> setLiveStartChrome({required bool visible}) async {
+    await _channel.invokeMethod<void>('setLiveStartChrome', {
+      'visible': visible,
+    });
+  }
+
   /// Live retouch preview on native camera (Face tab sliders, -1.5…1.5 → -150…150).
   static void setRetouchAdjustments({
     double saturation = 0,
@@ -444,5 +487,58 @@ class ArCameraBridge {
   /// Toggles overlay playback loop mode.
   static Future<void> setOverlayLoop(bool loop) async {
     await _channel.invokeMethod<void>('setOverlayLoop', {'loop': loop});
+  }
+
+  /// Attaches a WebRTC video track fed by FaceWarp (beauty + filters) to an
+  /// existing flutter_webrtc local [streamId]. Call after LiveKit/WebRTC init.
+  static Future<Map<Object?, Object?>?> attachBeautyVideoTrack({
+    required String streamId,
+    int width = 720,
+    int height = 1280,
+    int fps = 24,
+  }) async {
+    try {
+      final result = await _channel.invokeMethod<Map<Object?, Object?>>(
+        'attachBeautyVideoTrack',
+        {
+          'streamId': streamId,
+          'width': width,
+          'height': height,
+          'fps': fps,
+        },
+      );
+      return result;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<void> releaseBeautyVideoTrack() async {
+    try {
+      await _channel.invokeMethod<void>('releaseBeautyVideoTrack');
+    } catch (_) {}
+  }
+
+  /// When true, native refuses `stopCamera` so Flutter Camera2 cannot steal
+  /// the CameraX lens while FaceWarp is publishing beauty frames to LiveKit.
+  static Future<void> setLivePublishingExclusive(bool exclusive) async {
+    try {
+      await _channel.invokeMethod<void>(
+        'setLivePublishingExclusive',
+        <String, Object?>{'exclusive': exclusive},
+      );
+    } catch (_) {
+      // Native may not be ready yet; exclusive is best-effort.
+    }
+  }
+
+  /// Frames pushed by [ArBeautyVideoCapturer] since last attach (0 if idle).
+  static Future<int> beautyPushedFrameCount() async {
+    try {
+      final n = await _channel.invokeMethod<int>('beautyPushedFrameCount');
+      return n ?? 0;
+    } catch (_) {
+      return 0;
+    }
   }
 }

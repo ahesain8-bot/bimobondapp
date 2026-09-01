@@ -756,6 +756,7 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
     int maxAttempts = 3,
     Future<void> Function()? beforeVideoCapture,
     LiveMediaHints? mediaHints,
+    bool useArBeautyCamera = false,
   }) => _media.connectAndPublish(
     url: url,
     token: token,
@@ -763,6 +764,7 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
     cameraPosition: useFrontCamera ? CameraPosition.front : CameraPosition.back,
     beforeVideoCapture: beforeVideoCapture,
     mediaHints: mediaHints,
+    useArBeautyCamera: useArBeautyCamera,
   );
 
   @override

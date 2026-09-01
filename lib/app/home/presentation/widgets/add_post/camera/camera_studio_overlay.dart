@@ -320,8 +320,8 @@ class CameraStudioOverlay extends StatelessWidget {
                           onDurationSelected(seconds);
                           onStudioModeSelected(CameraStudioMode.video);
                         },
-                        onLiveSelected: () =>
-                            onStudioModeSelected(CameraStudioMode.live),
+                        // Open live start (Kotlin beauty) — not empty live mode.
+                        onLiveSelected: onGoLiveTap,
                         onTextSelected: onTextModeTap,
                       ),
                     if (useNativeArFilters &&

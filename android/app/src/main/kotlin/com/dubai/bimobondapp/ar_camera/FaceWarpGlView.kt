@@ -196,6 +196,9 @@ class FaceWarpGlView @JvmOverloads constructor(
         }
         setEGLContextClientVersion(2)
         setEGLConfigChooser(RecordableConfigChooser())
+        // Keep beauty under Flutter Hybrid Composition chrome (LIVE UI).
+        setZOrderOnTop(false)
+        setZOrderMediaOverlay(true)
         // The editor is a Flutter route over this still-mounted platform view.
         // suspendPreview() pauses this GLSurfaceView without pausing the Activity;
         // preserving EGL keeps the camera SurfaceTexture and shader resources
@@ -260,6 +263,8 @@ class FaceWarpGlView @JvmOverloads constructor(
     fun setCameraTransform(rotationDegrees: Int, frontMirror: Boolean, bufW: Int, bufH: Int) {
         renderer.setCameraTransform(rotationDegrees, frontMirror, bufW, bufH)
     }
+
+    fun cameraRotationDegrees(): Int = renderer.cameraRotationDegrees()
 
     /** Oriented camera buffer size for letterbox-free GL recording. */
     fun orientedCameraSize(): Pair<Int, Int> = renderer.orientedCameraSize()
