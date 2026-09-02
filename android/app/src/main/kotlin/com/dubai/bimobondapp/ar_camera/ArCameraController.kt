@@ -3924,7 +3924,10 @@ object ArCameraController {
             analysisUseCaseBound = false
             pngFastAnalysisBound = false
             videoUseCaseBound = false
-            ArCameraWatchdog.reportGlFailure()
+            // Deliberately not reportGlFailure(): a camera provider that never
+            // arrived says nothing about the GL pipeline, and degrading it is a
+            // one-way latch that would kill filters and the preview surface for
+            // the rest of the session without helping the camera come back.
             return
         }
         Log.w(
@@ -4476,17 +4479,28 @@ object ArCameraController {
                     flushPendingPhotoCapture()
                 }
             } catch (t: Throwable) {
-                // Same rule as the future above: nothing in the bind path is
-                // worth taking the whole app down for. Drop to no preview and
-                // let the watchdog's degrade path pick it up.
-                Log.e(PREVIEW_QUALITY_TAG, "bindCamera failed", t)
+                // Nothing in the bind path is worth taking the whole app down
+                // for — but this must not report a GL failure either.
+                //
+                // It used to. ArCameraWatchdog.degraded is a one-way latch, and
+                // applyRenderMode() answers it with forceSimplePreview(), which
+                // sets warpGlView to GONE and turns OES off for the rest of the
+                // session. So a single transient exception anywhere in this
+                // 450-line listener permanently disabled the GL pipeline and
+                // left the host staring at a black preview. Crash traded for a
+                // dead camera is not an improvement.
+                //
+                // Clear the per-bind state and leave the pipeline intact; the
+                // normal rebind path can still recover. reportGlFailure stays
+                // for what it was built for — a shader that will not compile or
+                // an EGL surface the driver refuses.
+                Log.e(PREVIEW_QUALITY_TAG, "bindCamera failed; will retry on next rebind", t)
                 switchingCamera = false
                 camera = null
                 imageCapture = null
                 analysisUseCaseBound = false
                 pngFastAnalysisBound = false
                 videoUseCaseBound = false
-                ArCameraWatchdog.reportGlFailure()
             }
             } finally {
                 finishCameraBind(bindGeneration)
