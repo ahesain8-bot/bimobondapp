@@ -24,6 +24,27 @@ import GoogleMaps
           ArCameraPlatformViewFactory(),
           withId: ArCameraConstants.viewType
         )
+          
+          
+          // Channel used by Dart to capture the photo
+          let channel = FlutterMethodChannel(
+              name: ArCameraConstants.channelName,
+              binaryMessenger: registrar.messenger()
+            )
+            channel.setMethodCallHandler { call, result in
+              guard call.method == "takePhoto" else {
+                result(FlutterMethodNotImplemented)
+                return
+              }
+              ArCameraController.shared.takePhoto { path, errorCode in
+                if let path {
+                  result(path)
+                } else {
+                  result(FlutterError(code: errorCode ?? "photo_failed", message: nil, details: nil))
+                }
+              }
+            }
+          
       }
 
    
