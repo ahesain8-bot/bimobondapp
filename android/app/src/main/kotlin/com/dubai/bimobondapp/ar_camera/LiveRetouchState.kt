@@ -191,12 +191,8 @@ object LiveRetouchState {
     var blushRadius: Float = 0f
 
     fun clear() {
-        // Back camera keeps Retouch-Off color baseline; front stays neutral.
-        adjustments = if (ArCameraBridge.isFrontCamera) {
-            LiveRetouchAdjustments.neutral()
-        } else {
-            LiveRetouchAdjustments.liveBaseline()
-        }
+        // Disabled retouch must be pixel-neutral on both cameras.
+        adjustments = LiveRetouchAdjustments.neutral()
         noseWingL = floatArrayOf(0f, 0f)
         noseWingR = floatArrayOf(0f, 0f)
         noseRadius = 0f

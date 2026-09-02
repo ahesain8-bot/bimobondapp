@@ -500,12 +500,7 @@ class ArCameraBridge {
     try {
       final result = await _channel.invokeMethod<Map<Object?, Object?>>(
         'attachBeautyVideoTrack',
-        {
-          'streamId': streamId,
-          'width': width,
-          'height': height,
-          'fps': fps,
-        },
+        {'streamId': streamId, 'width': width, 'height': height, 'fps': fps},
       );
       return result;
     } catch (_) {

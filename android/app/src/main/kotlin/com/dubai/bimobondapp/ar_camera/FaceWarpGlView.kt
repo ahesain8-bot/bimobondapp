@@ -86,58 +86,22 @@ class FaceWarpGlView @JvmOverloads constructor(
     private val mainHandler = Handler(Looper.getMainLooper())
 
     /**
-     * Caps how many pixels the beauty shader actually renders per frame.
-     *
-     * The OES fragment shader costs roughly 17 external-texture fetches per pixel
-     * with retouch off and ~29 with it on (sceneGrainClean 8, featheredSkinConf 4,
-     * detailAt 4, surfaceBlur 8, baseBlur 4, plus the base sample). Every one of
-     * those is a samplerExternalOES fetch, which carries a YUV->RGB conversion in
-     * hardware and is far more expensive than an ordinary 2D sample.
-     *
-     * Rendering that at a modern phone's full display size (1080x2436 = 2.6M
-     * pixels) works out to ~76M such fetches per frame — around 2.3 BILLION per
-     * second at 30fps, which is past what a mid-range Mali can sustain. The GPU
-     * falls behind, the camera pipeline backs up behind it, and it reads as
-     * whole-app lag. It also explained the exact reported pattern: retouch off was
-     * "better but still laggy" (17 taps still running), retouch on was "extreme".
-     *
-     * The output is scaled back up to the view by the display hardware for free.
-     * Nothing about the look, the tuned beauty/retouch values or the shader itself
-     * changes — this only sets how many pixels that unchanged shader runs on.
-     *
-     * Deliberately applied on every device rather than behind a device-tier check:
-     * the tier signals Android exposes (camera hardware level, performance class,
-     * RAM) all misreported the phone this was diagnosed on as high-end, so gating
-     * on them would have left the affected device at full resolution.
+     * Production POST camera always shades at the full useful view size (former
+     * B / RAW_OES). The old ~1.2MP cap belonged to CURRENT_OES and is gone —
+     * neutral frames use the cheap RAW_OES pass-through; active filters only
+     * pay for their own work on top of that full-resolution surface.
      */
-    private val maxRenderPixels = MAX_RENDER_PIXELS
-
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
-        applyRenderResolutionCap(w, h)
+        renderer.setAndroidViewSize(w, h)
+        applyFullRenderResolution(w, h)
     }
 
-    /**
-     * Safe against re-entry: setFixedSize changes the SURFACE size, not the VIEW
-     * size, so this cannot retrigger onSizeChanged.
-     */
-    private fun applyRenderResolutionCap(viewW: Int, viewH: Int) {
+    /** Always match the view — never downscale then upscale the live preview. */
+    private fun applyFullRenderResolution(viewW: Int, viewH: Int) {
         if (viewW <= 0 || viewH <= 0) return
-        val pixels = viewW.toLong() * viewH.toLong()
-        if (pixels <= maxRenderPixels) {
-            Log.i(TAG, "render res: view ${viewW}x${viewH} ($pixels px) within budget — unscaled")
-            return
-        }
-        val scale = kotlin.math.sqrt(maxRenderPixels.toDouble() / pixels.toDouble())
-        val renderW = ((viewW * scale).toInt() and 1.inv()).coerceAtLeast(2)
-        val renderH = ((viewH * scale).toInt() and 1.inv()).coerceAtLeast(2)
-        val factor = pixels.toDouble() / (renderW.toLong() * renderH.toLong()).toDouble()
-        Log.i(
-            TAG,
-            "render res: view ${viewW}x${viewH} ($pixels px) -> surface ${renderW}x${renderH} " +
-                "(${String.format("%.2f", factor)}x fewer shaded pixels)",
-        )
-        holder.setFixedSize(renderW, renderH)
+        holder.setSizeFromLayout()
+        Log.i(TAG, "render res: PRODUCTION_RAW_OES — cap bypassed, view ${viewW}x$viewH")
     }
 
     @Volatile
@@ -178,7 +142,10 @@ class FaceWarpGlView @JvmOverloads constructor(
         renderer.onCameraSurfaceReady = { st ->
             cameraSurfaceTexture = st
 
-            st.setOnFrameAvailableListener { requestRender() }
+            st.setOnFrameAvailableListener {
+                ArCameraDiagnostics.onOesCallback()
+                requestRender()
+            }
             mainHandler.post {
                 val waiters = synchronized(cameraSurfaceWaiters) {
                     val pending = cameraSurfaceWaiters.toList()
@@ -409,13 +376,5 @@ class FaceWarpGlView @JvmOverloads constructor(
 
     private companion object {
         const val TAG = "ArGlRenderRes"
-
-        /**
-         * ~1.2 megapixels: on a 1080x2436 display this renders at about 744x1678,
-         * a little over 2x fewer shaded pixels. Above 720p-class height, so the
-         * preview stays sharp on screen, while more than halving the per-frame
-         * texture-fetch load described above.
-         */
-        const val MAX_RENDER_PIXELS = 1_200_000L
     }
 }

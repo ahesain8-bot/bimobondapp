@@ -101,16 +101,18 @@ data class LiveBeautyAdjustments(
 object LiveBeautyState {
     @Volatile
     var adjustments: LiveBeautyAdjustments = LiveBeautyAdjustments(
-        smooth = LiveBeautyAdjustments.smoothFromStrength(
-            LiveBeautyAdjustments.MAGIC_AUTO_STRENGTH,
-        ),
+        // Neutral until Flutter / Magic enables beauty — stored defaults must not
+        // touch pixels while the feature is Off.
+        smooth = 0f,
+        whiten = 0f,
+        brighten = 0f,
     )
 
     /** Retouch panel Off/On — face smooth boost, independent of color filters. */
     @Volatile
-    var magicOn: Boolean = true
+    var magicOn: Boolean = false
 
-    /** 0..1 Smooth slider while Magic is On. */
+    /** 0..1 Smooth slider while Magic is On (preserved while Off). */
     @Volatile
     var magicStrength: Float = LiveBeautyAdjustments.MAGIC_AUTO_STRENGTH
 
@@ -163,6 +165,8 @@ object LiveBeautyState {
         val appliedSmooth = (smooth * i).coerceIn(0f, 1f)
         val cur = adjustments
         adjustments = LiveBeautyAdjustments(
+            // Named filters may request smooth, but Magic Off must not invent
+            // residual DEFAULT_SMOOTH / whiten / brighten under the hood.
             smooth = if (magicOn) {
                 max(appliedSmooth, LiveBeautyAdjustments.smoothFromStrength(magicStrength))
             } else {
@@ -228,7 +232,9 @@ object LiveBeautyState {
         adjustments = if (enabled) {
             cur.copy(smooth = LiveBeautyAdjustments.smoothFromStrength(magicStrength))
         } else {
-            cur.copy(smooth = LiveBeautyAdjustments.DEFAULT_SMOOTH)
+            // Keep magicStrength for the next On, but zero live smooth so Off
+            // cannot leave DEFAULT_SMOOTH (0.20) modifying pixels.
+            cur.copy(smooth = 0f)
         }
     }
 
@@ -247,14 +253,38 @@ object LiveBeautyState {
             adjustments.whiten
         }
 
-    /** Back to the baseline (smooth only, no lip tint) — "Original" filter. */
+    /**
+     * True when any beauty / makeup value would change pixels. Magic Off with
+     * residual stored slider values must return false for those Magic-owned
+     * channels (smooth/whiten boost/sharpen) — callers pass explicit zeros.
+     */
+    fun needsPixelProcessing(): Boolean {
+        if (magicOn) return true
+        if (needsAnyMakeup()) return true
+        val a = adjustments
+        return a.smooth > 0.01f ||
+            a.whiten > 0.01f ||
+            a.brighten > 0.01f ||
+            a.blush > 0.01f ||
+            a.lipStrength > 0.01f ||
+            a.foundation > 0.01f ||
+            a.contour > 0.01f ||
+            a.eyeliner > 0.01f ||
+            a.eyeshadow > 0.01f ||
+            a.underEye > 0.01f ||
+            a.brightenEye > 0.01f
+    }
+
+    /** Back to the baseline — Magic On keeps slider smooth; Off stays pixel-neutral. */
     fun clear() {
         adjustments = LiveBeautyAdjustments(
             smooth = if (magicOn) {
                 LiveBeautyAdjustments.smoothFromStrength(magicStrength)
             } else {
-                LiveBeautyAdjustments.DEFAULT_SMOOTH
+                0f
             },
+            whiten = 0f,
+            brighten = 0f,
         )
     }
 
