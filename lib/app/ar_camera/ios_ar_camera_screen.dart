@@ -19,6 +19,14 @@ class IosArCameraScreen extends StatefulWidget {
 
 class _IosArCameraScreenState extends State<IosArCameraScreen> {
   bool _isCapturing = false;
+  bool _isFlipping = false;
+
+  Future<void> _flip() async {
+    if (_isFlipping) return;
+    setState(() => _isFlipping = true);
+    await ArCameraBridge.flipCamera();
+    if (mounted) setState(() => _isFlipping = false);
+  }
 
   Future<void> _capture() async {
     if (_isCapturing) return;
@@ -92,11 +100,20 @@ class _IosArCameraScreenState extends State<IosArCameraScreen> {
             ),
           ),
           SafeArea(
-            child: Align(
-              alignment: Alignment.topLeft,
-              child: IconButton(
-                icon: const Icon(Icons.close, color: Colors.white),
-                onPressed: () => Navigator.of(context).pop(),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.cameraswitch, color: Colors.white),
+                    onPressed: _isFlipping ? null : _flip,
+                  ),
+                ],
               ),
             ),
           ),

@@ -31,20 +31,24 @@ import GoogleMaps
               name: ArCameraConstants.channelName,
               binaryMessenger: registrar.messenger()
             )
-            channel.setMethodCallHandler { call, result in
-              guard call.method == "takePhoto" else {
-                result(FlutterMethodNotImplemented)
-                return
+          channel.setMethodCallHandler { call, result in
+              switch call.method {
+              case "takePhoto":
+                  ArCameraController.shared.takePhoto { path, errorCode in
+                      if let path {
+                          result(path)
+                      } else {
+                          result(FlutterError(code: errorCode ?? "photo_failed", message: nil, details: nil))
+                      }
+                  }
+              case "flipCamera":
+                  ArCameraController.shared.flipCamera { isFront in
+                      result(isFront)
+                  }
+              default:
+                  result(FlutterMethodNotImplemented)
               }
-              ArCameraController.shared.takePhoto { path, errorCode in
-                if let path {
-                  result(path)
-                } else {
-                  result(FlutterError(code: errorCode ?? "photo_failed", message: nil, details: nil))
-                }
-              }
-            }
-          
+          }
       }
 
    
