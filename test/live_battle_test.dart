@@ -69,6 +69,37 @@ void main() {
       expect(battle.isActive, isFalse);
     });
 
+    test('finished socket type and victory phase end the battle', () {
+      final active = LiveBattle.fromJson(json);
+      final ended = LiveBattle.fromJson({
+        ...json,
+        'status': '',
+        'phase': 'VICTORY_LAP',
+      }).normalizedForUpdate(updateType: 'finished');
+
+      expect(active.isActive, isTrue);
+      expect(ended.isActive, isFalse);
+      expect(ended.isFinished, isTrue);
+
+      final merged = ended.withTimingFrom(active, updateType: 'finished');
+      expect(merged.isActive, isFalse);
+    });
+
+    test('partial score tick does not resurrect a finished battle', () {
+      final finished = LiveBattle.fromJson({
+        ...json,
+        'status': 'FINISHED',
+        'phase': 'VICTORY_LAP',
+      });
+      final scoreTick = LiveBattle.fromJson({
+        ...json,
+      }..remove('status'));
+
+      final merged = scoreTick.withTimingFrom(finished);
+      expect(merged.isActive, isFalse);
+      expect(merged.isFinished, isTrue);
+    });
+
     test('classifies PK API errors without treating them as a crash', () {
       expect(
         isAlreadyInBattleError(
@@ -129,6 +160,36 @@ void main() {
     expect(opponent.liveId, 'live-b');
     expect(opponent.hostName, 'صاحب البث');
     expect(opponent.viewers, 102);
+  });
+
+  test('battle opponent maps the flat opponents API shape', () {
+    final opponent = LiveBattleOpponent.fromJson({
+      'id': 'live-opp-1',
+      'title': 'Guitar Riffs',
+      'viewers': 85,
+      'user': {
+        'id': 'u-opp-1',
+        'username': 'john_guitar',
+        'avatarUrl': 'https://cdn.example.com/avatars/john.jpg',
+      },
+    });
+
+    expect(opponent.liveId, 'live-opp-1');
+    expect(opponent.hostName, 'john_guitar');
+    expect(opponent.viewers, 85);
+  });
+
+  test('empty nested live does not drop a flat opponent id', () {
+    final opponent = LiveBattleOpponent.fromJson({
+      'live': <String, dynamic>{},
+      'id': 'live-flat',
+      'title': 'بث',
+      'viewers': 3,
+      'user': {'id': 'u1', 'fullName': 'Host'},
+    });
+
+    expect(opponent.liveId, 'live-flat');
+    expect(opponent.hostName, 'Host');
   });
 
   test(

@@ -13,6 +13,7 @@ import 'package:bimobondapp/app/gifts/presentation/di/gifts_injector.dart'
 import 'package:bimobondapp/core/network/api_client.dart';
 import 'package:bimobondapp/features/live_viewer/data/datasources/live_remote_datasource.dart';
 import 'package:bimobondapp/features/live_viewer/domain/entities/live_entity.dart';
+import 'package:bimobondapp/features/live_viewer/domain/entities/live_feed_page_result.dart';
 import 'package:bimobondapp/features/live_viewer/domain/entities/live_session_entity.dart';
 import 'package:bimobondapp/core/theme/app_theme.dart';
 import 'package:bimobondapp/features/live_viewer/presentation/di/live_viewer_injector.dart'
@@ -109,18 +110,25 @@ class _PkFirstDataSource implements LiveRemoteDataSource {
   }
 
   @override
-  Future<List<LiveEntity>> getLiveFeed({
+  Future<LiveFeedPageResult> getLiveFeed({
     int page = 1,
     int limit = 10,
     String? category,
   }) async {
-    final lives = await _inner.getLiveFeed(
+    final pageResult = await _inner.getLiveFeed(
       page: page,
       limit: limit,
       category: category,
     );
-    if (lives.isEmpty) return lives;
-    return [_asBattle(lives.first), ...lives.skip(1)];
+    if (pageResult.lives.isEmpty) return pageResult;
+    final lives = pageResult.lives;
+    return LiveFeedPageResult(
+      lives: [_asBattle(lives.first), ...lives.skip(1)],
+      page: pageResult.page,
+      limit: pageResult.limit,
+      total: pageResult.total,
+      totalPages: pageResult.totalPages,
+    );
   }
 
   @override

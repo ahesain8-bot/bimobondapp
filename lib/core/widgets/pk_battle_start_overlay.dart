@@ -86,7 +86,11 @@ class _PkBattleStartOverlayState extends State<PkBattleStartOverlay>
 
   Future<void> _playClashSound() async {
     try {
-      final player = AudioPlayer();
+      final player = AudioPlayer(
+        handleInterruptions: false,
+        androidApplyAudioAttributes: false,
+        handleAudioSessionActivation: false,
+      );
       _player = player;
       await player.setUrl(_clashSfxUrl);
       await player.setVolume(0.9);

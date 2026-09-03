@@ -39,7 +39,6 @@ class LiveRoomBottomBar extends StatelessWidget {
                   iconWidth: 28,
                   iconHeight: 25,
                   onTap: () {
-                    bloc.add(const LiveRoomCollabTapped());
                     LiveRoomGuestsSheet.show(context);
                   },
                 ),

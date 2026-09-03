@@ -95,10 +95,11 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
   bool _showFilters = false;
   bool _showPhotoEditor = false;
   MediaPhotoEditorTab _photoEditorTab = MediaPhotoEditorTab.face;
-  MediaPhotoEditorTool _photoEditorTool = MediaPhotoEditorTool.smooth;
+  MediaPhotoEditorTool _photoEditorTool = MediaPhotoEditorTool.magic;
 
-  /// Retouch (Magic) On by default when the camera opens.
-  bool _photoEditorMagicOn = true;
+  /// Retouch (Magic) starts Off so the live preview is the former B pass-through
+  /// until the user enables Beauty / Face effects.
+  bool _photoEditorMagicOn = false;
   bool _preserveNeutralAdjustments = false;
 
   /// Auto Smooth level when Retouch Off→On (0..1). TikTok ≈ 40.
@@ -289,8 +290,8 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       ArCameraBridge.onRecordingAutoStopped = _onNativeRecordingAutoStopped;
       ArCameraBridge.warmup();
       _applyArFilter(ArFilterCatalog.items[_arFilterIndex].id);
-      // Retouch/Magic On by default on camera open.
-      ArCameraBridge.setMagicEnabled(true, strength: _kMagicAutoSmooth);
+      // Production opens on the B pass-through; Magic stays Off until tapped.
+      ArCameraBridge.setMagicEnabled(false);
       ArCameraBridge.clearMakeup();
       _preserveNeutralAdjustments = false;
       _photoAdjustments.addAll(_kMagicBeautyDefaults);
@@ -1958,23 +1959,23 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
         // Keep PlatformView mounted — remounting caused a black live start.
         // Only hide photo/video chrome so the live UI can sit on top.
         setState(() => _liveHandoffActive = true);
-        ArLiveBeautyDefaults.apply(isFrontCamera: _isFrontCamera);
+        // Keep the same AR camera running; live starts without beauty.
+        ArLiveBeautyDefaults.clear();
         await Navigator.of(context).push(
           PageRouteBuilder<void>(
             opaque: false,
             barrierColor: Colors.transparent,
-            pageBuilder: (_, __, ___) => const LiveStartPage(
-              reuseHostArCamera: true,
-            ),
+            pageBuilder: (_, __, ___) =>
+                const LiveStartPage(reuseHostArCamera: true),
           ),
         );
       } else {
         setState(() => _liveHandoffActive = true);
         await Future<void>.delayed(const Duration(milliseconds: 160));
         if (!mounted) return;
-        await Navigator.of(context).push(
-          MaterialPageRoute<void>(builder: (_) => const LiveStartPage()),
-        );
+        await Navigator.of(
+          context,
+        ).push(MaterialPageRoute<void>(builder: (_) => const LiveStartPage()));
       }
     } catch (_) {
       // Never leave a frozen preview.
@@ -1988,6 +1989,9 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
             _applyArFilter(ArFilterCatalog.items[_arFilterIndex].id);
             if (_photoEditorMagicOn) {
               ArCameraBridge.setMagicEnabled(true, strength: _kMagicAutoSmooth);
+            } else {
+              ArCameraBridge.setMagicEnabled(false);
+              ArCameraBridge.clearBeautyFilter();
             }
             _syncRetouchToNative();
           }
@@ -2871,133 +2875,135 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
           const Positioned.fill(child: FrontScreenFlashOverlay()),
         if (!hideStudioChrome)
           CameraStudioOverlay(
-          l10n: l10n,
-          isStoryMode: widget.isStory,
-          showGalleryUpload: !widget.returnMediaOnDone,
-          useNativeArFilters: true,
-          arFilterIndex: _arFilterIndex,
-          onArFilterSelected: _onArFilterSelected,
-          arColorCategoryId: _arColorCategoryId,
-          onArColorCategorySelected: _onArColorCategorySelected,
-          arFilterIntensity: _arFilterIntensity,
-          onArFilterIntensityChanged: _onArFilterIntensityChanged,
-          filters: filters,
-          filterCategorySlug: _filterCategorySlug,
-          selectedFilter: _selectedFilter,
-          selectedDuration: _effectiveMaxRecordSeconds,
-          selectedSpeed: _selectedSpeed,
-          studioMode: _studioMode,
-          showFilters: _showFilters,
-          showPhotoEditor: _showPhotoEditor,
-          beautyEnabled:
-              _beautyEnabled ||
-              _photoEditorMagicOn ||
-              _photoAdjustments.values.any((v) => v.abs() > 0.02),
-          photoEditorTab: _photoEditorTab,
-          photoEditorTool: _photoEditorTool,
-          photoEditorMagicOn: _photoEditorMagicOn,
-          photoEditorAdjustments: _photoAdjustments,
-          onPhotoEditorTabChanged: (tab) =>
-              setState(() => _photoEditorTab = tab),
-          onPhotoEditorToolSelected: (tool) =>
-              setState(() => _photoEditorTool = tool),
-          onPhotoEditorMagicToggled: _onPhotoEditorMagicToggled,
-          onPhotoEditorAdjustmentChanged: _onPhotoEditorAdjustmentChanged,
-          onPhotoEditorReset: _resetPhotoEditor,
-          photoEditorColorFilterId: () {
-            final id = ArFilterCatalog.items[_arFilterIndex].id;
-            return ArFilterCatalog.isColorFilter(id) ? id : 'none';
-          }(),
-          photoEditorColorFilterIntensity: _arFilterIntensity,
-          onPhotoEditorColorFilterSelected: _onMakeupFilmFilterSelected,
-          onPhotoEditorColorFilterIntensityChanged: _onArFilterIntensityChanged,
-          photoEditorLipColor: _selectedLipColor,
-          onPhotoEditorLipColorSelected: _onLipColorSelected,
-          timerEnabled: _timerEnabled,
-          flashEnabled: _flashEnabled,
-          isRecording: _isRecording,
-          isBusy: _isBusy || _isProcessingCapture,
-          recordSeconds: _recordSeconds,
-          hasDraftClips:
-              _layoutMode == CameraLayoutMode.off && _videoSegments.isNotEmpty,
-          onFinishRecording: () {
-            unawaited(_finishMultiClipVideo());
-          },
-          onDiscardDraft: _discardVideoDraft,
-          countdownValue: _countdownValue,
-          selectedEffectSlug: null,
-          workspaceTabIndex: _workspaceTabIndex,
-          onClose: () => context.pop(),
-          onFilterCategorySelected: _onFilterCategorySelected,
-          onFilterSelected: _applyFilter,
-          onClearFilter: _clearFilter,
-          onDurationSelected: _onDurationSelected,
-          onStudioModeSelected: _onStudioModeSelected,
-          onEffectsTap: () {},
-          onUploadTap: () => CameraStudioSheets.pickFromLibrary(
-            context,
             l10n: l10n,
-            limit: widget.isStory ? 1 : 5,
-            chooseMediaType: true,
-            onPicked: _importFromGallery,
+            isStoryMode: widget.isStory,
+            showGalleryUpload: !widget.returnMediaOnDone,
+            useNativeArFilters: true,
+            arFilterIndex: _arFilterIndex,
+            onArFilterSelected: _onArFilterSelected,
+            arColorCategoryId: _arColorCategoryId,
+            onArColorCategorySelected: _onArColorCategorySelected,
+            arFilterIntensity: _arFilterIntensity,
+            onArFilterIntensityChanged: _onArFilterIntensityChanged,
+            filters: filters,
+            filterCategorySlug: _filterCategorySlug,
+            selectedFilter: _selectedFilter,
+            selectedDuration: _effectiveMaxRecordSeconds,
+            selectedSpeed: _selectedSpeed,
+            studioMode: _studioMode,
+            showFilters: _showFilters,
+            showPhotoEditor: _showPhotoEditor,
+            beautyEnabled:
+                _beautyEnabled ||
+                _photoEditorMagicOn ||
+                _photoAdjustments.values.any((v) => v.abs() > 0.02),
+            photoEditorTab: _photoEditorTab,
+            photoEditorTool: _photoEditorTool,
+            photoEditorMagicOn: _photoEditorMagicOn,
+            photoEditorAdjustments: _photoAdjustments,
+            onPhotoEditorTabChanged: (tab) =>
+                setState(() => _photoEditorTab = tab),
+            onPhotoEditorToolSelected: (tool) =>
+                setState(() => _photoEditorTool = tool),
+            onPhotoEditorMagicToggled: _onPhotoEditorMagicToggled,
+            onPhotoEditorAdjustmentChanged: _onPhotoEditorAdjustmentChanged,
+            onPhotoEditorReset: _resetPhotoEditor,
+            photoEditorColorFilterId: () {
+              final id = ArFilterCatalog.items[_arFilterIndex].id;
+              return ArFilterCatalog.isColorFilter(id) ? id : 'none';
+            }(),
+            photoEditorColorFilterIntensity: _arFilterIntensity,
+            onPhotoEditorColorFilterSelected: _onMakeupFilmFilterSelected,
+            onPhotoEditorColorFilterIntensityChanged:
+                _onArFilterIntensityChanged,
+            photoEditorLipColor: _selectedLipColor,
+            onPhotoEditorLipColorSelected: _onLipColorSelected,
+            timerEnabled: _timerEnabled,
+            flashEnabled: _flashEnabled,
+            isRecording: _isRecording,
+            isBusy: _isBusy || _isProcessingCapture,
+            recordSeconds: _recordSeconds,
+            hasDraftClips:
+                _layoutMode == CameraLayoutMode.off &&
+                _videoSegments.isNotEmpty,
+            onFinishRecording: () {
+              unawaited(_finishMultiClipVideo());
+            },
+            onDiscardDraft: _discardVideoDraft,
+            countdownValue: _countdownValue,
+            selectedEffectSlug: null,
+            workspaceTabIndex: _workspaceTabIndex,
+            onClose: () => context.pop(),
+            onFilterCategorySelected: _onFilterCategorySelected,
+            onFilterSelected: _applyFilter,
+            onClearFilter: _clearFilter,
+            onDurationSelected: _onDurationSelected,
+            onStudioModeSelected: _onStudioModeSelected,
+            onEffectsTap: () {},
+            onUploadTap: () => CameraStudioSheets.pickFromLibrary(
+              context,
+              l10n: l10n,
+              limit: widget.isStory ? 1 : 5,
+              chooseMediaType: true,
+              onPicked: _importFromGallery,
+            ),
+            onGoLiveTap: _handleGoLiveTap,
+            onRecordTap: _onRecordTap,
+            onFlip: _flipCamera,
+            onFlash: _toggleFlash,
+            onSpeedTap: _toggleSpeedPicker,
+            onBeautyTap: _togglePhotoEditor,
+            onFiltersToggle: () {
+              final next = !_showFilters;
+              setState(() {
+                _showFilters = next;
+                if (next) _showPhotoEditor = false;
+              });
+              // Deliberately NOT re-syncing the native letterbox margins here.
+              // bottomHeight() shrinks by ~48px while this panel is open, but
+              // that's purely cosmetic — the live preview's ClipPath already
+              // reflects it (see _buildNativeArCameraBody). Re-applying it
+              // natively via ArCameraBridge.setPreviewLetterbox changes
+              // previewView/warpGlView's actual layout margins, which resizes
+              // the underlying SurfaceView — the exact thing this screen's own
+              // ArCameraPreview sizing comment warns blacks/freezes the camera
+              // out ("resizing SurfaceView blacks it out"). Was causing a
+              // brief camera freeze on every open AND close of this panel.
+              if (next) {
+                unawaited(ArCameraBridge.prepareShaderPipeline());
+              }
+            },
+            onTimerToggle: _openCountdownSheet,
+            onMusicTap: _pickSound,
+            onClearSound: _selectedSound == null ? null : _clearSound,
+            onLayoutTap: _toggleLayoutPicker,
+            onAspectRatioTap: _toggleRatioLetterbox,
+            onTextModeTap: () => _showComingSoon(l10n.cameraLiveComingSoon),
+            ratioLetterboxed: _ratioLetterboxed,
+            selectedLayoutMode: _layoutMode,
+            layoutPickerOpen: _layoutPickerOpen,
+            onLayoutModeSelected: _onLayoutModeSelected,
+            speedPickerOpen: _speedPickerOpen,
+            onSpeedSelected: _onSpeedSelected,
+            onDismissToolPopups: _dismissToolPopups,
+            layoutCellPhotos: _layoutCellPhotos,
+            layoutActiveCellIndex: _layoutActiveCell,
+            onLayoutCellDelete: _deleteLayoutCell,
+            onLayoutCellDuplicate: (index) =>
+                unawaited(_duplicateLayoutCell(index)),
+            onLayoutCellImport: _studioMode == CameraStudioMode.video
+                ? null
+                : (index) => unawaited(_importLayoutCell(index)),
+            onWorkspaceTabSelected: (index) {
+              setState(() => _workspaceTabIndex = index);
+            },
+            soundLabel: _studioMode == CameraStudioMode.live
+                ? l10n.cameraLiveTitleHint
+                : (_selectedSound?.name ?? l10n.cameraAddSound),
+            onLongPressStart: (_) => _onRecordHoldStart(),
+            onLongPressEnd: (_) => _onRecordHoldEnd(),
+            filterLabelBuilder: (preset) => _filterLabel(l10n, preset),
           ),
-          onGoLiveTap: _handleGoLiveTap,
-          onRecordTap: _onRecordTap,
-          onFlip: _flipCamera,
-          onFlash: _toggleFlash,
-          onSpeedTap: _toggleSpeedPicker,
-          onBeautyTap: _togglePhotoEditor,
-          onFiltersToggle: () {
-            final next = !_showFilters;
-            setState(() {
-              _showFilters = next;
-              if (next) _showPhotoEditor = false;
-            });
-            // Deliberately NOT re-syncing the native letterbox margins here.
-            // bottomHeight() shrinks by ~48px while this panel is open, but
-            // that's purely cosmetic — the live preview's ClipPath already
-            // reflects it (see _buildNativeArCameraBody). Re-applying it
-            // natively via ArCameraBridge.setPreviewLetterbox changes
-            // previewView/warpGlView's actual layout margins, which resizes
-            // the underlying SurfaceView — the exact thing this screen's own
-            // ArCameraPreview sizing comment warns blacks/freezes the camera
-            // out ("resizing SurfaceView blacks it out"). Was causing a
-            // brief camera freeze on every open AND close of this panel.
-            if (next) {
-              unawaited(ArCameraBridge.prepareShaderPipeline());
-            }
-          },
-          onTimerToggle: _openCountdownSheet,
-          onMusicTap: _pickSound,
-          onClearSound: _selectedSound == null ? null : _clearSound,
-          onLayoutTap: _toggleLayoutPicker,
-          onAspectRatioTap: _toggleRatioLetterbox,
-          onTextModeTap: () => _showComingSoon(l10n.cameraLiveComingSoon),
-          ratioLetterboxed: _ratioLetterboxed,
-          selectedLayoutMode: _layoutMode,
-          layoutPickerOpen: _layoutPickerOpen,
-          onLayoutModeSelected: _onLayoutModeSelected,
-          speedPickerOpen: _speedPickerOpen,
-          onSpeedSelected: _onSpeedSelected,
-          onDismissToolPopups: _dismissToolPopups,
-          layoutCellPhotos: _layoutCellPhotos,
-          layoutActiveCellIndex: _layoutActiveCell,
-          onLayoutCellDelete: _deleteLayoutCell,
-          onLayoutCellDuplicate: (index) =>
-              unawaited(_duplicateLayoutCell(index)),
-          onLayoutCellImport: _studioMode == CameraStudioMode.video
-              ? null
-              : (index) => unawaited(_importLayoutCell(index)),
-          onWorkspaceTabSelected: (index) {
-            setState(() => _workspaceTabIndex = index);
-          },
-          soundLabel: _studioMode == CameraStudioMode.live
-              ? l10n.cameraLiveTitleHint
-              : (_selectedSound?.name ?? l10n.cameraAddSound),
-          onLongPressStart: (_) => _onRecordHoldStart(),
-          onLongPressEnd: (_) => _onRecordHoldEnd(),
-          filterLabelBuilder: (preset) => _filterLabel(l10n, preset),
-        ),
       ],
     );
   }

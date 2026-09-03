@@ -136,7 +136,8 @@ class _FloatingGiftsLayerState extends State<FloatingGiftsLayer> {
     );
     final audioUrl = _readString(gift['audioUrl']);
     final type = _readString(gift['type'])?.toUpperCase();
-    final isAudio = type == 'AUDIO';
+    final isAudio =
+        type == 'AUDIO' || (audioUrl != null && audioUrl.trim().isNotEmpty);
     final color = _readString(gift['color']);
 
     if (isAudio) {

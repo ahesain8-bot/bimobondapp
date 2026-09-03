@@ -21,11 +21,19 @@ class LiveRoomHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<LiveRoomBloc, LiveRoomState>(
-      buildWhen: (previous, current) =>
-          current is LiveRoomReady &&
-          (previous is! LiveRoomReady ||
-              previous.session != current.session ||
-              previous.topGifterAvatars != current.topGifterAvatars),
+      buildWhen: (previous, current) {
+        if (current is! LiveRoomReady) return false;
+        if (previous is! LiveRoomReady) return true;
+        final a = previous.session;
+        final b = current.session;
+        return a.likeCount != b.likeCount ||
+            a.viewerCount != b.viewerCount ||
+            a.host.id != b.host.id ||
+            a.host.displayName != b.host.displayName ||
+            a.host.avatarUrl != b.host.avatarUrl ||
+            a.host.hostHeartCount != b.host.hostHeartCount ||
+            previous.topGifterAvatars != current.topGifterAvatars;
+      },
       builder: (context, state) {
         if (state is! LiveRoomReady) {
           return const SizedBox.shrink();

@@ -1,14 +1,19 @@
 import 'package:dartz/dartz.dart';
 import 'package:bimobondapp/features/live_viewer/core/errors/failures.dart';
 import '../entities/live_entity.dart';
+import '../entities/live_feed_page_result.dart';
 import '../entities/live_session_entity.dart';
 
 abstract class LiveRepository {
   /// GET /lives/feed
-  Future<Either<Failure, List<LiveEntity>>> getLiveFeed({
+  ///
+  /// [forceRefresh] bypasses the short client TTL cache used to avoid
+  /// hammering the endpoint when the Lives tab is opened repeatedly.
+  Future<Either<Failure, LiveFeedPageResult>> getLiveFeed({
     int page = 1,
     int limit = 10,
     String? category,
+    bool forceRefresh = false,
   });
 
   /// GET /lives/{id}

@@ -45,9 +45,9 @@ class LiveBloc extends Bloc<LiveEvent, LiveState> {
     return state is LiveReady ? state : const LiveReady();
   }
 
-  /// PlatformView.init already starts CameraX; we re-bind + apply beauty once
-  /// the view is up. Retry because startCamera is a no-op if refs are null.
-  Future<void> _bootArBeauty({required bool isFront}) async {
+  /// PlatformView.init already starts CameraX; we re-bind once the view is up
+  /// and keep beauty Off until the host opens Beautify.
+  Future<void> _bootArCamera() async {
     await Future<void>.delayed(_arAttachDelay);
     for (var i = 0; i < 6; i++) {
       if (isClosed) return;
@@ -55,7 +55,7 @@ class LiveBloc extends Bloc<LiveEvent, LiveState> {
       await Future<void>.delayed(const Duration(milliseconds: 200));
     }
     if (isClosed) return;
-    await ArLiveBeautyDefaults.applyWithRetry(isFrontCamera: isFront);
+    await ArLiveBeautyDefaults.clearWithRetry();
   }
 
   Future<void> _onInitialize(
@@ -65,7 +65,7 @@ class LiveBloc extends Bloc<LiveEvent, LiveState> {
     emit(const LiveCameraInitializing());
 
     if (reuseHostArCamera) {
-      // Camera already running on the route underneath.
+      // Same CameraX / FaceWarp as Add Post image/video — keep it raw.
       emit(
         const LiveReady(
           controller: null,
@@ -73,7 +73,7 @@ class LiveBloc extends Bloc<LiveEvent, LiveState> {
           isFrontCamera: true,
         ),
       );
-      ArLiveBeautyDefaults.apply(isFrontCamera: true);
+      ArLiveBeautyDefaults.clear();
       return;
     }
 
@@ -86,7 +86,7 @@ class LiveBloc extends Bloc<LiveEvent, LiveState> {
           isFrontCamera: true,
         ),
       );
-      await _bootArBeauty(isFront: true);
+      await _bootArCamera();
       return;
     }
 
@@ -112,7 +112,7 @@ class LiveBloc extends Bloc<LiveEvent, LiveState> {
       final nextIsFront = !current.isFrontCamera;
       emit(current.copyWith(isFrontCamera: nextIsFront));
       await ArCameraBridge.flipCamera();
-      ArLiveBeautyDefaults.apply(isFrontCamera: nextIsFront);
+      // Do not re-force beauty defaults on flip — leave Magic as the host set it.
       return;
     }
 
@@ -201,7 +201,7 @@ class LiveBloc extends Bloc<LiveEvent, LiveState> {
       if (!current.isCameraInitialized) {
         emit(current.copyWith(isCameraInitialized: true));
       }
-      await _bootArBeauty(isFront: current.isFrontCamera);
+      await _bootArCamera();
       return;
     }
 

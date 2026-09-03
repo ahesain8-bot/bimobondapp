@@ -238,14 +238,31 @@ object ArLiveStartPopup {
             )
         }
 
-        fun toolCell(label: String, glyph: String, method: String?, showDot: Boolean = false): View {
+        fun toolCell(
+            label: String,
+            glyph: String,
+            method: String?,
+            showDot: Boolean = false,
+            badge: String? = null,
+            comingSoon: Boolean = false,
+            onLocalTap: (() -> Unit)? = null,
+        ): View {
             val col = LinearLayout(activity).apply {
                 orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER_HORIZONTAL
                 setPadding(dp(4), dp(6), dp(4), dp(6))
-                if (method != null) {
-                    setOnClickListener {
-                        ArCameraBridge.liveStartEventSink?.invoke(method, null)
+                setOnClickListener {
+                    when {
+                        onLocalTap != null -> onLocalTap()
+                        comingSoon -> {
+                            ArCameraBridge.liveStartEventSink?.invoke(
+                                "onLiveStartComingSoon",
+                                label,
+                            )
+                        }
+                        method != null -> {
+                            ArCameraBridge.liveStartEventSink?.invoke(method, null)
+                        }
                     }
                 }
             }
@@ -276,6 +293,28 @@ object ArLiveStartPopup {
                     },
                 )
             }
+            if (badge != null) {
+                iconWrap.addView(
+                    TextView(activity).apply {
+                        text = badge
+                        setTextColor(Color.WHITE)
+                        setTextSize(TypedValue.COMPLEX_UNIT_SP, 9f)
+                        setTypeface(Typeface.DEFAULT_BOLD)
+                        gravity = Gravity.CENTER
+                        setPadding(dp(4), dp(1), dp(4), dp(1))
+                        background = GradientDrawable().apply {
+                            setColor(Color.parseColor(TIKTOK_RED))
+                            cornerRadius = dpF(8f)
+                        }
+                    },
+                    FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ).apply {
+                        gravity = Gravity.TOP or Gravity.END
+                    },
+                )
+            }
             col.addView(iconWrap, LinearLayout.LayoutParams(dp(28), dp(28)))
             col.addView(
                 TextView(activity).apply {
@@ -284,38 +323,105 @@ object ArLiveStartPopup {
                     setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
                     gravity = Gravity.CENTER
                     setPadding(0, dp(4), 0, 0)
+                    maxLines = 1
                 },
             )
             return col
         }
 
-        val tools = LinearLayout(activity).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
-            weightSum = 5f
-            addView(
-                toolCell("Flip", "⟲", "onLiveStartFlip"),
-                LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f),
-            )
-            addView(
-                toolCell("Enhance", "✦", "onLiveStartBeautify"),
-                LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f),
-            )
-            addView(
-                toolCell("Effects", "☺", "onLiveStartEffects"),
-                LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f),
-            )
-            addView(
-                toolCell("Settings", "⚙", "onLiveStartSettings", showDot = true),
-                LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f),
-            )
-            addView(
-                toolCell("More", "▾", null),
-                LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f),
-            )
+        fun toolRow(vararg cells: View): LinearLayout {
+            return LinearLayout(activity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER
+                weightSum = 5f
+                for (cell in cells) {
+                    addView(
+                        cell,
+                        LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f),
+                    )
+                }
+            }
         }
+
+        var toolsExpanded = false
+        val toolsHost = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+
+        fun rebuildTools() {
+            toolsHost.removeAllViews()
+            if (!toolsExpanded) {
+                toolsHost.addView(
+                    toolRow(
+                        toolCell("Flip", "⟲", "onLiveStartFlip"),
+                        toolCell("Enhance", "✦", "onLiveStartBeautify"),
+                        toolCell("Effects", "☺", "onLiveStartEffects"),
+                        toolCell("Settings", "⚙", "onLiveStartSettings", showDot = true),
+                        toolCell(
+                            "More",
+                            "▾",
+                            null,
+                            onLocalTap = {
+                                toolsExpanded = true
+                                rebuildTools()
+                            },
+                        ),
+                    ),
+                )
+            } else {
+                toolsHost.addView(
+                    toolRow(
+                        toolCell("Flip", "⟲", "onLiveStartFlip"),
+                        toolCell("Enhance", "✦", "onLiveStartBeautify"),
+                        toolCell("Effects", "☺", "onLiveStartEffects"),
+                        toolCell("Settings", "⚙", "onLiveStartSettings", showDot = true),
+                        toolCell(
+                            "Less",
+                            "▴",
+                            null,
+                            onLocalTap = {
+                                toolsExpanded = false
+                                rebuildTools()
+                            },
+                        ),
+                    ),
+                )
+                toolsHost.addView(
+                    toolRow(
+                        toolCell("Boards", "▦", null, comingSoon = true),
+                        toolCell("Dual", "📷", null, comingSoon = true),
+                        toolCell("Share", "↗", "onLiveStartShare"),
+                        toolCell("LIVE Center", "⌂", "onLiveStartLiveCenter"),
+                        toolCell(
+                            "Campaigns",
+                            "★",
+                            "onLiveStartCampaigns",
+                            badge = "2",
+                        ),
+                    ),
+                    LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ).apply { topMargin = dp(8) },
+                )
+                toolsHost.addView(
+                    toolRow(
+                        toolCell("Subscription", "☆", null, comingSoon = true),
+                        toolCell("Service+", "💬", "onLiveStartServicePlus"),
+                        toolCell("Shop", "🛍", null, comingSoon = true),
+                        toolCell("Interact", "OX", "onLiveStartInteract"),
+                        toolCell("Promote", "🔥", null, comingSoon = true),
+                    ),
+                    LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ).apply { topMargin = dp(8) },
+                )
+            }
+        }
+        rebuildTools()
         panel.addView(
-            tools,
+            toolsHost,
             LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT,

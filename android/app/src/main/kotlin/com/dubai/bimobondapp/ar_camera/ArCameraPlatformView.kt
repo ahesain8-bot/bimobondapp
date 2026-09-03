@@ -69,6 +69,7 @@ class ArCameraPlatformView(
     }
 
     init {
+        ArCameraDiagnostics.configure(context)
         ArCameraBridge.faceOverlay = faceOverlay
         ArCameraBridge.previewView = previewView
         ArCameraBridge.warpGlView = warpGlView
