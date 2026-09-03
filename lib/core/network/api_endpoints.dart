@@ -9,7 +9,7 @@ class ApiEndpoints {
   /// Base URL for the Nest HTTP + Socket.IO host.
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://134.209.2.225',
+    defaultValue: 'http://159.65.227.87',
   );
 
   // ── Auth ──────────────────────────────────────────────
