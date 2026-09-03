@@ -23,9 +23,18 @@ class LiveRoomInfoRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<LiveRoomBloc, LiveRoomState>(
-      buildWhen: (previous, current) =>
-          current is LiveRoomReady &&
-          (previous is! LiveRoomReady || previous.session != current.session),
+      buildWhen: (previous, current) {
+        if (current is! LiveRoomReady) return false;
+        if (previous is! LiveRoomReady) return true;
+        final a = previous.session;
+        final b = current.session;
+        return a.hourlyRankingLabel != b.hourlyRankingLabel ||
+            a.hourlyRank != b.hourlyRank ||
+            a.galleryCurrent != b.galleryCurrent ||
+            a.galleryTotal != b.galleryTotal ||
+            a.guestInviteCount != b.guestInviteCount ||
+            a.title != b.title;
+      },
       builder: (context, state) {
         if (state is! LiveRoomReady) {
           return const SizedBox.shrink();

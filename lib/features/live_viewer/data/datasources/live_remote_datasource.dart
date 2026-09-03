@@ -2,13 +2,14 @@ import 'dart:math';
 
 import '../../core/constants/api_constants.dart';
 import '../../domain/entities/live_entity.dart';
+import '../../domain/entities/live_feed_page_result.dart';
 import '../../domain/entities/live_session_entity.dart';
 import '../services/fake_livekit_service.dart';
 
 /// Remote API contract. Today this is an in-memory mock that mimics
 /// REST latency and payloads. Replace with Dio/Retrofit later.
 abstract class LiveRemoteDataSource {
-  Future<List<LiveEntity>> getLiveFeed({
+  Future<LiveFeedPageResult> getLiveFeed({
     int page = 1,
     int limit = 10,
     String? category,
@@ -92,7 +93,7 @@ class FakeLiveRemoteDataSource implements LiveRemoteDataSource {
   ];
 
   @override
-  Future<List<LiveEntity>> getLiveFeed({
+  Future<LiveFeedPageResult> getLiveFeed({
     int page = 1,
     int limit = 10,
     String? category,
@@ -100,7 +101,15 @@ class FakeLiveRemoteDataSource implements LiveRemoteDataSource {
     await Future.delayed(const Duration(milliseconds: 700));
 
     // Simulate end of pagination after page 5.
-    if (page > 5) return [];
+    if (page > 5) {
+      return LiveFeedPageResult(
+        lives: const [],
+        page: page,
+        limit: limit,
+        totalPages: 5,
+        total: 5 * limit,
+      );
+    }
 
     final lives = List.generate(
       limit,
@@ -110,7 +119,13 @@ class FakeLiveRemoteDataSource implements LiveRemoteDataSource {
     for (final live in lives) {
       _cache[live.id] = live;
     }
-    return lives;
+    return LiveFeedPageResult(
+      lives: lives,
+      page: page,
+      limit: limit,
+      totalPages: 5,
+      total: 5 * limit,
+    );
   }
 
   @override

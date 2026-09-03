@@ -57,6 +57,7 @@ class _LiveStartPageState extends State<LiveStartPage>
   bool _isBeautifyPanelVisible = false;
   bool _isEffectsPanelVisible = false;
   bool _isSettingsPanelVisible = false;
+  bool _toolsExpanded = false;
   late final CameraRepository _cameraRepository;
   late final LiveBloc _liveBloc;
   bool _openingLive = false;
@@ -83,7 +84,8 @@ class _LiveStartPageState extends State<LiveStartPage>
 
     if (_reuseAr) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        ArLiveBeautyDefaults.apply(isFrontCamera: true);
+        // Same camera as Add Post — start raw; Beautify opts in later.
+        ArLiveBeautyDefaults.clear();
       });
     }
 
@@ -97,6 +99,16 @@ class _LiveStartPageState extends State<LiveStartPage>
       ArCameraBridge.onLiveStartFlip = () {
         _liveBloc.add(const LiveCameraSwitchRequested());
       };
+      ArCameraBridge.onLiveStartShare = () => _openFromNative(_openStartLiveSharePage);
+      ArCameraBridge.onLiveStartLiveCenter =
+          () => _openFromNative(_openServicePlusPage);
+      ArCameraBridge.onLiveStartCampaigns =
+          () => _openFromNative(_openFansCommunityPage);
+      ArCameraBridge.onLiveStartServicePlus =
+          () => _openFromNative(_openServicePlusPage);
+      ArCameraBridge.onLiveStartInteract =
+          () => _openFromNative(_openStartLiveInteractionSheet);
+      ArCameraBridge.onLiveStartComingSoon = _showComingSoon;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _enableNativeChrome();
       });
@@ -217,6 +229,12 @@ class _LiveStartPageState extends State<LiveStartPage>
       ArCameraBridge.onLiveStartEffects = null;
       ArCameraBridge.onLiveStartSettings = null;
       ArCameraBridge.onLiveStartFlip = null;
+      ArCameraBridge.onLiveStartShare = null;
+      ArCameraBridge.onLiveStartLiveCenter = null;
+      ArCameraBridge.onLiveStartCampaigns = null;
+      ArCameraBridge.onLiveStartServicePlus = null;
+      ArCameraBridge.onLiveStartInteract = null;
+      ArCameraBridge.onLiveStartComingSoon = null;
       ArCameraBridge.setLiveStartChrome(visible: false);
     }
     WidgetsBinding.instance.removeObserver(this);
@@ -298,70 +316,21 @@ class _LiveStartPageState extends State<LiveStartPage>
     return StartLiveInteractionSheet.show(context);
   }
 
-  Future<void> _openMoreSheet() {
-    return showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: const Color(0xFF1C1C1E),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (sheetContext) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(8, 12, 8, 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.ios_share_rounded, color: Colors.white),
-                  title: const Text('Share', style: TextStyle(color: Colors.white)),
-                  onTap: () {
-                    Navigator.pop(sheetContext);
-                    _openStartLiveSharePage();
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.home_outlined, color: Colors.white),
-                  title: const Text(
-                    'LIVE Center',
-                    style: TextStyle(color: Colors.white),
-                  ),
-                  onTap: () {
-                    Navigator.pop(sheetContext);
-                    _openServicePlusPage();
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(
-                    Icons.assignment_outlined,
-                    color: Colors.white,
-                  ),
-                  title: const Text(
-                    'Get leads',
-                    style: TextStyle(color: Colors.white),
-                  ),
-                  onTap: () {
-                    Navigator.pop(sheetContext);
-                    _openFansCommunityPage();
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(
-                    Icons.photo_camera_back_outlined,
-                    color: Colors.white,
-                  ),
-                  title: const Text('Dual', style: TextStyle(color: Colors.white)),
-                  onTap: () {
-                    Navigator.pop(sheetContext);
-                    _openStartLiveInteractionSheet();
-                  },
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+  void _showComingSoon(String label) {
+    if (!mounted) return;
+    final name = label.trim().isEmpty ? 'This' : label.trim();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('$name coming soon')),
     );
+  }
+
+  Future<void> _openFromNative(Future<void> Function() open) async {
+    await _hideNativeChrome();
+    if (!mounted) return;
+    await open();
+    if (mounted && _useNativeChrome) {
+      await _enableNativeChrome();
+    }
   }
 
   @override
@@ -465,10 +434,23 @@ class _LiveStartPageState extends State<LiveStartPage>
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     ToolsRow(
+                      expanded: _toolsExpanded,
+                      onExpandedChanged: (value) {
+                        setState(() => _toolsExpanded = value);
+                      },
                       onBeautifyTap: _toggleBeautifyPanel,
                       onEffectsTap: _toggleEffectsPanel,
                       onSettingsTap: _toggleSettingsPanel,
-                      onMoreTap: _openMoreSheet,
+                      onShareTap: _openStartLiveSharePage,
+                      onLiveCenterTap: _openServicePlusPage,
+                      onCampaignsTap: _openFansCommunityPage,
+                      onServicePlusTap: _openServicePlusPage,
+                      onInteractTap: _openStartLiveInteractionSheet,
+                      onSubscriptionTap: () => _showComingSoon('Subscription'),
+                      onShopTap: () => _showComingSoon('Shop'),
+                      onPromoteTap: () => _showComingSoon('Promote'),
+                      onBoardsTap: () => _showComingSoon('Boards'),
+                      onDualTap: () => _showComingSoon('Dual'),
                     ),
                     const SizedBox(height: AppSpacing.sm),
                     LiveContainer(titleController: _titleController),

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -38,16 +39,28 @@ class LiveRoomStage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<LiveRoomBloc, LiveRoomState>(
-      buildWhen: (previous, current) =>
-          previous.runtimeType != current.runtimeType ||
-          (current is LiveRoomReady &&
-              (previous is! LiveRoomReady ||
-                  previous.guests != current.guests ||
-                  previous.battle != current.battle ||
-                  previous.battleMediaRoom != current.battleMediaRoom ||
-                  previous.topGifterAvatars != current.topGifterAvatars ||
-                  previous.opponentTopGifterAvatars !=
-                      current.opponentTopGifterAvatars)),
+      buildWhen: (previous, current) {
+        if (previous.runtimeType != current.runtimeType) return true;
+        if (current is! LiveRoomReady || previous is! LiveRoomReady) {
+          return true;
+        }
+        // Score ticks must not rebuild VideoTrackRenderer tiles.
+        final prevBattle = previous.battle;
+        final currBattle = current.battle;
+        final battleLayoutChanged =
+            (prevBattle?.isActive == true) != (currBattle?.isActive == true) ||
+            prevBattle?.id != currBattle?.id ||
+            prevBattle?.live1Id != currBattle?.live1Id ||
+            prevBattle?.live2Id != currBattle?.live2Id ||
+            prevBattle?.status != currBattle?.status ||
+            prevBattle?.phase != currBattle?.phase;
+        return previous.guests != current.guests ||
+            battleLayoutChanged ||
+            previous.battleMediaRoom != current.battleMediaRoom ||
+            previous.topGifterAvatars != current.topGifterAvatars ||
+            previous.opponentTopGifterAvatars !=
+                current.opponentTopGifterAvatars;
+      },
       builder: (context, state) {
         final guests = state is LiveRoomReady
             ? state.activeGuests
@@ -257,18 +270,24 @@ class _BattleStageState extends State<_BattleStage> {
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             Expanded(
-                              child: _BattleFeedTile(
-                                child: _HostBattleVideo(
-                                  avatarUrl: widget.hostAvatarUrl,
+                              child: RepaintBoundary(
+                                key: const ValueKey('host_pk_self_video'),
+                                child: _BattleFeedTile(
+                                  child: _HostBattleVideo(
+                                    avatarUrl: widget.hostAvatarUrl,
+                                  ),
                                 ),
                               ),
                             ),
                             Container(width: 1.5, color: Colors.black),
                             Expanded(
-                              child: _BattleFeedTile(
-                                child: _OpponentVideo(
-                                  room: room is Room ? room : null,
-                                  avatarUrl: widget.opponentAvatarUrl,
+                              child: RepaintBoundary(
+                                key: const ValueKey('host_pk_opponent_video'),
+                                child: _BattleFeedTile(
+                                  child: _OpponentVideo(
+                                    room: room is Room ? room : null,
+                                    avatarUrl: widget.opponentAvatarUrl,
+                                  ),
                                 ),
                               ),
                             ),
@@ -278,13 +297,39 @@ class _BattleStageState extends State<_BattleStage> {
                           left: 0,
                           right: 0,
                           top: 0,
-                          child: _HostBattleChrome(
-                            leftScore: battle.scoreFor(currentLiveId),
-                            rightScore: battle.opponentScoreFor(currentLiveId),
-                            endTime: battle.endTime,
-                            multiplier: battle.multiplier,
-                            winnerLiveId: battle.winnerLiveId,
-                            currentLiveId: currentLiveId,
+                          child: BlocBuilder<LiveRoomBloc, LiveRoomState>(
+                            buildWhen: (previous, current) {
+                              if (previous is! LiveRoomReady ||
+                                  current is! LiveRoomReady) {
+                                return previous.runtimeType !=
+                                    current.runtimeType;
+                              }
+                              final prev = previous.battle;
+                              final curr = current.battle;
+                              if (prev == null || curr == null) {
+                                return prev != curr;
+                              }
+                              return prev.live1Score != curr.live1Score ||
+                                  prev.live2Score != curr.live2Score ||
+                                  prev.endTime != curr.endTime ||
+                                  prev.multiplier != curr.multiplier ||
+                                  prev.winnerLiveId != curr.winnerLiveId ||
+                                  prev.phase != curr.phase;
+                            },
+                            builder: (context, state) {
+                              final active = state is LiveRoomReady
+                                  ? state.battle
+                                  : null;
+                              final b = active ?? battle;
+                              return _HostBattleChrome(
+                                leftScore: b.scoreFor(currentLiveId),
+                                rightScore: b.opponentScoreFor(currentLiveId),
+                                endTime: b.endTime,
+                                multiplier: b.multiplier,
+                                winnerLiveId: b.winnerLiveId,
+                                currentLiveId: currentLiveId,
+                              );
+                            },
                           ),
                         ),
                         if (_showStartOverlay)
@@ -720,10 +765,15 @@ class _OpponentVideoState extends State<_OpponentVideo> {
   EventsListener<RoomEvent>? _listener;
   VideoTrack? _track;
   String? _trackKey;
+  Timer? _trackPollTimer;
 
   @override
   void initState() {
     super.initState();
+    debugPrint(
+      '[PK-DIAG][${DateTime.now().toIso8601String()}] '
+      'opponent_video_widget_create roomHash=${widget.room?.hashCode}',
+    );
     _attach(widget.room);
   }
 
@@ -731,6 +781,11 @@ class _OpponentVideoState extends State<_OpponentVideo> {
   void didUpdateWidget(covariant _OpponentVideo oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!identical(oldWidget.room, widget.room)) {
+      debugPrint(
+        '[PK-DIAG][${DateTime.now().toIso8601String()}] '
+        'opponent_video_room_swap '
+        'from=${oldWidget.room?.hashCode} to=${widget.room?.hashCode}',
+      );
       _detach();
       _attach(widget.room);
     }
@@ -738,11 +793,17 @@ class _OpponentVideoState extends State<_OpponentVideo> {
 
   @override
   void dispose() {
+    debugPrint(
+      '[PK-DIAG][${DateTime.now().toIso8601String()}] '
+      'opponent_video_widget_dispose trackKey=$_trackKey',
+    );
     _detach();
     super.dispose();
   }
 
   void _detach() {
+    _trackPollTimer?.cancel();
+    _trackPollTimer = null;
     _listener?.dispose();
     _listener = null;
   }
@@ -759,23 +820,42 @@ class _OpponentVideoState extends State<_OpponentVideo> {
       ..on<TrackUnmutedEvent>((_) => _refreshTrack(room))
       ..on<ParticipantConnectedEvent>((_) => _refreshTrack(room))
       ..on<ParticipantDisconnectedEvent>((_) => _refreshTrack(room));
+    // Release builds can miss the first TrackSubscribedEvent; poll until the
+    // opponent host video is attached or the room is replaced.
+    _trackPollTimer?.cancel();
+    _trackPollTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
+      if (!mounted || !identical(widget.room, room)) {
+        _trackPollTimer?.cancel();
+        _trackPollTimer = null;
+        return;
+      }
+      _refreshTrack(room);
+      if (_track != null) {
+        _trackPollTimer?.cancel();
+        _trackPollTimer = null;
+      }
+    });
   }
 
   void _refreshTrack(Room? room) {
     VideoTrack? next;
+    VideoTrack? mutedFallback;
     final participants = room?.remoteParticipants.values;
     if (participants != null) {
       for (final participant in participants) {
         for (final publication in participant.videoTrackPublications) {
           final track = publication.track;
-          if (publication.subscribed && !publication.muted && track != null) {
+          if (!publication.subscribed || track == null) continue;
+          if (!publication.muted) {
             next = track;
             break;
           }
+          mutedFallback ??= track;
         }
         if (next != null) break;
       }
     }
+    next ??= mutedFallback;
     final key = next == null ? null : (next.sid ?? '${next.hashCode}');
     if (!mounted) {
       _track = next;
@@ -783,6 +863,10 @@ class _OpponentVideoState extends State<_OpponentVideo> {
       return;
     }
     if (key == _trackKey && identical(next, _track)) return;
+    debugPrint(
+      '[PK-DIAG][${DateTime.now().toIso8601String()}] '
+      'opponent_renderer_track_change from=$_trackKey to=$key',
+    );
     setState(() {
       _track = next;
       _trackKey = key;

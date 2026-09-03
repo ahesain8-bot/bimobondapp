@@ -1959,7 +1959,8 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
         // Keep PlatformView mounted — remounting caused a black live start.
         // Only hide photo/video chrome so the live UI can sit on top.
         setState(() => _liveHandoffActive = true);
-        ArLiveBeautyDefaults.apply(isFrontCamera: _isFrontCamera);
+        // Keep the same AR camera running; live starts without beauty.
+        ArLiveBeautyDefaults.clear();
         await Navigator.of(context).push(
           PageRouteBuilder<void>(
             opaque: false,
@@ -1988,6 +1989,9 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
             _applyArFilter(ArFilterCatalog.items[_arFilterIndex].id);
             if (_photoEditorMagicOn) {
               ArCameraBridge.setMagicEnabled(true, strength: _kMagicAutoSmooth);
+            } else {
+              ArCameraBridge.setMagicEnabled(false);
+              ArCameraBridge.clearBeautyFilter();
             }
             _syncRetouchToNative();
           }

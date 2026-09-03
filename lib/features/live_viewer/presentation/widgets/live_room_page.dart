@@ -337,10 +337,16 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
             (prev.live?.id) != (curr.live?.id) ||
             prev.guests != curr.guests ||
             prev.isOnStage != curr.isOnStage ||
-            prev.battle != curr.battle ||
+            // Score ticks update via nested PkBattleBar — do not rebuild
+            // the whole stage (VideoTrackRenderer flash).
+            (prev.battle?.isActive == true) != (curr.battle?.isActive == true) ||
+            prev.battle?.id != curr.battle?.id ||
+            prev.battle?.live1Id != curr.battle?.live1Id ||
+            prev.battle?.live2Id != curr.battle?.live2Id ||
+            prev.battle?.status != curr.battle?.status ||
+            prev.battle?.phase != curr.battle?.phase ||
             prev.battleOpponentLive != curr.battleOpponentLive ||
             prev.battleRoom != curr.battleRoom ||
-            prev.topViewerAvatars != curr.topViewerAvatars ||
             prev.opponentTopGifterAvatars != curr.opponentTopGifterAvatars ||
             prevInfo != currInfo;
       },
@@ -711,6 +717,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                 )
               else
                 LiveVideoPlayer(
+                  key: ValueKey('viewer_primary_${live.id}'),
                   live: live,
                   isActive: widget.isActive && connected,
                 ),
@@ -822,11 +829,12 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                         }
                       },
                       onClose: () {
-                        // Leave the feed entirely. Advancing to the next page
-                        // left LiveKit joined in the background after pop.
-                        widget.onClose?.call();
+                        if (widget.onClose != null) {
+                          widget.onClose!();
+                          return;
+                        }
                         context.read<LiveViewerBloc>().add(
-                          const LiveViewerDeactivated(),
+                          const LiveViewerDeactivated(leavingFeed: true),
                         );
                         if (context.canPop()) {
                           context.pop();
@@ -1280,6 +1288,7 @@ class _PkVideoLayout extends StatelessWidget {
                 fit: StackFit.expand,
                 children: [
                   LiveVideoPlayer(
+                    key: ValueKey('viewer_pk_host_${live.id}'),
                     live: live,
                     isActive: isActive,
                     fit: BoxFit.fitWidth,
@@ -1361,15 +1370,16 @@ class _PkGuestFeed extends StatelessWidget {
   }
 
   VideoTrack? _remoteVideoTrack(Room room) {
+    VideoTrack? mutedFallback;
     for (final participant in room.remoteParticipants.values) {
       for (final publication in participant.videoTrackPublications) {
         final track = publication.track;
-        if (publication.subscribed && !publication.muted && track != null) {
-          return track;
-        }
+        if (!publication.subscribed || track == null) continue;
+        if (!publication.muted) return track;
+        mutedFallback ??= track;
       }
     }
-    return null;
+    return mutedFallback;
   }
 
   Widget _fallback() {

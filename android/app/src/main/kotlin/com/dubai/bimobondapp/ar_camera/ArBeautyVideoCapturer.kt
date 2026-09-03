@@ -32,6 +32,8 @@ class ArBeautyVideoCapturer : VideoCapturer {
     private var capturing = false
     @Volatile
     private var pausedForCameraSwitch = false
+    /** After flip resume, drop a few captures so the first published frame is clean. */
+    private val warmupSkipRemaining = AtomicInteger(0)
     private var width = 720
     private var height = 1280
     private var frameIntervalMs = 66L
@@ -157,12 +159,17 @@ class ArBeautyVideoCapturer : VideoCapturer {
     fun setPausedForCameraSwitch(paused: Boolean) {
         pausedForCameraSwitch = paused
         if (paused) {
+            warmupSkipRemaining.set(0)
             mainHandler.post {
                 try {
                     ArCameraBridge.warpGlView?.clearLastCapturedFrame()
                 } catch (_: Throwable) {
                 }
             }
+        } else {
+            // Drop post-flip captures until the OES transform settles — too few
+            // and viewers still see one corrupt frame; too many feels laggy.
+            warmupSkipRemaining.set(6)
         }
         Log.i(TAG, "pausedForCameraSwitch=$paused")
     }
@@ -187,6 +194,30 @@ class ArBeautyVideoCapturer : VideoCapturer {
         } ?: return
 
         if (raw.isRecycled || raw.width < 2 || raw.height < 2) {
+            try {
+                raw.recycle()
+            } catch (_: Throwable) {
+            }
+            return
+        }
+
+        // Landscape / tiny buffers must never reach LiveKit — viewers decode
+        // them as horizontal static when the track is negotiated as 720x1280.
+        if (raw.height < raw.width) {
+            val n = skippedBad.incrementAndGet()
+            if (n == 1 || n % 20 == 0) {
+                Log.w(TAG, "skip landscape beauty frame ${raw.width}x${raw.height} #$n")
+            }
+            try {
+                raw.recycle()
+            } catch (_: Throwable) {
+            }
+            return
+        }
+
+        val skip = warmupSkipRemaining.get()
+        if (skip > 0) {
+            warmupSkipRemaining.decrementAndGet()
             try {
                 raw.recycle()
             } catch (_: Throwable) {

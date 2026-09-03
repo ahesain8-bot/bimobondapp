@@ -32,6 +32,11 @@ class LiveRoomRecoverEndAndRestart extends LiveRoomEvent {
   const LiveRoomRecoverEndAndRestart();
 }
 
+/// Loads comments/gallery/guests/rank/battle after media is up (P2, non-blocking).
+class LiveRoomEnrichSessionRequested extends LiveRoomEvent {
+  const LiveRoomEnrichSessionRequested();
+}
+
 /// Reconnects to the existing active live (`POST /lives/:id/start`).
 class LiveRoomRecoverResumeActive extends LiveRoomEvent {
   const LiveRoomRecoverResumeActive();

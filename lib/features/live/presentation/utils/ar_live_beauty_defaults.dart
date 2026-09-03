@@ -1,11 +1,9 @@
 import 'package:bimobondapp/app/ar_camera/ar_camera_bridge.dart';
 
-/// Default FaceWarp beauty — TikTok-style open grade (exposure/gamma first).
+/// FaceWarp beauty helpers for live.
 ///
-/// Tuned to match a bright TikTok selfie look:
-/// Smooth 40, Shape -8, Nose 6, Eyes 7, Mouth 2, Tooth 8, BrightenEye 8,
-/// Whiten 10 — lighting via Exposure ~+0.12 and Brightness/Gamma ~+0.07
-/// (not extra whiten).
+/// Live starts **raw** (same camera as Add Post image/video). Call [apply]
+/// only when the host opts in via Beautify.
 class ArLiveBeautyDefaults {
   ArLiveBeautyDefaults._();
 
@@ -34,6 +32,15 @@ class ArLiveBeautyDefaults {
   static const double frontTooth = 0.08; // ≈ 8
   static const double frontMouth = 0.02; // ≈ 2
   static const double frontBrightenEye = 0.08; // ≈ 8
+
+  /// Raw camera — Magic Off, no retouch / makeup / beauty filter.
+  static void clear() {
+    ArCameraBridge.setMagicEnabled(false);
+    ArCameraBridge.clearBeautyFilter();
+    ArCameraBridge.clearRetouchAdjustments();
+    ArCameraBridge.clearMakeup();
+    ArCameraBridge.setFilter('none');
+  }
 
   /// Turns Magic On and applies the TikTok-open retouch grade.
   static void apply({required bool isFrontCamera}) {
@@ -81,6 +88,18 @@ class ArLiveBeautyDefaults {
         mouth: frontMouth * 0.5,
       );
     }
+  }
+
+  /// Clear now, then again after GL/CameraX settle (first open often races).
+  static Future<void> clearWithRetry() async {
+    try {
+      await ArCameraBridge.prepareShaderPipeline();
+    } catch (_) {}
+    clear();
+    await Future<void>.delayed(const Duration(milliseconds: 450));
+    clear();
+    await Future<void>.delayed(const Duration(milliseconds: 700));
+    clear();
   }
 
   /// Apply now, then again after GL/CameraX settle (first open often races).

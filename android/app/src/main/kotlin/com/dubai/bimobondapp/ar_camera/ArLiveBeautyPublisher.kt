@@ -52,19 +52,38 @@ object ArLiveBeautyPublisher {
         return c.pushedFrameCount()
     }
 
+    @JvmStatic
+    fun hasActiveCapturer(): Boolean = capturer is ArBeautyVideoCapturer
+
     /** Pause beauty frames during CameraX front/back rebind. */
     @JvmStatic
     fun pauseForCameraSwitch() {
-        (capturer as? ArBeautyVideoCapturer)?.setPausedForCameraSwitch(true)
+        val c = capturer as? ArBeautyVideoCapturer ?: return
+        c.setPausedForCameraSwitch(true)
+        // Keep the WebRTC track enabled — disabling it can black the viewer.
+        // Pausing frame push freezes the last good encoded frame instead.
+        Log.i(TAG, "beauty publish paused for camera switch")
     }
 
     /**
-     * Resume only after the new camera transform looks settled and we have a
-     * usable capture — otherwise viewers get horizontal-static YUV garbage.
+     * Resume beauty publish after CameraX flip.
+     *
+     * Waits for a portrait capture (and a sane rotation when available) so
+     * viewers never decode the sideways / horizontal-static garbage that
+     * appears while the new lens is still settling. Dart already completed
+     * the flip Future in [ArCameraController.finishCameraFlip], so this
+     * polling does not block the host UI.
      */
     @JvmStatic
-    fun resumeAfterCameraSwitch(delayMs: Long = 700L) {
-        val c = capturer as? ArBeautyVideoCapturer ?: return
+    fun resumeAfterCameraSwitch(
+        delayMs: Long = 450L,
+        onComplete: (() -> Unit)? = null,
+    ) {
+        val c = capturer as? ArBeautyVideoCapturer
+        if (c == null) {
+            onComplete?.invoke()
+            return
+        }
         val main = android.os.Handler(android.os.Looper.getMainLooper())
         fun attempt(n: Int) {
             val gl = ArCameraBridge.warpGlView
@@ -87,24 +106,30 @@ object ArLiveBeautyPublisher {
                 snap?.recycle()
             } catch (_: Throwable) {
             }
-            val rotOk = rot == 90 || rot == 270 || rot == 0 || rot == 180
-            if ((portraitOk && rotOk) || n >= 10) {
+            // 0 is allowed once a portrait buffer exists (some devices report
+            // 0 briefly after transform); without portrait we keep waiting.
+            val settled = portraitOk || n >= 12
+            if (settled) {
                 try {
                     gl?.resetAfterRouteResume()
                     gl?.clearLastCapturedFrame()
                     gl?.requestCaptureNow()
                 } catch (_: Throwable) {
                 }
-                // One more beat so the first pumped frame is a fresh capture.
                 main.postDelayed({
                     c.setPausedForCameraSwitch(false)
-                    Log.i(TAG, "beauty publish resumed after flip (attempt=$n rot=$rot)")
-                }, 120L)
+                    Log.i(
+                        TAG,
+                        "beauty publish resumed after flip (attempt=$n rot=$rot portrait=$portraitOk)",
+                    )
+                    onComplete?.invoke()
+                }, 100L)
             } else {
-                main.postDelayed({ attempt(n + 1) }, 120L)
+                Log.i(TAG, "flip resume wait n=$n rot=$rot portrait=$portraitOk")
+                main.postDelayed({ attempt(n + 1) }, 100L)
             }
         }
-        main.postDelayed({ attempt(0) }, delayMs.coerceIn(400L, 1500L))
+        main.postDelayed({ attempt(0) }, delayMs.coerceIn(250L, 1200L))
     }
 
     /**

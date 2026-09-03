@@ -5,7 +5,6 @@ import 'package:bimobondapp/app/ar_camera/ar_camera_bridge.dart';
 import '../../../../../core/utils/app_sizes.dart';
 import '../../../../../core/constants/app_spacing.dart';
 import '../../../../../core/utils/app_text_styles.dart';
-import '../../utils/ar_live_beauty_defaults.dart';
 import 'ar_live_camera_preview.dart';
 
 /// Beauty controls shown above the live setup actions.
@@ -86,16 +85,14 @@ class _BeautifyPanelState extends State<BeautifyPanel> {
 
   int _selectedTab = 0;
   int _selectedControl = 0;
-  double _intensity = 45;
+  /// UI preview only until the host moves the slider (then Magic turns On).
+  double _intensity = 0;
 
   @override
   void initState() {
     super.initState();
-    if (ArLiveCameraPreview.isSupported) {
-      // Keep beauty On when the panel opens; match TikTok-natural smooth ~45.
-      ArLiveBeautyDefaults.apply(isFrontCamera: true);
-      ArCameraBridge.setMagicEnabled(true, strength: _intensity / 100);
-    }
+    // Panel opens without forcing beauty — Magic stays Off until the host
+    // moves the intensity slider (or taps apply controls).
   }
 
   @override
@@ -122,11 +119,12 @@ class _BeautifyPanelState extends State<BeautifyPanel> {
               onChanged: (value) {
                 setState(() => _intensity = value);
                 if (ArLiveCameraPreview.isSupported) {
-                  // Map 0–100 slider → FaceWarp magic strength 0–1.
-                  ArCameraBridge.setMagicEnabled(
-                    true,
-                    strength: (value / 100).clamp(0.0, 1.0),
-                  );
+                  final strength = (value / 100).clamp(0.0, 1.0);
+                  if (strength <= 0.001) {
+                    ArCameraBridge.setMagicEnabled(false);
+                  } else {
+                    ArCameraBridge.setMagicEnabled(true, strength: strength);
+                  }
                 }
               },
             ),

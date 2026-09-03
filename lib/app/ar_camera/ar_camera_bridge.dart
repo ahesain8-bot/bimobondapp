@@ -19,6 +19,12 @@ class ArCameraBridge {
   static void Function()? onLiveStartEffects;
   static void Function()? onLiveStartSettings;
   static void Function()? onLiveStartFlip;
+  static void Function()? onLiveStartShare;
+  static void Function()? onLiveStartLiveCenter;
+  static void Function()? onLiveStartCampaigns;
+  static void Function()? onLiveStartServicePlus;
+  static void Function()? onLiveStartInteract;
+  static void Function(String label)? onLiveStartComingSoon;
 
   /// Registers platform → Dart callbacks (e.g. layout max-duration auto-stop).
   static void installPlatformCallbacks() {
@@ -40,6 +46,18 @@ class ArCameraBridge {
         onLiveStartSettings?.call();
       } else if (call.method == 'onLiveStartFlip') {
         onLiveStartFlip?.call();
+      } else if (call.method == 'onLiveStartShare') {
+        onLiveStartShare?.call();
+      } else if (call.method == 'onLiveStartLiveCenter') {
+        onLiveStartLiveCenter?.call();
+      } else if (call.method == 'onLiveStartCampaigns') {
+        onLiveStartCampaigns?.call();
+      } else if (call.method == 'onLiveStartServicePlus') {
+        onLiveStartServicePlus?.call();
+      } else if (call.method == 'onLiveStartInteract') {
+        onLiveStartInteract?.call();
+      } else if (call.method == 'onLiveStartComingSoon') {
+        onLiveStartComingSoon?.call(call.arguments?.toString() ?? '');
       }
     });
   }
@@ -52,6 +70,12 @@ class ArCameraBridge {
     onLiveStartEffects = null;
     onLiveStartSettings = null;
     onLiveStartFlip = null;
+    onLiveStartShare = null;
+    onLiveStartLiveCenter = null;
+    onLiveStartCampaigns = null;
+    onLiveStartServicePlus = null;
+    onLiveStartInteract = null;
+    onLiveStartComingSoon = null;
     _channel.setMethodCallHandler(null);
   }
 

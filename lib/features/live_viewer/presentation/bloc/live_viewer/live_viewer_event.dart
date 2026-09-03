@@ -20,7 +20,28 @@ class LiveViewerActivated extends LiveViewerEvent {
 }
 
 class LiveViewerDeactivated extends LiveViewerEvent {
-  const LiveViewerDeactivated();
+  const LiveViewerDeactivated({this.leavingFeed = false});
+
+  /// When true, the viewer is exiting the live feed route — block any later
+  /// activate events until this BLoC instance is disposed.
+  final bool leavingFeed;
+
+  @override
+  List<Object?> get props => [leavingFeed];
+}
+
+/// Loads coins/comments/guests/top gifters/battle after video is connected (P2).
+class LiveViewerHudEnrichRequested extends LiveViewerEvent {
+  const LiveViewerHudEnrichRequested({
+    required this.liveId,
+    required this.sessionGeneration,
+  });
+
+  final String liveId;
+  final int sessionGeneration;
+
+  @override
+  List<Object?> get props => [liveId, sessionGeneration];
 }
 
 class LiveViewerRetryRequested extends LiveViewerEvent {

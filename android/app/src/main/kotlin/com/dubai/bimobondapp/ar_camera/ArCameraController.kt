@@ -386,6 +386,9 @@ object ArCameraController {
     @Volatile
     private var switchingCamera = false
 
+    /** Completes Dart flipCamera only after CameraX bind finishes. */
+    private var pendingFlipResult: ((Boolean) -> Unit)? = null
+
     private var noFaceStreak = 0
 
     @Volatile
@@ -570,12 +573,19 @@ object ArCameraController {
             return
         }
 
+        // Previous flip still waiting on bind — fail it without resuming
+        // publish; this flip keeps the beauty pump paused.
+        val staleWaiter = pendingFlipResult
+        pendingFlipResult = null
+        staleWaiter?.invoke(false)
+
         // Stop publishing into LiveKit while CameraX rebinds — otherwise viewers
         // get sideways/scrambled frames with rotation=0 until transform arrives.
-        if (ArLiveBeautyPublisher.isLivePublishingExclusive()) {
-            ArLiveBeautyPublisher.pauseForCameraSwitch()
-        }
+        // Always pause when a beauty capturer is attached (not only when the
+        // exclusive flag is set — that race left frames pumping during flip).
+        ArLiveBeautyPublisher.pauseForCameraSwitch()
 
+        pendingFlipResult = onResult
         switchingCamera = true
         imageAnalysis?.clearAnalyzer()
 
@@ -603,12 +613,38 @@ object ArCameraController {
             if (!preferOesBinding) {
                 ArCameraBridge.coverPreviewForRebind()
             }
+            // Resume + onResult happen in finishCameraFlip after bind completes.
+            // Calling them here raced unbindAll and destroyed the viewer stream.
             bindCamera(lifecycleOwner, previewView, faceOverlay)
             ArCameraBridge.applyCurrentFilter()
-            if (ArLiveBeautyPublisher.isLivePublishingExclusive()) {
-                ArLiveBeautyPublisher.resumeAfterCameraSwitch()
-            }
-            onResult?.invoke(true)
+        }
+    }
+
+    /**
+     * Ends a [flipCamera] once CameraX has rebound (or failed).
+     *
+     * Completes the Dart Future immediately after bind so the host UI can
+     * flip. Beauty publish resumes in the background — waiting on a perfect
+     * portrait snap here left LiveKit muted/paused and made live flip look
+     * like a no-op.
+     */
+    private fun finishCameraFlip(success: Boolean) {
+        val waiter = pendingFlipResult ?: return
+        pendingFlipResult = null
+        // Tell Flutter the lens switched now; do not block on publish resume.
+        waiter.invoke(success)
+        if (ArLiveBeautyPublisher.hasActiveCapturer()) {
+            ArLiveBeautyPublisher.resumeAfterCameraSwitch(
+                delayMs = if (success) 400L else 200L,
+            )
+        }
+    }
+
+    /** Clears [switchingCamera] and completes a pending flip if one is waiting. */
+    private fun endSwitchingCamera(bindSucceeded: Boolean? = null) {
+        switchingCamera = false
+        if (pendingFlipResult != null) {
+            finishCameraFlip(bindSucceeded ?: (camera != null))
         }
     }
 
@@ -3396,7 +3432,8 @@ object ArCameraController {
             } catch (_: Throwable) {
                 0
             }
-            glView.setCameraTransform(initialRot, frontMirror = false, bufW, bufH)
+            val mirrorFront = ArCameraBridge.isFrontCamera
+            glView.setCameraTransform(initialRot, frontMirror = mirrorFront, bufW, bufH)
             request.setTransformationInfoListener(executor) { info ->
                 android.util.Log.i(
                     "ArCameraOES",
@@ -3410,7 +3447,7 @@ object ArCameraController {
                 )
                 glView.setCameraTransform(
                     info.rotationDegrees,
-                    frontMirror = false,
+                    frontMirror = ArCameraBridge.isFrontCamera,
                     bufW,
                     bufH,
                 )
@@ -3954,11 +3991,11 @@ object ArCameraController {
         faceOverlay: FaceOverlayView,
     ) {
         val activity = ArCameraBridge.hostActivity ?: run {
-            switchingCamera = false
+            endSwitchingCamera(bindSucceeded = false)
             return
         }
         val executor = analysisExecutor ?: run {
-            switchingCamera = false
+            endSwitchingCamera(bindSucceeded = false)
             return
         }
         val cameraProviderFuture = ProcessCameraProvider.getInstance(activity)
@@ -4162,7 +4199,7 @@ object ArCameraController {
                         }
                     }
                 }
-                switchingCamera = false
+                endSwitchingCamera(bindSucceeded = camera != null)
                 return@addListener
             }
 
@@ -4425,7 +4462,7 @@ object ArCameraController {
                     videoUseCaseBound = false
                 }
             } finally {
-                switchingCamera = false
+                endSwitchingCamera(bindSucceeded = camera != null)
                 flushPendingHardwareRecordStart()
                 flushPendingPhotoCapture()
             }
