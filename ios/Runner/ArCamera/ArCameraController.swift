@@ -15,7 +15,11 @@ final class ArCameraController: NSObject {
     static let shared = ArCameraController()
 
     let session = AVCaptureSession()
-    private let sessionQueue = DispatchQueue(label: "com.dubai.bimobondapp.ar_camera.session")
+
+    private let sessionQueue = DispatchQueue(
+        label: "com.dubai.bimobondapp.ar_camera.session"
+    )
+
     private let photoOutput = AVCapturePhotoOutput()
     private var currentInput: AVCaptureDeviceInput?
     private(set) var isFrontCamera = true
@@ -23,7 +27,7 @@ final class ArCameraController: NSObject {
 
     private override init() { super.init() }
 
-    // MARK: - Lifecycle (mirrors start/stop/onHostPause/onHostResume)
+    // MARK: - Lifecycle
 
     func start(completion: (() -> Void)? = nil) {
         switch AVCaptureDevice.authorizationStatus(for: .video) {
@@ -75,16 +79,29 @@ final class ArCameraController: NSObject {
 
     func toggleTorch(completion: @escaping (Bool, String?) -> Void) {
         sessionQueue.async { [weak self] in
-            guard let self, let device = self.currentInput?.device, device.hasTorch else {
-                DispatchQueue.main.async { completion(false, "torch_unavailable") }
+            guard
+                let self,
+                let device = self.currentInput?.device,
+                device.hasTorch
+            else {
+                DispatchQueue.main.async {
+                    completion(false, "torch_unavailable")
+                }
                 return
             }
+
             do {
                 try device.lockForConfiguration()
+
                 let newState = device.torchMode != .on
                 device.torchMode = newState ? .on : .off
+
                 device.unlockForConfiguration()
-                DispatchQueue.main.async { completion(newState, nil) }
+
+                DispatchQueue.main.async {
+                    completion(newState, nil)
+                }
+
             } catch {
                 DispatchQueue.main.async { completion(false, "torch_failed") }
             }
@@ -120,8 +137,14 @@ final class ArCameraController: NSObject {
         let delegate = PhotoCaptureDelegate { path in
             completion(path, path == nil ? "photo_failed" : nil)
         }
-        photoCaptureDelegate = delegate // keep alive until the callback fires
-        photoOutput.capturePhoto(with: settings, delegate: delegate)
+
+        // Keep delegate alive until the capture callback fires.
+        photoCaptureDelegate = delegate
+
+        photoOutput.capturePhoto(
+            with: settings,
+            delegate: delegate
+        )
     }
 
     // MARK: - Internal session setup
@@ -141,9 +164,15 @@ final class ArCameraController: NSObject {
     /// supports — mirrors Android's CameraX target-resolution selection.
     private func configureSession() {
         session.beginConfiguration()
-        defer { session.commitConfiguration() }
+        defer {
+            session.commitConfiguration()
+        }
 
-        for preset: AVCaptureSession.Preset in [.hd4K3840x2160, .hd1920x1080, .high] {
+        for preset: AVCaptureSession.Preset in [
+            .hd4K3840x2160,
+            .hd1920x1080,
+            .high
+        ] {
             if session.canSetSessionPreset(preset) {
                 session.sessionPreset = preset
                 break
@@ -154,14 +183,25 @@ final class ArCameraController: NSObject {
 
         if !session.outputs.contains(photoOutput), session.canAddOutput(photoOutput) {
             session.addOutput(photoOutput)
-            if #available(iOS 16.0, *) {
-                if let device = currentInput?.device {
-                    photoOutput.maxPhotoDimensions = device.activeFormat.supportedMaxPhotoDimensions.last
-                        ?? photoOutput.maxPhotoDimensions
-                }
-            } else {
-                photoOutput.isHighResolutionCaptureEnabled = true
-            }
+
+            // Set the maximum photo dimensions for the current camera.
+            refreshMaxPhotoDimensions()
+        }
+    }
+
+    /// Updates the maximum photo dimensions based on the currently active
+    /// camera. Called on initial setup and after every camera flip.
+    private func refreshMaxPhotoDimensions() {
+        guard let device = currentInput?.device else {
+            return
+        }
+
+        if #available(iOS 16.0, *) {
+            photoOutput.maxPhotoDimensions =
+                device.activeFormat.supportedMaxPhotoDimensions.last
+                ?? photoOutput.maxPhotoDimensions
+        } else {
+            photoOutput.isHighResolutionCaptureEnabled = true
         }
     }
 
@@ -175,15 +215,30 @@ final class ArCameraController: NSObject {
             currentInput = nil
         }
 
-        let position: AVCaptureDevice.Position = front ? .front : .back
-        guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: position),
-              let input = try? AVCaptureDeviceInput(device: device),
-              session.canAddInput(input) else {
+        let position: AVCaptureDevice.Position =
+            front ? .front : .back
+
+        guard
+            let device = AVCaptureDevice.default(
+                .builtInWideAngleCamera,
+                for: .video,
+                position: position
+            ),
+            let input = try? AVCaptureDeviceInput(device: device),
+            session.canAddInput(input)
+        else {
             return false
         }
 
         session.addInput(input)
         currentInput = input
+
+        // If the photo output is already attached, this is a camera flip.
+        // Refresh the maximum photo dimensions for the new camera.
+        if session.outputs.contains(photoOutput) {
+            refreshMaxPhotoDimensions()
+        }
+
         return true
     }
 }
