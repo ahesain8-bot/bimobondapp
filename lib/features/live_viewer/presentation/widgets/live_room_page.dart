@@ -637,7 +637,17 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                                 final pinned = state.pinnedComment;
                                 return LayoutBuilder(
                                   builder: (context, constraints) {
-                                    final pinH = pinned == null ? 0.0 : 50.0;
+                                    // A LayoutBuilder can briefly receive less
+                                    // than the preferred 40px (for example
+                                    // while the keyboard or page is resizing).
+                                    // Keep the comment area within the space
+                                    // actually available instead of using an
+                                    // invalid clamp range.
+                                    final pinH = pinned == null ? 0.0 : 56.0;
+                                    final commentsHeight = math.max(
+                                      0.0,
+                                      constraints.maxHeight - pinH,
+                                    );
                                     return Column(
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
@@ -650,11 +660,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                                           context: context,
                                           state: state,
                                           live: live,
-                                          height: (constraints.maxHeight - pinH)
-                                              .clamp(
-                                                40.0,
-                                                constraints.maxHeight,
-                                              ),
+                                          height: commentsHeight,
                                           alignTop: false,
                                           highContrast: true,
                                         ),
@@ -715,7 +721,11 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                                 final pinned = state.pinnedComment;
                                 return LayoutBuilder(
                                   builder: (context, constraints) {
-                                    final pinH = pinned == null ? 0.0 : 50.0;
+                                    final pinH = pinned == null ? 0.0 : 56.0;
+                                    final commentsHeight = math.max(
+                                      0.0,
+                                      constraints.maxHeight - pinH,
+                                    );
                                     return Column(
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
@@ -728,11 +738,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                                           context: context,
                                           state: state,
                                           live: live,
-                                          height: (constraints.maxHeight - pinH)
-                                              .clamp(
-                                                40.0,
-                                                constraints.maxHeight,
-                                              ),
+                                          height: commentsHeight,
                                           alignTop: false,
                                         ),
                                       ],
