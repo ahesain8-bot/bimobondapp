@@ -1,151 +1,120 @@
 import 'package:camera/camera.dart';
-import 'package:bimobondapp/app/camera_engine/native_camera_controller.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../../../core/constants/app_spacing.dart';
-import '../../../../../core/utils/app_colors.dart';
-import '../../../../../core/utils/app_sizes.dart';
-import '../../../../../core/utils/app_text_styles.dart';
+import 'package:bimobondapp/app/ar_camera/ar_camera_bridge.dart';
+
 import '../../bloc/start_live/live_bloc.dart';
 import '../../bloc/start_live/live_event.dart';
 import '../../bloc/start_live/live_state.dart';
 import '../../pages/live_room_page.dart';
+import '../live_countdown_overlay.dart';
+import 'ar_live_camera_preview.dart';
 
-/// Live setup card: title input + image picker + LIVE start button.
+/// Opens the live room after countdown + camera handoff.
+Future<void> openLiveRoomFromStart(
+  BuildContext context, {
+  required String title,
+  LiveBloc? liveBloc,
+}) async {
+  final useAr = ArLiveCameraPreview.isSupported;
+  if (useAr) {
+    await ArCameraBridge.setLivePublishingExclusive(true);
+  }
+
+  await LiveCountdownOverlay.run(context);
+  if (!context.mounted) {
+    if (useAr) {
+      await ArCameraBridge.setLivePublishingExclusive(false);
+    }
+    return;
+  }
+
+  final bloc = liveBloc ?? context.read<LiveBloc>();
+
+  CameraController? runningCamera;
+  if (useAr) {
+    // Keep Kotlin FaceWarp / CameraX running.
+  } else {
+    final ready = bloc.state is LiveReady ? bloc.state as LiveReady : null;
+    runningCamera = (ready != null && ready.isCameraInitialized)
+        ? ready.controller
+        : null;
+
+    if (runningCamera != null) {
+      bloc.add(const LiveCameraHandedOff());
+    } else {
+      bloc.add(const LiveAppPaused());
+    }
+  }
+  if (!context.mounted) {
+    if (useAr) {
+      await ArCameraBridge.setLivePublishingExclusive(false);
+    }
+    return;
+  }
+
+  await Navigator.of(context).push(
+    useAr
+        ? PageRouteBuilder<void>(
+            opaque: false,
+            barrierColor: Colors.transparent,
+            pageBuilder: (_, __, ___) => LiveRoomPage(
+              title: title.isEmpty ? null : title,
+              initialCamera: null,
+              useArBeautyCamera: true,
+            ),
+          )
+        : MaterialPageRoute<void>(
+            builder: (_) => LiveRoomPage(
+              title: title.isEmpty ? null : title,
+              initialCamera: runningCamera,
+            ),
+          ),
+  );
+
+  if (useAr) {
+    await ArCameraBridge.setLivePublishingExclusive(false);
+  }
+  if (!context.mounted) return;
+  bloc.add(const LiveAppResumed());
+}
+
+/// TikTok red pill **Go LIVE** CTA.
 class LiveContainer extends StatelessWidget {
   const LiveContainer({super.key, required this.titleController});
 
   final TextEditingController titleController;
 
-  Future<void> _openLiveRoom(BuildContext context) async {
-    final title = titleController.text.trim();
-    final liveBloc = context.read<LiveBloc>();
-    final useExistingArCamera =
-        !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
-
-    // REUSE the camera that is already running on the start screen: hand the
-    // SAME controller to the room (no close/reopen -> no black flicker).
-    final ready = liveBloc.state is LiveReady
-        ? liveBloc.state as LiveReady
-        : null;
-    final CameraController? runningCamera =
-        (ready != null && ready.isCameraInitialized) ? ready.controller : null;
-    final NativeCameraController? runningNativeCamera =
-        (ready != null && ready.isCameraInitialized)
-        ? ready.nativeController
-        : null;
-
-    if (useExistingArCamera) {
-      // Let the destination PlatformView claim the existing CameraX session
-      // before this route is removed. This avoids an expensive stop/open gap.
-    } else if (runningCamera != null || runningNativeCamera != null) {
-      liveBloc.add(const LiveCameraHandedOff());
-    } else {
-      liveBloc.add(const LiveAppPaused());
-    }
-    if (!context.mounted) return;
-
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => LiveRoomPage(
-          title: title.isEmpty ? null : title,
-          initialCamera: useExistingArCamera ? null : runningCamera,
-          initialNativeCamera: useExistingArCamera ? null : runningNativeCamera,
-        ),
-      ),
-    );
-
-    if (!context.mounted) return;
-    liveBloc.add(const LiveAppResumed());
-  }
+  static const Color _tikTokRed = Color(0xFFFE2C55);
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: AppSpacing.xxl),
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.smd,
-        vertical: AppSpacing.sm,
-      ),
-      decoration: BoxDecoration(
-        color: AppColors.liveContainer.withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(AppSizes.radiusCard),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.1),
-          width: 1,
-        ),
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: titleController,
-                  decoration: InputDecoration(
-                    hintText: 'اضافة عنوان',
-                    hintStyle: AppTextStyles.titleHint.copyWith(fontSize: 13),
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                  style: AppTextStyles.titleInput.copyWith(fontSize: 13),
-                  textAlign: TextAlign.right,
-                  maxLines: 1,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Container(
-                width: AppSizes.imagePickerButton,
-                height: AppSizes.imagePickerButton,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(AppSizes.radiusSmall),
-                ),
-                child: const Icon(
-                  Icons.image_outlined,
-                  color: Colors.white60,
-                  size: AppSizes.imagePickerIcon,
-                ),
-              ),
-            ],
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 28),
+      child: SizedBox(
+        width: double.infinity,
+        height: 50,
+        child: ElevatedButton(
+          onPressed: () => openLiveRoomFromStart(
+            context,
+            title: titleController.text.trim(),
           ),
-          const SizedBox(height: AppSpacing.liveContentGap),
-          SizedBox(
-            width: double.infinity,
-            height: AppSizes.liveButtonHeight,
-            child: ElevatedButton(
-              onPressed: () => _openLiveRoom(context),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryRed,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppSizes.radiusButton),
-                ),
-                elevation: 0,
-                padding: EdgeInsets.zero,
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    'LIVE',
-                    style: AppTextStyles.liveTitle.copyWith(
-                      fontSize: 15,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                  SizedBox(width: AppSpacing.xs),
-                  Text(
-                    'إنشاء',
-                    style: AppTextStyles.liveStart.copyWith(fontSize: 15),
-                  ),
-                ],
-              ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: _tikTokRed,
+            foregroundColor: Colors.white,
+            shape: const StadiumBorder(),
+            elevation: 0,
+          ),
+          child: const Text(
+            'Go LIVE',
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.3,
             ),
           ),
-        ],
+        ),
       ),
     );
   }

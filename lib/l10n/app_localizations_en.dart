@@ -3701,10 +3701,34 @@ class AppLocalizationsEn extends AppLocalizations {
   String get mediaEditorDiscardTitle => 'Discard changes?';
 
   @override
-  String get mediaPhotoEditorFace => 'Face';
+  String get mediaPhotoEditorFace => 'Beauty';
 
   @override
   String get mediaPhotoEditorMakeup => 'Makeup';
+
+  @override
+  String get mediaPhotoEditorLipstick => 'Lipstick';
+
+  @override
+  String get mediaPhotoEditorBlush => 'Blush';
+
+  @override
+  String get mediaPhotoEditorEyeliner => 'Eyeliner';
+
+  @override
+  String get mediaPhotoEditorEyeshadow => 'Shadow';
+
+  @override
+  String get mediaPhotoEditorFoundation => 'Foundation';
+
+  @override
+  String get mediaPhotoEditorContour => 'Contour';
+
+  @override
+  String get mediaPhotoEditorUnderEye => 'Under-eye';
+
+  @override
+  String get mediaPhotoEditorBrightenEye => 'Brighten eye';
 
   @override
   String get mediaPhotoEditorMagic => 'Magic';
@@ -4897,4 +4921,55 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get templateEditorPresetFilmBurn => 'Film burn';
+
+  @override
+  String get templateEditorClipReplace => 'Replace';
+
+  @override
+  String get templateEditorClipVolume => 'Volume';
+
+  @override
+  String get templateEditorClipReduceNoise => 'Reduce noise';
+
+  @override
+  String get templateEditorClipRotate => 'Rotate';
+
+  @override
+  String get templateEditorClipBeautify => 'Beautify';
+
+  @override
+  String get templateEditorClipAdjust => 'Adjust';
+
+  @override
+  String get templateEditorClipOverlay => 'Overlay';
+
+  @override
+  String get templateEditorClipReverse => 'Reverse';
+
+  @override
+  String get templateEditorClipFreeze => 'Freeze';
+
+  @override
+  String get templateEditorClipMask => 'Mask';
+
+  @override
+  String get templateEditorClipOpacity => 'Opacity';
+
+  @override
+  String get templateEditorClipVoiceEffect => 'Voice effect';
+
+  @override
+  String get templateEditorClipAnimation => 'Animation';
+
+  @override
+  String get templateEditorClipCutout => 'Cutout';
+
+  @override
+  String get templateEditorClipBackground => 'Background';
+
+  @override
+  String get templateEditorClipMagic => 'Magic';
+
+  @override
+  String get templateEditorClipComingSoon => 'Coming soon';
 }

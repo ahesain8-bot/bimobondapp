@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 
+import 'package:bimobondapp/app/ar_camera/ar_camera_bridge.dart';
+
 import '../../../../../core/utils/app_sizes.dart';
 import '../../../../../core/constants/app_spacing.dart';
 import '../../../../../core/utils/app_text_styles.dart';
+import 'ar_live_camera_preview.dart';
 
 /// Beauty controls shown above the live setup actions.
 class BeautifyPanel extends StatefulWidget {
@@ -82,7 +85,15 @@ class _BeautifyPanelState extends State<BeautifyPanel> {
 
   int _selectedTab = 0;
   int _selectedControl = 0;
-  double _intensity = 60;
+  /// UI preview only until the host moves the slider (then Magic turns On).
+  double _intensity = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // Panel opens without forcing beauty — Magic stays Off until the host
+    // moves the intensity slider (or taps apply controls).
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -105,7 +116,17 @@ class _BeautifyPanelState extends State<BeautifyPanel> {
           children: [
             _BeautyIntensitySlider(
               value: _intensity,
-              onChanged: (value) => setState(() => _intensity = value),
+              onChanged: (value) {
+                setState(() => _intensity = value);
+                if (ArLiveCameraPreview.isSupported) {
+                  final strength = (value / 100).clamp(0.0, 1.0);
+                  if (strength <= 0.001) {
+                    ArCameraBridge.setMagicEnabled(false);
+                  } else {
+                    ArCameraBridge.setMagicEnabled(true, strength: strength);
+                  }
+                }
+              },
             ),
             _BeautyTabs(
               tabs: _tabs,

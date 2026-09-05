@@ -24,14 +24,15 @@ object BackPersonPresence {
     /**
      * Extra [uBrighten] on skin while a person is in the back-camera frame.
      * Scaled by [presentWeight]; empty frame keeps 0 extra.
+     * TikTok-like open face lighting on rear.
      */
-    const val STEP2_SKIN_BRIGHTEN = 0.45f
+        const val STEP2_SKIN_BRIGHTEN = 0.52f
 
     /**
      * Mild skin open while person is present (replaces live −47 crush).
      * Kept soft so face opens without going chalky white.
      */
-    const val STEP2_SKIN_RETOUCH_BRIGHT = 0.18f
+    const val STEP2_SKIN_RETOUCH_BRIGHT = 0.28f
 
     /**
      * Typical back-camera face fill sits ~0.05–0.09 at arm's length; face

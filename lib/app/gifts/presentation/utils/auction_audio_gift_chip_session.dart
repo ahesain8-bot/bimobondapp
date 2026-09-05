@@ -4,6 +4,10 @@ import 'package:bimobondapp/core/utils/media_utils.dart';
 import 'package:just_audio/just_audio.dart';
 
 /// Shows the auction audio shelf chip only while a music gift is playing.
+///
+/// Must not take over the process audio session: guests on stage
+/// (استضافة غرفة) and the host already own a LiveKit communication session.
+/// Activating a media session here silently fails playback for the receiver.
 class AuctionAudioGiftChipSession {
   Timer? _hideTimer;
   StreamSubscription<PlayerState>? _playerSub;
@@ -28,7 +32,12 @@ class AuctionAudioGiftChipSession {
 
     final resolved = MediaUtils.resolveAbsoluteUrl(audioUrl ?? '').trim();
     if (resolved.isNotEmpty) {
-      final player = AudioPlayer();
+      // Keep LiveKit mic/speaker session intact while mixing gift SFX.
+      final player = AudioPlayer(
+        handleInterruptions: false,
+        androidApplyAudioAttributes: false,
+        handleAudioSessionActivation: false,
+      );
       _player = player;
       try {
         await player.setUrl(resolved);
@@ -45,6 +54,7 @@ class AuctionAudioGiftChipSession {
             unawaited(clear(onUpdate: onUpdate));
           }
         });
+        await player.setVolume(1.0);
         await player.play();
       } catch (_) {
         await player.dispose();

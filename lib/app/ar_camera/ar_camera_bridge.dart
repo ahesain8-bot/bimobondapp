@@ -12,6 +12,20 @@ class ArCameraBridge {
 
   static void Function(String path)? onRecordingAutoStopped;
 
+  /// Native live-start chrome (above beauty GL) → Flutter.
+  static void Function(String title)? onLiveStartGoLive;
+  static void Function()? onLiveStartClose;
+  static void Function()? onLiveStartBeautify;
+  static void Function()? onLiveStartEffects;
+  static void Function()? onLiveStartSettings;
+  static void Function()? onLiveStartFlip;
+  static void Function()? onLiveStartShare;
+  static void Function()? onLiveStartLiveCenter;
+  static void Function()? onLiveStartCampaigns;
+  static void Function()? onLiveStartServicePlus;
+  static void Function()? onLiveStartInteract;
+  static void Function(String label)? onLiveStartComingSoon;
+
   /// Registers platform → Dart callbacks (e.g. layout max-duration auto-stop).
   static void installPlatformCallbacks() {
     _channel.setMethodCallHandler((call) async {
@@ -20,29 +34,53 @@ class ArCameraBridge {
         if (path != null && path.isNotEmpty) {
           onRecordingAutoStopped?.call(path);
         }
+      } else if (call.method == 'onLiveStartGoLive') {
+        onLiveStartGoLive?.call(call.arguments?.toString() ?? '');
+      } else if (call.method == 'onLiveStartClose') {
+        onLiveStartClose?.call();
+      } else if (call.method == 'onLiveStartBeautify') {
+        onLiveStartBeautify?.call();
+      } else if (call.method == 'onLiveStartEffects') {
+        onLiveStartEffects?.call();
+      } else if (call.method == 'onLiveStartSettings') {
+        onLiveStartSettings?.call();
+      } else if (call.method == 'onLiveStartFlip') {
+        onLiveStartFlip?.call();
+      } else if (call.method == 'onLiveStartShare') {
+        onLiveStartShare?.call();
+      } else if (call.method == 'onLiveStartLiveCenter') {
+        onLiveStartLiveCenter?.call();
+      } else if (call.method == 'onLiveStartCampaigns') {
+        onLiveStartCampaigns?.call();
+      } else if (call.method == 'onLiveStartServicePlus') {
+        onLiveStartServicePlus?.call();
+      } else if (call.method == 'onLiveStartInteract') {
+        onLiveStartInteract?.call();
+      } else if (call.method == 'onLiveStartComingSoon') {
+        onLiveStartComingSoon?.call(call.arguments?.toString() ?? '');
       }
     });
   }
 
   static void clearPlatformCallbacks() {
     onRecordingAutoStopped = null;
+    onLiveStartGoLive = null;
+    onLiveStartClose = null;
+    onLiveStartBeautify = null;
+    onLiveStartEffects = null;
+    onLiveStartSettings = null;
+    onLiveStartFlip = null;
+    onLiveStartShare = null;
+    onLiveStartLiveCenter = null;
+    onLiveStartCampaigns = null;
+    onLiveStartServicePlus = null;
+    onLiveStartInteract = null;
+    onLiveStartComingSoon = null;
     _channel.setMethodCallHandler(null);
   }
 
   static Future<void> warmup() async {
     await _channel.invokeMethod<void>('warmup');
-  }
-
-  /// Lets the native platform view bind only after Flutter's single
-  /// permission flow has completed.  Keeping the prompt in Flutter prevents
-  /// CameraX and permission_handler from racing each other with duplicate
-  /// CAMERA/RECORD_AUDIO dialogs and duplicate camera binds.
-  static Future<void> notifyPermissionsGranted() async {
-    try {
-      await _channel.invokeMethod<void>('permissionsGranted');
-    } catch (_) {
-      // The preview can be disposed while a system permission sheet is open.
-    }
   }
 
   static Future<void> prepareShaderPipeline() async {
@@ -250,7 +288,24 @@ class ArCameraBridge {
     });
   }
 
-  /// Live retouch preview on native camera (Face tab sliders, -1…1 → -100…100).
+  /// Hides the full-screen FaceWarp GL preview (PK battle). Capture/publish
+  /// keeps running; Flutter shows the clipped LiveKit local track instead.
+  static Future<void> setLocalPreviewHidden(bool hidden) async {
+    try {
+      await _channel.invokeMethod<void>('setLocalPreviewHidden', {
+        'hidden': hidden,
+      });
+    } catch (_) {}
+  }
+
+  /// Shows/hides native live-start chrome drawn above the beauty GLSurfaceView.
+  static Future<void> setLiveStartChrome({required bool visible}) async {
+    await _channel.invokeMethod<void>('setLiveStartChrome', {
+      'visible': visible,
+    });
+  }
+
+  /// Live retouch preview on native camera (Face tab sliders, -1.5…1.5 → -150…150).
   static void setRetouchAdjustments({
     double saturation = 0,
     double brightness = 0,
@@ -265,7 +320,7 @@ class ArCameraBridge {
     double tooth = 0,
     double mouth = 0,
   }) {
-    int level(double v) => (v * 100).round().clamp(-100, 100);
+    int level(double v) => (v * 100).round().clamp(-150, 150);
     _channel.invokeMethod<void>('setRetouchAdjustments', {
       'saturationLevel': level(saturation),
       'brightnessLevel': level(brightness),
@@ -335,6 +390,50 @@ class ArCameraBridge {
     });
   }
 
+  /// TikTok-style tap-to-focus. [x]/[y] are normalized (0…1) in preview space.
+  static Future<void> tapToFocus({required double x, required double y}) async {
+    await _channel.invokeMethod<void>('tapToFocus', {
+      'x': x.clamp(0.0, 1.0),
+      'y': y.clamp(0.0, 1.0),
+    });
+  }
+
+  /// TikTok-style makeup (lipstick / foundation / shadow / contour / blush /
+  /// under-eye / brighten eye), intensities 0…1.
+  static void setMakeup({
+    double lipstick = 0,
+    double blush = 0,
+    double eyeliner = 0,
+    double eyeshadow = 0,
+    double foundation = 0,
+    double contour = 0,
+    double underEye = 0,
+    double brightenEye = 0,
+    String lipTint = '#DB4761',
+    String blushTint = '#F27A85',
+    String eyelinerTint = '#0F0D14',
+    String eyeshadowTint = '#8C5170',
+  }) {
+    _channel.invokeMethod<void>('setMakeup', {
+      'lipstick': lipstick.clamp(0.0, 1.0),
+      'blush': blush.clamp(0.0, 1.0),
+      'eyeliner': eyeliner.clamp(0.0, 1.0),
+      'eyeshadow': eyeshadow.clamp(0.0, 1.0),
+      'foundation': foundation.clamp(0.0, 1.0),
+      'contour': contour.clamp(0.0, 1.0),
+      'underEye': underEye.clamp(0.0, 1.0),
+      'brightenEye': brightenEye.clamp(0.0, 1.0),
+      'lipTint': lipTint,
+      'blushTint': blushTint,
+      'eyelinerTint': eyelinerTint,
+      'eyeshadowTint': eyeshadowTint,
+    });
+  }
+
+  static void clearMakeup() {
+    setMakeup();
+  }
+
   static void playCountdownTick({bool isFinal = false}) {
     unawaited(
       _channel
@@ -358,15 +457,15 @@ class ArCameraBridge {
   }) async {
     final out = await _channel.invokeMethod<String>('applyBeauty', {
       'path': path,
-      'saturationLevel': saturationLevel.clamp(-100, 100),
-      'brightnessLevel': brightnessLevel.clamp(-100, 100),
-      'contrastLevel': contrastLevel.clamp(-100, 100),
-      'exposureLevel': exposureLevel.clamp(-100, 100),
-      'whiteBalanceLevel': whiteBalanceLevel.clamp(-100, 100),
-      'highlightsLevel': highlightsLevel.clamp(-100, 100),
-      'shadowsLevel': shadowsLevel.clamp(-100, 100),
-      'noseLevel': noseLevel.clamp(-100, 100),
-      'jawLevel': jawLevel.clamp(-100, 100),
+      'saturationLevel': saturationLevel.clamp(-150, 150),
+      'brightnessLevel': brightnessLevel.clamp(-150, 150),
+      'contrastLevel': contrastLevel.clamp(-150, 150),
+      'exposureLevel': exposureLevel.clamp(-150, 150),
+      'whiteBalanceLevel': whiteBalanceLevel.clamp(-150, 150),
+      'highlightsLevel': highlightsLevel.clamp(-150, 150),
+      'shadowsLevel': shadowsLevel.clamp(-150, 150),
+      'noseLevel': noseLevel.clamp(-150, 150),
+      'jawLevel': jawLevel.clamp(-150, 150),
       if (maxEdge != null) 'maxEdge': maxEdge,
     });
     return out;
@@ -412,5 +511,53 @@ class ArCameraBridge {
   /// Toggles overlay playback loop mode.
   static Future<void> setOverlayLoop(bool loop) async {
     await _channel.invokeMethod<void>('setOverlayLoop', {'loop': loop});
+  }
+
+  /// Attaches a WebRTC video track fed by FaceWarp (beauty + filters) to an
+  /// existing flutter_webrtc local [streamId]. Call after LiveKit/WebRTC init.
+  static Future<Map<Object?, Object?>?> attachBeautyVideoTrack({
+    required String streamId,
+    int width = 720,
+    int height = 1280,
+    int fps = 24,
+  }) async {
+    try {
+      final result = await _channel.invokeMethod<Map<Object?, Object?>>(
+        'attachBeautyVideoTrack',
+        {'streamId': streamId, 'width': width, 'height': height, 'fps': fps},
+      );
+      return result;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<void> releaseBeautyVideoTrack() async {
+    try {
+      await _channel.invokeMethod<void>('releaseBeautyVideoTrack');
+    } catch (_) {}
+  }
+
+  /// When true, native refuses `stopCamera` so Flutter Camera2 cannot steal
+  /// the CameraX lens while FaceWarp is publishing beauty frames to LiveKit.
+  static Future<void> setLivePublishingExclusive(bool exclusive) async {
+    try {
+      await _channel.invokeMethod<void>(
+        'setLivePublishingExclusive',
+        <String, Object?>{'exclusive': exclusive},
+      );
+    } catch (_) {
+      // Native may not be ready yet; exclusive is best-effort.
+    }
+  }
+
+  /// Frames pushed by [ArBeautyVideoCapturer] since last attach (0 if idle).
+  static Future<int> beautyPushedFrameCount() async {
+    try {
+      final n = await _channel.invokeMethod<int>('beautyPushedFrameCount');
+      return n ?? 0;
+    } catch (_) {
+      return 0;
+    }
   }
 }

@@ -3,11 +3,13 @@ import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/messages/messages_text.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/stories/story_profile_avatar.dart';
 import 'package:bimobondapp/app/social/domain/entities/social_user_entity.dart';
+import 'package:bimobondapp/app/social/domain/entities/social_user_page_entity.dart';
 import 'package:bimobondapp/app/social/domain/entities/user_suggestion_entity.dart';
 import 'package:bimobondapp/app/social/domain/usecases/get_suggestions_usecase.dart';
 import 'package:bimobondapp/app/social/domain/usecases/social_user_list_usecases.dart';
 import 'package:bimobondapp/app/social/presentation/di/social_injector.dart'
     as social_di;
+import 'package:bimobondapp/app/social/presentation/utils/enrich_social_follow_state.dart';
 import 'package:bimobondapp/app/social/presentation/utils/social_follow_toggle.dart';
 import 'package:bimobondapp/app/social/presentation/utils/suggestion_follow_toggle.dart';
 import 'package:bimobondapp/app/social/presentation/widgets/profile_follow_button.dart';
@@ -163,37 +165,58 @@ class _MyFollowersScreenState extends State<MyFollowersScreen> {
     if (!mounted) return;
 
     result.fold(
-      (failure) => setState(() {
-        _isLoading = false;
-        _isLoadingMore = false;
-        _hasLoaded = true;
-        _errorMessage = failure.message;
-        if (loadMore) _page--;
-      }),
-      (page) => setState(() {
-        _isLoading = false;
-        _isLoadingMore = false;
-        _hasLoaded = true;
-        _errorMessage = null;
-        _hasReachedMax = page.hasReachedMax;
-
-        final normalized = _mergeFollowers(
-          page.users.map(_normalizeFollower).toList(),
+      (failure) {
+        setState(() {
+          _isLoading = false;
+          _isLoadingMore = false;
+          _hasLoaded = true;
+          _errorMessage = failure.message;
+          if (loadMore) _page--;
+        });
+      },
+      (page) {
+        _applyFollowersPage(
+          page,
+          userId: userId,
           refresh: refresh,
         );
-
-        if (refresh) {
-          _followers
-            ..clear()
-            ..addAll(normalized);
-        } else {
-          final existingIds = _followers.map((user) => user.id).toSet();
-          _followers.addAll(
-            normalized.where((user) => !existingIds.contains(user.id)),
-          );
-        }
-      }),
+      },
     );
+  }
+
+  Future<void> _applyFollowersPage(
+    SocialUserPageEntity page, {
+    required String userId,
+    required bool refresh,
+  }) async {
+    final normalized = _mergeFollowers(
+      page.users.map(_normalizeFollower).toList(),
+      refresh: refresh,
+    );
+    final enriched = await enrichSocialFollowState(
+      normalized,
+      currentUserId: userId,
+    );
+    if (!mounted) return;
+
+    setState(() {
+      _isLoading = false;
+      _isLoadingMore = false;
+      _hasLoaded = true;
+      _errorMessage = null;
+      _hasReachedMax = page.hasReachedMax;
+
+      if (refresh) {
+        _followers
+          ..clear()
+          ..addAll(enriched);
+      } else {
+        final existingIds = _followers.map((user) => user.id).toSet();
+        _followers.addAll(
+          enriched.where((user) => !existingIds.contains(user.id)),
+        );
+      }
+    });
   }
 
   Future<void> _loadSuggestions() async {

@@ -11,6 +11,8 @@ import '../../bloc/live_room/live_room_state.dart';
 import 'live_room_host_sheet_chrome.dart';
 
 /// Host multi-guest / collaboration sheet (lives/mobile-api.md §10).
+///
+/// Opens with **بدء منافسة** (other LIVE hosts) plus guest invite / seats.
 class LiveRoomGuestsSheet {
   const LiveRoomGuestsSheet._();
 
@@ -19,6 +21,9 @@ class LiveRoomGuestsSheet {
     final repo = context.read<LiveSessionRepository>();
     final state = bloc.state;
     if (state is! LiveRoomReady) return Future.value();
+
+    // Any entry into استضافة غرفة dismisses the bottom battle-request prompt.
+    bloc.add(const LiveRoomCollabTapped());
 
     return LiveRoomHostSheetChrome.show(
       context: context,
@@ -117,7 +122,8 @@ class _LiveRoomGuestsSheetBodyState extends State<_LiveRoomGuestsSheetBody>
     required String success,
   }) async {
     if (_busy) return;
-    if (_battle?.isActive == true) {
+    final ready = context.read<LiveRoomBloc>().state;
+    if (ready is LiveRoomReady && ready.isBattleActive) {
       snack('هناك جولة منافسة نشطة بالفعل');
       return;
     }
@@ -129,16 +135,19 @@ class _LiveRoomGuestsSheetBodyState extends State<_LiveRoomGuestsSheetBody>
       context.read<LiveRoomBloc>().add(LiveRoomBattleChanged(battle));
       snack(success);
     } catch (e) {
+      if (!mounted) return;
       if (isAlreadyInBattleError(e)) {
-        final existing = await _loadBattleSafely();
-        if (mounted && existing != null && existing.isActive) {
-          setState(() => _battle = existing);
-          context.read<LiveRoomBloc>().add(LiveRoomBattleChanged(existing));
-          snack('المنافسة الجارية ما زالت مفتوحة');
-          return;
-        }
+        try {
+          final existing = await repository.loadBattle(widget.liveId);
+          if (mounted && existing != null && existing.isActive) {
+            setState(() => _battle = existing);
+            context.read<LiveRoomBloc>().add(LiveRoomBattleChanged(existing));
+            snack('المنافسة الجارية ما زالت مفتوحة');
+            return;
+          }
+        } catch (_) {}
       }
-      if (mounted) snack(noOpponentsMessage(e));
+      snack(noOpponentsMessage(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -178,8 +187,6 @@ class _LiveRoomGuestsSheetBodyState extends State<_LiveRoomGuestsSheetBody>
     final pending = _guests.where((g) => g.isPending).toList();
     final active = _guests.where((g) => g.isActive).toList();
 
-    // The bloc keeps the roster fresh off `liveGuestUpdate`; mirroring it here
-    // means a viewer's request lands in the open sheet without a manual pull.
     return BlocListener<LiveRoomBloc, LiveRoomState>(
       listenWhen: (previous, current) =>
           current is LiveRoomReady &&
@@ -194,7 +201,7 @@ class _LiveRoomGuestsSheetBodyState extends State<_LiveRoomGuestsSheetBody>
         });
       },
       child: LiveRoomHostSheetChrome(
-        title: 'الضيوف والتعاون',
+        title: 'استضافة غرفة',
         actions: [
           IconButton(
             onPressed: _loading || _busy ? null : _load,
@@ -290,7 +297,7 @@ class _LiveRoomGuestsSheetBodyState extends State<_LiveRoomGuestsSheetBody>
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const Text(
-                'المعركة جارية الآن',
+                'المنافسة جارية الآن',
                 style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w800,
@@ -328,13 +335,13 @@ class _LiveRoomGuestsSheetBodyState extends State<_LiveRoomGuestsSheetBody>
                               liveId: widget.liveId,
                               battleId: battle.id,
                             ),
-                            success: 'تم إنهاء المعركة',
+                            success: 'تم إنهاء المنافسة',
                           ),
                     style: FilledButton.styleFrom(
                       foregroundColor: Colors.red.shade100,
                       backgroundColor: Colors.red.shade900,
                     ),
-                    child: const Text('إنهاء المعركة'),
+                    child: const Text('إنهاء المنافسة'),
                   ),
                 ],
               ),
@@ -348,7 +355,7 @@ class _LiveRoomGuestsSheetBodyState extends State<_LiveRoomGuestsSheetBody>
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const Text(
-          'المعارك المباشرة',
+          'بدء منافسة',
           style: TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.w800,
@@ -357,70 +364,72 @@ class _LiveRoomGuestsSheetBodyState extends State<_LiveRoomGuestsSheetBody>
         ),
         const SizedBox(height: 6),
         const Text(
-          'اختر مضيفاً مباشراً أو دع الخادم يجد خصماً متاحاً.',
+          'اختر مضيفاً لديه بث مباشر الآن لتتنافس معه.',
           style: TextStyle(color: Colors.white54, fontSize: 12),
         ),
         const SizedBox(height: 10),
-        if (_opponents.isEmpty)
-          const Padding(
-            padding: EdgeInsets.only(bottom: 10),
-            child: Text(
-              'لا يوجد بث مباشر آخر متاح للمنافسة الآن',
-              style: TextStyle(color: Colors.white54, fontSize: 12),
-            ),
-          )
-        else
-          FilledButton.icon(
-            onPressed: _busy
-                ? null
-                : () => _runBattle(
-                    () => repository.matchBattle(widget.liveId),
-                    success: 'بدأت المعركة',
-                  ),
-            icon: const Icon(Icons.bolt),
-            label: const Text('مطابقة تلقائية وبدء المعركة'),
-          ),
-        if (_opponents.isNotEmpty) ...[
-          const SizedBox(height: 10),
-          ..._opponents
-              .take(8)
-              .map(
-                (opponent) => ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: CircleAvatar(
-                    backgroundImage: opponent.hostAvatar?.isNotEmpty == true
-                        ? NetworkImage(opponent.hostAvatar!)
-                        : null,
-                    child: opponent.hostAvatar?.isNotEmpty == true
-                        ? null
-                        : const Icon(Icons.person),
-                  ),
-                  title: Text(
-                    opponent.hostName,
-                    style: const TextStyle(color: Colors.white),
-                  ),
-                  subtitle: Text(
-                    '${opponent.viewers} مشاهد · ${opponent.title}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Colors.white54, fontSize: 12),
-                  ),
-                  trailing: OutlinedButton(
-                    onPressed: _busy
-                        ? null
-                        : () => _runBattle(
-                            () => repository.startBattle(
-                              liveId: widget.liveId,
-                              opponentLiveId: opponent.liveId,
-                            ),
-                            success: 'بدأت المعركة مع ${opponent.hostName}',
-                          ),
-                    child: const Text('تحدّي'),
-                  ),
+        FilledButton.icon(
+          onPressed: _busy
+              ? null
+              : () => _runBattle(
+                  () => repository.matchBattle(widget.liveId),
+                  success: 'بدأت جولة المنافسة',
                 ),
-              ),
+          icon: const Icon(Icons.bolt),
+          label: const Text('مطابقة سريعة'),
+        ),
+        if (_opponents.isEmpty) ...[
+          const SizedBox(height: 12),
+          const Text(
+            'لا يوجد بث مباشر آخر متاح للمنافسة الآن',
+            style: TextStyle(color: Colors.white54, fontSize: 13),
+          ),
+        ] else ...[
+          const SizedBox(height: 12),
+          _sectionTitle('بثوث مباشرة (${_opponents.length})'),
+          ..._opponents.take(12).map(_opponentTile),
         ],
       ],
+    );
+  }
+
+  Widget _opponentTile(LiveBattleOpponent opponent) {
+    final avatar = opponent.hostAvatar;
+    final hasAvatar = avatar != null && avatar.isNotEmpty;
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: CircleAvatar(
+        radius: 22,
+        backgroundColor: Colors.white12,
+        backgroundImage: hasAvatar ? NetworkImage(avatar) : null,
+        child: hasAvatar
+            ? null
+            : const Icon(Icons.person, color: Colors.white70),
+      ),
+      title: Text(
+        opponent.hostName,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+      ),
+      subtitle: Text(
+        '${opponent.viewers} مشاهد · ${opponent.title}',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(color: Colors.white54, fontSize: 12),
+      ),
+      trailing: FilledButton(
+        onPressed: _busy
+            ? null
+            : () => _runBattle(
+                () => repository.startBattle(
+                  liveId: widget.liveId,
+                  opponentLiveId: opponent.liveId,
+                ),
+                success: 'بدأت المنافسة مع ${opponent.hostName}',
+              ),
+        child: const Text('تحدّي'),
+      ),
     );
   }
 

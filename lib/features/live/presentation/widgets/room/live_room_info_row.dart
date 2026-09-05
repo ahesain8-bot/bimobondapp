@@ -15,16 +15,26 @@ import 'live_room_elapsed_timer.dart';
 import 'live_room_pill.dart';
 import 'live_room_ranking_sheet.dart';
 
-/// Second header row: ranking + gallery (start), green invite (end).
+/// Second header row — TikTok creator chips under the top bar:
+/// ranking · gallery · timer …… invite
 class LiveRoomInfoRow extends StatelessWidget {
   const LiveRoomInfoRow({super.key});
 
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<LiveRoomBloc, LiveRoomState>(
-      buildWhen: (previous, current) =>
-          current is LiveRoomReady &&
-          (previous is! LiveRoomReady || previous.session != current.session),
+      buildWhen: (previous, current) {
+        if (current is! LiveRoomReady) return false;
+        if (previous is! LiveRoomReady) return true;
+        final a = previous.session;
+        final b = current.session;
+        return a.hourlyRankingLabel != b.hourlyRankingLabel ||
+            a.hourlyRank != b.hourlyRank ||
+            a.galleryCurrent != b.galleryCurrent ||
+            a.galleryTotal != b.galleryTotal ||
+            a.guestInviteCount != b.guestInviteCount ||
+            a.title != b.title;
+      },
       builder: (context, state) {
         if (state is! LiveRoomReady) {
           return const SizedBox.shrink();
@@ -33,45 +43,47 @@ class LiveRoomInfoRow extends StatelessWidget {
         final session = state.session;
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Row(
+          child: Directionality(
             textDirection: TextDirection.ltr,
-            children: [
-              _RankingChip(
-                label: session.hourlyRankingLabel,
-                onTap: () {
-                  context.read<LiveRoomBloc>().add(
-                    const LiveRoomRankingTapped(),
-                  );
-                  LiveRoomRankingSheet.show(context);
-                },
-              ),
-              const SizedBox(width: 6),
-              GestureDetector(
-                onTap: () => LiveRoomGallerySheet.show(context),
-                child: LiveRoomPill(
-                  height: AppSizes.roomChipHeight,
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  color: AppColors.overlayPillSoft,
-                  child: Text(
-                    '${session.galleryCurrent}/${session.galleryTotal} المعرض',
-                    style: AppTextStyles.roomChip,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                _RankingChip(
+                  label: session.hourlyRankingLabel,
+                  onTap: () {
+                    context.read<LiveRoomBloc>().add(
+                      const LiveRoomRankingTapped(),
+                    );
+                    LiveRoomRankingSheet.show(context);
+                  },
+                ),
+                const SizedBox(width: 6),
+                GestureDetector(
+                  onTap: () => LiveRoomGallerySheet.show(context),
+                  child: LiveRoomPill(
+                    height: AppSizes.roomChipHeight,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    color: AppColors.overlayPillSoft,
+                    child: Text(
+                      '${session.galleryCurrent}/${session.galleryTotal}',
+                      style: AppTextStyles.roomChip,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 6),
-              // Elapsed live time (counts up from 00:00 once streaming).
-              const LiveRoomElapsedTimer(),
-              const Spacer(),
-              _InviteChip(
-                count: session.guestInviteCount,
-                onTap: () {
-                  context.read<LiveRoomBloc>().add(
-                    const LiveRoomInviteTapped(),
-                  );
-                  LiveRoomGuestsSheet.show(context);
-                },
-              ),
-            ],
+                const SizedBox(width: 6),
+                const LiveRoomElapsedTimer(),
+                const Spacer(),
+                _InviteChip(
+                  count: session.guestInviteCount,
+                  onTap: () {
+                    context.read<LiveRoomBloc>().add(
+                      const LiveRoomInviteTapped(),
+                    );
+                    LiveRoomGuestsSheet.show(context);
+                  },
+                ),
+              ],
+            ),
           ),
         );
       },

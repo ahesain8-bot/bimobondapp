@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:video_player/video_player.dart';
 
-import '../../../../core/utils/app_media_cache_manager.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/services/fake_livekit_service.dart'
     show LiveKitConnectionState, LiveKitService;
@@ -18,16 +17,12 @@ class LiveVideoPlayer extends StatefulWidget {
   final bool isActive;
 
   final BoxFit fit;
-  final bool compact;
-  final bool liveKitOnly;
 
   const LiveVideoPlayer({
     super.key,
     required this.live,
     this.isActive = true,
     this.fit = BoxFit.cover,
-    this.compact = false,
-    this.liveKitOnly = false,
   });
 
   @override
@@ -54,7 +49,7 @@ class _LiveVideoPlayerState extends State<LiveVideoPlayer> {
     _liveKitSub = liveKit.stateStream.listen(_onLiveKitState);
     final room = liveKit.room;
     if (room != null) _attachRoom(room);
-    if (widget.isActive && !widget.liveKitOnly) _init();
+    if (widget.isActive) _init();
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
@@ -128,15 +123,23 @@ class _LiveVideoPlayerState extends State<LiveVideoPlayer> {
       final capWidth = hints?.subscribeWidth ?? 1280;
       final capHeight = hints?.subscribeHeight ?? 720;
       final dims = isActive
-          ? widget.compact
-                ? const VideoDimensions(640, 960)
-                : VideoDimensions(capWidth, capHeight)
+          ? VideoDimensions(capWidth, capHeight)
           : const VideoDimensions(854, 480);
-      final quality = isActive
-          ? widget.compact
-                ? VideoQuality.MEDIUM
-                : VideoQuality.HIGH
-          : VideoQuality.LOW;
+      final quality = isActive ? VideoQuality.HIGH : VideoQuality.LOW;
+      // Skip no-op renegotiation — re-applying the same floor mid-PK stalls
+      // decode and looks like a freeze/reload.
+      final currentDims = pub.dimensions;
+      final alreadyAtFloor =
+          pub.videoQuality == quality &&
+          currentDims != null &&
+          currentDims.width >= dims.width &&
+          currentDims.height >= dims.height;
+      if (alreadyAtFloor) {
+        debugPrint(
+          '[VIDEO-FIX] VIEWER-FLOOR: skip (already ${dims.width}x${dims.height} ${quality.name})',
+        );
+        return;
+      }
       debugPrint(
         '[VIDEO-FIX] VIEWER-FLOOR: liveId=${widget.live.id}'
         '  isActive=$isActive'
@@ -197,8 +200,7 @@ class _LiveVideoPlayerState extends State<LiveVideoPlayer> {
     if (state == LiveKitConnectionState.connected) {
       final room = liveKit.room;
       if (room != null && room != _room) _attachRoom(room);
-      if (!widget.liveKitOnly &&
-          widget.isActive &&
+      if (widget.isActive &&
           _controller == null &&
           !_initializing &&
           !_hasError) {
@@ -255,11 +257,10 @@ class _LiveVideoPlayerState extends State<LiveVideoPlayer> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.live.id != widget.live.id) {
       _disposeController();
-      if (widget.isActive && !widget.liveKitOnly) _init();
-    } else if (oldWidget.isActive != widget.isActive ||
-        oldWidget.compact != widget.compact) {
+      if (widget.isActive) _init();
+    } else if (oldWidget.isActive != widget.isActive) {
       unawaited(_applyQualityFloor(widget.isActive));
-      if (widget.isActive && !widget.liveKitOnly) {
+      if (widget.isActive) {
         if (_controller == null) {
           _init();
         } else {
@@ -279,7 +280,6 @@ class _LiveVideoPlayerState extends State<LiveVideoPlayer> {
   }
 
   Future<void> _init() async {
-    if (widget.liveKitOnly) return;
     final gen = ++_gen;
     if (!mounted) return;
 
@@ -309,10 +309,7 @@ class _LiveVideoPlayerState extends State<LiveVideoPlayer> {
 
     VideoPlayerController? controller;
     try {
-      final cachedFile = await AppMediaCacheManager.getCachedVideoFile(url);
-      controller = cachedFile != null
-          ? VideoPlayerController.file(cachedFile)
-          : VideoPlayerController.networkUrl(Uri.parse(url));
+      controller = VideoPlayerController.networkUrl(Uri.parse(url));
       await controller.initialize();
       if (!mounted || gen != _gen || !widget.isActive) {
         await controller.dispose();
@@ -375,7 +372,11 @@ class _LiveVideoPlayerState extends State<LiveVideoPlayer> {
           fit: widget.fit == BoxFit.cover
               ? VideoViewFit.cover
               : VideoViewFit.contain,
-          placeholderBuilder: (_) => _buildPlaceholderMedia(),
+          placeholderBuilder: (_) => AnimatedVideoPlaceholder(
+            seed: widget.live.id,
+            category: widget.live.category,
+            hostInitial: widget.live.hostName,
+          ),
         ),
       );
     }
@@ -396,17 +397,12 @@ class _LiveVideoPlayerState extends State<LiveVideoPlayer> {
       );
     }
 
-    return _buildPlaceholderMedia();
-  }
-
-  Widget _buildPlaceholderMedia() {
     final thumbnailUrl = widget.live.thumbnailUrl;
     if (thumbnailUrl != null && thumbnailUrl.isNotEmpty) {
       return ColoredBox(
         color: Colors.black,
         child: CachedNetworkImage(
           imageUrl: thumbnailUrl,
-          cacheManager: AppMediaCacheManager.instance,
           fit: widget.fit,
           width: double.infinity,
           height: double.infinity,

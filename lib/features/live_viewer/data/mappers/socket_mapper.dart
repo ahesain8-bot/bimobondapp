@@ -18,8 +18,6 @@ class SocketMapper {
 
     final content =
         nested['content']?.toString() ?? nested['text']?.toString() ?? '';
-    final fullName = user?['fullName']?.toString();
-    final handle = user?['username']?.toString();
 
     final comment = CommentEntity(
       id:
@@ -31,9 +29,7 @@ class SocketMapper {
           fallbackLiveId ??
           '',
       userId: user?['id']?.toString() ?? nested['userId']?.toString() ?? '',
-      username: (fullName != null && fullName.trim().isNotEmpty)
-          ? fullName.trim()
-          : (handle ?? 'User'),
+      username: _displayName(user, fallback: 'User'),
       userAvatar: user?['avatarUrl']?.toString(),
       content: content,
       createdAt: _parseDate(nested['createdAt']) ?? DateTime.now(),
@@ -119,11 +115,11 @@ class SocketMapper {
       giftId: gift?['id']?.toString() ?? map['giftId']?.toString() ?? '',
       liveId: liveId,
       senderId: sender?['id']?.toString() ?? map['senderId']?.toString() ?? '',
-      senderName:
-          sender?['username']?.toString() ??
-          sender?['fullName']?.toString() ??
-          map['senderName']?.toString() ??
-          'User',
+      senderName: _displayName(
+        sender,
+        flat: map['senderName']?.toString(),
+        fallback: 'User',
+      ),
       senderAvatar: sender?['avatarUrl']?.toString(),
       quantity: _asInt(map['quantity']) ?? _asInt(gift?['quantity']) ?? 1,
       totalCost:
@@ -274,10 +270,7 @@ class SocketMapper {
     return UserJoinedEvent(
       liveId: map['liveId']?.toString() ?? fallbackLiveId ?? '',
       userId: userId,
-      username:
-          user['username']?.toString() ??
-          user['fullName']?.toString() ??
-          'User',
+      username: _displayName(user, fallback: 'User'),
       avatarUrl: user['avatarUrl']?.toString() ?? user['avatar']?.toString(),
       viewerCount: _viewerCount(map),
       timestamp: DateTime.now(),
@@ -350,6 +343,21 @@ class SocketMapper {
   }
 
   // ── Helpers ───────────────────────────────────────────
+
+  /// Prefer [fullName] over handle/[username] for live chat & gift labels.
+  static String _displayName(
+    Map<String, dynamic>? user, {
+    String? flat,
+    String fallback = 'User',
+  }) {
+    final full = user?['fullName']?.toString().trim();
+    if (full != null && full.isNotEmpty) return full;
+    final flatTrimmed = flat?.trim();
+    if (flatTrimmed != null && flatTrimmed.isNotEmpty) return flatTrimmed;
+    final handle = user?['username']?.toString().trim();
+    if (handle != null && handle.isNotEmpty) return handle;
+    return fallback;
+  }
 
   static Map<String, dynamic>? _asMap(dynamic value) {
     if (value is Map<String, dynamic>) return value;

@@ -399,8 +399,9 @@ class _MediaStudioPreviewState extends State<MediaStudioPreview> {
           return Image.file(
             widget.file,
             fit: widget.fit,
-            width: double.infinity,
-            height: double.infinity,
+            width: constraints.maxWidth,
+            height: constraints.maxHeight,
+            alignment: Alignment.center,
             gaplessPlayback: true,
             filterQuality: FilterQuality.low,
             cacheWidth: targetW,

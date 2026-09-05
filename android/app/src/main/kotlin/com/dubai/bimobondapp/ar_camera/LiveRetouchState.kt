@@ -5,13 +5,11 @@ import com.dubai.bimobondapp.beauty.BeautyFilterProcessor
 import kotlin.math.roundToInt
 
 /**
- * Live camera retouch sliders (−1…1, 0 = original). Applied in GPU preview and
+ * Live camera retouch sliders (−1.5…1.5, 0 = original). Applied in GPU preview and
  * baked into captures via the same GL pipeline.
  *
- * [liveBaseline] color grade (contrast max, saturation +10, brightness −47,
- * exposure +6, warmth −8, highlights +8, shadows +10) is for the **back
- * camera only** while Retouch/Magic is Off. Front stays neutral unless Magic
- * or a color filter pushes different values.
+ * [liveBaseline] / Magic On defaults match the TikTok-style beauty preset
+ * (smooth 50, contrast 39, shape −83, …).
  */
 data class LiveRetouchAdjustments(
     val saturation: Float = 0f,
@@ -29,7 +27,7 @@ data class LiveRetouchAdjustments(
     val eyes: Float = 0f,
     /** Teeth tone: −1 dull, 0 natural, +1 whiter. */
     val tooth: Float = 0f,
-    /** Lip thickness: −1 thinner, 0 natural, +1 thicker. */
+    /** Lip thickness / openness: −1 thinner, 0 natural, +1 fuller & more open. */
     val mouth: Float = 0f,
 ) {
     val hasColor: Boolean
@@ -62,7 +60,7 @@ data class LiveRetouchAdjustments(
     }
 
     fun toProcessorAdjustments(): BeautyFilterProcessor.Adjustments {
-        fun level(v: Float) = (v * 100f).roundToInt().coerceIn(-100, 100)
+        fun level(v: Float) = (v * 100f).roundToInt().coerceIn(-150, 150)
         return BeautyFilterProcessor.Adjustments(
             saturation = level(saturation),
             brightness = level(brightness),
@@ -76,14 +74,14 @@ data class LiveRetouchAdjustments(
     }
 
     companion object {
-        /** Face slider labels (value×100) → back-camera Retouch-Off baseline. */
-        const val DEFAULT_SATURATION = 0.10f
-        const val DEFAULT_BRIGHTNESS = -0.47f
-        const val DEFAULT_CONTRAST = 1.0f
-        const val DEFAULT_EXPOSURE = 0.06f
-        const val DEFAULT_WHITE_BALANCE = -0.08f
-        const val DEFAULT_HIGHLIGHTS = 0.08f
-        const val DEFAULT_SHADOWS = 0.10f
+        /** Face slider labels (value×100) → TikTok-style beauty color baseline. */
+        const val DEFAULT_SATURATION = -0.07f
+        const val DEFAULT_BRIGHTNESS = -0.15f
+        const val DEFAULT_CONTRAST = 0.39f
+        const val DEFAULT_EXPOSURE = -0.53f
+        const val DEFAULT_WHITE_BALANCE = -0.04f
+        const val DEFAULT_HIGHLIGHTS = -0.22f
+        const val DEFAULT_SHADOWS = -0.50f
 
         fun neutral(): LiveRetouchAdjustments = LiveRetouchAdjustments()
 
@@ -182,13 +180,19 @@ object LiveRetouchState {
     @Volatile
     var toothRegion: FloatArray = floatArrayOf(0f, 0f, 0f, 0f)
 
+    /** Cheek apples for blush (always when makeup blush is on / shape warp). */
+    @Volatile
+    var blushCheekL: FloatArray = floatArrayOf(0f, 0f)
+
+    @Volatile
+    var blushCheekR: FloatArray = floatArrayOf(0f, 0f)
+
+    @Volatile
+    var blushRadius: Float = 0f
+
     fun clear() {
-        // Back camera keeps Retouch-Off color baseline; front stays neutral.
-        adjustments = if (ArCameraBridge.isFrontCamera) {
-            LiveRetouchAdjustments.neutral()
-        } else {
-            LiveRetouchAdjustments.liveBaseline()
-        }
+        // Disabled retouch must be pixel-neutral on both cameras.
+        adjustments = LiveRetouchAdjustments.neutral()
         noseWingL = floatArrayOf(0f, 0f)
         noseWingR = floatArrayOf(0f, 0f)
         noseRadius = 0f
@@ -202,6 +206,9 @@ object LiveRetouchState {
         mouthRadius = 0f
         toothVisibility = 0f
         toothRegion = floatArrayOf(0f, 0f, 0f, 0f)
+        blushCheekL = floatArrayOf(0f, 0f)
+        blushCheekR = floatArrayOf(0f, 0f)
+        blushRadius = 0f
     }
 
     /** Maps nose alar wings for live slim/expand (−1 expand, +1 slim). */
@@ -210,7 +217,9 @@ object LiveRetouchState {
         imageWidth: Int,
         imageHeight: Int,
     ) {
-        if (kotlin.math.abs(adjustments.nose) < 0.01f || snapshot == null ||
+        if ((kotlin.math.abs(adjustments.nose) < 0.01f &&
+                !LiveBeautyState.needsContourNose()) ||
+            snapshot == null ||
             imageWidth <= 0 || imageHeight <= 0
         ) {
             noseRadius = 0f
@@ -254,16 +263,20 @@ object LiveRetouchState {
     /**
      * Shape: left/right cheek pads only (−1 expand, +1 slim). Centers sit on
      * the cheek apples so nose and lips are not pulled with the sides.
+     * Also refreshes blush cheek anchors whenever makeup blush is active.
      */
     fun updateJawLandmarks(
         snapshot: FaceLandmarkSnapshot?,
         imageWidth: Int,
         imageHeight: Int,
     ) {
-        if (kotlin.math.abs(adjustments.shape) < 0.01f || snapshot == null ||
+        val needShape = kotlin.math.abs(adjustments.shape) >= 0.01f
+        val needBlush = LiveBeautyState.needsBlushMakeup()
+        if ((!needShape && !needBlush) || snapshot == null ||
             imageWidth <= 0 || imageHeight <= 0
         ) {
-            jawRadius = 0f
+            if (!needShape) jawRadius = 0f
+            if (!needBlush) blushRadius = 0f
             return
         }
         val leftCheek = snapshot.landmarks.getOrNull(MediaPipeLandmarkIndices.LEFT_CHEEK)
@@ -273,7 +286,8 @@ object LiveRetouchState {
             ?: averageZone(snapshot, MediaPipeLandmarkIndices.RIGHT_JAW_ZONE)
             ?: snapshot.landmarks.getOrNull(397)
         if (leftCheek == null || rightCheek == null) {
-            jawRadius = 0f
+            if (!needShape) jawRadius = 0f
+            if (!needBlush) blushRadius = 0f
             return
         }
         // Bias slightly toward the jaw so the pad covers cheek → lower cheek,
@@ -285,24 +299,44 @@ object LiveRetouchState {
         val left = PointF(leftCheek.x, targetY)
         val right = PointF(rightCheek.x, targetY)
         val front = ArCameraBridge.isFrontCamera
-        jawWingL = FaceCoordinateMapper.toWarpUv(
+        val uvL = FaceCoordinateMapper.toWarpUv(
             left.x, left.y, imageWidth, imageHeight, isFrontCamera = front,
         )
-        jawWingR = FaceCoordinateMapper.toWarpUv(
+        val uvR = FaceCoordinateMapper.toWarpUv(
             right.x, right.y, imageWidth, imageHeight, isFrontCamera = front,
         )
         val faceWidth = (right.x - left.x).coerceAtLeast(1f)
-        // Soft cheek pad — slightly wider so the fade is gentle (no stamp).
-        jawRadius = FaceCoordinateMapper.toWarpRadiusX(faceWidth * 0.24f, imageWidth)
+        if (needShape) {
+            jawWingL = uvL
+            jawWingR = uvR
+            jawRadius = FaceCoordinateMapper.toWarpRadiusX(faceWidth * 0.24f, imageWidth)
+        } else {
+            jawRadius = 0f
+        }
+        if (needBlush) {
+            // Higher on the apple for blush (less jaw bias than shape warp).
+            val blushY = cheekY * 0.85f + chinY * 0.15f
+            blushCheekL = FaceCoordinateMapper.toWarpUv(
+                leftCheek.x, blushY, imageWidth, imageHeight, isFrontCamera = front,
+            )
+            blushCheekR = FaceCoordinateMapper.toWarpUv(
+                rightCheek.x, blushY, imageWidth, imageHeight, isFrontCamera = front,
+            )
+            blushRadius = FaceCoordinateMapper.toWarpRadiusX(faceWidth * 0.18f, imageWidth)
+        } else {
+            blushRadius = 0f
+        }
     }
 
-    /** Eye centers for lid open/close (−1 closed, +1 open). */
+    /** Eye centers for lid open/close (−1 closed, +1 open) and eye makeup. */
     fun updateEyeLandmarks(
         snapshot: FaceLandmarkSnapshot?,
         imageWidth: Int,
         imageHeight: Int,
     ) {
-        if (kotlin.math.abs(adjustments.eyes) < 0.01f || snapshot == null ||
+        val needEyes = kotlin.math.abs(adjustments.eyes) >= 0.01f ||
+            LiveBeautyState.needsEyeMakeup()
+        if (!needEyes || snapshot == null ||
             imageWidth <= 0 || imageHeight <= 0
         ) {
             eyeRadius = 0f
@@ -337,14 +371,15 @@ object LiveRetouchState {
         eyeRadius = FaceCoordinateMapper.toWarpRadiusX(eyeW * 1.05f, imageWidth)
     }
 
-    /** Mouth center for lip thick/thin (−1 thinner, +1 thicker). */
+    /** Mouth center for lip thick/thin (−1 thinner, +1 thicker) and lipstick. */
     fun updateMouthLandmarks(
         snapshot: FaceLandmarkSnapshot?,
         imageWidth: Int,
         imageHeight: Int,
     ) {
         if ((kotlin.math.abs(adjustments.mouth) < 0.01f &&
-                kotlin.math.abs(adjustments.tooth) < 0.01f) ||
+                kotlin.math.abs(adjustments.tooth) < 0.01f &&
+                !LiveBeautyState.needsMouthAnchors()) ||
             snapshot == null ||
             imageWidth <= 0 || imageHeight <= 0
         ) {
@@ -367,7 +402,16 @@ object LiveRetouchState {
             cx, cy, imageWidth, imageHeight, isFrontCamera = front,
         )
         val mouthW = (right.x - left.x).coerceAtLeast(1f)
-        mouthRadius = FaceCoordinateMapper.toWarpRadiusX(mouthW * 0.58f, imageWidth)
+        // Lipstick-only: tighter radius so tint stays on the lips.
+        val lipScale = if (LiveBeautyState.needsLipMakeup() &&
+            kotlin.math.abs(adjustments.mouth) < 0.01f &&
+            kotlin.math.abs(adjustments.tooth) < 0.01f
+        ) {
+            0.50f
+        } else {
+            0.58f
+        }
+        mouthRadius = FaceCoordinateMapper.toWarpRadiusX(mouthW * lipScale, imageWidth)
 
         val innerTop =
             snapshot.landmarks.getOrNull(MediaPipeLandmarkIndices.MOUTH_INNER_TOP)

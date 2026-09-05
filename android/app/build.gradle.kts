@@ -105,4 +105,8 @@ dependencies {
 
     // OpenCV Android SDK (Maven Central) — still-image beauty pipeline
     implementation("org.opencv:opencv:4.9.0")
+
+    // Same WebRTC as flutter_webrtc / livekit — needed so app Kotlin can
+    // implement VideoCapturer for FaceWarp → LiveKit beauty publish.
+    implementation("io.github.webrtc-sdk:android:144.7559.09")
 }

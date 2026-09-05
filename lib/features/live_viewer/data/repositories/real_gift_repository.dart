@@ -88,6 +88,15 @@ class RealGiftRepository implements GiftRepository {
       );
 
       final total = gift.coinCost * quantity;
+      final senderMap = payload['sender'] is Map
+          ? Map<String, dynamic>.from(payload['sender'] as Map)
+          : null;
+      final fullName = senderMap?['fullName']?.toString().trim();
+      final resolvedSenderName = (fullName != null && fullName.isNotEmpty)
+          ? fullName
+          : (payload['senderName']?.toString() ??
+                senderMap?['username']?.toString() ??
+                'You');
       final sent = GiftSentEntity(
         id:
             payload['id']?.toString() ??
@@ -95,18 +104,15 @@ class RealGiftRepository implements GiftRepository {
         giftId: giftId,
         liveId: liveId,
         senderId: payload['senderId']?.toString() ?? '',
-        senderName: payload['senderName']?.toString() ?? 'You',
-        senderAvatar: payload['senderAvatar']?.toString(),
+        senderName: resolvedSenderName,
+        senderAvatar: payload['senderAvatar']?.toString() ??
+            senderMap?['avatarUrl']?.toString(),
         quantity: quantity,
         totalCost: _asInt(payload['totalCost']) ?? total,
         sentAt: DateTime.now(),
         giftDetails: gift,
         senderGifterLevel: _asInt(
-          payload['sender'] is Map
-              ? Map<String, dynamic>.from(
-                  payload['sender'] as Map,
-                )['gifterLevel']
-              : payload['gifterLevel'],
+          senderMap?['gifterLevel'] ?? payload['gifterLevel'],
         ),
       );
 
@@ -153,10 +159,11 @@ class RealGiftRepository implements GiftRepository {
                   userMap?['id']?.toString() ??
                   item['userId']?.toString() ??
                   '',
-              username:
-                  userMap?['username']?.toString() ??
-                  userMap?['fullName']?.toString() ??
-                  'User',
+              username: (() {
+                final full = userMap?['fullName']?.toString().trim();
+                if (full != null && full.isNotEmpty) return full;
+                return userMap?['username']?.toString() ?? 'User';
+              })(),
               avatarUrl: userMap?['avatarUrl']?.toString(),
               totalCoins: _asInt(item['coins'] ?? item['totalCoins']) ?? 0,
               rank: _asInt(item['rank']) ?? rank,

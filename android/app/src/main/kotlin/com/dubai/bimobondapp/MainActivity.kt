@@ -8,19 +8,18 @@ import com.dubai.bimobondapp.ar_camera.ArCameraBridge
 import com.dubai.bimobondapp.ar_camera.ArCameraController
 import com.dubai.bimobondapp.ar_camera.ArCameraOverlayPrefetcher
 import com.dubai.bimobondapp.ar_camera.ArCameraPlatformViewFactory
-import com.dubai.bimobondapp.ar_camera.ArCameraLivePublisher
+import com.dubai.bimobondapp.ar_camera.ArLiveBeautyPublisher
+import com.dubai.bimobondapp.ar_camera.ArLiveStartPopup
 import com.dubai.bimobondapp.ar_camera.ScreenOverlaySource
 import com.dubai.bimobondapp.ar_camera.parseOverlayMediaType
 import com.dubai.bimobondapp.ar_camera.FaceLandmarkerHolder
 import com.dubai.bimobondapp.ar_camera.LiveBeautyAdjustments
 import com.dubai.bimobondapp.ar_camera.LiveBeautyState
-import com.dubai.bimobondapp.ar_camera.LiveCaptureCapability
 import com.dubai.bimobondapp.ar_camera.LiveRetouchAdjustments
 import com.dubai.bimobondapp.ar_camera.LiveRetouchState
 import com.dubai.bimobondapp.beauty.BeautyFilterProcessor
 import com.dubai.bimobondapp.camera_engine.NativeCameraPlugin
 import com.dubai.bimobondapp.camera_engine.TemplateExportPlugin
-import com.dubai.bimobondapp.live_beauty.LiveBeautyPlugin
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -59,13 +58,6 @@ class MainActivity : FlutterActivity() {
 
         // Phase 1: CameraX → Flutter TextureRegistry (no effects / recording).
         NativeCameraPlugin.register(flutterEngine, this)
-        // Publish the already-rendered ar_camera frame; this bridge never opens
-        // another camera or changes the existing CameraX configuration.
-        ArCameraLivePublisher.register(flutterEngine)
-        // Native frame processing for the published LiveKit track. Without
-        // registering this channel, every beauty-sheet close throws a
-        // MissingPluginException and the selected beauty preset is ignored.
-        LiveBeautyPlugin.register(flutterEngine)
         // Template timeline → Media3 Transformer / MediaCodec export.
         TemplateExportPlugin.register(flutterEngine, this)
 
@@ -114,22 +106,6 @@ class MainActivity : FlutterActivity() {
                     "warmup" -> {
                         warmArCameraPipeline()
                         result.success(null)
-                    }
-                    // Flutter owns the one permission prompt used by both the
-                    // studio and live screens.  Bind only after it completes;
-                    // otherwise CameraX's request races permission_handler
-                    // and the same surface can be rebound twice.
-                    "permissionsGranted" -> {
-                        ArCameraController.onPermissionGranted()
-                        result.success(null)
-                    }
-                    // Whether this handset may start a broadcast at 1080p.
-                    // See LiveCaptureCapability for why core count and total
-                    // RAM are not the test.
-                    "allowsFullHdLive" -> {
-                        result.success(
-                            LiveCaptureCapability.allowsFullHd(applicationContext),
-                        )
                     }
                     "applyBeauty" -> {
                         val path = call.argument<String>("path")
@@ -423,8 +399,16 @@ class MainActivity : FlutterActivity() {
                     // before pushing a route that opens its own camera (live
                     // room) so the lens is never held twice at once.
                     "stopCamera" -> {
-                        ArCameraController.stop()
-                        result.success(null)
+                        if (ArLiveBeautyPublisher.isLivePublishingExclusive()) {
+                            android.util.Log.w(
+                                "ArCamera",
+                                "stopCamera ignored — live beauty publish owns CameraX",
+                            )
+                            result.success(null)
+                        } else {
+                            ArCameraController.stop()
+                            result.success(null)
+                        }
                     }
                     // Re-initialises the native camera after [stopCamera] when
                     // the camera screen becomes visible again.
@@ -445,10 +429,68 @@ class MainActivity : FlutterActivity() {
                         }
                         result.success(null)
                     }
+                    "attachBeautyVideoTrack" -> {
+                        val streamId = call.argument<String>("streamId")
+                        if (streamId.isNullOrBlank()) {
+                            result.error("bad_args", "streamId required", null)
+                            return@setMethodCallHandler
+                        }
+                        val width = call.argument<Int>("width") ?: 720
+                        val height = call.argument<Int>("height") ?: 1280
+                        val fps = call.argument<Int>("fps") ?: 24
+                        try {
+                            val map = ArLiveBeautyPublisher.attachBeautyTrack(
+                                this@MainActivity,
+                                streamId,
+                                width,
+                                height,
+                                fps,
+                                flutterEngine,
+                            )
+                            if (map == null) {
+                                result.error(
+                                    "beauty_track_failed",
+                                    "Could not attach AR beauty track",
+                                    null,
+                                )
+                            } else {
+                                result.success(map)
+                            }
+                        } catch (t: Throwable) {
+                            result.error(
+                                "beauty_track_failed",
+                                t.message ?: "unknown",
+                                null,
+                            )
+                        }
+                    }
+                    "releaseBeautyVideoTrack" -> {
+                        ArLiveBeautyPublisher.release()
+                        ArLiveBeautyPublisher.setLivePublishingExclusive(false)
+                        result.success(null)
+                    }
+                    "setLivePublishingExclusive" -> {
+                        val exclusive = call.argument<Boolean>("exclusive") ?: false
+                        ArLiveBeautyPublisher.setLivePublishingExclusive(exclusive)
+                        result.success(null)
+                    }
+                    "beautyPushedFrameCount" -> {
+                        result.success(ArLiveBeautyPublisher.pushedFrameCount())
+                    }
                     "setPreviewLetterbox" -> {
                         val top = call.argument<Int>("topPx") ?: 0
                         val bottom = call.argument<Int>("bottomPx") ?: 0
                         ArCameraBridge.setPreviewLetterbox(top, bottom)
+                        result.success(null)
+                    }
+                    "setLocalPreviewHidden" -> {
+                        val hidden = call.argument<Boolean>("hidden") ?: false
+                        ArCameraBridge.setLocalPreviewHidden(hidden)
+                        result.success(null)
+                    }
+                    "setLiveStartChrome" -> {
+                        val visible = call.argument<Boolean>("visible") ?: false
+                        ArLiveStartPopup.setVisible(this@MainActivity, visible)
                         result.success(null)
                     }
                     "setRetouchAdjustments" -> {
@@ -548,6 +590,43 @@ class MainActivity : FlutterActivity() {
                             }
                         }
                     }
+                    "tapToFocus" -> {
+                        val nx = (call.argument<Double>("x") ?: 0.5).toFloat()
+                        val ny = (call.argument<Double>("y") ?: 0.5).toFloat()
+                        ArCameraController.tapToFocus(nx, ny) { ok, error ->
+                            if (ok) {
+                                result.success(null)
+                            } else {
+                                result.error("focus_failed", error ?: "unknown", null)
+                            }
+                        }
+                    }
+                    "setMakeup" -> {
+                        fun level(key: String): Float =
+                            when (val raw = call.argument<Any>(key)) {
+                                is Double -> raw.toFloat()
+                                is Int -> raw.toFloat()
+                                is Long -> raw.toFloat()
+                                is Float -> raw
+                                else -> 0f
+                            }.coerceIn(0f, 1f)
+                        LiveBeautyState.applyMakeup(
+                            lipstick = level("lipstick"),
+                            blush = level("blush"),
+                            eyeliner = level("eyeliner"),
+                            eyeshadow = level("eyeshadow"),
+                            foundation = level("foundation"),
+                            contour = level("contour"),
+                            underEye = level("underEye"),
+                            brightenEye = level("brightenEye"),
+                            lipTintHex = call.argument<String>("lipTint"),
+                            blushHex = call.argument<String>("blushTint"),
+                            eyelinerHex = call.argument<String>("eyelinerTint"),
+                            eyeshadowHex = call.argument<String>("eyeshadowTint"),
+                        )
+                        ArCameraBridge.warpGlView?.requestRender()
+                        result.success(null)
+                    }
                     "playCountdownTick" -> {
                         val isFinal = call.argument<Boolean>("isFinal") ?: false
                         CountdownTonePlayer.play(isFinal)
@@ -560,6 +639,11 @@ class MainActivity : FlutterActivity() {
         ArCameraController.onRecordingAutoStopped = { path ->
             runOnUiThread {
                 arCameraChannel?.invokeMethod("onRecordingAutoStopped", path)
+            }
+        }
+        ArCameraBridge.liveStartEventSink = { method, args ->
+            runOnUiThread {
+                arCameraChannel?.invokeMethod(method, args)
             }
         }
     }
@@ -620,6 +704,9 @@ class MainActivity : FlutterActivity() {
 
     override fun onDestroy() {
         ArCameraController.onRecordingAutoStopped = null
+        ArCameraBridge.liveStartEventSink = null
+        ArLiveStartPopup.dismiss()
+        ArLiveBeautyPublisher.release()
         NativeCameraPlugin.dispose()
         CountdownTonePlayer.release()
         super.onDestroy()

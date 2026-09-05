@@ -1,5 +1,4 @@
 import 'package:camera/camera.dart';
-import 'package:bimobondapp/app/camera_engine/native_camera_controller.dart';
 import 'package:bimobondapp/app/auctions/data/datasources/auction_socket_service.dart';
 import 'package:bimobondapp/app/auctions/presentation/di/auctions_injector.dart'
     as auctions_di;
@@ -32,6 +31,7 @@ import '../bloc/live_room/live_room_state.dart';
 import '../effects/live_face_tracker.dart';
 import '../effects/live_face_tracker_scope.dart';
 import '../widgets/room/live_room_bottom_bar.dart';
+import '../widgets/room/live_room_camera_layer.dart';
 import '../widgets/room/live_room_chat_composer.dart';
 import '../widgets/room/live_room_chat_feed.dart';
 import '../widgets/room/live_room_competition_request_prompt.dart';
@@ -41,7 +41,6 @@ import '../widgets/room/live_room_stage.dart';
 import '../widgets/room/live_room_effects_panel.dart';
 import '../widgets/room/live_room_header.dart';
 import '../widgets/room/live_room_info_row.dart';
-import '../widgets/live_countdown_overlay.dart';
 import '../widgets/room/live_starting_indicator.dart';
 import '../widgets/vignette_layer.dart';
 import '../utils/live_screen_wakelock.dart';
@@ -54,7 +53,7 @@ class LiveRoomPage extends StatefulWidget {
     super.key,
     this.title,
     this.initialCamera,
-    this.initialNativeCamera,
+    this.useArBeautyCamera = false,
   });
 
   /// Optional title entered on the start screen.
@@ -64,8 +63,8 @@ class LiveRoomPage extends StatefulWidget {
   /// Handed over so the room reuses the same lens (no reopen, no flicker).
   final CameraController? initialCamera;
 
-  /// CameraX/GPU camera already running on Android's start-live screen.
-  final NativeCameraController? initialNativeCamera;
+  /// Android: stream FaceWarp beauty frames via LiveKit (no raw camera track).
+  final bool useArBeautyCamera;
 
   @override
   State<LiveRoomPage> createState() => _LiveRoomPageState();
@@ -79,7 +78,6 @@ class _LiveRoomPageState extends State<LiveRoomPage>
   late final LiveFaceTracker _faceTracker;
   late final DateTime _startIndicatorDeadline;
   var _depsReady = false;
-  var _showStartCountdown = true;
 
   @override
   void initState() {
@@ -135,7 +133,7 @@ class _LiveRoomPageState extends State<LiveRoomPage>
           LiveRoomStarted(
             title: widget.title,
             initialCamera: widget.initialCamera,
-            initialNativeCamera: widget.initialNativeCamera,
+            useArBeautyCamera: widget.useArBeautyCamera,
           ),
         );
   }
@@ -234,7 +232,6 @@ class _LiveRoomPageState extends State<LiveRoomPage>
                     if (current is! LiveRoomReady) return true;
                     if (previous is! LiveRoomReady) return true;
                     return previous.controller != current.controller ||
-                        previous.nativeController != current.nativeController ||
                         previous.selectedEffectId != current.selectedEffectId ||
                         previous.isCameraInitialized !=
                             current.isCameraInitialized ||
@@ -263,24 +260,14 @@ class _LiveRoomPageState extends State<LiveRoomPage>
                 ),
               ],
               child: Scaffold(
-                backgroundColor: Colors.black,
+                backgroundColor: widget.useArBeautyCamera
+                    ? Colors.transparent
+                    : Colors.black,
                 // Keep the camera canvas fixed; the bottom chrome follows the
                 // keyboard through the view inset instead of resizing video.
                 resizeToAvoidBottomInset: false,
-                body: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    _LiveRoomBody(
-                      startIndicatorDeadline: _startIndicatorDeadline,
-                    ),
-                    if (_showStartCountdown)
-                      LiveCountdownLayer(
-                        onFinished: () {
-                          if (!mounted) return;
-                          setState(() => _showStartCountdown = false);
-                        },
-                      ),
-                  ],
+                body: _LiveRoomBody(
+                  startIndicatorDeadline: _startIndicatorDeadline,
                 ),
               ),
             ),
@@ -383,19 +370,12 @@ class _LiveRoomBody extends StatelessWidget {
           );
         }
 
-        // Keep the exact same stage subtree mounted while Opening becomes
-        // Ready.  ArCameraPreview is an Android PlatformView; replacing its
-        // parent with LiveRoomStage used to dispose/recreate the Kotlin GL
-        // surface in the middle of LiveKit publication, so the custom track
-        // was attached successfully but produced no frames.
+        // Opening: local preview as soon as the camera is ready (API still in flight).
         if (state is LiveRoomOpening) {
           return Stack(
             fit: StackFit.expand,
             children: [
-              LiveRoomStage(
-                topInset:
-                    MediaQuery.paddingOf(context).top + AppSpacing.roomStageTop,
-              ),
+              const LiveRoomCameraLayer(),
               const VignetteLayer(),
               LiveStartingIndicator(
                 deadline: startIndicatorDeadline,
@@ -493,12 +473,16 @@ class _LiveRoomBody extends StatelessWidget {
                           SizedBox(height: AppSpacing.xs),
                           Flexible(
                             child: Padding(
-                              padding: EdgeInsetsDirectional.only(
-                                start: AppSpacing.xl,
-                                end: AppSpacing.roomHorizontal,
+                              // TikTok creator: activity feed bottom-left.
+                              padding: EdgeInsets.only(
+                                left: AppSpacing.xl,
+                                right: AppSpacing.roomHorizontal,
                                 bottom: AppSpacing.xs,
                               ),
-                              child: LiveRoomChatFeed(),
+                              child: Directionality(
+                                textDirection: TextDirection.ltr,
+                                child: LiveRoomChatFeed(),
+                              ),
                             ),
                           ),
                         ],

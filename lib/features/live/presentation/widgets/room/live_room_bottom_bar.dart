@@ -9,13 +9,13 @@ import 'live_room_guests_sheet.dart';
 import 'live_room_options_sheet.dart';
 import 'live_room_share_sheet.dart';
 
-/// Host live bottom bar — TikTok LIVE order:
-/// [Say something…] [guests] [effects] [share] [more]
+/// Host LIVE bottom bar — TikTok creator order:
+/// `[guests] [beauty] [share] [more]`
 class LiveRoomBottomBar extends StatelessWidget {
   const LiveRoomBottomBar({super.key});
 
   static const double _buttonSize = 36;
-  static const double _actionGap = 4;
+  static const double _actionGap = 6;
   static const Color _buttonFill = Color(0x85202024);
 
   @override
@@ -33,36 +33,12 @@ class LiveRoomBottomBar extends StatelessWidget {
             height: 42,
             child: Row(
               children: [
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () => bloc.add(const LiveRoomChatTapped()),
-                    child: Container(
-                      height: 38,
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
-                      alignment: Alignment.centerLeft,
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.48),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        'اكتب تعليقاً…',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.55),
-                          fontSize: 15,
-                          fontWeight: FontWeight.w400,
-                          height: 1.1,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: _actionGap),
+                const Spacer(),
                 _CircleSvgButton(
                   asset: AppAssets.roomBarCollab,
                   iconWidth: 28,
                   iconHeight: 25,
                   onTap: () {
-                    bloc.add(const LiveRoomCollabTapped());
                     LiveRoomGuestsSheet.show(context);
                   },
                 ),

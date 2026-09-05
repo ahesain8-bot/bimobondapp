@@ -21,6 +21,7 @@ import 'package:bimobondapp/app/video_templates/presentation/models/template_edi
 import 'package:bimobondapp/app/video_templates/presentation/utils/template_editor_l10n.dart';
 import 'package:bimobondapp/app/video_templates/presentation/utils/template_export_l10n.dart';
 import 'package:bimobondapp/app/video_templates/presentation/utils/template_font_cache.dart';
+import 'package:bimobondapp/app/video_templates/presentation/widgets/editor/template_editor_clip_tools_bar.dart';
 import 'package:bimobondapp/app/video_templates/presentation/widgets/editor/template_editor_export_overlay.dart';
 import 'package:bimobondapp/app/video_templates/presentation/widgets/editor/template_editor_layer_toolbar.dart';
 import 'package:bimobondapp/app/video_templates/presentation/widgets/editor/template_editor_playback_bar.dart';
@@ -83,6 +84,8 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
   AppLocalizations get _l10n => AppLocalizations.of(context)!;
   int _selectedSlotIndex = 0;
   TemplateEditorPanel? _activePanel;
+  /// When true, closing a preset sheet returns to the CapCut-style Edit tools bar.
+  bool _resumeClipToolsAfterSheet = false;
   TemplateEditorOverlayKind? _selectedOverlayKind;
   String? _selectedOverlayId;
   String? _replaceOverlayId;
@@ -784,6 +787,336 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
     setState(() {
       _activePanel = _activePanel == panel ? null : panel;
     });
+  }
+
+  Future<void> _onClipToolSelected(TemplateClipTool tool) async {
+    if (_busy) return;
+    final slot = _selectedSlot;
+    final fill = _session.fills[slot.id];
+    final hasMedia = fill?.hasMedia ?? false;
+
+    Future<void> requireMedia(Future<void> Function() action) async {
+      if (!hasMedia) {
+        _showSnack(_l10n.templateEditorClipReplace);
+        await _pickMediaForSlot(_selectedSlotIndex);
+        return;
+      }
+      await action();
+    }
+
+    switch (tool) {
+      case TemplateClipTool.replace:
+        await _pickMediaForSlot(_selectedSlotIndex);
+        if (mounted) setState(() {});
+        return;
+      case TemplateClipTool.delete:
+        await requireMedia(() async {
+          await _session.clearSlot(slot.id);
+          await _refreshPreview();
+          if (mounted) setState(() {});
+        });
+        return;
+      case TemplateClipTool.rotate:
+        await requireMedia(() async {
+          final next = ((fill?.rotation ?? 0) + 90) % 360;
+          _session.patchSlotFill(slot.id, rotation: next.toDouble());
+          await _refreshPreview();
+          if (mounted) setState(() {});
+        });
+        return;
+      case TemplateClipTool.speed:
+        await requireMedia(() async {
+          final current = fill?.speed ?? 1;
+          const steps = [0.5, 1.0, 1.5, 2.0];
+          final i = steps.indexWhere((s) => (s - current).abs() < 0.01);
+          final next = steps[(i < 0 ? 0 : i + 1) % steps.length];
+          _session.patchSlotFill(slot.id, speed: next);
+          await _refreshPreview();
+          if (mounted) {
+            setState(() {});
+            _showSnack('${_l10n.cameraSpeed} ${next}x');
+          }
+        });
+        return;
+      case TemplateClipTool.volume:
+        await requireMedia(() async {
+          final muted = (fill?.volume ?? 1) <= 0.01;
+          _session.patchSlotFill(slot.id, volume: muted ? 1.0 : 0.0);
+          await _refreshPreview();
+          if (mounted) setState(() {});
+        });
+        return;
+      case TemplateClipTool.filters:
+        _clearOverlaySelection();
+        setState(() {
+          _resumeClipToolsAfterSheet = true;
+          _activePanel = TemplateEditorPanel.filters;
+        });
+        return;
+      case TemplateClipTool.effects:
+      case TemplateClipTool.magic:
+        _clearOverlaySelection();
+        setState(() {
+          _resumeClipToolsAfterSheet = true;
+          _activePanel = TemplateEditorPanel.effects;
+        });
+        return;
+      case TemplateClipTool.animation:
+        _clearOverlaySelection();
+        setState(() {
+          _resumeClipToolsAfterSheet = true;
+          _activePanel = TemplateEditorPanel.transitions;
+        });
+        return;
+      case TemplateClipTool.overlay:
+        _clearOverlaySelection();
+        setState(() => _activePanel = TemplateEditorPanel.edit);
+        unawaited(_addStickerOverlay());
+        return;
+      case TemplateClipTool.background:
+        await _pickMediaForSlot(_selectedSlotIndex);
+        if (mounted) setState(() {});
+        return;
+      case TemplateClipTool.beautify:
+        await requireMedia(() async {
+          final on = !(fill?.beautify ?? false);
+          _session.patchSlotFill(slot.id, beautify: on);
+          if (on) {
+            final soft = _filterPresets
+                .where((p) => p.filterName == 'warm' || p.filterName == 'fade')
+                .firstOrNull;
+            if (soft != null) await _applyFilter(soft);
+          }
+          if (mounted) {
+            setState(() {});
+            _showSnack(
+              '${_l10n.templateEditorClipBeautify}: '
+              '${on ? 'ON' : 'OFF'}',
+            );
+          }
+        });
+        return;
+      case TemplateClipTool.crop:
+      case TemplateClipTool.adjust:
+        await requireMedia(() async {
+          await _showClipSliderSheet(
+            title: tool == TemplateClipTool.crop
+                ? _l10n.mediaEditorCrop
+                : _l10n.templateEditorClipAdjust,
+            value: fill?.scale ?? 1,
+            min: 0.5,
+            max: 2.5,
+            labelBuilder: (v) => '${(v * 100).round()}%',
+            onChanged: (v) async {
+              _session.patchSlotFill(slot.id, scale: v);
+              await _refreshPreview();
+              if (mounted) setState(() {});
+            },
+          );
+        });
+        return;
+      case TemplateClipTool.opacity:
+        await requireMedia(() async {
+          await _showClipSliderSheet(
+            title: _l10n.templateEditorClipOpacity,
+            value: fill?.opacity ?? 1,
+            min: 0,
+            max: 1,
+            labelBuilder: (v) => '${(v * 100).round()}%',
+            onChanged: (v) async {
+              _session.patchSlotFill(slot.id, opacity: v);
+              await _refreshPreview();
+              if (mounted) setState(() {});
+            },
+          );
+        });
+        return;
+      case TemplateClipTool.reverse:
+        await requireMedia(() async {
+          final on = !(fill?.reversed ?? false);
+          _session.patchSlotFill(slot.id, reversed: on);
+          if (mounted) {
+            setState(() {});
+            _showSnack(
+              '${_l10n.templateEditorClipReverse}: ${on ? 'ON' : 'OFF'}',
+            );
+          }
+        });
+        return;
+      case TemplateClipTool.freeze:
+        await requireMedia(() async {
+          final on = !(fill?.freeze ?? false);
+          _session.patchSlotFill(slot.id, freeze: on);
+          if (mounted) {
+            setState(() {});
+            _showSnack(
+              '${_l10n.templateEditorClipFreeze}: ${on ? 'ON' : 'OFF'}',
+            );
+          }
+        });
+        return;
+      case TemplateClipTool.reduceNoise:
+        await requireMedia(() async {
+          final on = !(fill?.reduceNoise ?? false);
+          _session.patchSlotFill(slot.id, reduceNoise: on);
+          if (mounted) {
+            setState(() {});
+            _showSnack(
+              '${_l10n.templateEditorClipReduceNoise}: ${on ? 'ON' : 'OFF'}',
+            );
+          }
+        });
+        return;
+      case TemplateClipTool.cutout:
+        await requireMedia(() async {
+          final on = !(fill?.cutout ?? false);
+          _session.patchSlotFill(slot.id, cutout: on);
+          if (mounted) {
+            setState(() {});
+            _showSnack(
+              '${_l10n.templateEditorClipCutout}: ${on ? 'ON' : 'OFF'}',
+            );
+          }
+        });
+        return;
+      case TemplateClipTool.mask:
+        await requireMedia(() async {
+          final current = fill?.maskType;
+          final next = current == null
+              ? 'circle'
+              : current == 'circle'
+                  ? 'rect'
+                  : null;
+          _session.patchSlotFill(
+            slot.id,
+            maskType: next,
+            clearMask: next == null,
+          );
+          if (mounted) {
+            setState(() {});
+            _showSnack(
+              '${_l10n.templateEditorClipMask}: ${next ?? 'OFF'}',
+            );
+          }
+        });
+        return;
+      case TemplateClipTool.voiceEffect:
+        await requireMedia(() async {
+          final current = fill?.voiceEffect;
+          const cycle = [null, 'chipmunk', 'deep', 'robot'];
+          final i = cycle.indexOf(current);
+          final next = cycle[(i + 1) % cycle.length];
+          _session.patchSlotFill(
+            slot.id,
+            voiceEffect: next,
+            clearVoiceEffect: next == null,
+          );
+          if (mounted) {
+            setState(() {});
+            _showSnack(
+              '${_l10n.templateEditorClipVoiceEffect}: ${next ?? 'OFF'}',
+            );
+          }
+        });
+        return;
+      case TemplateClipTool.split:
+        await requireMedia(() async {
+          final preview = _preview;
+          if (preview == null) return;
+          final t = preview.playhead;
+          final start = fill?.trimStart ?? 0.0;
+          final end = fill?.trimEnd;
+          if (end != null && (t <= start + 0.05 || t >= end - 0.05)) {
+            _showSnack(_l10n.templateEditorClipComingSoon);
+            return;
+          }
+          // Soft split: trim current clip at playhead. Second half needs backend
+          // multi-slot insert — flag is not enough without a new slot id.
+          _session.patchSlotFill(slot.id, trimEnd: t);
+          await _refreshPreview();
+          if (mounted) {
+            setState(() {});
+            _showSnack(_l10n.videoEditorSplit);
+          }
+        });
+        return;
+    }
+  }
+
+  Future<void> _showClipSliderSheet({
+    required String title,
+    required double value,
+    required double min,
+    required double max,
+    required String Function(double) labelBuilder,
+    required Future<void> Function(double) onChanged,
+  }) async {
+    var live = value.clamp(min, max);
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: TemplateEditorTheme.panel,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+            child: StatefulBuilder(
+              builder: (context, setModal) {
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      labelBuilder(live),
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.7),
+                      ),
+                    ),
+                    Slider(
+                      value: live,
+                      min: min,
+                      max: max,
+                      onChanged: (v) => setModal(() => live = v),
+                      onChangeEnd: (v) => unawaited(onChanged(v)),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _closeActiveSheet() {
+    setState(() {
+      _replaceOverlayId = null;
+      if (_resumeClipToolsAfterSheet) {
+        _resumeClipToolsAfterSheet = false;
+        _activePanel = TemplateEditorPanel.edit;
+      } else {
+        _activePanel = null;
+      }
+    });
+  }
+
+  Widget _buildClipToolsBar() {
+    return TemplateEditorClipToolsBar(
+      onClose: () => setState(() => _activePanel = null),
+      onToolSelected: (tool) => unawaited(_onClipToolSelected(tool)),
+    );
   }
 
   Future<void> _applyFilter(TemplatePresetItem preset) async {
@@ -1763,8 +2096,8 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
               }
             }
             _clearOverlaySelection();
-            setState(() {});
-          },
+                    setState(() {});
+                  },
           onLayers: () => _showFxLayersSheet(isFilter: true),
           layersEnabled: _session.userFilters.length > 1,
           copyEnabled: _session.filtersForSlot(
@@ -1869,8 +2202,8 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
             } else {
               unawaited(_refreshPreview());
             }
-            setState(() {});
-          },
+                    setState(() {});
+                  },
           copyEnabled: false,
         );
       case TemplateEditorOverlayKind.audio:
@@ -1934,13 +2267,13 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
           return SafeArea(
             child: Column(
               mainAxisSize: MainAxisSize.min,
-              children: [
+        children: [
                 Padding(
                   padding: const EdgeInsets.all(16),
                   child: Text(
                     _l10n.templateEditorFilterLayers,
                     style: const TextStyle(
-                      color: Colors.white,
+              color: Colors.white,
                       fontWeight: FontWeight.w700,
                       fontSize: 16,
                     ),
@@ -1987,9 +2320,9 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Padding(
+            Padding(
                 padding: const EdgeInsets.all(16),
-                child: Text(
+              child: Text(
                   _l10n.templateEditorEffectLayers,
                   style: const TextStyle(
                     color: Colors.white,
@@ -2218,12 +2551,12 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
                 child: _showRenderedPreview
                     ? _buildRenderedPreview()
                     : preview == null
-                    ? const Center(
-                        child: CircularProgressIndicator(color: Colors.white),
-                      )
-                    : ListenableBuilder(
-                        listenable: preview,
-                        builder: (context, _) {
+                ? const Center(
+                    child: CircularProgressIndicator(color: Colors.white),
+                  )
+                : ListenableBuilder(
+                    listenable: preview,
+                    builder: (context, _) {
                           return Stack(
                             fit: StackFit.expand,
                             children: [
@@ -2285,10 +2618,7 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
           selectedId: _selectedFilterId,
           onSelected: _applyFilter,
           onClear: () => _applyFilter(kFallbackFilterPresets.first),
-          onClose: () => setState(() {
-            _activePanel = null;
-            _replaceOverlayId = null;
-          }),
+          onClose: _closeActiveSheet,
         );
       case TemplateEditorPanel.effects:
         return TemplateEditorPresetSheet(
@@ -2299,10 +2629,7 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
           selectedId: _selectedEffectId,
           onSelected: _applyEffect,
           onClear: () => _applyEffect(kFallbackEffectPresets.first),
-          onClose: () => setState(() {
-            _activePanel = null;
-            _replaceOverlayId = null;
-          }),
+          onClose: _closeActiveSheet,
         );
       case TemplateEditorPanel.transitions:
         return TemplateEditorPresetSheet(
@@ -2315,10 +2642,7 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
               ?.transitionType,
           onSelected: _applyTransition,
           onClear: () => _applyTransition(kFallbackTransitionPresets.first),
-          onClose: () => setState(() {
-            _activePanel = null;
-            _replaceOverlayId = null;
-          }),
+          onClose: _closeActiveSheet,
         );
       case TemplateEditorPanel.stickers:
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -2362,8 +2686,8 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
         fit: StackFit.expand,
         children: [
           SafeArea(
-            child: Column(
-              children: [
+                    child: Column(
+                      children: [
                 _buildTopBar(),
                 if (_error != null)
                   Padding(
@@ -2442,9 +2766,9 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
                                           onOverlayTap:
                                               _busy ? null : _onOverlayTap,
                                           selectedOverlayId: _selectedOverlayId,
-                                        ),
-                                      ),
-                                    ],
+                          ),
+                        ),
+                      ],
                                   );
                                 },
                               ),
@@ -2475,29 +2799,32 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
                               ),
                             ),
                         ],
-                      );
-                    },
-                  ),
-                ),
+                );
+              },
+            ),
+          ),
                 if (!_showRenderedPreview)
-                  _buildLayerToolbar() ??
-                      TemplateEditorToolbar(
-                        editable: _editable,
-                        activePanel: _activePanel,
-                        onPanelSelected: (panel) {
-                          if (_busy) return;
-                          _clearOverlaySelection();
-                          if (panel == TemplateEditorPanel.edit) {
-                            unawaited(_pickMediaForSlot(_selectedSlotIndex));
-                            return;
-                          }
-                          if (panel == TemplateEditorPanel.audio) {
-                            unawaited(_pickAudio());
-                            return;
-                          }
-                          _togglePanel(panel);
-                        },
-                      ),
+                  _activePanel == TemplateEditorPanel.edit
+                      ? _buildClipToolsBar()
+                      : _buildLayerToolbar() ??
+                          TemplateEditorToolbar(
+                            editable: _editable,
+                            activePanel: _activePanel,
+                            onPanelSelected: (panel) {
+                              if (_busy) return;
+                              _resumeClipToolsAfterSheet = false;
+                              _clearOverlaySelection();
+                              if (panel == TemplateEditorPanel.edit) {
+                                _togglePanel(TemplateEditorPanel.edit);
+                                return;
+                              }
+                              if (panel == TemplateEditorPanel.audio) {
+                                unawaited(_pickAudio());
+                                return;
+                              }
+                              _togglePanel(panel);
+                            },
+                          ),
                 if (_showRenderedPreview && _renderedPlayer != null)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(24, 8, 24, 12),
@@ -2528,9 +2855,9 @@ class _VideoTemplateEditorScreenState extends State<VideoTemplateEditorScreen> {
                                   color: Colors.white.withValues(alpha: 0.7),
                                   fontSize: 13,
                                 ),
-                              ),
-                            ),
-                          ],
+            ),
+          ),
+        ],
                         );
                       },
                     ),

@@ -192,6 +192,12 @@ class LiveApiClient {
         );
       case 404:
         throw NotFoundException(message, statusCode: 404, details: decoded);
+      case 429:
+        throw ApiException(
+          message.isNotEmpty ? message : 'Too many requests. Please wait a moment.',
+          statusCode: 429,
+          details: decoded,
+        );
       case 503:
         throw ServiceUnavailableException(
           message,

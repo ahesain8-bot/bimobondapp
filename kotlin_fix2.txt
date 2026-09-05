@@ -1,0 +1,59 @@
+﻿.\gradlew.bat : Note: C:\Users\Flutter_2_2026\AppData\Local\Pub\Cache\hosted\pub.dev\cloud_firestore-6.3.0\android\src\
+main\java\io\flutter\plugins\firebase\firestore\utils\PipelineStageHandlers.java uses unchecked or unsafe operations.
+At C:\Users\Flutter_2_2026\AppData\Local\Temp\ps-script-65cd348f-e489-40dc-bd88-f530645a0770.ps1:110 char:87
++ ... ndapp\android"; .\gradlew.bat :app:compileDebugKotlin -q 2>&1 | Out-F ...
++                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Note: C:\Users\...afe operations.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Note: Recompile with -Xlint:unchecked for details.
+Note: Some input files use or override a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+Note: C:\Users\Flutter_2_2026\AppData\Local\Pub\Cache\hosted\pub.dev\google_mlkit_commons-0.11.1\android\src\main\java\
+com\google_mlkit_commons\InputImageConverter.java uses unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+Note: C:\Users\Flutter_2_2026\AppData\Local\Pub\Cache\hosted\pub.dev\google_mlkit_face_detection-0.13.2\android\src\mai
+n\java\com\google_mlkit_face_detection\FaceDetector.java uses unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+Note: C:\Users\Flutter_2_2026\AppData\Local\Pub\Cache\hosted\pub.dev\video_thumbnail-0.5.6\android\src\main\java\xyz\ju
+stsoft\video_thumbnail\VideoThumbnailPlugin.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+Note: C:\Users\Flutter_2_2026\AppData\Local\Pub\Cache\hosted\pub.dev\video_thumbnail-0.5.6\android\src\main\java\xyz\ju
+stsoft\video_thumbnail\VideoThumbnailPlugin.java uses unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+Note: Some input files use or override a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+Note: Some input files use unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+Note: Some input files use or override a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+e: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/duba
+i/bimobondapp/ar_camera/ArLiveBeautyPublisher.kt:31:5 Platform declaration clash: The following declarations have the 
+same JVM signature (setLivePublishingExclusive(Z)V):
+    fun `<set-livePublishingExclusive>`(`<set-?>`: Boolean): Unit defined in 
+com.dubai.bimobondapp.ar_camera.ArLiveBeautyPublisher
+    fun setLivePublishingExclusive(exclusive: Boolean): Unit defined in 
+com.dubai.bimobondapp.ar_camera.ArLiveBeautyPublisher
+e: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/duba
+i/bimobondapp/ar_camera/ArLiveBeautyPublisher.kt:38:5 Platform declaration clash: The following declarations have the 
+same JVM signature (setLivePublishingExclusive(Z)V):
+    fun `<set-livePublishingExclusive>`(`<set-?>`: Boolean): Unit defined in 
+com.dubai.bimobondapp.ar_camera.ArLiveBeautyPublisher
+    fun setLivePublishingExclusive(exclusive: Boolean): Unit defined in 
+com.dubai.bimobondapp.ar_camera.ArLiveBeautyPublisher
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:compileDebugKotlin'.
+> A failure occurred while executing 
+org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction
+   > Compilation error. See log for more details
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 3m 13s

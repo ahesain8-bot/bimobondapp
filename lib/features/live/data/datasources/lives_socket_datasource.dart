@@ -216,10 +216,11 @@ class LivesSocketDataSource {
       _controller.add(
         LiveHudUserJoinedEvent(
           userId: userId,
-          username:
-              user['username']?.toString() ??
-              user['fullName']?.toString() ??
-              'مشاهد',
+          username: (() {
+            final full = user['fullName']?.toString().trim();
+            if (full != null && full.isNotEmpty) return full;
+            return user['username']?.toString() ?? 'مشاهد';
+          })(),
           avatarUrl:
               user['avatarUrl']?.toString() ?? user['avatar']?.toString(),
           viewers: _asInt(

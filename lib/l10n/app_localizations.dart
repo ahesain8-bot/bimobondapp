@@ -7106,7 +7106,7 @@ abstract class AppLocalizations {
   /// No description provided for @mediaPhotoEditorFace.
   ///
   /// In en, this message translates to:
-  /// **'Face'**
+  /// **'Beauty'**
   String get mediaPhotoEditorFace;
 
   /// No description provided for @mediaPhotoEditorMakeup.
@@ -7114,6 +7114,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Makeup'**
   String get mediaPhotoEditorMakeup;
+
+  /// No description provided for @mediaPhotoEditorLipstick.
+  ///
+  /// In en, this message translates to:
+  /// **'Lipstick'**
+  String get mediaPhotoEditorLipstick;
+
+  /// No description provided for @mediaPhotoEditorBlush.
+  ///
+  /// In en, this message translates to:
+  /// **'Blush'**
+  String get mediaPhotoEditorBlush;
+
+  /// No description provided for @mediaPhotoEditorEyeliner.
+  ///
+  /// In en, this message translates to:
+  /// **'Eyeliner'**
+  String get mediaPhotoEditorEyeliner;
+
+  /// No description provided for @mediaPhotoEditorEyeshadow.
+  ///
+  /// In en, this message translates to:
+  /// **'Shadow'**
+  String get mediaPhotoEditorEyeshadow;
+
+  /// No description provided for @mediaPhotoEditorFoundation.
+  ///
+  /// In en, this message translates to:
+  /// **'Foundation'**
+  String get mediaPhotoEditorFoundation;
+
+  /// No description provided for @mediaPhotoEditorContour.
+  ///
+  /// In en, this message translates to:
+  /// **'Contour'**
+  String get mediaPhotoEditorContour;
+
+  /// No description provided for @mediaPhotoEditorUnderEye.
+  ///
+  /// In en, this message translates to:
+  /// **'Under-eye'**
+  String get mediaPhotoEditorUnderEye;
+
+  /// No description provided for @mediaPhotoEditorBrightenEye.
+  ///
+  /// In en, this message translates to:
+  /// **'Brighten eye'**
+  String get mediaPhotoEditorBrightenEye;
 
   /// No description provided for @mediaPhotoEditorMagic.
   ///
@@ -9394,6 +9442,108 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Film burn'**
   String get templateEditorPresetFilmBurn;
+
+  /// No description provided for @templateEditorClipReplace.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace'**
+  String get templateEditorClipReplace;
+
+  /// No description provided for @templateEditorClipVolume.
+  ///
+  /// In en, this message translates to:
+  /// **'Volume'**
+  String get templateEditorClipVolume;
+
+  /// No description provided for @templateEditorClipReduceNoise.
+  ///
+  /// In en, this message translates to:
+  /// **'Reduce noise'**
+  String get templateEditorClipReduceNoise;
+
+  /// No description provided for @templateEditorClipRotate.
+  ///
+  /// In en, this message translates to:
+  /// **'Rotate'**
+  String get templateEditorClipRotate;
+
+  /// No description provided for @templateEditorClipBeautify.
+  ///
+  /// In en, this message translates to:
+  /// **'Beautify'**
+  String get templateEditorClipBeautify;
+
+  /// No description provided for @templateEditorClipAdjust.
+  ///
+  /// In en, this message translates to:
+  /// **'Adjust'**
+  String get templateEditorClipAdjust;
+
+  /// No description provided for @templateEditorClipOverlay.
+  ///
+  /// In en, this message translates to:
+  /// **'Overlay'**
+  String get templateEditorClipOverlay;
+
+  /// No description provided for @templateEditorClipReverse.
+  ///
+  /// In en, this message translates to:
+  /// **'Reverse'**
+  String get templateEditorClipReverse;
+
+  /// No description provided for @templateEditorClipFreeze.
+  ///
+  /// In en, this message translates to:
+  /// **'Freeze'**
+  String get templateEditorClipFreeze;
+
+  /// No description provided for @templateEditorClipMask.
+  ///
+  /// In en, this message translates to:
+  /// **'Mask'**
+  String get templateEditorClipMask;
+
+  /// No description provided for @templateEditorClipOpacity.
+  ///
+  /// In en, this message translates to:
+  /// **'Opacity'**
+  String get templateEditorClipOpacity;
+
+  /// No description provided for @templateEditorClipVoiceEffect.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice effect'**
+  String get templateEditorClipVoiceEffect;
+
+  /// No description provided for @templateEditorClipAnimation.
+  ///
+  /// In en, this message translates to:
+  /// **'Animation'**
+  String get templateEditorClipAnimation;
+
+  /// No description provided for @templateEditorClipCutout.
+  ///
+  /// In en, this message translates to:
+  /// **'Cutout'**
+  String get templateEditorClipCutout;
+
+  /// No description provided for @templateEditorClipBackground.
+  ///
+  /// In en, this message translates to:
+  /// **'Background'**
+  String get templateEditorClipBackground;
+
+  /// No description provided for @templateEditorClipMagic.
+  ///
+  /// In en, this message translates to:
+  /// **'Magic'**
+  String get templateEditorClipMagic;
+
+  /// No description provided for @templateEditorClipComingSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'Coming soon'**
+  String get templateEditorClipComingSoon;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

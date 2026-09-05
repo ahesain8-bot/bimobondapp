@@ -91,7 +91,11 @@ class GiftCatalogAudioPreview {
     _activeGiftId = gift.id;
     _notify();
 
-    final player = AudioPlayer();
+    final player = AudioPlayer(
+      handleInterruptions: false,
+      androidApplyAudioAttributes: false,
+      handleAudioSessionActivation: false,
+    );
     _player = player;
 
     try {

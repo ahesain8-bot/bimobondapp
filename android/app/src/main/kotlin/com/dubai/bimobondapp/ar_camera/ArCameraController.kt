@@ -14,7 +14,10 @@ import android.graphics.PorterDuffXfermode
 import android.graphics.Rect
 import android.graphics.RectF
 import android.hardware.camera2.CameraCharacteristics
+import android.hardware.camera2.CameraCaptureSession
 import android.hardware.camera2.CaptureRequest
+import android.hardware.camera2.CaptureResult
+import android.hardware.camera2.TotalCaptureResult
 import android.media.MediaCodec
 import android.media.MediaFormat
 import android.os.Handler
@@ -70,7 +73,6 @@ import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicInteger
 import androidx.camera.core.Camera
 import android.util.Log
 
@@ -99,11 +101,8 @@ object ArCameraController {
      * Note this is passed to CameraX in sensor/landscape order (see
      * [buildLivePreview]) — width/height here are the portrait orientation.
      */
-    // The size itself now comes from LiveCaptureCapability.previewTargetPortrait():
-    // 1080x1920 where the SoC sustains it, 720x1280 where it does not. The
-    // multi-stream ceiling described above still holds for the capable tier —
-    // asking above 1080p with the skin-mask stream bound only buys a resolution
-    // search CameraX discards.
+    private const val PREVIEW_TARGET_WIDTH = 1080
+    private const val PREVIEW_TARGET_HEIGHT = 1920
 
     /** Landmarks / distortion only — keep low so Preview stream stays sharp. */
     private const val ANALYSIS_WIDTH = 640
@@ -116,11 +115,11 @@ object ArCameraController {
     private const val PREVIEW_EXPOSURE_BIAS = 0
 
     /**
-     * Front gets a mild positive EV so selfies open up toward TikTok brightness.
-     * Back stays slightly negative so the brighter rear sensor does not wash out.
+     * Mild positive EV so live preview opens toward TikTok brightness on both
+     * lenses. Back was previously negative EV (darker than the sensor default).
      */
     private const val PREVIEW_EXPOSURE_EV_STOPS = 0.55f
-    private const val PREVIEW_EXPOSURE_EV_STOPS_BACK = -0.35f
+    private const val PREVIEW_EXPOSURE_EV_STOPS_BACK = 0.45f
 
     /**
      * Front-camera zoom ratio applied on bind. Selfie lenses/HAL 1.0x defaults are
@@ -131,12 +130,6 @@ object ArCameraController {
      * and rely on [FaceWarpRenderer]'s software wide-zoom instead.
      */
     private const val FRONT_ZOOM_OUT_RATIO = 0.75f
-
-    /** How many times a failed camera-provider resolution is retried before degrading. */
-    private const val CAMERA_INIT_MAX_ATTEMPTS = 3
-
-    /** Base backoff between those retries; multiplied by the attempt number. */
-    private const val CAMERA_INIT_RETRY_MS = 400L
 
     /**
      * Bilateral-filter smoothing strength baked into captured photos and recorded
@@ -207,7 +200,7 @@ object ArCameraController {
      * past the camera's real bound size does not add detail, it just upscales
      * (confirmed twice: 2560 and 3072 both got silently downgraded to 1920x1080
      * by the camera itself once a second stream was bound — see
-     * the preview-target comment above — so the encoder recorded an
+     * PREVIEW_TARGET_WIDTH/HEIGHT's comment — so the encoder recorded an
      * upscale from a 1080p source instead of genuine extra detail, costing GPU
      * time and file size for nothing). 1920 matches this device's real
      * multi-stream ceiling.
@@ -293,10 +286,23 @@ object ArCameraController {
      */
     private const val FACE_METERING_ENABLED = false
 
+    /**
+     * Back-camera face autofocus (TikTok-style). AF only — not AE/AWB — so we
+     * sharpen on the person without the exposure wash-out that [FACE_METERING_ENABLED]
+     * caused. Front stays on continuous AF alone (fixed/soft lenses hunt worse).
+     */
+    private const val BACK_FACE_AF_ENABLED = true
+
     private const val FACE_METER_MOVE_THRESHOLD = 0.08f
 
     /** Minimum gap between metering requests — AE needs time to converge. */
     private const val FACE_METER_INTERVAL_MS = 2_000L
+
+    /** Face AF re-triggers less often than AE would — avoids focus hunting. */
+    private const val BACK_FACE_AF_INTERVAL_MS = 2_800L
+
+    /** After a face AF pulse, CAF resumes (continuous picture). */
+    private const val BACK_FACE_AF_AUTO_CANCEL_SEC = 3L
 
     /**
      * Metering region size as a fraction of the frame. Wide enough to cover the
@@ -304,6 +310,9 @@ object ArCameraController {
      * and not, say, an eyebrow.
      */
     private const val FACE_METER_SIZE = 0.25f
+
+    /** Slightly tighter than AE face region — AF wants the face plane, not the room. */
+    private const val BACK_FACE_AF_SIZE = 0.22f
 
     /** Sample points per axis across the face when measuring skin tone. */
     private const val SKIN_TONE_GRID = 12
@@ -377,28 +386,8 @@ object ArCameraController {
     @Volatile
     private var switchingCamera = false
 
-    /**
-     * CameraX only permits one unbind/bind transaction at a time.  Surface
-     * callbacks, route handoff and filter changes can all ask for one in the
-     * same frame; serialise them and run one final bind using the latest state.
-     */
-    private val cameraBindInFlight = AtomicBoolean(false)
-    private val cameraBindQueued = AtomicBoolean(false)
-    private val cameraBindGeneration = AtomicInteger(0)
-
-    /** Consecutive failed [ProcessCameraProvider] resolutions; see [onCameraProviderUnavailable]. */
-    private var cameraInitAttempts = 0
-
-    /**
-     * True while a retry is already scheduled.
-     *
-     * Several bind requests are usually in flight at once (the preview, the
-     * resume path and a filter change all ask), and without this they each
-     * failed and each incremented [cameraInitAttempts] — the whole budget went
-     * in about ten milliseconds, so the app gave up long before a camera that
-     * was merely busy could come back.
-     */
-    private var cameraInitRetryPending = false
+    /** Completes Dart flipCamera only after CameraX bind finishes. */
+    private var pendingFlipResult: ((Boolean) -> Unit)? = null
 
     private var noFaceStreak = 0
 
@@ -465,35 +454,6 @@ object ArCameraController {
         return ArCameraBridge.isFrontCamera
     }
 
-    /**
-     * Keep the selected lens on real devices, but do not fail a live session
-     * when an emulator (or a legacy device) exposes only one camera.  CameraX
-     * otherwise accepts the request late and the AR/WebRTC path receives no
-     * frames, which used to make the app leave the live room.
-     */
-    private fun availableCameraSelector(cameraProvider: ProcessCameraProvider): CameraSelector {
-        val requested = if (ArCameraBridge.isFrontCamera) {
-            CameraSelector.DEFAULT_FRONT_CAMERA
-        } else {
-            CameraSelector.DEFAULT_BACK_CAMERA
-        }
-        val fallback = if (ArCameraBridge.isFrontCamera) {
-            CameraSelector.DEFAULT_BACK_CAMERA
-        } else {
-            CameraSelector.DEFAULT_FRONT_CAMERA
-        }
-        return try {
-            if (requested.filter(cameraProvider.availableCameraInfos).isNotEmpty()) {
-                requested
-            } else {
-                Log.w(PREVIEW_QUALITY_TAG, "requested camera unavailable; using available fallback lens")
-                fallback
-            }
-        } catch (_: Throwable) {
-            fallback
-        }
-    }
-
     private fun notifyBackPersonPresence(faceFill: Float) {
         if (isBoundFrontLens()) {
             BackPersonPresence.clearForFrontCamera()
@@ -538,28 +498,7 @@ object ArCameraController {
         previewView: PreviewView,
         faceOverlay: FaceOverlayView,
     ) {
-        if (started) {
-            // Flutter may replace its Android PlatformView while the Activity
-            // and CameraX controller stay alive (notably Opening -> Ready).
-            // Rebind the running camera to the new owner instead of leaving it
-            // attached to the disposed PreviewView/GL surface.
-            previewView.implementationMode = PreviewView.ImplementationMode.PERFORMANCE
-            previewView.scaleType = PreviewView.ScaleType.FILL_CENTER
-            previewView.visibility = View.VISIBLE
-            previewView.post {
-                if (started &&
-                    ArCameraBridge.previewView === previewView &&
-                    ArCameraBridge.faceOverlay === faceOverlay
-                ) {
-                    Log.i("ArCameraLifecycle", "Controller.start HANDOFF to current PlatformView")
-                    bindCamera(lifecycleOwner, previewView, faceOverlay)
-                    ArCameraBridge.applyCurrentFilter()
-                } else {
-                    Log.i("ArCameraLifecycle", "Controller.start ignored stale PlatformView handoff")
-                }
-            }
-            return
-        }
+        if (started) return
         started = true
 
         // SurfaceView path — sharper live preview than TextureView (COMPATIBLE).
@@ -581,12 +520,23 @@ object ArCameraController {
         ArCameraWatchdog.isPaused = { isRecordingActive() || previewSuspended }
 
         if (!hasCameraPermission(activity)) {
-            // Permission is intentionally requested by Flutter before this
-            // platform view is made ready.  Requesting it here as well races
-            // permission_handler, and on some devices each completion causes
-            // a separate CameraX bind/unbind cycle.
-            Log.i("ArCameraLifecycle", "Controller.start waiting for Flutter camera permission")
+            ActivityCompat.requestPermissions(
+                activity,
+                arrayOf(
+                    Manifest.permission.CAMERA,
+                    Manifest.permission.RECORD_AUDIO,
+                ),
+                100,
+            )
             return
+        }
+
+        if (!hasMicPermission(activity)) {
+            ActivityCompat.requestPermissions(
+                activity,
+                arrayOf(Manifest.permission.RECORD_AUDIO),
+                101,
+            )
         }
 
         if (previewView.width > 0 && previewView.height > 0) {
@@ -601,7 +551,6 @@ object ArCameraController {
     }
 
     fun onPermissionGranted() {
-        if (!started || previewSuspended) return
         val lifecycleOwner = ArCameraBridge.lifecycleOwner ?: return
         val previewView = ArCameraBridge.previewView ?: return
         val faceOverlay = ArCameraBridge.faceOverlay ?: return
@@ -624,6 +573,19 @@ object ArCameraController {
             return
         }
 
+        // Previous flip still waiting on bind — fail it without resuming
+        // publish; this flip keeps the beauty pump paused.
+        val staleWaiter = pendingFlipResult
+        pendingFlipResult = null
+        staleWaiter?.invoke(false)
+
+        // Stop publishing into LiveKit while CameraX rebinds — otherwise viewers
+        // get sideways/scrambled frames with rotation=0 until transform arrives.
+        // Always pause when a beauty capturer is attached (not only when the
+        // exclusive flag is set — that race left frames pumping during flip).
+        ArLiveBeautyPublisher.pauseForCameraSwitch()
+
+        pendingFlipResult = onResult
         switchingCamera = true
         imageAnalysis?.clearAnalyzer()
 
@@ -633,6 +595,12 @@ object ArCameraController {
         cachedSnapshot = null
         FaceLandmarkSmoother.reset()
         BackPersonPresence.reset()
+        lastFaceAfX = -1f
+        lastFaceAfY = -1f
+        lastFaceAfMs = 0L
+        lastMeterX = -1f
+        lastMeterY = -1f
+        lastMeterMs = 0L
         if (ArCameraBridge.isFrontCamera) {
             BackPersonPresence.clearForFrontCamera()
         }
@@ -645,9 +613,38 @@ object ArCameraController {
             if (!preferOesBinding) {
                 ArCameraBridge.coverPreviewForRebind()
             }
+            // Resume + onResult happen in finishCameraFlip after bind completes.
+            // Calling them here raced unbindAll and destroyed the viewer stream.
             bindCamera(lifecycleOwner, previewView, faceOverlay)
             ArCameraBridge.applyCurrentFilter()
-            onResult?.invoke(true)
+        }
+    }
+
+    /**
+     * Ends a [flipCamera] once CameraX has rebound (or failed).
+     *
+     * Completes the Dart Future immediately after bind so the host UI can
+     * flip. Beauty publish resumes in the background — waiting on a perfect
+     * portrait snap here left LiveKit muted/paused and made live flip look
+     * like a no-op.
+     */
+    private fun finishCameraFlip(success: Boolean) {
+        val waiter = pendingFlipResult ?: return
+        pendingFlipResult = null
+        // Tell Flutter the lens switched now; do not block on publish resume.
+        waiter.invoke(success)
+        if (ArLiveBeautyPublisher.hasActiveCapturer()) {
+            ArLiveBeautyPublisher.resumeAfterCameraSwitch(
+                delayMs = if (success) 400L else 200L,
+            )
+        }
+    }
+
+    /** Clears [switchingCamera] and completes a pending flip if one is waiting. */
+    private fun endSwitchingCamera(bindSucceeded: Boolean? = null) {
+        switchingCamera = false
+        if (pendingFlipResult != null) {
+            finishCameraFlip(bindSucceeded ?: (camera != null))
         }
     }
 
@@ -695,6 +692,49 @@ object ArCameraController {
             onResult(true, null)
         } catch (e: Exception) {
             onResult(false, e.message ?: "zoom_failed")
+        }
+    }
+
+    /**
+     * TikTok-style tap-to-focus: AF + AE + AWB at [normalizedX]/[normalizedY]
+     * (0…1 in preview view space). Continuous AF ([CONTROL_AF_MODE_CONTINUOUS_PICTURE])
+     * stays the default; this one-shot action auto-cancels after a few seconds so CAF
+     * resumes.
+     */
+    fun tapToFocus(
+        normalizedX: Float,
+        normalizedY: Float,
+        onResult: ((Boolean, String?) -> Unit)? = null,
+    ) {
+        val cam = camera
+        val preview = ArCameraBridge.previewView
+        if (cam == null || preview == null) {
+            onResult?.invoke(false, "no_camera")
+            return
+        }
+        val w = preview.width
+        val h = preview.height
+        if (w <= 0 || h <= 0) {
+            onResult?.invoke(false, "no_preview")
+            return
+        }
+        try {
+            val x = normalizedX.coerceIn(0f, 1f) * w
+            val y = normalizedY.coerceIn(0f, 1f) * h
+            val point = preview.meteringPointFactory.createPoint(x, y)
+            val action = FocusMeteringAction.Builder(
+                point,
+                FocusMeteringAction.FLAG_AF or
+                    FocusMeteringAction.FLAG_AE or
+                    FocusMeteringAction.FLAG_AWB,
+            )
+                .setAutoCancelDuration(3, java.util.concurrent.TimeUnit.SECONDS)
+                .build()
+            cam.cameraControl.startFocusAndMetering(action)
+            onResult?.invoke(true, null)
+        } catch (e: Exception) {
+            Log.w(PREVIEW_QUALITY_TAG, "tapToFocus failed", e)
+            onResult?.invoke(false, e.message ?: "focus_failed")
         }
     }
 
@@ -873,6 +913,13 @@ object ArCameraController {
     }
 
     fun stop() {
+        if (ArLiveBeautyPublisher.isLivePublishingExclusive()) {
+            Log.w(
+                "ArCameraLifecycle",
+                "Controller.stop ignored — live beauty publish owns CameraX",
+            )
+            return
+        }
         abortCapture()
         ArCameraWatchdog.onDegrade = null
         ArCameraWatchdog.isPaused = null
@@ -891,9 +938,6 @@ object ArCameraController {
         analysisUseCaseBound = false
         videoUseCaseBound = false
         rebindPosted = false
-        cameraBindGeneration.incrementAndGet()
-        cameraBindQueued.set(false)
-        cameraBindInFlight.set(false)
         convertingFrame.set(false)
         frameCounter = 0
         cachedWarpParams = FaceWarpParams.INACTIVE
@@ -2928,6 +2972,14 @@ object ArCameraController {
         }
     }
 
+    private fun surfaceRotationToDegrees(rotation: Int): Int = when (rotation) {
+        Surface.ROTATION_0 -> 0
+        Surface.ROTATION_90 -> 90
+        Surface.ROTATION_180 -> 180
+        Surface.ROTATION_270 -> 270
+        else -> 0
+    }
+
     private fun hasCameraPermission(activity: Activity): Boolean {
         return ContextCompat.checkSelfPermission(activity, Manifest.permission.CAMERA) ==
             PackageManager.PERMISSION_GRANTED
@@ -3020,10 +3072,7 @@ object ArCameraController {
     private fun buildLivePreview(
         displayRotation: Int,
         cameraProvider: ProcessCameraProvider,
-        activity: Activity,
     ): Preview {
-        val (targetW, targetH) = LiveCaptureCapability.previewTargetPortrait(activity)
-
         val resolutionSelector = ResolutionSelector.Builder()
             .setAspectRatioStrategy(
                 AspectRatioStrategy(
@@ -3045,11 +3094,7 @@ object ArCameraController {
                     // Swapping to landscape order (1920x1080) matches CameraX's
                     // expected convention; AspectRatioStrategy above still locks
                     // it to 16:9, and setTargetRotation handles final rotation.
-                    // Tier-aware: 1080p where the SoC can carry it, 720p where
-                    // it cannot. Every frame crosses the face-warp shader, so
-                    // this is the largest single lever on live smoothness, and
-                    // is passed in sensor/landscape order per the note above.
-                    Size(targetH, targetW),
+                    Size(PREVIEW_TARGET_HEIGHT, PREVIEW_TARGET_WIDTH),
                     ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER,
                 ),
             )
@@ -3059,20 +3104,30 @@ object ArCameraController {
             .setResolutionSelector(resolutionSelector)
             .setTargetRotation(displayRotation)
 
-        val selector = availableCameraSelector(cameraProvider)
+        val selector = if (ArCameraBridge.isFrontCamera) {
+            CameraSelector.DEFAULT_FRONT_CAMERA
+        } else {
+            CameraSelector.DEFAULT_BACK_CAMERA
+        }
         val previewCameraInfo = try {
             selector.filter(cameraProvider.availableCameraInfos).firstOrNull()
         } catch (t: Throwable) {
             null
         }
-        val noiseMode = previewCameraInfo?.let { bestNoiseReductionMode(it) }
-            ?: CaptureRequest.NOISE_REDUCTION_MODE_FAST
-        val edgeMode = previewCameraInfo?.let { bestEdgeMode(it) }
-            ?: CaptureRequest.EDGE_MODE_FAST
-        Log.i(PREVIEW_QUALITY_TAG, "live preview quality: noiseMode=$noiseMode edgeMode=$edgeMode")
+        val camera2Info = previewCameraInfo?.let { Camera2CameraInfo.from(it) }
+        val cameraId = try { camera2Info?.cameraId } catch (_: Throwable) { null }
+        val hardwareLevel = try {
+            camera2Info?.getCameraCharacteristic(CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL)
+        } catch (_: Throwable) { null }
+        Log.i(
+            ArCameraDiagnostics.TAG,
+            "CAMERA id=$cameraId lens=${if (ArCameraBridge.isFrontCamera) "FRONT" else "BACK"} " +
+                "hardwareLevel=$hardwareLevel rawBaseline=true",
+        )
+        Log.i(PREVIEW_QUALITY_TAG, "live preview quality: noiseMode=HAL_DEFAULT edgeMode=HAL_DEFAULT")
         logSupportedPreviewSizes(previewCameraInfo)
 
-        Camera2Interop.Extender(builder)
+        val extender = Camera2Interop.Extender(builder)
             .setCaptureRequestOption(
                 CaptureRequest.CONTROL_MODE,
                 CaptureRequest.CONTROL_MODE_AUTO,
@@ -3102,18 +3157,18 @@ object ArCameraController {
                 CaptureRequest.CONTROL_AE_EXPOSURE_COMPENSATION,
                 PREVIEW_EXPOSURE_BIAS,
             )
-            .setCaptureRequestOption(
-                CaptureRequest.NOISE_REDUCTION_MODE,
-                noiseMode,
-            )
-            .setCaptureRequestOption(
-                CaptureRequest.HOT_PIXEL_MODE,
-                CaptureRequest.HOT_PIXEL_MODE_HIGH_QUALITY,
-            )
-            .setCaptureRequestOption(
-                CaptureRequest.EDGE_MODE,
-                edgeMode,
-            )
+
+        // Production POST camera keeps the former B / RAW_OES Camera2 baseline:
+        // leave ISP NR/EDGE/HOT_PIXEL at the HAL's safe automatic defaults.
+        extender.setSessionCaptureCallback(object : CameraCaptureSession.CaptureCallback() {
+            override fun onCaptureCompleted(
+                session: CameraCaptureSession,
+                request: CaptureRequest,
+                result: TotalCaptureResult,
+            ) {
+                logCaptureResult(result)
+            }
+        })
 
         return builder.build()
     }
@@ -3145,6 +3200,29 @@ object ArCameraController {
 
     @Volatile
     private var loggedPreviewSizes = false
+
+    @Volatile
+    private var requestedPreviewFpsRange: Range<Int>? = null
+    private var lastCaptureDiagnosticNs = 0L
+
+    private fun logCaptureResult(result: CaptureResult) {
+        val now = System.nanoTime()
+        if (now - lastCaptureDiagnosticNs < 2_000_000_000L) return
+        lastCaptureDiagnosticNs = now
+        Log.i(
+            ArCameraDiagnostics.TAG,
+            "CAMERA crop=${result.get(CaptureResult.SCALER_CROP_REGION)} " +
+                "requestedFps=${requestedPreviewFpsRange ?: "HAL_DEFAULT"} " +
+                "actualFps=${result.get(CaptureResult.CONTROL_AE_TARGET_FPS_RANGE)} " +
+                "ev=${result.get(CaptureResult.CONTROL_AE_EXPOSURE_COMPENSATION)} " +
+                "iso=${result.get(CaptureResult.SENSOR_SENSITIVITY)} " +
+                "exposureNs=${result.get(CaptureResult.SENSOR_EXPOSURE_TIME)} " +
+                "frameDurationNs=${result.get(CaptureResult.SENSOR_FRAME_DURATION)} " +
+                "nr=${result.get(CaptureResult.NOISE_REDUCTION_MODE)} " +
+                "edge=${result.get(CaptureResult.EDGE_MODE)} " +
+                "hotPixel=${result.get(CaptureResult.HOT_PIXEL_MODE)}",
+        )
+    }
 
     /**
      * Strongest noise reduction the device advertises. HIGH_QUALITY gives the
@@ -3230,61 +3308,54 @@ object ArCameraController {
     /** Apply EV + AE FPS range after bindToLifecycle (device-clamped, camera-wide). */
     @OptIn(ExperimentalCamera2Interop::class)
     private fun applyPreviewLook(bound: Camera) {
+        // Former B / RAW_OES production baseline: EV=0, HAL default FPS/NR/EDGE.
+        requestedPreviewFpsRange = null
         try {
             val exposure = bound.cameraInfo.exposureState
-            if (exposure.isExposureCompensationSupported) {
-                val range = exposure.exposureCompensationRange
-                // Convert the target EV bias to a raw index using this device's actual
-                // step size (1/3, 1/2, or 1 EV all exist in the wild) — a fixed raw
-                // index like "1" can be a negligible +0.17EV nudge on some devices and
-                // a full stop on others, so it can't reliably brighten every phone.
-                val step = exposure.exposureCompensationStep.toFloat().let {
-                    if (it > 0f) it else 1f
-                }
-                val targetEv = if (ArCameraBridge.isFrontCamera) {
-                    PREVIEW_EXPOSURE_EV_STOPS
-                } else {
-                    PREVIEW_EXPOSURE_EV_STOPS_BACK
-                }
-                val rawIndex = Math.round(targetEv / step)
-                val index = rawIndex.coerceIn(range.lower, range.upper)
-                Log.i(
-                    PREVIEW_QUALITY_TAG,
-                    "EV range=[${range.lower},${range.upper}] " +
-                        "step=${exposure.exposureCompensationStep} " +
-                        "applyIndex=$index current=${exposure.exposureCompensationIndex}",
-                )
-                if (index != exposure.exposureCompensationIndex) {
-                    bound.cameraControl.setExposureCompensationIndex(index)
-                }
-            } else {
-                Log.i(PREVIEW_QUALITY_TAG, "EV compensation not supported on this camera")
+            if (exposure.isExposureCompensationSupported &&
+                exposure.exposureCompensationIndex != 0
+            ) {
+                bound.cameraControl.setExposureCompensationIndex(0)
             }
-        } catch (t: Throwable) {
-            Log.w(PREVIEW_QUALITY_TAG, "applyPreviewLook exposure failed", t)
-        }
-
-        // NOTE: noise/edge mode and capture intent are intentionally NOT re-asserted
-        // here via Camera2CameraControl — that applies camera-wide (including to
-        // ImageCapture's still JPEG request) and was why photos were coming out dark
-        // and over-smoothed. Preview.Builder's own Camera2Interop.Extender in
-        // [buildLivePreview] already sets the right per-device modes, scoped only to
-        // the Preview stream. AE FPS range below is a legitimate camera-wide 3A
-        // setting (there's no "preview-only" framerate), so that one stays.
-        try {
-            val camera2 = Camera2CameraControl.from(bound.cameraControl)
-            val fpsRange = bestPreviewFpsRange(bound.cameraInfo)
-            Log.i(PREVIEW_QUALITY_TAG, "preview AE target fps range=$fpsRange")
-            camera2.addCaptureRequestOptions(
-                CaptureRequestOptions.Builder()
-                    .setCaptureRequestOption(
-                        CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE,
-                        fpsRange,
-                    )
-                    .build(),
+            Camera2CameraControl.from(bound.cameraControl).clearCaptureRequestOptions()
+            Log.i(
+                ArCameraDiagnostics.TAG,
+                "CAMERA neutral baseline EV=0 AE=AUTO AWB=AUTO AF=CONTINUOUS " +
+                    "fps=HAL_DEFAULT NR/EDGE/HOT_PIXEL=HAL_DEFAULT",
             )
         } catch (t: Throwable) {
-            Log.w(PREVIEW_QUALITY_TAG, "fps range apply skipped", t)
+            Log.w(ArCameraDiagnostics.TAG, "neutral baseline apply failed", t)
+        }
+    }
+
+    /**
+     * One-shot center AF when the rear camera binds so the first frames are sharp
+     * (CAF alone can sit soft until the subject moves). Auto-cancels back into
+     * [CONTROL_AF_MODE_CONTINUOUS_PICTURE].
+     */
+    private fun kickBackCameraAutofocus(bound: Camera) {
+        try {
+            val preview = ArCameraBridge.previewView
+            val factory = if (preview != null && preview.width > 0 && preview.height > 0) {
+                preview.meteringPointFactory
+            } else {
+                SurfaceOrientedMeteringPointFactory(1f, 1f)
+            }
+            val point = if (preview != null && preview.width > 0 && preview.height > 0) {
+                factory.createPoint(preview.width * 0.5f, preview.height * 0.5f)
+            } else {
+                factory.createPoint(0.5f, 0.5f)
+            }
+            val action = FocusMeteringAction.Builder(
+                point,
+                FocusMeteringAction.FLAG_AF,
+            )
+                .setAutoCancelDuration(BACK_FACE_AF_AUTO_CANCEL_SEC, java.util.concurrent.TimeUnit.SECONDS)
+                .build()
+            bound.cameraControl.startFocusAndMetering(action)
+            Log.i(PREVIEW_QUALITY_TAG, "back camera autofocus kick")
+        } catch (t: Throwable) {
+            Log.w(PREVIEW_QUALITY_TAG, "back autofocus kick failed", t)
         }
     }
 
@@ -3295,17 +3366,8 @@ object ArCameraController {
      * i.e. unchanged) and on the back camera, which is left at its default 1.0x.
      */
     private fun applyFrontZoomOut(bound: Camera) {
-        if (!ArCameraBridge.isFrontCamera) return
-        try {
-            val zoomState = bound.cameraInfo.zoomState.value ?: return
-            val target = FRONT_ZOOM_OUT_RATIO.coerceIn(zoomState.minZoomRatio, zoomState.maxZoomRatio)
-            if (target < zoomState.zoomRatio) {
-                bound.cameraControl.setZoomRatio(target)
-                Log.i(PREVIEW_QUALITY_TAG, "front zoom-out applied ratio=$target")
-            }
-        } catch (t: Throwable) {
-            Log.w(PREVIEW_QUALITY_TAG, "front zoom-out failed", t)
-        }
+        // Production B baseline keeps HAL framing — no forced front zoom-out.
+        return
     }
 
     /** PreviewView surface with resolution audit log (actual stream size). */
@@ -3318,6 +3380,10 @@ object ArCameraController {
                 "Preview SurfaceRequest ${res.width}x${res.height} " +
                     "view=${previewView.width}x${previewView.height} " +
                     "mode=${previewView.implementationMode} scale=${previewView.scaleType}",
+            )
+            Log.i(
+                ArCameraDiagnostics.TAG,
+                "CAMERA SurfaceRequest=${res.width}x${res.height} path=PreviewView",
             )
             viewProvider.onSurfaceRequested(request)
         }
@@ -3332,6 +3398,10 @@ object ArCameraController {
                 return@setSurfaceProvider
             }
             val res = request.resolution
+            Log.i(
+                ArCameraDiagnostics.TAG,
+                "CAMERA SurfaceRequest=${res.width}x${res.height} path=OES",
+            )
             // Keep camera buffer aspect (e.g. 1440x1080 → scaled). Do NOT force
             // phone screen aspect — that stretched/squashed faces.
             // CAPTURE_MAX_EDGE (not a lower "warm buffer" cap like the old 960) —
@@ -3350,16 +3420,34 @@ object ArCameraController {
                     "+${ArCameraBridge.oesDiagElapsedMs()}ms",
             )
 
-            glView.setCameraTransform(0, frontMirror = false, bufW, bufH)
+            // Prefer display-relative sensor rotation over 0 so the first frames
+            // after a flip are upright (beauty LiveKit publish reads these).
+            val initialRot = try {
+                camera?.cameraInfo?.sensorRotationDegrees
+                    ?: glView.display?.rotation?.let { surfaceRotationToDegrees(it) }
+                    ?: ArCameraBridge.previewView?.display?.rotation?.let {
+                        surfaceRotationToDegrees(it)
+                    }
+                    ?: 0
+            } catch (_: Throwable) {
+                0
+            }
+            val mirrorFront = ArCameraBridge.isFrontCamera
+            glView.setCameraTransform(initialRot, frontMirror = mirrorFront, bufW, bufH)
             request.setTransformationInfoListener(executor) { info ->
                 android.util.Log.i(
                     "ArCameraOES",
-                    "transform rot=${info.rotationDegrees} buf=${bufW}x${bufH} " +
+                    "transform rot=${info.rotationDegrees} crop=${info.cropRect} buf=${bufW}x${bufH} " +
                         "+${ArCameraBridge.oesDiagElapsedMs()}ms",
+                )
+                Log.i(
+                    ArCameraDiagnostics.TAG,
+                    "CAMERA rotation=${info.rotationDegrees} crop=${info.cropRect} " +
+                        "SurfaceTextureBuffer=${bufW}x$bufH",
                 )
                 glView.setCameraTransform(
                     info.rotationDegrees,
-                    frontMirror = false,
+                    frontMirror = ArCameraBridge.isFrontCamera,
                     bufW,
                     bufH,
                 )
@@ -3534,9 +3622,20 @@ object ArCameraController {
             "Controller.onHostPause started=$started recording=${isRecordingActive()} " +
                 "suspended=$previewSuspended boundOes=$boundToOes " +
                 "preferOes=$preferOesBinding filter=${ArCameraBridge.currentFilter} " +
-                "glSurface=${ArCameraBridge.warpGlView?.cameraSurfaceTexture() != null}",
+                "glSurface=${ArCameraBridge.warpGlView?.cameraSurfaceTexture() != null} " +
+                "liveExclusive=${ArLiveBeautyPublisher.isLivePublishingExclusive()}",
         )
         if (!started) return
+        // Live beauty publish must keep CameraX open. Activity onPause fires for
+        // dialogs / brief inactive transitions and previously unbound the lens,
+        // leaving viewers with audio-only streams.
+        if (ArLiveBeautyPublisher.isLivePublishingExclusive()) {
+            Log.w(
+                "ArCameraLifecycle",
+                "Controller.onHostPause skipped unbind — live beauty publish owns CameraX",
+            )
+            return
+        }
         hostWasPaused = true
         hostResumeGeneration++
         // Do not leave lifecycle-bound use cases around for CameraX to
@@ -3547,9 +3646,6 @@ object ArCameraController {
         camera = null
         boundToOes = false
         rebindPosted = false
-        cameraBindGeneration.incrementAndGet()
-        cameraBindQueued.set(false)
-        cameraBindInFlight.set(false)
         switchingCamera = false
         ArCameraWatchdog.stop()
         Log.i("ArCameraLifecycle", "Controller.onHostPause camera fully unbound")
@@ -3889,641 +3985,488 @@ object ArCameraController {
         }
     }
 
-    /**
-     * CameraX could not hand us a provider.
-     *
-     * The message it carries ("Retrying initialization might resolve temporary
-     * camera errors") is worth taking literally: the common causes — another
-     * app still releasing the lens, a HAL restart, a cold emulator — clear on
-     * their own within a second. Retry a few times on a short backoff, then
-     * stop and degrade rather than spin: a device with no usable lens at all
-     * (an emulator booted `-camera-front none -camera-back none`) would
-     * otherwise rebind forever.
-     */
-    private fun onCameraProviderUnavailable(
-        cause: Throwable,
-        lifecycleOwner: LifecycleOwner,
-        previewView: PreviewView,
-        faceOverlay: FaceOverlayView,
-    ) {
-        switchingCamera = false
-        // A scheduled retry uses the latest requested configuration; keeping a
-        // second queued bind here would immediately race that retry.
-        cameraBindQueued.set(false)
-        // A retry for this same failure is already queued; let it do the work.
-        if (cameraInitRetryPending) return
-        cameraInitAttempts++
-        if (cameraInitAttempts > CAMERA_INIT_MAX_ATTEMPTS) {
-            Log.e(
-                PREVIEW_QUALITY_TAG,
-                "camera provider unavailable after $CAMERA_INIT_MAX_ATTEMPTS attempts; giving up",
-                cause,
-            )
-            camera = null
-            imageCapture = null
-            analysisUseCaseBound = false
-            pngFastAnalysisBound = false
-            videoUseCaseBound = false
-            // Deliberately not reportGlFailure(): a camera provider that never
-            // arrived says nothing about the GL pipeline, and degrading it is a
-            // one-way latch that would kill filters and the preview surface for
-            // the rest of the session without helping the camera come back.
-            return
-        }
-        Log.w(
-            PREVIEW_QUALITY_TAG,
-            "camera provider unavailable (attempt $cameraInitAttempts); retrying",
-            cause,
-        )
-        val activity = ArCameraBridge.hostActivity ?: return
-        cameraInitRetryPending = true
-        activity.window.decorView.postDelayed({
-            cameraInitRetryPending = false
-            if (ArCameraBridge.hostActivity == null) return@postDelayed
-            bindCamera(lifecycleOwner, previewView, faceOverlay)
-        }, CAMERA_INIT_RETRY_MS * cameraInitAttempts)
-    }
-
     private fun bindCamera(
         lifecycleOwner: LifecycleOwner,
         previewView: PreviewView,
         faceOverlay: FaceOverlayView,
     ) {
-        if (!started || previewSuspended) {
-            switchingCamera = false
-            return
-        }
-        if (ArCameraBridge.previewView !== previewView ||
-            ArCameraBridge.faceOverlay !== faceOverlay
-        ) {
-            Log.i("ArCameraLifecycle", "bindCamera ignored stale PlatformView")
-            return
-        }
-        if (!cameraBindInFlight.compareAndSet(false, true)) {
-            cameraBindQueued.set(true)
-            Log.i(
-                "ArCameraOES",
-                "bindCamera coalesced; a bind is already in flight " +
-                    "+${ArCameraBridge.oesDiagElapsedMs()}ms",
-            )
-            return
-        }
-        bindCameraNow(
-            lifecycleOwner,
-            previewView,
-            faceOverlay,
-            cameraBindGeneration.get(),
-        )
-    }
-
-    private fun bindCameraNow(
-        lifecycleOwner: LifecycleOwner,
-        previewView: PreviewView,
-        faceOverlay: FaceOverlayView,
-        bindGeneration: Int,
-    ) {
         val activity = ArCameraBridge.hostActivity ?: run {
-            switchingCamera = false
-            finishCameraBind(bindGeneration)
+            endSwitchingCamera(bindSucceeded = false)
             return
         }
         val executor = analysisExecutor ?: run {
-            switchingCamera = false
-            finishCameraBind(bindGeneration)
+            endSwitchingCamera(bindSucceeded = false)
             return
         }
         val cameraProviderFuture = ProcessCameraProvider.getInstance(activity)
         cameraProviderFuture.addListener({
-            try {
-                if (bindGeneration != cameraBindGeneration.get() ||
-                    !started ||
-                    previewSuspended ||
-                    ArCameraBridge.previewView !== previewView ||
-                    ArCameraBridge.faceOverlay !== faceOverlay
-                ) {
-                    Log.i("ArCameraLifecycle", "bindCamera cancelled stale transaction")
-                    return@addListener
-                }
-                val bindStart = android.os.SystemClock.elapsedRealtime()
-            // CameraX resolves this future with a failure when the device
-            // reports no usable camera — a transient HAL hiccup, another app
-            // holding the lens, or an emulator booted with a lens set to
-            // `none`. This runs on the main thread from a Handler callback, so
-            // letting the ExecutionException out of here does not fail the
-            // bind, it kills the process: the user tapped "go live" and the app
-            // vanished. Retry a bounded number of times (CameraX's own message
-            // says a retry often clears it) and then degrade to no preview.
-            val cameraProvider = try {
-                cameraProviderFuture.get().also { cameraInitAttempts = 0 }
-            } catch (t: Throwable) {
-                onCameraProviderUnavailable(t, lifecycleOwner, previewView, faceOverlay)
-                return@addListener
+            val bindStart = android.os.SystemClock.elapsedRealtime()
+            val cameraProvider = cameraProviderFuture.get()
+            val displayRotation = activity.windowManager.defaultDisplay.rotation
+            val pngFast = ArCameraBridge.currentFilter.isPngOverlay()
+            val analysisTarget = if (pngFast) {
+                Size(PNG_ANALYSIS_WIDTH, PNG_ANALYSIS_HEIGHT)
+            } else {
+                Size(ANALYSIS_WIDTH, ANALYSIS_HEIGHT)
             }
-            try {
-                val displayRotation = activity.windowManager.defaultDisplay.rotation
-                val pngFast = ArCameraBridge.currentFilter.isPngOverlay()
-                val analysisTarget = if (pngFast) {
-                    Size(PNG_ANALYSIS_WIDTH, PNG_ANALYSIS_HEIGHT)
+
+            val preview = buildLivePreview(displayRotation, cameraProvider)
+
+            val glView = ArCameraBridge.warpGlView
+            // Simple mode never binds the camera into the GL/OES pipeline — that
+            // is the path with the most moving parts (a second EGL surface, an
+            // encoder surface, shaders) and therefore the most ways for an
+            // unfamiliar driver to stall it.
+            val useOes = !inSimpleMode() &&
+                preferOesBinding &&
+                glView != null &&
+                glView.cameraSurfaceTexture() != null
+
+            android.util.Log.i(
+                "ArCameraOES",
+                "bindCamera: START useOes=$useOes preferOes=$preferOesBinding " +
+                    "stReady=${glView?.cameraSurfaceTexture() != null} " +
+                    "+${ArCameraBridge.oesDiagElapsedMs()}ms",
+            )
+
+            imageAnalysis?.clearAnalyzer()
+            android.util.Log.i(
+                "ArCameraOES",
+                "bindCamera: unbindAll BEFORE +${ArCameraBridge.oesDiagElapsedMs()}ms",
+            )
+            cameraProvider.unbindAll()
+            android.util.Log.i(
+                "ArCameraOES",
+                "bindCamera: unbindAll AFTER +${ArCameraBridge.oesDiagElapsedMs()}ms",
+            )
+            imageAnalysis = null
+            videoCapture = null
+            simpleHardwareRecorder.attach(null)
+
+            val selector = if (ArCameraBridge.isFrontCamera) {
+                CameraSelector.DEFAULT_FRONT_CAMERA
+            } else {
+                CameraSelector.DEFAULT_BACK_CAMERA
+            }
+
+            fun applyTorchAfterBind(bound: Camera?) {
+                camera = bound
+                if (bound == null) return
+                // Restarts the stall timer. Only the OES/GL path reports frames
+                // individually, so only that path can be watched for stalls —
+                // see ArCameraWatchdog.onCameraBound.
+                ArCameraWatchdog.onCameraBound(hasPerFrameSignal = useOes)
+                applyPreviewLook(bound)
+                applyFrontZoomOut(bound)
+                if (ArCameraBridge.isFrontCamera) {
+                    try {
+                        bound.cameraControl.enableTorch(false)
+                    } catch (_: Exception) {
+                    }
+                    applyScreenFlash(torchEnabled)
                 } else {
-                    Size(ANALYSIS_WIDTH, ANALYSIS_HEIGHT)
-                }
-
-                val preview = buildLivePreview(
-                    displayRotation,
-                    cameraProvider,
-                    activity,
-                )
-
-                val glView = ArCameraBridge.warpGlView
-                // Simple mode never binds the camera into the GL/OES pipeline — that
-                // is the path with the most moving parts (a second EGL surface, an
-                // encoder surface, shaders) and therefore the most ways for an
-                // unfamiliar driver to stall it.
-                val useOes = !inSimpleMode() &&
-                    preferOesBinding &&
-                    glView != null &&
-                    glView.cameraSurfaceTexture() != null
-
-                android.util.Log.i(
-                    "ArCameraOES",
-                    "bindCamera: START useOes=$useOes preferOes=$preferOesBinding " +
-                        "stReady=${glView?.cameraSurfaceTexture() != null} " +
-                        "+${ArCameraBridge.oesDiagElapsedMs()}ms",
-                )
-
-                imageAnalysis?.clearAnalyzer()
-                android.util.Log.i(
-                    "ArCameraOES",
-                    "bindCamera: unbindAll BEFORE +${ArCameraBridge.oesDiagElapsedMs()}ms",
-                )
-                cameraProvider.unbindAll()
-                android.util.Log.i(
-                    "ArCameraOES",
-                    "bindCamera: unbindAll AFTER +${ArCameraBridge.oesDiagElapsedMs()}ms",
-                )
-                imageAnalysis = null
-                videoCapture = null
-                simpleHardwareRecorder.attach(null)
-
-                val selector = availableCameraSelector(cameraProvider)
-
-                fun applyTorchAfterBind(bound: Camera?) {
-                    camera = bound
-                    if (bound == null) return
-                    // Restarts the stall timer. Only the OES/GL path reports frames
-                    // individually, so only that path can be watched for stalls —
-                    // see ArCameraWatchdog.onCameraBound.
-                    ArCameraWatchdog.onCameraBound(hasPerFrameSignal = useOes)
-                    applyPreviewLook(bound)
-                    applyFrontZoomOut(bound)
-                    if (ArCameraBridge.isFrontCamera) {
+                    applyScreenFlash(false)
+                    if (torchEnabled && bound.cameraInfo.hasFlashUnit()) {
                         try {
-                            bound.cameraControl.enableTorch(false)
+                            bound.cameraControl.enableTorch(true)
                         } catch (_: Exception) {
                         }
-                        applyScreenFlash(torchEnabled)
-                    } else {
-                        applyScreenFlash(false)
-                        if (torchEnabled && bound.cameraInfo.hasFlashUnit()) {
-                            try {
-                                bound.cameraControl.enableTorch(true)
-                            } catch (_: Exception) {
-                            }
-                        }
                     }
                 }
+            }
 
-                if (useOes && glView != null) {
-                    resetOesPhotoReady()
-                    boundToOes = true
-                    glView.setOesEnabled(true)
-                    glView.setOnFramePresented { onOesFramePresented() }
-                    bindPreviewToOes(preview, glView, activity)
-                    // Lazy, same as the non-OES bind path below ("Capture binds
-                    // on shutter"): idle Normal Mode is Preview + Analysis only —
-                    // two streams, not three. takePhotoWithImageCaptureToFile
-                    // already handles imageCapture being null (sets
-                    // preferCaptureBinding + requestPreviewRebind, this same
-                    // function then runs again with it true) and its own
-                    // callback already resets preferCaptureBinding back to false
-                    // for FilterType.NONE afterward — this plumbing already
-                    // existed, Normal Mode just never used it, and instead bound
-                    // ImageCapture (even at the now-reduced moderate resolution)
-                    // continuously, which was keeping the camera HAL close to
-                    // saturated (measured ~97% on camerahalserver).
-                    val capture = if (preferCaptureBinding) {
-                        buildImageCapture(displayRotation, allowFullSensor = false)
-                    } else {
-                        null
+            if (useOes && glView != null) {
+                resetOesPhotoReady()
+                boundToOes = true
+                glView.setOesEnabled(true)
+                glView.setOnFramePresented { onOesFramePresented() }
+                bindPreviewToOes(preview, glView, activity)
+                // Lazy, same as the non-OES bind path below ("Capture binds
+                // on shutter"): idle Normal Mode is Preview + Analysis only —
+                // two streams, not three. takePhotoWithImageCaptureToFile
+                // already handles imageCapture being null (sets
+                // preferCaptureBinding + requestPreviewRebind, this same
+                // function then runs again with it true) and its own
+                // callback already resets preferCaptureBinding back to false
+                // for FilterType.NONE afterward — this plumbing already
+                // existed, Normal Mode just never used it, and instead bound
+                // ImageCapture (even at the now-reduced moderate resolution)
+                // continuously, which was keeping the camera HAL close to
+                // saturated (measured ~97% on camerahalserver).
+                val capture = if (preferCaptureBinding) {
+                    buildImageCapture(displayRotation, allowFullSensor = false)
+                } else {
+                    null
+                }
+                imageCapture = capture
+
+                // Normal Mode only — small background analysis stream feeding the
+                // landmark-rasterized skin mask (see processSkinMaskFrame /
+                // buildFaceSkinMaskBitmap). Attempted first; if this 3rd concurrent
+                // stream isn't supported on a given device, the catch block below
+                // falls back to the proven 2-stream (Preview + ImageCapture) bind.
+                // Preview + Analysis + Capture is one of CameraX's guaranteed
+                // stream combinations all the way down to LEGACY, so this does
+                // not need a hardware-level gate — and gating it did real damage:
+                // the landmarks this stream produces are what drive both the skin
+                // mask and face-metered exposure, and most phones report LIMITED,
+                // so on most phones neither was running at all. The bind is still
+                // wrapped in the fallback below for anything that surprises us.
+                val wantSkinMask =
+                    ArCameraBridge.currentFilter == FilterType.NONE
+                val skinMaskAnalysis = if (wantSkinMask) {
+                    ImageAnalysis.Builder()
+                        .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                        .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
+                        .setTargetResolution(Size(SKIN_MASK_ANALYSIS_EDGE, SKIN_MASK_ANALYSIS_EDGE))
+                        .setTargetRotation(displayRotation)
+                        .build()
+                        .also { a -> a.setAnalyzer(executor) { imageProxy -> processSkinMaskFrame(imageProxy) } }
+                } else {
+                    null
+                }
+                imageAnalysis = skinMaskAnalysis
+
+                try {
+                    val useCases = buildList<UseCase> {
+                        add(preview)
+                        capture?.let { add(it) }
+                        skinMaskAnalysis?.let { add(it) }
                     }
-                    imageCapture = capture
-
-                    // Normal Mode only — small background analysis stream feeding the
-                    // landmark-rasterized skin mask (see processSkinMaskFrame /
-                    // buildFaceSkinMaskBitmap). Attempted first; if this 3rd concurrent
-                    // stream isn't supported on a given device, the catch block below
-                    // falls back to the proven 2-stream (Preview + ImageCapture) bind.
-                    // Preview + Analysis + Capture is one of CameraX's guaranteed
-                    // stream combinations all the way down to LEGACY, so this does
-                    // not need a hardware-level gate — and gating it did real damage:
-                    // the landmarks this stream produces are what drive both the skin
-                    // mask and face-metered exposure, and most phones report LIMITED,
-                    // so on most phones neither was running at all. The bind is still
-                    // wrapped in the fallback below for anything that surprises us.
-                    val wantSkinMask = ArCameraBridge.currentFilter == FilterType.NONE
-                    val skinMaskAnalysis = if (wantSkinMask) {
-                        ImageAnalysis.Builder()
-                            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                            .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
-                            .setTargetResolution(Size(SKIN_MASK_ANALYSIS_EDGE, SKIN_MASK_ANALYSIS_EDGE))
-                            .setTargetRotation(displayRotation)
-                            .build()
-                            .also { a -> a.setAnalyzer(executor) { imageProxy -> processSkinMaskFrame(imageProxy) } }
-                    } else {
-                        null
-                    }
-                    imageAnalysis = skinMaskAnalysis
-
+                    val bound = cameraProvider.bindToLifecycle(
+                        lifecycleOwner,
+                        selector,
+                        *useCases.toTypedArray(),
+                    )
+                    applyTorchAfterBind(bound)
+                    android.util.Log.i(
+                        "ArCameraOES",
+                        "bindCamera: OES bind OK skinMask=${skinMaskAnalysis != null} " +
+                            "cost=${android.os.SystemClock.elapsedRealtime() - bindStart}ms " +
+                            "+${ArCameraBridge.oesDiagElapsedMs()}ms",
+                    )
+                    analysisUseCaseBound = skinMaskAnalysis != null
+                    pngFastAnalysisBound = false
+                    videoUseCaseBound = false
+                    videoCapture = null
+                    simpleHardwareRecorder.attach(null)
+                    scheduleOesPhotoWarmup(glView)
+                } catch (_: Exception) {
                     try {
-                        val useCases = buildList<UseCase> {
+                        cameraProvider.unbindAll()
+                        imageAnalysis = null
+                        val fallbackUseCases = buildList<UseCase> {
                             add(preview)
                             capture?.let { add(it) }
-                            skinMaskAnalysis?.let { add(it) }
                         }
-                        val bound = cameraProvider.bindToLifecycle(
-                            lifecycleOwner,
-                            selector,
-                            *useCases.toTypedArray(),
+                        applyTorchAfterBind(
+                            cameraProvider.bindToLifecycle(
+                                lifecycleOwner,
+                                selector,
+                                *fallbackUseCases.toTypedArray(),
+                            ),
                         )
-                        applyTorchAfterBind(bound)
-                        android.util.Log.i(
+                        analysisUseCaseBound = false
+                        android.util.Log.w(
                             "ArCameraOES",
-                            "bindCamera: OES bind OK skinMask=${skinMaskAnalysis != null} " +
-                                "cost=${android.os.SystemClock.elapsedRealtime() - bindStart}ms " +
+                            "bindCamera: OES bind fallback without skin-mask analysis " +
                                 "+${ArCameraBridge.oesDiagElapsedMs()}ms",
                         )
-                        analysisUseCaseBound = skinMaskAnalysis != null
-                        pngFastAnalysisBound = false
-                        videoUseCaseBound = false
-                        videoCapture = null
-                        simpleHardwareRecorder.attach(null)
-                        scheduleOesPhotoWarmup(glView)
                     } catch (_: Exception) {
                         try {
                             cameraProvider.unbindAll()
-                            imageAnalysis = null
-                            val fallbackUseCases = buildList<UseCase> {
-                                add(preview)
-                                capture?.let { add(it) }
-                            }
                             applyTorchAfterBind(
                                 cameraProvider.bindToLifecycle(
                                     lifecycleOwner,
                                     selector,
-                                    *fallbackUseCases.toTypedArray(),
+                                    preview,
                                 ),
                             )
-                            analysisUseCaseBound = false
+                            imageCapture = null
                             android.util.Log.w(
                                 "ArCameraOES",
-                                "bindCamera: OES bind fallback without skin-mask analysis " +
+                                "bindCamera: OES bind fallback preview-only " +
                                     "+${ArCameraBridge.oesDiagElapsedMs()}ms",
                             )
                         } catch (_: Exception) {
-                            try {
-                                cameraProvider.unbindAll()
-                                applyTorchAfterBind(
-                                    cameraProvider.bindToLifecycle(
-                                        lifecycleOwner,
-                                        selector,
-                                        preview,
-                                    ),
-                                )
-                                imageCapture = null
-                                android.util.Log.w(
-                                    "ArCameraOES",
-                                    "bindCamera: OES bind fallback preview-only " +
-                                        "+${ArCameraBridge.oesDiagElapsedMs()}ms",
-                                )
-                            } catch (_: Exception) {
-                                camera = null
-                                boundToOes = false
-                                imageCapture = null
-                                android.util.Log.e(
-                                    "ArCameraOES",
-                                    "bindCamera: OES bind FAILED +${ArCameraBridge.oesDiagElapsedMs()}ms",
-                                )
-                            }
+                            camera = null
+                            boundToOes = false
+                            imageCapture = null
+                            android.util.Log.e(
+                                "ArCameraOES",
+                                "bindCamera: OES bind FAILED +${ArCameraBridge.oesDiagElapsedMs()}ms",
+                            )
                         }
                     }
-                    switchingCamera = false
-                    return@addListener
                 }
+                endSwitchingCamera(bindSucceeded = camera != null)
+                return@addListener
+            }
 
-                boundToOes = false
-                glView?.setOesEnabled(false)
+            boundToOes = false
+            glView?.setOesEnabled(false)
 
-                val filter = ArCameraBridge.currentFilter
-                val needAnalysis = needsAnalysisUseCase(filter)
-                val needVideo = preferVideoBinding || needsVideoUseCase(filter)
-                // Normal idle: Preview ONLY. Capture binds on shutter; Analysis on effects; Video on record.
-                val needCapture = preferCaptureBinding || needAnalysis || needVideo
-                val boundCameraInfo = try {
-                    selector.filter(cameraProvider.availableCameraInfos).firstOrNull()
-                } catch (_: Throwable) {
-                    null
-                }
-                val highCapability = boundCameraInfo?.let { isHighCapabilityDevice(it) } ?: false
+            val filter = ArCameraBridge.currentFilter
+            val needAnalysis = needsAnalysisUseCase(filter)
+            val needVideo = preferVideoBinding || needsVideoUseCase(filter)
+            // Normal idle: Preview ONLY. Capture binds on shutter; Analysis on effects; Video on record.
+            val needCapture = preferCaptureBinding || needAnalysis || needVideo
+            val boundCameraInfo = try {
+                selector.filter(cameraProvider.availableCameraInfos).firstOrNull()
+            } catch (_: Throwable) {
+                null
+            }
+            val highCapability = boundCameraInfo?.let { isHighCapabilityDevice(it) } ?: false
 
-                val capture = if (needCapture) {
-                    // Full sensor only when nothing else is competing for the camera
-                    // AND the device can take it; sticker/overlay binds add Analysis
-                    // + Video + an effect on top.
-                    val heavyBind = needAnalysis || needVideo
-                    buildImageCapture(
-                        displayRotation,
-                        allowFullSensor = !heavyBind && highCapability,
-                    ).also { imageCapture = it }
-                } else {
-                    imageCapture = null
-                    null
-                }
+            val capture = if (needCapture) {
+                // Full sensor only when nothing else is competing for the camera
+                // AND the device can take it; sticker/overlay binds add Analysis
+                // + Video + an effect on top.
+                val heavyBind = needAnalysis || needVideo
+                buildImageCapture(
+                    displayRotation,
+                    allowFullSensor = !heavyBind && highCapability,
+                ).also { imageCapture = it }
+            } else {
+                imageCapture = null
+                null
+            }
 
-                attachPreviewSurfaceProvider(preview, previewView)
+            attachPreviewSurfaceProvider(preview, previewView)
 
-                val analysis = if (needAnalysis) {
-                    ImageAnalysis.Builder()
-                        .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                        .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
-                        .setTargetResolution(analysisTarget)
-                        .setTargetRotation(displayRotation)
-                        .build()
-                        .also { a ->
-                            a.setAnalyzer(executor) { imageProxy ->
-                                processImage(imageProxy, faceOverlay, activity)
-                            }
+            val analysis = if (needAnalysis) {
+                ImageAnalysis.Builder()
+                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                    .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
+                    .setTargetResolution(analysisTarget)
+                    .setTargetRotation(displayRotation)
+                    .build()
+                    .also { a ->
+                        a.setAnalyzer(executor) { imageProxy ->
+                            processImage(imageProxy, faceOverlay, activity)
                         }
-                } else {
-                    null
-                }
-                imageAnalysis = analysis
+                    }
+            } else {
+                null
+            }
+            imageAnalysis = analysis
 
-                val hwVideo = if (needVideo) {
-                    // FHD first: the previous HD-then-SD list capped every hardware
-                    // recording at 720p, which is well under what the stock camera app
-                    // writes and reads as soft/noisy on a 1080p+ screen. 4K is left out
-                    // deliberately — it would have to go through the same GL effect node
-                    // as the overlay filters.
-                    val preferred = preferredRecordQualities(boundCameraInfo, highCapability)
-                    val recorder = Recorder.Builder()
-                        .setQualitySelector(
-                            QualitySelector.fromOrderedList(
-                                preferred,
-                                FallbackStrategy.lowerQualityOrHigherThan(Quality.SD),
+            val hwVideo = if (needVideo) {
+                // FHD first: the previous HD-then-SD list capped every hardware
+                // recording at 720p, which is well under what the stock camera app
+                // writes and reads as soft/noisy on a 1080p+ screen. 4K is left out
+                // deliberately — it would have to go through the same GL effect node
+                // as the overlay filters.
+                val preferred = preferredRecordQualities(boundCameraInfo, highCapability)
+                val recorder = Recorder.Builder()
+                    .setQualitySelector(
+                        QualitySelector.fromOrderedList(
+                            preferred,
+                            FallbackStrategy.lowerQualityOrHigherThan(Quality.SD),
+                        ),
+                    )
+                    .build()
+                VideoCapture.Builder(recorder)
+                    .setMirrorMode(MirrorMode.MIRROR_MODE_ON_FRONT_ONLY)
+                    .build()
+                    .also { it.targetRotation = displayRotation }
+            } else {
+                null
+            }
+
+            fun bindCombo(
+                withAnalysis: Boolean,
+                withVideo: Boolean,
+                withCapture: Boolean,
+                withPngEffect: Boolean,
+                withScreenEffect: Boolean = false,
+            ): Boolean {
+                return try {
+                    val useAnalysis = withAnalysis && analysis != null
+                    val useVideo = withVideo && hwVideo != null
+                    val useCapture = withCapture && capture != null
+                    if (withPngEffect && useAnalysis && useVideo && useCapture && pngFast &&
+                        !inSimpleMode()
+                    ) {
+                        val overlay = stickerCameraOverlay ?: StickerCameraOverlay(
+                            activity.applicationContext,
+                        ).also { stickerCameraOverlay = it }
+                        val effect = overlay.ensureEffect()
+                        val viewPort = try {
+                            previewView.getViewPort(displayRotation)
+                        } catch (_: Exception) {
+                            null
+                        }
+                        val groupBuilder = UseCaseGroup.Builder()
+                            .addUseCase(preview)
+                            .addUseCase(analysis!!)
+                            .addUseCase(capture!!)
+                            .addUseCase(hwVideo!!)
+                            .addEffect(effect)
+                        if (viewPort != null) {
+                            groupBuilder.setViewPort(viewPort)
+                        }
+                        applyTorchAfterBind(
+                            cameraProvider.bindToLifecycle(
+                                lifecycleOwner,
+                                selector,
+                                groupBuilder.build(),
                             ),
                         )
-                        .build()
-                    VideoCapture.Builder(recorder)
-                        .setMirrorMode(MirrorMode.MIRROR_MODE_ON_FRONT_ONLY)
-                        .build()
-                        .also { it.targetRotation = displayRotation }
-                } else {
-                    null
-                }
-
-                fun bindCombo(
-                    withAnalysis: Boolean,
-                    withVideo: Boolean,
-                    withCapture: Boolean,
-                    withPngEffect: Boolean,
-                    withScreenEffect: Boolean = false,
-                ): Boolean {
-                    return try {
-                        val useAnalysis = withAnalysis && analysis != null
-                        val useVideo = withVideo && hwVideo != null
-                        val useCapture = withCapture && capture != null
-                        if (withPngEffect && useAnalysis && useVideo && useCapture && pngFast &&
-                            !inSimpleMode()
-                        ) {
-                            val overlay = stickerCameraOverlay ?: StickerCameraOverlay(
-                                activity.applicationContext,
-                            ).also { stickerCameraOverlay = it }
-                            val effect = overlay.ensureEffect()
-                            val viewPort = try {
+                    } else {
+                        val cases = buildList {
+                            add(preview)
+                            if (useAnalysis) add(analysis!!)
+                            if (useCapture) add(capture!!)
+                            if (useVideo) add(hwVideo!!)
+                        }
+                        // Tie VideoCapture/ImageCapture's crop to the same field of
+                        // view as Preview. Without a shared ViewPort, CameraX picks
+                        // each use case's resolution independently — e.g. the
+                        // Recorder's own 16:9 quality target vs. the full-screen
+                        // PreviewView — so recorded video/photos end up framed
+                        // differently than what was actually shown live.
+                        val viewPort = if (useVideo || useCapture) {
+                            try {
                                 previewView.getViewPort(displayRotation)
                             } catch (_: Exception) {
                                 null
                             }
+                        } else {
+                            null
+                        }
+                        // Bakes the full-screen Lottie into the recorded stream
+                        // (VIDEO_CAPTURE target only, so Preview/ImageCapture are
+                        // untouched). Needs a UseCaseGroup, so when there's no
+                        // ViewPort to build one around we still make one here.
+                        val screenEffect = if (withScreenEffect && useVideo && !inSimpleMode()) {
+                            val overlay = screenOverlayCameraEffect
+                                ?: ScreenOverlayCameraEffect().also {
+                                    screenOverlayCameraEffect = it
+                                }
+                            overlay.ensureEffect()
+                        } else {
+                            null
+                        }
+                        val bound = if (viewPort != null || screenEffect != null) {
                             val groupBuilder = UseCaseGroup.Builder()
-                                .addUseCase(preview)
-                                .addUseCase(analysis!!)
-                                .addUseCase(capture!!)
-                                .addUseCase(hwVideo!!)
-                                .addEffect(effect)
-                            if (viewPort != null) {
-                                groupBuilder.setViewPort(viewPort)
-                            }
-                            applyTorchAfterBind(
-                                cameraProvider.bindToLifecycle(
-                                    lifecycleOwner,
-                                    selector,
-                                    groupBuilder.build(),
-                                ),
+                            if (viewPort != null) groupBuilder.setViewPort(viewPort)
+                            if (screenEffect != null) groupBuilder.addEffect(screenEffect)
+                            cases.forEach { groupBuilder.addUseCase(it) }
+                            cameraProvider.bindToLifecycle(
+                                lifecycleOwner,
+                                selector,
+                                groupBuilder.build(),
                             )
                         } else {
-                            val cases = buildList {
-                                add(preview)
-                                if (useAnalysis) add(analysis!!)
-                                if (useCapture) add(capture!!)
-                                if (useVideo) add(hwVideo!!)
-                            }
-                            // Tie VideoCapture/ImageCapture's crop to the same field of
-                            // view as Preview. Without a shared ViewPort, CameraX picks
-                            // each use case's resolution independently — e.g. the
-                            // Recorder's own 16:9 quality target vs. the full-screen
-                            // PreviewView — so recorded video/photos end up framed
-                            // differently than what was actually shown live.
-                            val viewPort = if (useVideo || useCapture) {
-                                try {
-                                    previewView.getViewPort(displayRotation)
-                                } catch (_: Exception) {
-                                    null
-                                }
-                            } else {
-                                null
-                            }
-                            // Bakes the full-screen Lottie into the recorded stream
-                            // (VIDEO_CAPTURE target only, so Preview/ImageCapture are
-                            // untouched). Needs a UseCaseGroup, so when there's no
-                            // ViewPort to build one around we still make one here.
-                            val screenEffect = if (withScreenEffect && useVideo && !inSimpleMode()) {
-                                val overlay = screenOverlayCameraEffect
-                                    ?: ScreenOverlayCameraEffect().also {
-                                        screenOverlayCameraEffect = it
-                                    }
-                                overlay.ensureEffect()
-                            } else {
-                                null
-                            }
-                            val bound = if (viewPort != null || screenEffect != null) {
-                                val groupBuilder = UseCaseGroup.Builder()
-                                if (viewPort != null) groupBuilder.setViewPort(viewPort)
-                                if (screenEffect != null) groupBuilder.addEffect(screenEffect)
-                                cases.forEach { groupBuilder.addUseCase(it) }
-                                cameraProvider.bindToLifecycle(
-                                    lifecycleOwner,
-                                    selector,
-                                    groupBuilder.build(),
-                                )
-                            } else {
-                                cameraProvider.bindToLifecycle(
-                                    lifecycleOwner,
-                                    selector,
-                                    *cases.toTypedArray(),
-                                )
-                            }
-                            applyTorchAfterBind(bound)
-                        }
-                        analysisUseCaseBound = useAnalysis
-                        pngFastAnalysisBound = useAnalysis && pngFast
-                        if (useVideo) {
-                            videoCapture = hwVideo
-                            simpleHardwareRecorder.attach(hwVideo)
-                            videoUseCaseBound = true
-                        } else {
-                            videoCapture = null
-                            simpleHardwareRecorder.attach(null)
-                            videoUseCaseBound = false
-                        }
-                        if (!useCapture) {
-                            imageCapture = null
-                        }
-                        true
-                    } catch (_: Exception) {
-                        false
-                    }
-                }
-
-                try {
-                    val ok = when {
-                        needAnalysis && needVideo && pngFast ->
-                            bindCombo(true, true, true, withPngEffect = true) ||
-                                bindCombo(true, true, true, withPngEffect = false)
-                        needAnalysis && needVideo ->
-                            bindCombo(true, true, true, withPngEffect = false)
-                        needAnalysis ->
-                            bindCombo(true, false, true, withPngEffect = false)
-                        needVideo && filter.isScreenOverlay() &&
-                            ArCameraBridge.currentOverlaySource?.isVideo != true ->
-                            // Fall back to a plain video bind if the device can't take
-                            // the effect — recording still works, the overlay just
-                            // isn't baked in, same shape as the PNG-effect fallback.
-                            bindCombo(false, true, true, withPngEffect = false, withScreenEffect = true) ||
-                                bindCombo(false, true, true, withPngEffect = false)
-                        needVideo ->
-                            bindCombo(false, true, true, withPngEffect = false)
-                        needCapture ->
-                            bindCombo(false, false, true, withPngEffect = false)
-                        else ->
-                            // Sharpest Normal Mode path: Preview use case alone.
-                            bindCombo(false, false, false, withPngEffect = false)
-                    }
-                    if (!ok) {
-                        cameraProvider.unbindAll()
-                        applyTorchAfterBind(
                             cameraProvider.bindToLifecycle(
                                 lifecycleOwner,
                                 selector,
-                                preview,
-                            ),
-                        )
-                        analysisUseCaseBound = false
-                        pngFastAnalysisBound = false
+                                *cases.toTypedArray(),
+                            )
+                        }
+                        applyTorchAfterBind(bound)
+                    }
+                    analysisUseCaseBound = useAnalysis
+                    pngFastAnalysisBound = useAnalysis && pngFast
+                    if (useVideo) {
+                        videoCapture = hwVideo
+                        simpleHardwareRecorder.attach(hwVideo)
+                        videoUseCaseBound = true
+                    } else {
                         videoCapture = null
                         simpleHardwareRecorder.attach(null)
                         videoUseCaseBound = false
+                    }
+                    if (!useCapture) {
                         imageCapture = null
                     }
-                    Log.i(
-                        PREVIEW_QUALITY_TAG,
-                        "bind done filter=$filter analysis=$analysisUseCaseBound " +
-                            "video=$videoUseCaseBound capture=${imageCapture != null} " +
-                            "impl=${previewView.implementationMode}",
-                    )
+                    true
                 } catch (_: Exception) {
-                    try {
-                        cameraProvider.unbindAll()
-                        applyTorchAfterBind(
-                            cameraProvider.bindToLifecycle(
-                                lifecycleOwner,
-                                selector,
-                                preview,
-                            ),
-                        )
-                        analysisUseCaseBound = false
-                        pngFastAnalysisBound = false
-                        videoCapture = null
-                        simpleHardwareRecorder.attach(null)
-                        videoUseCaseBound = false
-                        imageCapture = null
-                    } catch (_: Exception) {
-                        camera = null
-                        imageCapture = null
-                        analysisUseCaseBound = false
-                        pngFastAnalysisBound = false
-                        videoUseCaseBound = false
-                    }
-                } finally {
-                    switchingCamera = false
-                    flushPendingHardwareRecordStart()
-                    flushPendingPhotoCapture()
+                    false
                 }
-            } catch (t: Throwable) {
-                // Nothing in the bind path is worth taking the whole app down
-                // for — but this must not report a GL failure either.
-                //
-                // It used to. ArCameraWatchdog.degraded is a one-way latch, and
-                // applyRenderMode() answers it with forceSimplePreview(), which
-                // sets warpGlView to GONE and turns OES off for the rest of the
-                // session. So a single transient exception anywhere in this
-                // 450-line listener permanently disabled the GL pipeline and
-                // left the host staring at a black preview. Crash traded for a
-                // dead camera is not an improvement.
-                //
-                // Clear the per-bind state and leave the pipeline intact; the
-                // normal rebind path can still recover. reportGlFailure stays
-                // for what it was built for — a shader that will not compile or
-                // an EGL surface the driver refuses.
-                Log.e(PREVIEW_QUALITY_TAG, "bindCamera failed; will retry on next rebind", t)
-                switchingCamera = false
-                camera = null
-                imageCapture = null
-                analysisUseCaseBound = false
-                pngFastAnalysisBound = false
-                videoUseCaseBound = false
             }
+
+            try {
+                val ok = when {
+                    needAnalysis && needVideo && pngFast ->
+                        bindCombo(true, true, true, withPngEffect = true) ||
+                            bindCombo(true, true, true, withPngEffect = false)
+                    needAnalysis && needVideo ->
+                        bindCombo(true, true, true, withPngEffect = false)
+                    needAnalysis ->
+                        bindCombo(
+                            true,
+                            false,
+                            withCapture = true,
+                            withPngEffect = false,
+                        )
+                    needVideo && filter.isScreenOverlay() &&
+                        ArCameraBridge.currentOverlaySource?.isVideo != true ->
+                        // Fall back to a plain video bind if the device can't take
+                        // the effect — recording still works, the overlay just
+                        // isn't baked in, same shape as the PNG-effect fallback.
+                        bindCombo(false, true, true, withPngEffect = false, withScreenEffect = true) ||
+                            bindCombo(false, true, true, withPngEffect = false)
+                    needVideo ->
+                        bindCombo(false, true, true, withPngEffect = false)
+                    needCapture ->
+                        bindCombo(false, false, true, withPngEffect = false)
+                    else ->
+                        // Sharpest Normal Mode path: Preview use case alone.
+                        bindCombo(false, false, false, withPngEffect = false)
+                }
+                if (!ok) {
+                    cameraProvider.unbindAll()
+                    applyTorchAfterBind(
+                        cameraProvider.bindToLifecycle(
+                            lifecycleOwner,
+                            selector,
+                            preview,
+                        ),
+                    )
+                    analysisUseCaseBound = false
+                    pngFastAnalysisBound = false
+                    videoCapture = null
+                    simpleHardwareRecorder.attach(null)
+                    videoUseCaseBound = false
+                    imageCapture = null
+                }
+                Log.i(
+                    PREVIEW_QUALITY_TAG,
+                    "bind done filter=$filter analysis=$analysisUseCaseBound " +
+                        "video=$videoUseCaseBound capture=${imageCapture != null} " +
+                        "impl=${previewView.implementationMode}",
+                )
+            } catch (_: Exception) {
+                try {
+                    cameraProvider.unbindAll()
+                    applyTorchAfterBind(
+                        cameraProvider.bindToLifecycle(
+                            lifecycleOwner,
+                            selector,
+                            preview,
+                        ),
+                    )
+                    analysisUseCaseBound = false
+                    pngFastAnalysisBound = false
+                    videoCapture = null
+                    simpleHardwareRecorder.attach(null)
+                    videoUseCaseBound = false
+                    imageCapture = null
+                } catch (_: Exception) {
+                    camera = null
+                    imageCapture = null
+                    analysisUseCaseBound = false
+                    pngFastAnalysisBound = false
+                    videoUseCaseBound = false
+                }
             } finally {
-                finishCameraBind(bindGeneration)
+                endSwitchingCamera(bindSucceeded = camera != null)
+                flushPendingHardwareRecordStart()
+                flushPendingPhotoCapture()
             }
         }, ContextCompat.getMainExecutor(activity))
-    }
-
-    /** Runs one coalesced bind after the in-flight CameraX transaction ends. */
-    private fun finishCameraBind(bindGeneration: Int) {
-        if (bindGeneration != cameraBindGeneration.get()) return
-        cameraBindInFlight.set(false)
-        if (!started || previewSuspended || cameraInitRetryPending) {
-            if (cameraInitRetryPending) cameraBindQueued.set(false)
-            return
-        }
-        if (!cameraBindQueued.compareAndSet(true, false)) return
-        mainHandler.post {
-            if (!started || previewSuspended) return@post
-            val lifecycleOwner = ArCameraBridge.lifecycleOwner ?: return@post
-            val previewView = ArCameraBridge.previewView ?: return@post
-            val faceOverlay = ArCameraBridge.faceOverlay ?: return@post
-            bindCamera(lifecycleOwner, previewView, faceOverlay)
-        }
     }
 
     private fun flushPendingPhotoCapture() {
@@ -4591,7 +4534,17 @@ object ArCameraController {
      * this can't pile up behind a slow device.
      */
     private fun processSkinMaskFrame(imageProxy: ImageProxy) {
+        ArCameraDiagnostics.onAnalysisFrame()
+        val analysisStartNs = System.nanoTime()
         skinMaskFrameCounter++
+        val analysisRotation = imageProxy.imageInfo.rotationDegrees
+        if (skinMaskFrameCounter % 30 == 1) {
+            Log.i(
+                ArCameraDiagnostics.TAG,
+                "ANALYSIS actual=${imageProxy.width}x${imageProxy.height} " +
+                    "crop=${imageProxy.cropRect} rotation=$analysisRotation target=144x144",
+            )
+        }
         // Tooth visibility must react quickly when lips close; the regular skin
         // mask can remain throttled because its geometry changes slowly.
         val detectEvery = if (
@@ -4603,13 +4556,14 @@ object ArCameraController {
         }
         val shouldRun = skinMaskFrameCounter % detectEvery == 0
         if (!shouldRun || !skinMaskBusy.compareAndSet(false, true)) {
+            ArCameraDiagnostics.onAnalysisDropped()
             imageProxy.close()
             return
         }
 
         // imageProxy is read and closed here, exactly once, before any further
         // processing — avoids a double-close if something below throws.
-        val rotation = imageProxy.imageInfo.rotationDegrees
+        val rotation = analysisRotation
         val rawBitmap = try {
             ImageProxyBitmapUtils.toBitmap(imageProxy)
         } catch (_: Exception) {
@@ -4618,10 +4572,12 @@ object ArCameraController {
         imageProxy.close()
 
         if (rawBitmap == null) {
+            ArCameraDiagnostics.onAnalysisDropped()
             skinMaskBusy.set(false)
             return
         }
 
+        var mediaPipeNs = 0L
         try {
             // Oriented but NOT mirrored — matches FaceCoordinateMapper.toWarpUv's
             // convention (mirror applied at sample time in the shader, not baked
@@ -4638,7 +4594,10 @@ object ArCameraController {
                 val landmarker = FaceLandmarkerHolder.get()
                 val snapshot = if (landmarker != null) {
                     try {
-                        landmarker.detect(oriented)?.let { result ->
+                        val mediaPipeStartNs = System.nanoTime()
+                        val result = landmarker.detect(oriented)
+                        mediaPipeNs = System.nanoTime() - mediaPipeStartNs
+                        result?.let {
                             FaceLandmarkMapper.fromResult(result, oriented.width, oriented.height)
                         }
                     } catch (t: Throwable) {
@@ -4651,10 +4610,7 @@ object ArCameraController {
                 // tracking whether or not anyone is detected in the frame.
                 measureSceneLuma(oriented)
                 if (snapshot != null) {
-                    @Suppress("ConstantConditionIf")
-                    if (FACE_METERING_ENABLED) {
-                        meterExposureOnFace(snapshot, oriented.width, oriented.height, rotation)
-                    }
+                    // Neutral B Camera2 baseline: no face-driven AE/AF overrides.
                     measureSkinTone(oriented, snapshot)
                     LiveRetouchState.updateNoseLandmarks(
                         snapshot,
@@ -4697,6 +4653,10 @@ object ArCameraController {
             }
         } finally {
             skinMaskBusy.set(false)
+            ArCameraDiagnostics.onAnalysisProcessed(
+                totalNs = System.nanoTime() - analysisStartNs,
+                mediaPipeNs = mediaPipeNs,
+            )
         }
     }
 
@@ -4904,6 +4864,11 @@ object ArCameraController {
     private var lastMeterY = -1f
     private var lastMeterMs = 0L
 
+    /** Back-camera face AF tracking (separate from AE metering state). */
+    private var lastFaceAfX = -1f
+    private var lastFaceAfY = -1f
+    private var lastFaceAfMs = 0L
+
     /**
      * Points the camera's auto-exposure and white balance at the face.
      *
@@ -4991,6 +4956,78 @@ object ArCameraController {
             cam.cameraControl.startFocusAndMetering(action)
         } catch (t: Throwable) {
             Log.w(PREVIEW_QUALITY_TAG, "face metering failed", t)
+        }
+    }
+
+    /**
+     * Back-camera only: pulse AF on the face when it moves enough. Auto-cancels
+     * so continuous picture AF resumes — sharp subject without AE wash-out.
+     */
+    private fun meterFocusOnFace(
+        snapshot: FaceLandmarkSnapshot,
+        imageWidth: Int,
+        imageHeight: Int,
+        rotationDegrees: Int,
+    ) {
+        if (ArCameraBridge.isFrontCamera) return
+        if (!boundToOes || isRecordingActive() || previewSuspended) return
+        val cam = camera ?: return
+        val analysis = imageAnalysis ?: return
+        if (imageWidth <= 0 || imageHeight <= 0) return
+
+        val landmarks = snapshot.landmarks
+        if (landmarks.isEmpty()) return
+
+        var sumX = 0f
+        var sumY = 0f
+        var count = 0
+        for (index in MediaPipeLandmarkIndices.FACE_OVAL) {
+            val p = landmarks.getOrNull(index) ?: continue
+            sumX += p.x
+            sumY += p.y
+            count++
+        }
+        if (count == 0) return
+        val ox = (sumX / count) / snapshot.imageWidth.toFloat()
+        val oy = (sumY / count) / snapshot.imageHeight.toFloat()
+        if (ox.isNaN() || oy.isNaN()) return
+
+        val rot = ((rotationDegrees % 360) + 360) % 360
+        val sx: Float
+        val sy: Float
+        when (rot) {
+            90 -> { sx = oy; sy = 1f - ox }
+            180 -> { sx = 1f - ox; sy = 1f - oy }
+            270 -> { sx = 1f - oy; sy = ox }
+            else -> { sx = ox; sy = oy }
+        }
+        if (sx !in 0f..1f || sy !in 0f..1f) return
+
+        val now = android.os.SystemClock.elapsedRealtime()
+        val first = lastFaceAfMs == 0L
+        val moved = kotlin.math.abs(sx - lastFaceAfX) > FACE_METER_MOVE_THRESHOLD ||
+            kotlin.math.abs(sy - lastFaceAfY) > FACE_METER_MOVE_THRESHOLD
+        if (!first && !moved) return
+        if (!first && now - lastFaceAfMs < BACK_FACE_AF_INTERVAL_MS) return
+        lastFaceAfX = sx
+        lastFaceAfY = sy
+        lastFaceAfMs = now
+
+        try {
+            val factory = SurfaceOrientedMeteringPointFactory(1f, 1f, analysis)
+            val point = factory.createPoint(sx, sy, BACK_FACE_AF_SIZE)
+            val action = FocusMeteringAction.Builder(
+                point,
+                FocusMeteringAction.FLAG_AF,
+            )
+                .setAutoCancelDuration(
+                    BACK_FACE_AF_AUTO_CANCEL_SEC,
+                    java.util.concurrent.TimeUnit.SECONDS,
+                )
+                .build()
+            cam.cameraControl.startFocusAndMetering(action)
+        } catch (t: Throwable) {
+            Log.w(PREVIEW_QUALITY_TAG, "back face AF failed", t)
         }
     }
 
