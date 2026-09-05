@@ -37,7 +37,7 @@ Future<void> pumpFeed(
 }
 
 void main() {
-  testWidgets('comment text hugs the right edge under Arabic RTL', (
+  testWidgets('comment text hugs the left edge under Arabic RTL', (
     tester,
   ) async {
     await pumpFeed(
@@ -52,38 +52,34 @@ void main() {
 
     expect(
       body.dx,
-      greaterThan(screenWidth / 2),
-      reason: 'the run must start in the right half, as Arabic reads',
+      lessThan(screenWidth / 2),
+      reason: 'the run must start in the left half, not drift to the centre',
     );
   });
 
-  testWidgets('RTL mirrors LTR rather than repeating its offsets', (
-    tester,
-  ) async {
+  testWidgets('RTL and LTR put the comment in the same place', (tester) async {
     await pumpFeed(
       tester,
       direction: TextDirection.ltr,
       comments: [comment('1', 'same spot')],
     );
-    final ltrRect = tester.getRect(find.text('same spot'));
-    final screenWidth =
-        tester.view.physicalSize.width / tester.view.devicePixelRatio;
+    final ltrX = tester.getTopLeft(find.text('same spot')).dx;
 
     await pumpFeed(
       tester,
       direction: TextDirection.rtl,
       comments: [comment('1', 'same spot')],
     );
-    final rtlRect = tester.getRect(find.text('same spot'));
+    final rtlX = tester.getTopLeft(find.text('same spot')).dx;
 
     expect(
-      screenWidth - rtlRect.right,
-      moreOrLessEquals(ltrRect.left, epsilon: 0.5),
-      reason: 'the feed sits the same distance from the leading edge in both',
+      rtlX,
+      moreOrLessEquals(ltrX, epsilon: 0.5),
+      reason: 'host and viewer must not mirror the feed in Arabic',
     );
   });
 
-  testWidgets('the avatar stays to the right of the text in RTL', (
+  testWidgets('the avatar stays to the left of the text in RTL', (
     tester,
   ) async {
     await pumpFeed(
@@ -100,11 +96,7 @@ void main() {
           )
           .first,
     );
-    expect(
-      row.textDirection,
-      isNull,
-      reason: 'the bubble follows ambient direction instead of forcing LTR',
-    );
+    expect(row.textDirection ?? TextDirection.ltr, TextDirection.ltr);
 
     final textX = tester.getTopLeft(find.text('نص التعليق')).dx;
     final avatarX = tester
@@ -118,7 +110,7 @@ void main() {
         )
         .dx;
 
-    expect(avatarX, greaterThan(textX));
+    expect(avatarX, lessThan(textX));
   });
 
   testWidgets('newest comment renders closest to the bottom', (tester) async {
@@ -143,7 +135,9 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('battle comments stay bare text over the video', (tester) async {
+  testWidgets('battle comments use an opaque dark contrast surface', (
+    tester,
+  ) async {
     await pumpFeed(
       tester,
       direction: TextDirection.rtl,
@@ -154,12 +148,8 @@ void main() {
     final bubble = tester.widget<Container>(
       find.byKey(const ValueKey('comment-bubble-1')),
     );
-
-    expect(
-      bubble.decoration,
-      isNull,
-      reason: 'the opaque PK pill is the one thing that did not read as TikTok',
-    );
+    final decoration = bubble.decoration! as BoxDecoration;
+    expect(decoration.color, const Color(0xD90B0B0D));
     expect(find.text('تعليق المنافسة'), findsOneWidget);
   });
 }

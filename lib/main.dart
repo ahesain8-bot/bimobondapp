@@ -1,3 +1,5 @@
+import 'package:bimobondapp/app/live_promotions/presentation/di/live_promotions_injector.dart'
+    as live_promotions_di;
 import 'package:bimobondapp/core/routes/app_router.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -72,28 +74,42 @@ void main() async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await PushNotificationService.instance.initializeEarly();
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  // Auth first and on its own: the rest read the SharedPreferences instance
+  // and the API client it registers.
   await auth_di.initAuth();
-  await social_di.initSocial();
-  await posts_di.initPosts();
-  await promotions_di.initPromotions();
-  await sounds_di.initSounds();
-  await search_di.initSearch();
-  await categories_di.initCategories();
-  await countries_di.initCountries();
-  await interests_di.initInterests();
-  await wallets_di.initWallets();
-  await gifts_di.initGifts();
-  await auctions_di.initAuctions();
-  await shop_di.initShop();
-  await seller_verification_di.initSellerVerification();
-  await stories_di.initStories();
-  await camera_studio_di.initCameraStudio();
-  await video_templates_di.initVideoTemplates();
+
+  // Everything below only registers into GetIt and touches already-cached
+  // async singletons, so there is no ordering between them — but they used to
+  // be twenty-one sequential awaits in front of `runApp`, which is what the
+  // platform log reported as "Skipped 160 frames! The application may be doing
+  // too much work on its main thread" and the long run of `onPreDraw return
+  // false` while Flutter waited for a first frame that could not be produced.
+  // Awaited as one batch they cost roughly the slowest of the group instead of
+  // the sum of all of them.
+  await Future.wait<void>([
+    social_di.initSocial(),
+    posts_di.initPosts(),
+    promotions_di.initPromotions(),
+    live_promotions_di.initLivePromotions(),
+    sounds_di.initSounds(),
+    search_di.initSearch(),
+    categories_di.initCategories(),
+    countries_di.initCountries(),
+    interests_di.initInterests(),
+    wallets_di.initWallets(),
+    gifts_di.initGifts(),
+    auctions_di.initAuctions(),
+    shop_di.initShop(),
+    seller_verification_di.initSellerVerification(),
+    stories_di.initStories(),
+    camera_studio_di.initCameraStudio(),
+    video_templates_di.initVideoTemplates(),
+    chats_di.initChats(),
+    notifications_di.initNotifications(),
+    calls_di.initCalls(),
+    live_viewer_di.initLiveViewer(),
+  ]);
   CameraStudioCatalogLoader.applyBundledCatalog();
-  await chats_di.initChats();
-  await notifications_di.initNotifications();
-  await calls_di.initCalls();
-  await live_viewer_di.initLiveViewer();
   runApp(const ProviderScope(child: MyApp()));
 }
 

@@ -16,6 +16,9 @@ class LiveFeedBloc extends Bloc<LiveFeedEvent, LiveFeedState> {
 
   final GetLiveFeedUseCase getLiveFeedUseCase;
   String? _currentCategory;
+  bool _followingOnly = false;
+  double? _latitude, _longitude;
+  int _queryGeneration = 0;
   static const _pageSize = 10;
 
   /// Prevents stacked silent polls while a previous one is still in flight.
@@ -28,26 +31,39 @@ class LiveFeedBloc extends Bloc<LiveFeedEvent, LiveFeedState> {
     LiveFeedLoadRequested event,
     Emitter<LiveFeedState> emit,
   ) async {
-    if (state.isLoading) return;
+    final queryChanged =
+        _currentCategory != event.category ||
+        _followingOnly != event.followingOnly ||
+        _latitude != event.latitude ||
+        _longitude != event.longitude;
+    if (state.isLoading && !queryChanged) return;
+    final generation = ++_queryGeneration;
     _currentCategory = event.category;
+    _followingOnly = event.followingOnly;
+    _latitude = event.latitude;
+    _longitude = event.longitude;
     emit(
       LiveFeedLoadInProgress(
-        lives: event.refresh ? const [] : state.lives,
+        lives: (event.refresh || queryChanged) ? const [] : state.lives,
         isLoading: true,
-        hasMore: event.refresh ? true : state.hasMore,
-        currentPage: event.refresh ? 1 : state.currentPage,
-        error: event.refresh ? null : state.error,
+        hasMore: (event.refresh || queryChanged) ? true : state.hasMore,
+        currentPage: (event.refresh || queryChanged) ? 1 : state.currentPage,
+        error: (event.refresh || queryChanged) ? null : state.error,
       ),
     );
 
     final result = await getLiveFeedUseCase(
-      page: event.refresh ? 1 : state.currentPage,
+      page: (event.refresh || queryChanged) ? 1 : state.currentPage,
       limit: _pageSize,
       category: event.category,
+      followingOnly: _followingOnly,
+      latitude: _latitude,
+      longitude: _longitude,
       // Opening Lives uses cache; only pull-to-refresh clears the TTL.
       forceRefresh: false,
     );
 
+    if (generation != _queryGeneration || isClosed) return;
     await result.fold(
       (failure) async {
         emit(
@@ -60,7 +76,7 @@ class LiveFeedBloc extends Bloc<LiveFeedEvent, LiveFeedState> {
         );
       },
       (page) async {
-        final merged = event.refresh
+        final merged = (event.refresh || queryChanged)
             ? page.lives
             : _dedupeAppend(state.lives, page.lives);
         emit(
@@ -81,12 +97,17 @@ class LiveFeedBloc extends Bloc<LiveFeedEvent, LiveFeedState> {
     Emitter<LiveFeedState> emit,
   ) async {
     if (state.isLoadingMore || !state.hasMore || state.isLoading) return;
+    final generation = _queryGeneration;
     emit(state.copyWith(isLoadingMore: true));
     final result = await getLiveFeedUseCase(
       page: state.currentPage,
       limit: _pageSize,
-      category: event.category ?? _currentCategory,
+      category: _currentCategory,
+      followingOnly: _followingOnly,
+      latitude: _latitude,
+      longitude: _longitude,
     );
+    if (generation != _queryGeneration || isClosed) return;
     await result.fold(
       (failure) async {
         emit(
@@ -112,6 +133,7 @@ class LiveFeedBloc extends Bloc<LiveFeedEvent, LiveFeedState> {
     Emitter<LiveFeedState> emit,
   ) async {
     if (state.isLoading) return;
+    final generation = ++_queryGeneration;
     emit(
       LiveFeedLoadInProgress(
         lives: const [],
@@ -125,8 +147,12 @@ class LiveFeedBloc extends Bloc<LiveFeedEvent, LiveFeedState> {
       page: 1,
       limit: _pageSize,
       category: _currentCategory,
+      followingOnly: _followingOnly,
+      latitude: _latitude,
+      longitude: _longitude,
       forceRefresh: true,
     );
+    if (generation != _queryGeneration || isClosed) return;
     await result.fold(
       (failure) async {
         emit(
@@ -162,10 +188,10 @@ class LiveFeedBloc extends Bloc<LiveFeedEvent, LiveFeedState> {
       return;
     }
     final last = _lastSilentAt;
-    if (last != null &&
-        DateTime.now().difference(last) < _silentMinInterval) {
+    if (last != null && DateTime.now().difference(last) < _silentMinInterval) {
       return;
     }
+    final generation = _queryGeneration;
     _silentBusy = true;
     _lastSilentAt = DateTime.now();
     try {
@@ -173,27 +199,35 @@ class LiveFeedBloc extends Bloc<LiveFeedEvent, LiveFeedState> {
         page: 1,
         limit: _pageSize,
         category: _currentCategory,
+        followingOnly: _followingOnly,
+        latitude: _latitude,
+        longitude: _longitude,
         forceRefresh: false,
       );
-      await result.fold((failure) async {
-        final msg = failure.message.toLowerCase();
-        if (msg.contains('too many') || failure.code == '429') {
-          _silentCooldownUntil =
-              DateTime.now().add(const Duration(minutes: 2));
-        }
-      }, (page) async {
-        final merged = _mergeSilent(state.lives, page.lives);
-        if (merged.length == state.lives.length &&
-            _sameIds(merged, state.lives)) {
-          return;
-        }
-        emit(
-          state.copyWith(
-            lives: merged,
-            hasMore: page.hasMore || state.hasMore,
-          ),
-        );
-      });
+      if (generation != _queryGeneration || isClosed) return;
+      await result.fold(
+        (failure) async {
+          final msg = failure.message.toLowerCase();
+          if (msg.contains('too many') || failure.code == '429') {
+            _silentCooldownUntil = DateTime.now().add(
+              const Duration(minutes: 2),
+            );
+          }
+        },
+        (page) async {
+          final merged = _mergeSilent(state.lives, page.lives);
+          if (merged.length == state.lives.length &&
+              _sameIds(merged, state.lives)) {
+            return;
+          }
+          emit(
+            state.copyWith(
+              lives: merged,
+              hasMore: page.hasMore || state.hasMore,
+            ),
+          );
+        },
+      );
     } finally {
       _silentBusy = false;
     }
@@ -216,9 +250,9 @@ class LiveFeedBloc extends Bloc<LiveFeedEvent, LiveFeedState> {
     List<LiveEntity> incoming,
   ) {
     if (incoming.isEmpty) return existing;
-    final byId = {for (final live in incoming) live.id: live};
+    final byId = {for (final live in incoming) live.feedEntryKey: live};
     final updated = existing
-        .map((live) => byId.remove(live.id) ?? live)
+        .map((live) => byId.remove(live.feedEntryKey) ?? live)
         .toList();
     if (byId.isEmpty) return updated;
     return [...updated, ...byId.values];
@@ -230,10 +264,10 @@ class LiveFeedBloc extends Bloc<LiveFeedEvent, LiveFeedState> {
     List<LiveEntity> incoming,
   ) {
     if (incoming.isEmpty) return existing;
-    final seen = existing.map((l) => l.id).toSet();
+    final seen = existing.map((l) => l.feedEntryKey).toSet();
     final additions = <LiveEntity>[];
     for (final live in incoming) {
-      if (seen.add(live.id)) additions.add(live);
+      if (seen.add(live.feedEntryKey)) additions.add(live);
     }
     if (additions.isEmpty) return existing;
     return [...existing, ...additions];
@@ -242,7 +276,7 @@ class LiveFeedBloc extends Bloc<LiveFeedEvent, LiveFeedState> {
   static bool _sameIds(List<LiveEntity> a, List<LiveEntity> b) {
     if (a.length != b.length) return false;
     for (var i = 0; i < a.length; i++) {
-      if (a[i].id != b[i].id) return false;
+      if (a[i] != b[i]) return false;
     }
     return true;
   }

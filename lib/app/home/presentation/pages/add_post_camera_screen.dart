@@ -302,8 +302,15 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       }
       _syncRetouchToNative();
     }
-    unawaited(CameraStudioPermissions.ensureCameraAndMicrophone());
+    unawaited(_prepareNativeCameraPermissions());
     unawaited(_loadCatalog());
+  }
+
+  Future<void> _prepareNativeCameraPermissions() async {
+    await CameraStudioPermissions.ensureCameraAndMicrophone();
+    if (_useNativeArFilters) {
+      await ArCameraBridge.notifyPermissionsGranted();
+    }
   }
 
   Future<void> _loadCatalog() async {
@@ -1822,7 +1829,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     });
   }
 
-  void _onArPreviewSwipeEnd(DragEndDetails details) {
+  void _onArPreviewSwipeEnd(double primaryVelocity) {
     if (!_useNativeArFilters ||
         _isRecording ||
         _showFilters ||
@@ -1833,7 +1840,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     final current = ArFilterCatalog.effectCarouselIndex(currentId);
     final count = ArFilterCatalog.effectItems.length;
     if (count == 0) return;
-    final velocity = details.primaryVelocity ?? 0;
+    final velocity = primaryVelocity;
     if (velocity < -80 || _arSwipeDrag < -36) {
       final next = (current + 1) % count;
       _onArFilterSelected(
@@ -2084,12 +2091,10 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       if (mounted) setState(() {});
       return;
     }
-    _onArPreviewSwipeEnd(
-      DragEndDetails(
-        velocity: details.velocity,
-        primaryVelocity: details.velocity.pixelsPerSecond.dx,
-      ),
-    );
+    // Scale gestures carry a two-dimensional velocity. Constructing
+    // DragEndDetails from it asserts when the user's finger leaves diagonally;
+    // only the horizontal component decides the effect carousel direction.
+    _onArPreviewSwipeEnd(details.velocity.pixelsPerSecond.dx);
   }
 
   void _onPreviewTapUp(TapUpDetails details, Size previewSize) {

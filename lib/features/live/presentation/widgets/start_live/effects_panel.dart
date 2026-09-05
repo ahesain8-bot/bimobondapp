@@ -4,10 +4,13 @@ import '../../../../../core/constants/app_spacing.dart';
 
 /// Effects browser with a horizontal category strip and vertical thumbnails.
 class EffectsPanel extends StatefulWidget {
-  const EffectsPanel({super.key});
+  const EffectsPanel({super.key, required this.onClose});
 
   static const double height = 320;
   static const double searchHeight = 380;
+
+  /// The toolbar is behind the tray, so the tray owns an explicit close path.
+  final VoidCallback onClose;
 
   @override
   State<EffectsPanel> createState() => _EffectsPanelState();
@@ -78,6 +81,7 @@ class _EffectsPanelState extends State<EffectsPanel> {
             if (_isSearching) ...[
               _EffectSearchHeader(
                 controller: _searchController,
+                onClose: widget.onClose,
                 onCancel: () {
                   FocusManager.instance.primaryFocus?.unfocus();
                   setState(() {
@@ -112,6 +116,7 @@ class _EffectsPanelState extends State<EffectsPanel> {
                 onSelected: (index) =>
                     setState(() => _selectedCategory = index),
                 onSearch: () => setState(() => _isSearching = true),
+                onClose: widget.onClose,
               ),
             Expanded(
               child: GridView.builder(
@@ -156,12 +161,14 @@ class _EffectCategories extends StatelessWidget {
     required this.selectedIndex,
     required this.onSelected,
     required this.onSearch,
+    required this.onClose,
   });
 
   final List<_EffectCategory> categories;
   final int selectedIndex;
   final ValueChanged<int> onSelected;
   final VoidCallback onSearch;
+  final VoidCallback onClose;
 
   @override
   Widget build(BuildContext context) {
@@ -170,10 +177,13 @@ class _EffectCategories extends StatelessWidget {
       child: Row(
         textDirection: TextDirection.rtl,
         children: [
-          const SizedBox(
-            width: 40,
-            child: Center(
-              child: Icon(Icons.block, color: Colors.white, size: 25),
+          SizedBox(
+            width: 44,
+            child: IconButton(
+              key: const Key('live_start_effects_close'),
+              tooltip: 'إغلاق المؤثرات',
+              onPressed: onClose,
+              icon: const Icon(Icons.close, color: Colors.white, size: 25),
             ),
           ),
           Expanded(
@@ -246,10 +256,15 @@ class _EffectCategories extends StatelessWidget {
 }
 
 class _EffectSearchHeader extends StatelessWidget {
-  const _EffectSearchHeader({required this.controller, required this.onCancel});
+  const _EffectSearchHeader({
+    required this.controller,
+    required this.onCancel,
+    required this.onClose,
+  });
 
   final TextEditingController controller;
   final VoidCallback onCancel;
+  final VoidCallback onClose;
 
   @override
   Widget build(BuildContext context) {
@@ -300,12 +315,16 @@ class _EffectSearchHeader extends StatelessWidget {
               style: TextButton.styleFrom(
                 foregroundColor: Colors.white,
                 minimumSize: const Size(45, 35),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.xs,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
               child: const Text('إلغاء', style: TextStyle(fontSize: 15)),
+            ),
+            IconButton(
+              key: const Key('live_start_effects_close_search'),
+              tooltip: 'إغلاق المؤثرات',
+              onPressed: onClose,
+              icon: const Icon(Icons.close, color: Colors.white),
             ),
           ],
         ),

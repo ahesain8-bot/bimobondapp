@@ -1,6 +1,8 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart';
 
+import 'live_feed_promotion.dart';
+
 class LiveEntity extends Equatable {
   final String id;
   final String hostId;
@@ -19,6 +21,12 @@ class LiveEntity extends Equatable {
   final bool isLive;
   final bool isFollowing;
   final Map<String, dynamic>? metadata;
+  final bool isPromoted;
+  final LiveFeedPromotion? promotion;
+
+  /// Feed occurrences have distinct identities even when they share a room.
+  String get feedEntryKey =>
+      '$id|${isPromoted ? 'promoted' : 'organic'}|${isPromoted ? promotion?.id ?? '' : ''}';
 
   const LiveEntity({
     required this.id,
@@ -38,6 +46,8 @@ class LiveEntity extends Equatable {
     this.isLive = true,
     this.metadata,
     this.isFollowing = false,
+    this.isPromoted = false,
+    this.promotion,
   });
 
   LiveEntity copyWith({
@@ -58,6 +68,9 @@ class LiveEntity extends Equatable {
     bool? isLive,
     bool? isFollowing,
     Map<String, dynamic>? metadata,
+    bool? isPromoted,
+    LiveFeedPromotion? promotion,
+    bool clearPromotion = false,
   }) {
     return LiveEntity(
       id: id ?? this.id,
@@ -77,6 +90,8 @@ class LiveEntity extends Equatable {
       isLive: isLive ?? this.isLive,
       isFollowing: isFollowing ?? this.isFollowing,
       metadata: metadata ?? this.metadata,
+      isPromoted: isPromoted ?? this.isPromoted,
+      promotion: clearPromotion ? null : (promotion ?? this.promotion),
     );
   }
 
@@ -99,6 +114,8 @@ class LiveEntity extends Equatable {
     isLive,
     isFollowing,
     metadata,
+    isPromoted,
+    promotion,
   ];
 }
 

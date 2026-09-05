@@ -1,3 +1,4 @@
+import 'package:bimobondapp/app/live_promotions/presentation/pages/live_promotions_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -39,10 +40,7 @@ import '../utils/live_screen_wakelock.dart';
 /// On Android, FaceWarp's GLSurfaceView paints above Flutter widgets, so the
 /// classic chrome (tools / title / LIVE) is shown via a native Dialog instead.
 class LiveStartPage extends StatefulWidget {
-  const LiveStartPage({
-    super.key,
-    this.reuseHostArCamera = false,
-  });
+  const LiveStartPage({super.key, this.reuseHostArCamera = false});
 
   /// Host route keeps [ArCameraPreview] mounted underneath this transparent page.
   final bool reuseHostArCamera;
@@ -99,15 +97,16 @@ class _LiveStartPageState extends State<LiveStartPage>
       ArCameraBridge.onLiveStartFlip = () {
         _liveBloc.add(const LiveCameraSwitchRequested());
       };
-      ArCameraBridge.onLiveStartShare = () => _openFromNative(_openStartLiveSharePage);
-      ArCameraBridge.onLiveStartLiveCenter =
-          () => _openFromNative(_openServicePlusPage);
-      ArCameraBridge.onLiveStartCampaigns =
-          () => _openFromNative(_openFansCommunityPage);
-      ArCameraBridge.onLiveStartServicePlus =
-          () => _openFromNative(_openServicePlusPage);
-      ArCameraBridge.onLiveStartInteract =
-          () => _openFromNative(_openStartLiveInteractionSheet);
+      ArCameraBridge.onLiveStartShare = () =>
+          _openFromNative(_openStartLiveSharePage);
+      ArCameraBridge.onLiveStartLiveCenter = () =>
+          _openFromNative(_openServicePlusPage);
+      ArCameraBridge.onLiveStartCampaigns = () =>
+          _openFromNative(_openFansCommunityPage);
+      ArCameraBridge.onLiveStartServicePlus = () =>
+          _openFromNative(_openServicePlusPage);
+      ArCameraBridge.onLiveStartInteract = () =>
+          _openFromNative(_openStartLiveInteractionSheet);
       ArCameraBridge.onLiveStartComingSoon = _showComingSoon;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _enableNativeChrome();
@@ -316,12 +315,19 @@ class _LiveStartPageState extends State<LiveStartPage>
     return StartLiveInteractionSheet.show(context);
   }
 
+  Future<void> _openPromotion() =>
+      LivePromotionsScreen.show(context, preLive: true);
+
   void _showComingSoon(String label) {
+    if (label.trim().toLowerCase() == 'promote') {
+      _openFromNative(_openPromotion);
+      return;
+    }
     if (!mounted) return;
     final name = label.trim().isEmpty ? 'This' : label.trim();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$name coming soon')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('$name coming soon')));
   }
 
   Future<void> _openFromNative(Future<void> Function() open) async {
@@ -365,11 +371,11 @@ class _LiveStartPageState extends State<LiveStartPage>
                   child: BeautifyPanel(),
                 ),
               if (_isEffectsPanelVisible)
-                const Positioned(
+                Positioned(
                   left: 0,
                   right: 0,
                   bottom: 0,
-                  child: EffectsPanel(),
+                  child: EffectsPanel(onClose: _toggleEffectsPanel),
                 ),
               if (_isSettingsPanelVisible)
                 Positioned.fill(
@@ -448,7 +454,7 @@ class _LiveStartPageState extends State<LiveStartPage>
                       onInteractTap: _openStartLiveInteractionSheet,
                       onSubscriptionTap: () => _showComingSoon('Subscription'),
                       onShopTap: () => _showComingSoon('Shop'),
-                      onPromoteTap: () => _showComingSoon('Promote'),
+                      onPromoteTap: _openPromotion,
                       onBoardsTap: () => _showComingSoon('Boards'),
                       onDualTap: () => _showComingSoon('Dual'),
                     ),
@@ -470,11 +476,11 @@ class _LiveStartPageState extends State<LiveStartPage>
                 child: BeautifyPanel(),
               ),
             if (_isEffectsPanelVisible)
-              const Positioned(
+              Positioned(
                 left: 0,
                 right: 0,
                 bottom: 0,
-                child: EffectsPanel(),
+                child: EffectsPanel(onClose: _toggleEffectsPanel),
               ),
             if (_isSettingsPanelVisible)
               Positioned.fill(

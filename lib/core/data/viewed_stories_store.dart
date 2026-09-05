@@ -1,10 +1,11 @@
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
+import 'package:bimobondapp/core/utils/build_safe_notifier.dart';
 import 'package:bimobondapp/core/utils/post_story_filter.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Tracks which story post ids the current user has opened (gray ring on Messages).
-class ViewedStoriesStore extends ChangeNotifier {
+class ViewedStoriesStore extends ChangeNotifier with BuildSafeNotifier {
   ViewedStoriesStore(this._prefs);
 
   final SharedPreferences _prefs;
@@ -20,14 +21,14 @@ class ViewedStoriesStore extends ChangeNotifier {
     if (userId != null && userId.isNotEmpty) {
       _viewed.addAll(_prefs.getStringList(_key(userId)) ?? const []);
     }
-    notifyListeners();
+    notifySafely();
   }
 
   Future<void> markViewed(String storyPostId) async {
     if (_userId == null || _userId!.isEmpty || storyPostId.isEmpty) return;
     if (!_viewed.add(storyPostId)) return;
     await _prefs.setStringList(_key(_userId!), _viewed.toList());
-    notifyListeners();
+    notifySafely();
   }
 
   bool isViewed(String storyPostId) => _viewed.contains(storyPostId);
@@ -43,7 +44,7 @@ class ViewedStoriesStore extends ChangeNotifier {
     await _prefs.remove(_key(userId));
     if (_userId == userId) {
       _viewed.clear();
-      notifyListeners();
+      notifySafely();
     }
   }
 }

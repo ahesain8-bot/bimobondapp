@@ -44,10 +44,12 @@ class WalletAccountingModel extends WalletAccountingEntity {
 }
 
 class WalletModel extends WalletEntity {
+  final bool hasVerifiedCoinBalance;
   const WalletModel({
     required super.id,
     required super.userId,
     required super.balanceCoins,
+    this.hasVerifiedCoinBalance = false,
     super.accountings,
   });
 
@@ -57,7 +59,8 @@ class WalletModel extends WalletEntity {
       return WalletModel.fromJson(data);
     }
 
-    final accountingsRaw = json['accountings'] ?? json['ledger'] ?? json['history'];
+    final accountingsRaw =
+        json['accountings'] ?? json['ledger'] ?? json['history'];
     final accountings = <WalletAccountingModel>[];
     if (accountingsRaw is List) {
       for (final entry in accountingsRaw) {
@@ -69,10 +72,20 @@ class WalletModel extends WalletEntity {
       }
     }
 
+    final rawCoins = json['balanceCoins'] ?? json['coinBalance'];
+    final coins = rawCoins is num
+        ? rawCoins
+        : num.tryParse(rawCoins?.toString() ?? '');
+    final verifiedCoins =
+        coins != null &&
+        coins.isFinite &&
+        coins >= 0 &&
+        coins == coins.roundToDouble();
     return WalletModel(
+      hasVerifiedCoinBalance: verifiedCoins,
       id: (json['id'] ?? json['_id'] ?? '').toString(),
       userId: (json['userId'] ?? json['user_id'] ?? '').toString(),
-      balanceCoins: WalletAccountingModel._readInt(
+      balanceCoins: verifiedCoins ? coins.toInt() : WalletAccountingModel._readInt(
         json['balanceCoins'] ??
             json['balanceUsd'] ??
             json['balance'] ??

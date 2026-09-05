@@ -116,9 +116,11 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
   StreamSubscription<LiveKitConnectionState>? _battleSub;
   String? _activeLiveId;
   bool _busy = false;
-  LiveEntity? _pendingActivate;
+  LiveViewerActivated? _pendingActivate;
+  Object? _activeActivation;
   bool _deactivateRequested = false;
   bool _feedExitRequested = false;
+
   /// Bumped on every deactivate/close so an in-flight join cannot keep
   /// LiveKit/socket alive after the viewer leaves the feed.
   int _sessionGeneration = 0;
@@ -183,15 +185,28 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     LiveViewerActivated event,
     Emitter<LiveViewerState> emit,
   ) async {
-    if (_feedExitRequested || _deactivateRequested || _tearingDown) return;
+    if (_feedExitRequested || _deactivateRequested) {
+      return;
+    }
     if (_busy) {
       // A leave/close is already pending — do not queue another join that
       // would revive LiveKit after the feed route is gone.
-      if (_deactivateRequested) return;
-      _pendingActivate = event.live;
+      if (_deactivateRequested) {
+        return;
+      }
+      _pendingActivate = event;
+      return;
+    }
+    // Rebuilds of one entry do not retry a failed, possibly billed join.
+    // Explicit Retry has no attribution; foreground follows Deactivated.
+    if (_activeLiveId == event.live.id &&
+        event.activation != null &&
+        identical(event.activation, _activeActivation)) {
       return;
     }
     if (_activeLiveId == event.live.id &&
+        (event.activation == null ||
+            identical(event.activation, _activeActivation)) &&
         state.connectionState == LiveConnectionState.connected) {
       return;
     }
@@ -205,6 +220,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
       await _teardown(silent: true, emit: emit);
       if (isClosed || _sessionGeneration != sessionGen) return;
       _activeLiveId = event.live.id;
+      _activeActivation = event.activation;
       final live = event.live;
 
       final isPk = live.metadata?['isPk'] == true;
@@ -250,7 +266,17 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
         return;
       }
 
-      final joinResult = await joinLiveUseCase(live.id);
+      // Resolve the account ID before attributing a promoted activation; host
+      // joins and reconnect/PK events (which have no activation) stay organic.
+      if (event.activation != null) {
+        _currentUserId = await _loadCurrentUserId(allowFirebaseFallback: false);
+        if (!_isCurrentSession(live.id, sessionGen)) return;
+      }
+      final campaignId = event.activation?.consume(
+        joiningLiveId: live.id,
+        viewerId: _currentUserId,
+      );
+      final joinResult = await joinLiveUseCase(live.id, campaignId: campaignId);
       if (!_isCurrentSession(live.id, sessionGen)) {
         await _abandonStaleSession();
         return;
@@ -276,7 +302,11 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
         },
         (result) async {
           final activatePerf = LiveRoomPerf.start();
-          LiveRoomPerf.mark(activatePerf, 'rest_ok', detail: 'liveId=${result.liveId}');
+          LiveRoomPerf.mark(
+            activatePerf,
+            'rest_ok',
+            detail: 'liveId=${result.liveId}',
+          );
 
           // JWT claim decode is debug diagnostics only — never block join.
           if (kDebugMode) {
@@ -307,7 +337,10 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
             socketService
                 .connect(liveId: result.liveId, token: result.socketToken)
                 .then((_) {
-                  LiveRoomPerf.log('socket_connected', detail: 'liveId=${live.id}');
+                  LiveRoomPerf.log(
+                    'socket_connected',
+                    detail: 'liveId=${live.id}',
+                  );
                   LiveRoomPerf.log('joinLive_ok', detail: 'liveId=${live.id}');
                   if (!_isCurrentSession(live.id, sessionGen)) {
                     unawaited(socketService.disconnect());
@@ -404,8 +437,10 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
       if (!shouldDeactivate) {
         final pending = _pendingActivate;
         _pendingActivate = null;
-        if (pending != null && pending.id != _activeLiveId) {
-          add(LiveViewerActivated(pending));
+        if (pending != null &&
+            (pending.live.id != _activeLiveId ||
+                !identical(pending.activation, _activeActivation))) {
+          add(pending);
         }
       }
     }
@@ -1483,7 +1518,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
         ),
       );
     } else if (event is LiveEndedEvent) {
-      await _disconnectBattleOpponent();
+      await _disconnectBattleOpponent(emit: emit);
       emit(
         state.copyWith(
           session: session.copyWith(
@@ -1809,7 +1844,9 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     );
   }
 
-  Future<String?> _loadCurrentUserId() async {
+  Future<String?> _loadCurrentUserId({
+    bool allowFirebaseFallback = true,
+  }) async {
     try {
       final payload = await apiClient.get(ApiEndpoints.authMe);
       final id = payload['id']?.toString();
@@ -1820,7 +1857,9 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
         if (nested != null && nested.isNotEmpty) return nested;
       }
     } catch (_) {}
-    return fb.FirebaseAuth.instance.currentUser?.uid;
+    return allowFirebaseFallback
+        ? fb.FirebaseAuth.instance.currentUser?.uid
+        : null;
   }
 
   Future<void> _refreshBattle(
@@ -1835,7 +1874,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
         // No battle on the server. Clear a stuck local PK (missed `finished`
         // socket). The old early-return left viewers in split UI forever.
         if (state.battle?.isActive == true) {
-          await _disconnectBattleOpponent();
+          await _disconnectBattleOpponent(emit: emit);
           emit(
             state.copyWith(
               clearBattle: true,
@@ -1884,7 +1923,8 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     final battleKey = battle.isActive ? '${battle.id}:$opponentId' : '';
     final connectionAlreadyInFlight = _battleConnectKeys.contains(battleKey);
     final startsMediaOperation =
-        !battle.isActive || (roomNeedsReplacement && !connectionAlreadyInFlight);
+        !battle.isActive ||
+        (roomNeedsReplacement && !connectionAlreadyInFlight);
     final operationGeneration = startsMediaOperation
         ? ++_battleOperationGeneration
         : _battleOperationGeneration;
@@ -1900,12 +1940,10 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
       ),
     );
     if (!battle.isActive) {
-      await _disconnectBattleOpponent(invalidate: false);
-      if (
-        isClosed ||
-        _tearingDown ||
-        operationGeneration != _battleOperationGeneration
-      ) {
+      await _disconnectBattleOpponent(invalidate: false, emit: emit);
+      if (isClosed ||
+          _tearingDown ||
+          operationGeneration != _battleOperationGeneration) {
         return;
       }
       emit(
@@ -1942,21 +1980,17 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     LiveViewerBattleRoomStateChanged event,
     Emitter<LiveViewerState> emit,
   ) async {
-    if (
-      isClosed ||
-      _tearingDown ||
-      _activeLiveId == null ||
-      state.battle?.isActive != true
-    ) {
+    if (isClosed ||
+        _tearingDown ||
+        _activeLiveId == null ||
+        state.battle?.isActive != true) {
       return;
     }
     switch (event.state) {
       case LiveKitConnectionState.disconnected:
       case LiveKitConnectionState.failed:
-        if (
-          event.state == LiveKitConnectionState.disconnected &&
-          _battleConnectKeys.isEmpty
-        ) {
+        if (event.state == LiveKitConnectionState.disconnected &&
+            _battleConnectKeys.isEmpty) {
           _battleRoomRecoveryInFlight = true;
         } else {
           _battleRoomRecoveryInFlight = false;
@@ -1984,7 +2018,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     required int generation,
     required Emitter<LiveViewerState> emit,
   }) async {
-    await _disconnectBattleOpponent(invalidate: false);
+    await _disconnectBattleOpponent(invalidate: false, emit: emit);
     final result = await joinLiveUseCase(opponentId);
     if (_activeLiveId != liveId ||
         isClosed ||
@@ -2042,12 +2076,10 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
             ),
           );
         } catch (e) {
-          if (
-            !isClosed &&
-            !_tearingDown &&
-            _activeLiveId == liveId &&
-            generation == _battleOperationGeneration
-          ) {
+          if (!isClosed &&
+              !_tearingDown &&
+              _activeLiveId == liveId &&
+              generation == _battleOperationGeneration) {
             emit(
               state.copyWith(moderationBanner: 'تعذر توصيل فيديو الخصم: $e'),
             );
@@ -2057,12 +2089,15 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     );
   }
 
-  Future<void> _disconnectBattleOpponent({bool invalidate = true}) async {
+  Future<void> _disconnectBattleOpponent({
+    bool invalidate = true,
+    Emitter<LiveViewerState>? emit,
+  }) async {
     if (invalidate) _battleOperationGeneration++;
     _battleRoomRecoveryInFlight = false;
     final opponentId = _battleOpponentLiveId;
     _battleOpponentLiveId = null;
-    if (!isClosed && state.battleRoom != null) {
+    if (emit != null && !isClosed && state.battleRoom != null) {
       emit(state.copyWith(battleRoom: null));
     }
     try {
@@ -2087,12 +2122,11 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
       id: map['id']?.toString() ?? 'pinned',
       liveId: live.id,
       userId: userMap?['id']?.toString() ?? map['userId']?.toString() ?? '',
-      username:
-          (() {
-            final full = userMap?['fullName']?.toString().trim();
-            if (full != null && full.isNotEmpty) return full;
-            return userMap?['username']?.toString() ?? 'User';
-          })(),
+      username: (() {
+        final full = userMap?['fullName']?.toString().trim();
+        if (full != null && full.isNotEmpty) return full;
+        return userMap?['username']?.toString() ?? 'User';
+      })(),
       userAvatar: userMap?['avatarUrl']?.toString(),
       content: content,
       createdAt:
@@ -2121,7 +2155,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     _battleSupportersRefreshTimer = null;
     _guestApprovalTimer?.cancel();
     _guestApprovalTimer = null;
-    await _disconnectBattleOpponent();
+    await _disconnectBattleOpponent(emit: emit);
     final id = _activeLiveId;
     _activeLiveId = null;
     if (id != null) {

@@ -8,7 +8,10 @@ class JoinLiveUseCase {
 
   JoinLiveUseCase(this.repository);
 
-  Future<Either<Failure, JoinLiveResult>> call(String liveId) {
-    return repository.joinLive(liveId);
+  Future<Either<Failure, JoinLiveResult>> call(
+    String liveId, {
+    String? campaignId,
+  }) {
+    return repository.joinLive(liveId, campaignId: campaignId);
   }
 }

@@ -1058,9 +1058,26 @@ class NativeCameraEngine(
 
         provider.unbindAll()
 
-        val selector = CameraSelector.Builder()
-            .requireLensFacing(lensFacing)
-            .build()
+        val requestedSelector = selectorFor(lensFacing)
+        val selector = if (provider.hasCamera(requestedSelector)) {
+            requestedSelector
+        } else {
+            val fallbackLens = if (lensFacing == CameraSelector.LENS_FACING_FRONT) {
+                CameraSelector.LENS_FACING_BACK
+            } else {
+                CameraSelector.LENS_FACING_FRONT
+            }
+            val fallbackSelector = selectorFor(fallbackLens)
+            if (!provider.hasCamera(fallbackSelector)) {
+                throw IllegalStateException("no_camera_available")
+            }
+            Log.w(
+                TAG,
+                "Requested lens is unavailable; falling back to lensFacing=$fallbackLens",
+            )
+            lensFacing = fallbackLens
+            fallbackSelector
+        }
 
         val resolutionSelector = ResolutionSelector.Builder()
             .setResolutionStrategy(
@@ -1128,6 +1145,10 @@ class NativeCameraEngine(
             torchEnabled = false
         }
     }
+
+    private fun selectorFor(lens: Int): CameraSelector = CameraSelector.Builder()
+        .requireLensFacing(lens)
+        .build()
 
     private fun buildImageAnalysis(): ImageAnalysis {
         val resolutionSelector = ResolutionSelector.Builder()

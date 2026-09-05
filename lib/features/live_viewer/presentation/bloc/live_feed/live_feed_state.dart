@@ -32,8 +32,7 @@ abstract class LiveFeedState extends Equatable {
     final resolvedIsLoading = isLoading ?? this.isLoading;
     final resolvedIsLoadingMore = isLoadingMore ?? this.isLoadingMore;
     final resolvedHasMore = hasMore ?? this.hasMore;
-    final resolvedError =
-        clearError ? null : (error ?? this.error);
+    final resolvedError = clearError ? null : (error ?? this.error);
     final resolvedCurrentPage = currentPage ?? this.currentPage;
 
     final bool hadError = this.error != null;
@@ -53,7 +52,7 @@ abstract class LiveFeedState extends Equatable {
 
     if (wantError) {
       return LiveFeedLoadFailure(
-        failure: resolvedError!,
+        failure: resolvedError,
         lives: resolvedLives,
         isLoading: false,
         isLoadingMore: resolvedIsLoadingMore,

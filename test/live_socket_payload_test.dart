@@ -228,6 +228,23 @@ void main() {
   });
 
   group('viewer SocketMapper guest events', () {
+    test('uses the user fullName for live comments', () {
+      final event = SocketMapper.commentEvent({
+        'liveId': 'l9',
+        'id': 'c9',
+        'content': 'Hello',
+        'user': {
+          'id': 'u9',
+          'username': 'user_u9',
+          'fullName': 'Viewer Display Name',
+        },
+      }, null);
+
+      expect(event, isA<LiveCommentEvent>());
+      expect(event!.comment.userId, 'u9');
+      expect(event.comment.username, 'Viewer Display Name');
+    });
+
     test('maps liveGuestInvite with the host name and role', () {
       final event = SocketMapper.guestInviteEvent({
         'liveId': 'l9',

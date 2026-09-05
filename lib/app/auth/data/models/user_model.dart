@@ -227,12 +227,22 @@ class UserModel extends UserEntity {
           _parseOptionalBool(json['isFollowing']) ??
           _parseOptionalBool(json['isFollowed']) ??
           _parseOptionalBool(json['viewerIsFollowing']) ??
-          _parseOptionalBool(json['following']),
+          _parseOptionalBool(json['youFollow']) ??
+          _parseOptionalBool(json['followedByMe']) ??
+          (_parseOptionalBool(json['isFriend']) == true ||
+                  _parseOptionalBool(json['isMutual']) == true
+              ? true
+              : null),
       isFollowedBy:
           _parseOptionalBool(json['isFollowedBy']) ??
           _parseOptionalBool(json['followsYou']) ??
-          _parseOptionalBool(json['isFollower']),
-      isFriend: _parseOptionalBool(json['isFriend']),
+          _parseOptionalBool(json['isFollower']) ??
+          (_parseOptionalBool(json['isFriend']) == true ||
+                  _parseOptionalBool(json['isMutual']) == true
+              ? true
+              : null),
+      isFriend: _parseOptionalBool(json['isFriend']) ??
+          _parseOptionalBool(json['isMutual']),
       isOnline: _parseOptionalBool(json['isOnline']),
       lastSeenAt: json['lastSeenAt']?.toString(),
       riskLevel: json['riskLevel']?.toString(),

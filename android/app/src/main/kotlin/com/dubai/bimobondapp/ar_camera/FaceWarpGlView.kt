@@ -82,6 +82,10 @@ class FaceWarpGlView @JvmOverloads constructor(
 ) : GLSurfaceView(context, attrs) {
 
     private val renderer = FaceWarpRenderer()
+    // The Flutter platform view and the live publisher can both request the
+    // renderer during the hand-off to LiveKit.  Serialize those calls and make
+    // the state visible across the platform/GL threads.
+    @Volatile
     private var glInitialized = false
     private val mainHandler = Handler(Looper.getMainLooper())
 
@@ -136,6 +140,7 @@ class FaceWarpGlView @JvmOverloads constructor(
         synchronized(cameraSurfaceWaiters) { cameraSurfaceWaiters.add(block) }
     }
 
+    @Synchronized
     fun ensureGlInitialized() {
         if (glInitialized) return
         glInitialized = true
@@ -317,7 +322,13 @@ class FaceWarpGlView @JvmOverloads constructor(
 
     fun setEncoderSurface(surface: Surface?, width: Int, height: Int) {
         ensureGlInitialized()
+        Log.i(
+            TAG,
+            "queue encoder surface id=${System.identityHashCode(this)} " +
+                "valid=${surface?.isValid == true} ${width}x$height",
+        )
         queueEvent {
+            Log.i(TAG, "apply encoder surface id=${System.identityHashCode(this)}")
             renderer.setEncoderTarget(surface, width, height)
         }
         requestRender()

@@ -29,17 +29,29 @@ class FakeLiveRepository implements LiveRepository {
     required int page,
     required int limit,
     String? category,
-  }) =>
-      '$page|$limit|${category ?? ''}';
+    bool followingOnly = false,
+    double? latitude,
+    double? longitude,
+  }) => '$page|$limit|${category ?? ''}|$followingOnly|$latitude|$longitude';
 
   @override
   Future<Either<Failure, LiveFeedPageResult>> getLiveFeed({
     int page = 1,
     int limit = 10,
     String? category,
+    bool followingOnly = false,
+    double? latitude,
+    double? longitude,
     bool forceRefresh = false,
   }) async {
-    final key = _feedKey(page: page, limit: limit, category: category);
+    final key = _feedKey(
+      page: page,
+      limit: limit,
+      category: category,
+      followingOnly: followingOnly,
+      latitude: latitude,
+      longitude: longitude,
+    );
 
     if (!forceRefresh &&
         page == 1 &&
@@ -59,6 +71,9 @@ class FakeLiveRepository implements LiveRepository {
       page: page,
       limit: limit,
       category: category,
+      followingOnly: followingOnly,
+      latitude: latitude,
+      longitude: longitude,
       cacheKey: key,
     );
     _feedInFlight = future;
@@ -77,6 +92,9 @@ class FakeLiveRepository implements LiveRepository {
     required int page,
     required int limit,
     String? category,
+    bool followingOnly = false,
+    double? latitude,
+    double? longitude,
     required String cacheKey,
   }) async {
     try {
@@ -84,6 +102,9 @@ class FakeLiveRepository implements LiveRepository {
         page: page,
         limit: limit,
         category: category,
+        followingOnly: followingOnly,
+        latitude: latitude,
+        longitude: longitude,
       );
       final activeLives = pageResult.lives
           .where((l) => l.status == LiveStatus.live)
@@ -201,28 +222,54 @@ class FakeLiveRepository implements LiveRepository {
     }
   }
 
-  final Map<String, Future<Either<Failure, JoinLiveResult>>> _joinInFlight =
-      {};
+  final Map<String, Future<Either<Failure, JoinLiveResult>>> _joinInFlight = {};
+
+  final Map<String, String?> _joinCampaigns = {};
 
   @override
-  Future<Either<Failure, JoinLiveResult>> joinLive(String liveId) async {
+  Future<Either<Failure, JoinLiveResult>> joinLive(
+    String liveId, {
+    String? campaignId,
+  }) async {
     final existing = _joinInFlight[liveId];
-    if (existing != null) return existing;
+    final normalizedCampaignId = campaignId?.trim();
+    final attribution =
+        normalizedCampaignId == null || normalizedCampaignId.isEmpty
+        ? null
+        : normalizedCampaignId;
+    if (existing != null) {
+      if (_joinCampaigns[liveId] != attribution) {
+        // One connection per room, with no silent attribution borrowing.
+        // The caller can finish its current activation and explicitly retry.
+        return const Left(
+          ValidationFailure(
+            'A different entry for this live is already connecting.',
+            code: 'JOIN_CONTEXT_CONFLICT',
+          ),
+        );
+      }
+      return existing;
+    }
 
-    final future = _joinLiveOnce(liveId);
+    _joinCampaigns[liveId] = attribution;
+    final future = _joinLiveOnce(liveId, campaignId: attribution);
     _joinInFlight[liveId] = future;
     try {
       return await future;
     } finally {
       if (identical(_joinInFlight[liveId], future)) {
         _joinInFlight.remove(liveId);
+        _joinCampaigns.remove(liveId);
       }
     }
   }
 
-  Future<Either<Failure, JoinLiveResult>> _joinLiveOnce(String liveId) async {
+  Future<Either<Failure, JoinLiveResult>> _joinLiveOnce(
+    String liveId, {
+    String? campaignId,
+  }) async {
     try {
-      final result = await _remote.joinLive(liveId);
+      final result = await _remote.joinLive(liveId, campaignId: campaignId);
       return Right(result);
     } on SocketException catch (e) {
       return Left(

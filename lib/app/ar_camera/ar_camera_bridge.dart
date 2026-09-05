@@ -79,6 +79,11 @@ class ArCameraBridge {
     _channel.setMethodCallHandler(null);
   }
 
+  /// Rebind after the shared Flutter permission flow has completed.
+  static Future<void> notifyPermissionsGranted() async {
+    await _channel.invokeMethod<void>('notifyPermissionsGranted');
+  }
+
   static Future<void> warmup() async {
     await _channel.invokeMethod<void>('warmup');
   }

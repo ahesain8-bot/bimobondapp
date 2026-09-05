@@ -321,7 +321,7 @@ void main() {
   );
 
   testWidgets(
-    'shows a thumbnail while asynchronous gift media is initializing',
+    'loading animation does not flash a static thumbnail before playback',
     (tester) async {
       await tester.pumpWidget(
         const MaterialApp(
@@ -334,11 +334,11 @@ void main() {
       );
       await tester.pump();
 
-      expect(find.byType(SafeNetworkImage), findsOneWidget);
+      expect(find.byType(SafeNetworkImage), findsNothing);
     },
   );
 
-  testWidgets('large gifts keep the live room visible', (tester) async {
+  testWidgets('large square gifts leave the upper live room visible', (tester) async {
     tester.view.physicalSize = const Size(400, 800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -356,9 +356,13 @@ void main() {
     final stage = tester.getSize(
       find.byKey(const ValueKey('gift-animation-stage')),
     );
-    expect(stage.width, closeTo(352, 0.1));
-    expect(stage.height, closeTo(384, 0.1));
-    expect(stage.width, lessThan(400));
-    expect(stage.height, lessThan(800 * 0.5));
+    // Matches the current square, bottom-aligned stage in
+    // gift_large_top_blend_test.dart; the upper half still shows the LIVE.
+    expect(stage.width, closeTo(400, 0.1));
+    expect(stage.height, closeTo(400, 0.1));
+    await tester.pump(const Duration(milliseconds: 500));
+    final rect = tester.getRect(find.byKey(const ValueKey('gift-animation-stage')));
+    expect(rect.bottom, closeTo(800, 0.1));
+    expect(rect.top, greaterThanOrEqualTo(400));
   });
 }

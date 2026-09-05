@@ -1,4 +1,5 @@
 import 'package:camera/camera.dart';
+import 'package:bimobondapp/app/camera_engine/native_camera_controller.dart';
 
 const Object _unset = Object();
 
@@ -21,6 +22,7 @@ class LiveCameraInitializing extends LiveState {
 class LiveReady extends LiveState {
   const LiveReady({
     this.controller,
+    this.nativeController,
     this.isCameraInitialized = false,
     this.isFrontCamera = true,
     this.isToolsExpanded = true,
@@ -30,6 +32,10 @@ class LiveReady extends LiveState {
 
   /// Active camera controller, `null` while not initialized.
   final CameraController? controller;
+
+  /// Android CameraX/GPU preview. This is preferred over the Flutter camera
+  /// and is handed to the live room until LiveKit takes ownership of the lens.
+  final NativeCameraController? nativeController;
 
   /// Whether the camera is initialized and can be previewed.
   final bool isCameraInitialized;
@@ -48,6 +54,7 @@ class LiveReady extends LiveState {
 
   LiveReady copyWith({
     Object? controller = _unset,
+    Object? nativeController = _unset,
     bool? isCameraInitialized,
     bool? isFrontCamera,
     bool? isToolsExpanded,
@@ -58,6 +65,9 @@ class LiveReady extends LiveState {
       controller: identical(controller, _unset)
           ? this.controller
           : controller as CameraController?,
+      nativeController: identical(nativeController, _unset)
+          ? this.nativeController
+          : nativeController as NativeCameraController?,
       isCameraInitialized: isCameraInitialized ?? this.isCameraInitialized,
       isFrontCamera: isFrontCamera ?? this.isFrontCamera,
       isToolsExpanded: isToolsExpanded ?? this.isToolsExpanded,
@@ -71,6 +81,7 @@ class LiveReady extends LiveState {
     if (identical(this, other)) return true;
     if (other is! LiveReady) return false;
     return other.controller == controller &&
+        other.nativeController == nativeController &&
         other.isCameraInitialized == isCameraInitialized &&
         other.isFrontCamera == isFrontCamera &&
         other.isToolsExpanded == isToolsExpanded &&
@@ -82,6 +93,7 @@ class LiveReady extends LiveState {
   int get hashCode {
     return Object.hash(
       controller,
+      nativeController,
       isCameraInitialized,
       isFrontCamera,
       isToolsExpanded,

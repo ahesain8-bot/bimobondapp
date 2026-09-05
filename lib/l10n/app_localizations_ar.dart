@@ -3049,7 +3049,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String notificationBodyGift(String name) {
-    return '$name sent you a gift';
+    return 'أرسل لك $name هدية';
   }
 
   @override
@@ -4972,4 +4972,220 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get templateEditorClipComingSoon => 'قريباً';
+
+  @override
+  String get livePromotionPromotedLabel => 'مُروَّج';
+
+  @override
+  String get lpTitle => 'ترويج البث المباشر';
+
+  @override
+  String get lpMine => 'ترويجات البث المباشر';
+
+  @override
+  String get lpPreLive => 'ابدأ بثك العام أولاً، ثم افتح المشاركة ← الترويج. معاينة الكاميرا هذه لا تحتوي على بث محفوظ يمكن ترويجه.';
+
+  @override
+  String get lpUnavailable => 'ترويج البث غير متاح مؤقتاً. يُرجى المحاولة لاحقاً.';
+
+  @override
+  String get lpEligibility => 'يمكن لمضيف بث عام مخطّط أو جارٍ ترويجه بحساب غير خاص وغير محظور. يجب تأكيد أهلية البث أولاً.';
+
+  @override
+  String get lpDisabled => 'ترويج البث معطّل حالياً.';
+
+  @override
+  String get lpObjective => 'هدفك';
+
+  @override
+  String get lpViews => 'مشاهدون أكثر';
+
+  @override
+  String get lpFollowers => 'متابعون أكثر';
+
+  @override
+  String get lpAudience => 'الجمهور';
+
+  @override
+  String get lpAutomatic => 'جمهور تلقائي';
+
+  @override
+  String get lpCustomAudience => 'جمهور مخصّص';
+
+  @override
+  String get lpAutomaticHint => 'دع الخدمة تختار الأشخاص المرجّح أن يشاهدوا بثك.';
+
+  @override
+  String get lpGenders => 'الجنس';
+
+  @override
+  String get lpAgeMin => 'العمر الأدنى (اختياري)';
+
+  @override
+  String get lpAgeMax => 'العمر الأعلى (اختياري)';
+
+  @override
+  String get lpCountries => 'الدول';
+
+  @override
+  String get lpLanguages => 'اللغات';
+
+  @override
+  String get lpCategories => 'الاهتمامات';
+
+  @override
+  String get lpOptionsUnavailable => 'خيارات الجمهور غير متاحة. أعد المحاولة لتحميلها.';
+
+  @override
+  String get lpGeo => 'الاستهداف الجغرافي (اختياري)';
+
+  @override
+  String get lpLatitude => 'خط العرض';
+
+  @override
+  String get lpLongitude => 'خط الطول';
+
+  @override
+  String get lpRadius => 'نصف القطر بالكيلومتر';
+
+  @override
+  String get lpPickMap => 'اختيار على الخريطة';
+
+  @override
+  String get lpClearGeo => 'مسح الموقع';
+
+  @override
+  String get lpBudget => 'الميزانية';
+
+  @override
+  String get lpCustomBudget => 'ميزانية مخصّصة';
+
+  @override
+  String get lpPackage => 'باقة';
+
+  @override
+  String get lpPackagesUnavailable => 'الباقات غير متاحة. يمكنك إعداد ميزانية مخصّصة.';
+
+  @override
+  String get lpCoins => 'عملات';
+
+  @override
+  String get lpDuration => 'المدة بالأيام';
+
+  @override
+  String get lpEstimates => 'النتائج التقديرية';
+
+  @override
+  String get lpEstimateHint => 'التقديرات غير مضمونة. يعتمد الوصول الفعلي على بثك والجمهور.';
+
+  @override
+  String get lpNoEstimates => 'التقديرات غير متاحة.';
+
+  @override
+  String get lpCreate => 'إنشاء حملة';
+
+  @override
+  String get lpCreateHint => 'إنشاء الحملة لا يدفع تكلفتها. ستراجع الدفع وتؤكده في خطوة منفصلة.';
+
+  @override
+  String get lpSave => 'حفظ التغييرات';
+
+  @override
+  String get lpEdit => 'تعديل الحملة';
+
+  @override
+  String get lpPay => 'مراجعة الدفع';
+
+  @override
+  String get lpConfirmPay => 'تأكيد الدفع';
+
+  @override
+  String get lpCost => 'تكلفة الحملة';
+
+  @override
+  String get lpBalance => 'رصيد العملات الحالي';
+
+  @override
+  String get lpUnknown => 'غير متاح';
+
+  @override
+  String get lpRetry => 'إعادة المحاولة';
+
+  @override
+  String get lpRefresh => 'تحديث';
+
+  @override
+  String get lpCancel => 'إلغاء الحملة';
+
+  @override
+  String get lpCancelHint => 'هل تريد إلغاء الحملة؟ يعيد الخادم العملات المدفوعة غير المستخدمة. قد يستغرق ظهور الرصيد المحدّث بعض الوقت.';
+
+  @override
+  String get lpBack => 'رجوع';
+
+  @override
+  String get lpPause => 'إيقاف مؤقت';
+
+  @override
+  String get lpResume => 'استئناف';
+
+  @override
+  String get lpEmpty => 'لا توجد حملات ترويج بث بعد';
+
+  @override
+  String get lpEmptyHint => 'افتح المشاركة ← الترويج أثناء استضافة بث عام.';
+
+  @override
+  String get lpLoadMore => 'تحميل المزيد';
+
+  @override
+  String get lpPending => 'بانتظار الدفع';
+
+  @override
+  String get lpActive => 'نشطة';
+
+  @override
+  String get lpPaused => 'متوقفة مؤقتاً';
+
+  @override
+  String get lpCompleted => 'مكتملة';
+
+  @override
+  String get lpCancelled => 'ملغاة';
+
+  @override
+  String get lpUnknownStatus => 'الحالة غير معروفة — حدّث الصفحة';
+
+  @override
+  String get lpImpressions => 'مرات الظهور';
+
+  @override
+  String get lpSpend => 'العملات المصروفة';
+
+  @override
+  String get lpRemaining => 'العملات المتبقية';
+
+  @override
+  String get lpPaymentUnknown => 'جارٍ التحقق من الدفع. حدّث الحملة والرصيد قبل أي إجراء آخر. لا تدفع مجدداً ما دامت النتيجة غير مؤكدة.';
+
+  @override
+  String get lpCleanup => 'انتهى البث. يجري تحديث حالة الحملة وردّ الرصيد غير المستخدم إن وُجد.';
+
+  @override
+  String get lpInsufficient => 'رصيد العملات غير كافٍ. اشحن رصيدك ثم حدّثه قبل تأكيد الدفع.';
+
+  @override
+  String get lpTopUp => 'شحن العملات';
+
+  @override
+  String get lpValidation => 'تحقّق من اختيار ميزانية واحدة بحد أدنى ٥ عملات، والمدة (١ أو ٣ أو ٧ أو ١٤ يوماً)، وترتيب الأعمار، وإدخال إحداثيات صحيحة كاملة مع نصف قطر موجب.';
+
+  @override
+  String get lpInteger => 'أدخل عدداً صحيحاً.';
+
+  @override
+  String get lpNumber => 'أدخل رقماً صالحاً ومحدوداً.';
+
+  @override
+  String get lpClose => 'إغلاق الترويج';
 }

@@ -4972,4 +4972,220 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get templateEditorClipComingSoon => 'Coming soon';
+
+  @override
+  String get livePromotionPromotedLabel => 'Promoted';
+
+  @override
+  String get lpTitle => 'Promote LIVE';
+
+  @override
+  String get lpMine => 'My LIVE promotions';
+
+  @override
+  String get lpPreLive => 'Start your public LIVE first, then open Share → Promote. This camera preview has no saved LIVE to promote.';
+
+  @override
+  String get lpUnavailable => 'LIVE promotions are temporarily unavailable. Please try again later.';
+
+  @override
+  String get lpEligibility => 'Only the host of a public planned or active LIVE can promote it, using an account that is neither private nor banned. Eligibility must be confirmed.';
+
+  @override
+  String get lpDisabled => 'LIVE promotions are currently disabled.';
+
+  @override
+  String get lpObjective => 'Your goal';
+
+  @override
+  String get lpViews => 'More viewers';
+
+  @override
+  String get lpFollowers => 'More followers';
+
+  @override
+  String get lpAudience => 'Audience';
+
+  @override
+  String get lpAutomatic => 'Automatic audience';
+
+  @override
+  String get lpCustomAudience => 'Custom audience';
+
+  @override
+  String get lpAutomaticHint => 'Let the service select people likely to watch your LIVE.';
+
+  @override
+  String get lpGenders => 'Genders';
+
+  @override
+  String get lpAgeMin => 'Minimum age (optional)';
+
+  @override
+  String get lpAgeMax => 'Maximum age (optional)';
+
+  @override
+  String get lpCountries => 'Countries';
+
+  @override
+  String get lpLanguages => 'Languages';
+
+  @override
+  String get lpCategories => 'Interests';
+
+  @override
+  String get lpOptionsUnavailable => 'Audience options are unavailable. Retry to load them.';
+
+  @override
+  String get lpGeo => 'Geographic targeting (optional)';
+
+  @override
+  String get lpLatitude => 'Latitude';
+
+  @override
+  String get lpLongitude => 'Longitude';
+
+  @override
+  String get lpRadius => 'Radius in km';
+
+  @override
+  String get lpPickMap => 'Choose on map';
+
+  @override
+  String get lpClearGeo => 'Clear location';
+
+  @override
+  String get lpBudget => 'Budget';
+
+  @override
+  String get lpCustomBudget => 'Custom budget';
+
+  @override
+  String get lpPackage => 'Package';
+
+  @override
+  String get lpPackagesUnavailable => 'Packages are unavailable. You can prepare a custom budget.';
+
+  @override
+  String get lpCoins => 'Coins';
+
+  @override
+  String get lpDuration => 'Duration in days';
+
+  @override
+  String get lpEstimates => 'Estimated results';
+
+  @override
+  String get lpEstimateHint => 'Estimates are not guaranteed. Actual delivery depends on your LIVE and audience.';
+
+  @override
+  String get lpNoEstimates => 'Estimates are unavailable.';
+
+  @override
+  String get lpCreate => 'Create campaign';
+
+  @override
+  String get lpCreateHint => 'Creating a campaign does not pay for it. You will review and confirm payment separately.';
+
+  @override
+  String get lpSave => 'Save changes';
+
+  @override
+  String get lpEdit => 'Edit campaign';
+
+  @override
+  String get lpPay => 'Review payment';
+
+  @override
+  String get lpConfirmPay => 'Confirm and pay';
+
+  @override
+  String get lpCost => 'Campaign cost';
+
+  @override
+  String get lpBalance => 'Current coin balance';
+
+  @override
+  String get lpUnknown => 'Unavailable';
+
+  @override
+  String get lpRetry => 'Retry';
+
+  @override
+  String get lpRefresh => 'Refresh';
+
+  @override
+  String get lpCancel => 'Cancel campaign';
+
+  @override
+  String get lpCancelHint => 'Cancel this campaign? The server refunds unused prepaid coins. The updated balance may take a moment to appear.';
+
+  @override
+  String get lpBack => 'Back';
+
+  @override
+  String get lpPause => 'Pause';
+
+  @override
+  String get lpResume => 'Resume';
+
+  @override
+  String get lpEmpty => 'No LIVE promotions yet';
+
+  @override
+  String get lpEmptyHint => 'Open Share → Promote while hosting a public LIVE.';
+
+  @override
+  String get lpLoadMore => 'Load more';
+
+  @override
+  String get lpPending => 'Pending payment';
+
+  @override
+  String get lpActive => 'Active';
+
+  @override
+  String get lpPaused => 'Paused';
+
+  @override
+  String get lpCompleted => 'Completed';
+
+  @override
+  String get lpCancelled => 'Cancelled';
+
+  @override
+  String get lpUnknownStatus => 'Status unavailable — refresh';
+
+  @override
+  String get lpImpressions => 'Impressions';
+
+  @override
+  String get lpSpend => 'Coins spent';
+
+  @override
+  String get lpRemaining => 'Coins remaining';
+
+  @override
+  String get lpPaymentUnknown => 'Payment is being verified. Refresh campaign and balance before taking further action. Do not pay again while the outcome is unknown.';
+
+  @override
+  String get lpCleanup => 'LIVE has ended. Campaign status and any unused balance refund are being updated.';
+
+  @override
+  String get lpInsufficient => 'Your coin balance is insufficient. Top up, then refresh before confirming payment.';
+
+  @override
+  String get lpTopUp => 'Top up coins';
+
+  @override
+  String get lpValidation => 'Check the budget mode, minimum 5 coins, duration (1, 3, 7 or 14 days), age order, and complete valid geographic coordinates with a positive radius.';
+
+  @override
+  String get lpInteger => 'Enter a whole number.';
+
+  @override
+  String get lpNumber => 'Enter a valid finite number.';
+
+  @override
+  String get lpClose => 'Close promotions';
 }

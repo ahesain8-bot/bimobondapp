@@ -1,3 +1,4 @@
+import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -166,7 +167,7 @@ class ToolsRow extends StatelessWidget {
           ),
           _ToolSpec(
             icon: Icons.local_fire_department_outlined,
-            label: 'Promote',
+            label: AppLocalizations.of(context)!.lpTitle,
             onTap: onPromoteTap,
           ),
         ],
@@ -239,9 +240,7 @@ class _ToolCell extends StatelessWidget {
               child: Stack(
                 clipBehavior: Clip.none,
                 children: [
-                  Center(
-                    child: Icon(tool.icon, color: Colors.white, size: 26),
-                  ),
+                  Center(child: Icon(tool.icon, color: Colors.white, size: 26)),
                   if (tool.showDot)
                     Positioned(
                       right: -2,

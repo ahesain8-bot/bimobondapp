@@ -13,6 +13,9 @@ abstract class LiveRepository {
     int page = 1,
     int limit = 10,
     String? category,
+    bool followingOnly = false,
+    double? latitude,
+    double? longitude,
     bool forceRefresh = false,
   });
 
@@ -32,7 +35,10 @@ abstract class LiveRepository {
   });
 
   /// POST /lives/{id}/join — returns tokens for LiveKit + socket.
-  Future<Either<Failure, JoinLiveResult>> joinLive(String liveId);
+  Future<Either<Failure, JoinLiveResult>> joinLive(
+    String liveId, {
+    String? campaignId,
+  });
 
   /// POST /lives/{id}/leave
   Future<Either<Failure, void>> leaveLive(String liveId);

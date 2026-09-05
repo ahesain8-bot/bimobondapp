@@ -6,6 +6,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'network_console.dart';
+
 class ApiClient {
   late final Dio _dio;
   final SharedPreferences sharedPreferences;
@@ -24,17 +26,6 @@ class ApiClient {
           'Content-Type': 'application/json',
           'x-api-key': ApiConstants.apiKey,
         },
-      ),
-    );
-
-    _dio.interceptors.add(
-      LogInterceptor(
-        request: true,
-        requestHeader: true,
-        requestBody: true,
-        responseHeader: true,
-        responseBody: true,
-        error: true,
       ),
     );
 
@@ -103,6 +94,13 @@ class ApiClient {
         },
       ),
     );
+
+    // Postman-style debug traces with bounded payload previews. It is placed
+    // after auth so the report reflects the outgoing request, while secrets
+    // remain redacted by [NetworkConsoleInterceptor].
+    if (kDebugMode) {
+      _dio.interceptors.add(NetworkConsoleInterceptor());
+    }
   }
 
   bool _shouldRefreshAndRetry(DioException error) {

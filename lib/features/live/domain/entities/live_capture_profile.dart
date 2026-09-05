@@ -66,10 +66,22 @@ class LiveCaptureProfile {
 
   /// Stable default for live publishing.
   ///
-  /// 1080p stays available in the quality picker, but it must be an explicit
-  /// choice. A number of Android Camera2 implementations report 1080p as
-  /// supported and then fail asynchronously while configuring the capture
-  /// session, leaving a valid-looking LiveKit track that produces no frames.
+  /// 720p, deliberately — not the highest tier the ladder can express.
+  ///
+  /// This was briefly raised to 1080p on the reasoning that the host already
+  /// captures at 1080x1920, so publishing at 720p downscales the source. That
+  /// reasoning was right about the capture and wrong about the cost. Measured
+  /// on an HONOR LGN-LX2 (Snapdragon SM6225, Adreno 610, Android 15) while
+  /// live: 90% CPU, 94% janky frames, a 101ms median frame (~10fps) with the
+  /// 99th percentile at 450ms, 1.1GB RSS against 125MB free — and the process
+  /// was then killed by the low-memory killer mid-broadcast. 1080p simulcast
+  /// also means three concurrent video encoders (1080p + 720p + 480p) instead
+  /// of two, on a chip that cannot afford either.
+  ///
+  /// So the tier is not a free choice: it has to be earned by the device.
+  /// [LiveVideoQualityPreference] resolves the real default at runtime and
+  /// only hands back [fullHd] where the hardware can sustain it; this constant
+  /// is the floor everything falls back to.
   static const LiveCaptureProfile preferred = hd;
 
   /// The profiles at or below [this], highest first.

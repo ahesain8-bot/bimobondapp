@@ -12,12 +12,18 @@ class GetLiveFeedUseCase {
     int page = 1,
     int limit = 10,
     String? category,
+    bool followingOnly = false,
+    double? latitude,
+    double? longitude,
     bool forceRefresh = false,
   }) {
     return repository.getLiveFeed(
       page: page,
       limit: limit,
       category: category,
+      followingOnly: followingOnly,
+      latitude: latitude,
+      longitude: longitude,
       forceRefresh: forceRefresh,
     );
   }

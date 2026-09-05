@@ -820,7 +820,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             smoothedSmooth = easeToward(smoothedSmooth, targetSmooth)
         }
         beautyDebugCounter++
-        if (beautyDebugCounter % 12 == 0) {
+        if (VERBOSE_FRAME_LOGS && beautyDebugCounter % 12 == 0) {
             Log.i(
                 "FaceWarpBeautyDbg",
                 "front=$isFrontSmooth magic=$magic magicStrength=$magicStrength " +
@@ -1064,6 +1064,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
 
     private var encoderEglSurface: AndroidEglSurface? = null
     private var lastEncoderSwapMs = 0L
+    private var encoderDiagnosticReported = false
     private val encoderMinIntervalMs = 33L
     private val encoderRestoreViewport = IntArray(4)
 
@@ -1073,6 +1074,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         encoderWidth = width.coerceAtLeast(2)
         encoderHeight = height.coerceAtLeast(2)
         lastEncoderSwapMs = 0L
+        encoderDiagnosticReported = false
     }
 
     private fun destroyEncoderEglSurface() {
@@ -1169,6 +1171,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
 
     /** Throttled log while moving the phone — filter logcat: FaceWarpExposure */
     private fun logExposureDebug(autoLiftTarget: Float, lowLight: Float) {
+        if (!VERBOSE_FRAME_LOGS) return
         exposureDebugCounter++
         if (exposureDebugCounter % 12 != 0) return
         val backlight = (measuredSceneLuma - measuredSkinLuma).coerceIn(-1f, 1f)
@@ -1261,7 +1264,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         // strength would visibly flicker.
         measuredNoiseFloor =
             measuredNoiseFloor + (estimate - measuredNoiseFloor) * 0.08f
-        Log.d(TAG, "measuredNoiseFloor=$measuredNoiseFloor")
+        if (VERBOSE_FRAME_LOGS) Log.d(TAG, "measuredNoiseFloor=$measuredNoiseFloor")
     }
 
     /** Same curve as GLSL smoothstep, for the strength maths above. */
@@ -1349,8 +1352,17 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         )
         val configs = arrayOfNulls<AndroidEglConfig>(1)
         val numConfigs = IntArray(1)
-        if (!EGL14.eglChooseConfig(display, attribList, 0, configs, 0, 1, numConfigs, 0)) {
-
+        val foundRecordable = EGL14.eglChooseConfig(
+            display,
+            attribList,
+            0,
+            configs,
+            0,
+            1,
+            numConfigs,
+            0,
+        ) && numConfigs[0] > 0 && configs[0] != null
+        if (!foundRecordable) {
             val fallback = intArrayOf(
                 EGL14.EGL_RED_SIZE, 8,
                 EGL14.EGL_GREEN_SIZE, 8,
@@ -1359,7 +1371,10 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                 EGL14.EGL_RENDERABLE_TYPE, EGL14.EGL_OPENGL_ES2_BIT,
                 EGL14.EGL_NONE,
             )
-            if (!EGL14.eglChooseConfig(display, fallback, 0, configs, 0, 1, numConfigs, 0)) {
+            if (!EGL14.eglChooseConfig(display, fallback, 0, configs, 0, 1, numConfigs, 0) ||
+                numConfigs[0] <= 0 ||
+                configs[0] == null
+            ) {
                 return null
             }
         }
@@ -1434,7 +1449,10 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         // Rendered before touching the encoder's own EGL surface — this is plain
         // FBO rendering, unrelated to which window surface happens to be current.
         val renderedTex = renderShaderAtBudget(draw, encW, encH)
-        if (renderedTex == 0) return
+        if (renderedTex == 0) {
+            reportEncoderDiagnostic("encoder FBO unavailable")
+            return
+        }
 
         val eglDisplay = EGL14.eglGetCurrentDisplay()
         val eglContext = EGL14.eglGetCurrentContext()
@@ -1444,6 +1462,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             eglContext == EGL14.EGL_NO_CONTEXT ||
             backupDraw == EGL14.EGL_NO_SURFACE
         ) {
+            reportEncoderDiagnostic("encoder has no current EGL context/surface")
             return
         }
 
@@ -1459,7 +1478,10 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
             // context's config makes a match structural rather than a coincidence.
             val config = contextConfig(eglDisplay, eglContext)
                 ?: chooseRecordableConfig(eglDisplay)
-                ?: return
+                ?: run {
+                    reportEncoderDiagnostic("encoder EGL config unavailable")
+                    return
+                }
             val surfaceAttribs = intArrayOf(EGL14.EGL_NONE)
             eglSurf = try {
                 EGL14.eglCreateWindowSurface(
@@ -1473,7 +1495,13 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                 Log.w(TAG, "encoder EGL surface creation failed", t)
                 null
             }
-            if (eglSurf == null || eglSurf == EGL14.EGL_NO_SURFACE) return
+            if (eglSurf == null || eglSurf == EGL14.EGL_NO_SURFACE) {
+                reportEncoderDiagnostic(
+                    "encoder EGL window surface unavailable " +
+                        "(0x${Integer.toHexString(EGL14.eglGetError())})",
+                )
+                return
+            }
             encoderEglSurface = eglSurf
         }
 
@@ -1500,8 +1528,15 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                 eglSurf,
                 now * 1_000_000L,
             )
-            EGL14.eglSwapBuffers(eglDisplay, eglSurf)
+            if (!EGL14.eglSwapBuffers(eglDisplay, eglSurf)) {
+                reportEncoderDiagnostic(
+                    "encoder eglSwapBuffers failed " +
+                        "(0x${Integer.toHexString(EGL14.eglGetError())})",
+                )
+                return
+            }
             lastEncoderSwapMs = now
+            reportEncoderDiagnostic("encoder presented first WebRTC frame", success = true)
         } catch (t: Throwable) {
             Log.e(TAG, "encoder frame present failed", t)
         } finally {
@@ -1512,6 +1547,16 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
                 encoderRestoreViewport[2],
                 encoderRestoreViewport[3],
             )
+        }
+    }
+
+    private fun reportEncoderDiagnostic(message: String, success: Boolean = false) {
+        if (encoderDiagnosticReported) return
+        encoderDiagnosticReported = true
+        if (success) {
+            Log.i(TAG, message)
+        } else {
+            Log.e(TAG, message)
         }
     }
 
@@ -2798,6 +2843,17 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
 
         private const val TAG = "FaceWarpRenderer"
         private const val FACE_PIPELINE_TAG = "ArFacePipeline"
+
+        /**
+         * Diagnostic logging for the per-frame beauty/exposure/noise values.
+         *
+         * These run on the GL thread, and the exposure and beauty lines each
+         * build their message from six or more `String.format` calls. That is
+         * real work inside the frame, repeated for the whole broadcast, for
+         * output nobody reads outside a tuning session. Off unless someone
+         * is actually tuning.
+         */
+        private const val VERBOSE_FRAME_LOGS = false
 
         /** Consecutive camera-texture update failures before giving up on GL. */
         private const val MAX_OES_UPDATE_FAILURES = 30

@@ -1,4 +1,5 @@
 import '../../domain/entities/live_entity.dart';
+import '../../domain/entities/live_feed_promotion.dart';
 
 /// Data-transfer object for live feed items.
 /// Swap JSON parsing here when wiring real REST responses.
@@ -16,6 +17,8 @@ class LiveDto {
   final int likeCount;
   final DateTime startTime;
   final String status;
+  final bool isPromoted;
+  final LiveFeedPromotion? promotion;
 
   const LiveDto({
     required this.id,
@@ -31,6 +34,8 @@ class LiveDto {
     this.likeCount = 0,
     required this.startTime,
     this.status = 'live',
+    this.isPromoted = false,
+    this.promotion,
   });
 
   factory LiveDto.fromJson(Map<String, dynamic> json) {
@@ -60,6 +65,8 @@ class LiveDto {
           ) ??
           DateTime.now(),
       status: json['status'] as String? ?? 'live',
+      isPromoted: json['isPromoted'] == true,
+      promotion: LiveFeedPromotion.fromJson(json['promotion']),
     );
   }
 
@@ -77,6 +84,8 @@ class LiveDto {
     'like_count': likeCount,
     'start_time': startTime.toIso8601String(),
     'status': status,
+    'isPromoted': isPromoted,
+    if (promotion != null) 'promotion': promotion!.toJson(),
   };
 
   LiveEntity toEntity() {
@@ -94,12 +103,15 @@ class LiveDto {
       likeCount: likeCount,
       startTime: startTime,
       status: _mapStatus(status),
-      isLive: status == 'live',
+      isLive: status.toLowerCase() == 'live',
+      isPromoted: isPromoted,
+      promotion: promotion,
     );
   }
 
   static LiveStatus _mapStatus(String value) {
-    switch (value) {
+    switch (value.toLowerCase()) {
+      case 'planned':
       case 'scheduled':
         return LiveStatus.scheduled;
       case 'paused':

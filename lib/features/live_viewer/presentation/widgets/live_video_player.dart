@@ -15,6 +15,7 @@ import 'fallback_media.dart';
 class LiveVideoPlayer extends StatefulWidget {
   final LiveEntity live;
   final bool isActive;
+  final bool liveKitOnly;
 
   final BoxFit fit;
 
@@ -22,6 +23,7 @@ class LiveVideoPlayer extends StatefulWidget {
     super.key,
     required this.live,
     this.isActive = true,
+    this.liveKitOnly = false,
     this.fit = BoxFit.cover,
   });
 
@@ -297,7 +299,7 @@ class _LiveVideoPlayerState extends State<LiveVideoPlayer> {
     final isHttp =
         url != null &&
         (url.startsWith('http://') || url.startsWith('https://'));
-    if (url == null || url.isEmpty || !isHttp) {
+    if (widget.liveKitOnly || url == null || url.isEmpty || !isHttp) {
       if (!mounted || gen != _gen) return;
       setState(() {
         _initializing = false;
