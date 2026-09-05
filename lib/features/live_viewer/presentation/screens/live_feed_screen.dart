@@ -1,4 +1,7 @@
+import 'package:bimobondapp/core/data/user_location_store.dart';
 import 'dart:async';
+import 'package:bimobondapp/l10n/app_localizations.dart';
+import '../../domain/entities/live_feed_activation.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -44,11 +47,22 @@ class _LiveFeedViewState extends State<LiveFeedScreen>
   /// header collapses in sync with the page, matching the reference video.
   final ValueNotifier<double> _discoverFactor = ValueNotifier<double>(1);
   var _userDraggingFeed = false;
+
   /// Story taps jump pages without entering fullscreen Discover collapse.
   var _storyJumpInProgress = false;
   Timer? _refreshTimer;
   var _refreshInFlight = false;
   var _isExiting = false;
+  LiveFeedActivation? _activation;
+  String? _entryKey;
+
+  void _activate(LiveEntity live) {
+    if (_entryKey != live.feedEntryKey) {
+      _entryKey = live.feedEntryKey;
+      _activation = LiveFeedActivation.fromEntry(live);
+    }
+    _viewerBloc.add(LiveViewerActivated(live, activation: _activation));
+  }
 
   static const double _storiesStripH = 104;
   static const double _discoverTitleH = 48;
@@ -65,7 +79,16 @@ class _LiveFeedViewState extends State<LiveFeedScreen>
     Future.microtask(() {
       // Uses the repository TTL cache — reopening Lives does not re-hit
       // the network when a fresh page-1 response is already available.
-      _feedBloc.add(const LiveFeedLoadRequested(refresh: true));
+      final coordinates = di.sl.isRegistered<UserLocationStore>()
+          ? di.sl<UserLocationStore>().viewerCoordinates
+          : null;
+      _feedBloc.add(
+        LiveFeedLoadRequested(
+          refresh: true,
+          latitude: coordinates?.latitude,
+          longitude: coordinates?.longitude,
+        ),
+      );
     });
 
     LiveFeedRefreshBus.instance.addListener(_onLiveEndedSignal);
@@ -97,7 +120,7 @@ class _LiveFeedViewState extends State<LiveFeedScreen>
       final lives = _feedBloc.state.lives;
       if (lives.isNotEmpty) {
         final index = _currentIndex.value.clamp(0, lives.length - 1);
-        _viewerBloc.add(LiveViewerActivated(lives[index]));
+        _activate(lives[index]);
       }
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden) {
@@ -214,7 +237,8 @@ class _LiveFeedViewState extends State<LiveFeedScreen>
     switch (notification) {
       case ScrollStartNotification(:final dragDetails) when dragDetails != null:
         _userDraggingFeed = true;
-      case ScrollUpdateNotification(:final dragDetails) when dragDetails != null:
+      case ScrollUpdateNotification(:final dragDetails)
+          when dragDetails != null:
         _userDraggingFeed = true;
         if (singleLive) {
           _applySingleLiveDrag(dragDetails);
@@ -276,7 +300,7 @@ class _LiveFeedViewState extends State<LiveFeedScreen>
         _feedBloc.add(const LiveFeedLoadMoreRequested());
       }
 
-      _viewerBloc.add(LiveViewerActivated(rooms[i]));
+      _activate(rooms[i]);
     });
   }
 
@@ -290,7 +314,7 @@ class _LiveFeedViewState extends State<LiveFeedScreen>
     _showDiscover();
     _currentIndex.value = index;
     _pageController.jumpToPage(index);
-    _viewerBloc.add(LiveViewerActivated(lives[index]));
+    _activate(lives[index]);
   }
 
   void _onGoLive() {
@@ -309,7 +333,7 @@ class _LiveFeedViewState extends State<LiveFeedScreen>
         _pageController.jumpToPage(0);
         _currentIndex.value = 0;
         _discoverFactor.value = 1;
-        _viewerBloc.add(LiveViewerActivated(lives.first));
+        _activate(lives.first);
       }
     } finally {
       _refreshInFlight = false;
@@ -355,13 +379,12 @@ class _LiveFeedViewState extends State<LiveFeedScreen>
                   if (!mounted || _isExiting) return;
                   final lives = _feedBloc.state.lives;
                   if (lives.isEmpty) return;
-                  final target =
-                      _currentIndex.value.clamp(0, lives.length - 1);
+                  final target = _currentIndex.value.clamp(0, lives.length - 1);
                   if (_currentIndex.value != target) {
                     _pageController.jumpToPage(target);
                     _currentIndex.value = target;
                   }
-                  _viewerBloc.add(LiveViewerActivated(lives[target]));
+                  _activate(lives[target]);
                 });
               }
             },
@@ -374,36 +397,32 @@ class _LiveFeedViewState extends State<LiveFeedScreen>
             unawaited(_closeDiscover());
           },
           child: Scaffold(
-          backgroundColor: Colors.black,
-          resizeToAvoidBottomInset: false,
-          body: BlocBuilder<LiveFeedBloc, LiveFeedState>(
-            buildWhen: (prev, next) =>
-                prev.isLoading != next.isLoading ||
-                prev.isLoadingMore != next.isLoadingMore ||
-                prev.hasMore != next.hasMore ||
-                prev.error != next.error ||
-                !_sameRooms(prev.lives, next.lives),
-            builder: (context, feed) {
-              return ValueListenableBuilder<int>(
-                valueListenable: _currentIndex,
-                builder: (context, currentIndex, _) {
-                  return ValueListenableBuilder<double>(
-                    valueListenable: _discoverFactor,
-                    builder: (context, discoverFactor, _) {
-                      return _buildBody(
-                        feed,
-                        currentIndex,
-                        discoverFactor,
-                      );
-                    },
-                  );
-                },
-              );
-            },
+            backgroundColor: Colors.black,
+            resizeToAvoidBottomInset: false,
+            body: BlocBuilder<LiveFeedBloc, LiveFeedState>(
+              buildWhen: (prev, next) =>
+                  prev.isLoading != next.isLoading ||
+                  prev.isLoadingMore != next.isLoadingMore ||
+                  prev.hasMore != next.hasMore ||
+                  prev.error != next.error ||
+                  !_sameRooms(prev.lives, next.lives),
+              builder: (context, feed) {
+                return ValueListenableBuilder<int>(
+                  valueListenable: _currentIndex,
+                  builder: (context, currentIndex, _) {
+                    return ValueListenableBuilder<double>(
+                      valueListenable: _discoverFactor,
+                      builder: (context, discoverFactor, _) {
+                        return _buildBody(feed, currentIndex, discoverFactor);
+                      },
+                    );
+                  },
+                );
+              },
+            ),
           ),
         ),
       ),
-    ),
     );
   }
 
@@ -411,7 +430,7 @@ class _LiveFeedViewState extends State<LiveFeedScreen>
     if (identical(a, b)) return true;
     if (a.length != b.length) return false;
     for (var i = 0; i < a.length; i++) {
-      if (a[i].id != b[i].id) return false;
+      if (a[i] != b[i]) return false;
     }
     return true;
   }
@@ -429,7 +448,9 @@ class _LiveFeedViewState extends State<LiveFeedScreen>
       return Column(
         children: [
           _DiscoverHeader(onClose: _exitLiveFeed),
-          Expanded(child: _ErrorView(error: feed.error!, onRetry: _refresh)),
+          Expanded(
+            child: _ErrorView(error: feed.error!, onRetry: _refresh),
+          ),
         ],
       );
     }
@@ -464,18 +485,38 @@ class _LiveFeedViewState extends State<LiveFeedScreen>
           controller: _pageController,
           scrollDirection: Axis.vertical,
           allowImplicitScrolling: false,
-          physics: const PageScrollPhysics(
-            parent: BouncingScrollPhysics(),
-          ),
+          physics: const PageScrollPhysics(parent: BouncingScrollPhysics()),
           itemCount: feed.lives.length,
           onPageChanged: _onPageChanged,
           itemBuilder: (context, index) {
             final live = feed.lives[index];
-            return LiveRoomPage(
-              key: ValueKey(live.id),
-              live: live,
-              isActive: index == selected,
-              onClose: _exitLiveFeed,
+            return Stack(
+              key: ValueKey(live.feedEntryKey),
+              fit: StackFit.expand,
+              children: [
+                LiveRoomPage(
+                  live: live,
+                  isActive: index == selected,
+                  onClose: _exitLiveFeed,
+                ),
+                if (live.isPromoted)
+                  PositionedDirectional(
+                    start: 16,
+                    top: 94,
+                    child: SafeArea(
+                      child: IgnorePointer(
+                        child: Chip(
+                          avatar: const Icon(Icons.campaign_outlined, size: 18),
+                          label: Text(
+                            AppLocalizations.of(
+                              context,
+                            )!.livePromotionPromotedLabel,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             );
           },
         ),

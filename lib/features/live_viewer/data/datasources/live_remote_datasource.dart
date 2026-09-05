@@ -13,11 +13,14 @@ abstract class LiveRemoteDataSource {
     int page = 1,
     int limit = 10,
     String? category,
+    bool followingOnly = false,
+    double? latitude,
+    double? longitude,
   });
 
   Future<LiveEntity> getLiveById(String liveId);
 
-  Future<JoinLiveResult> joinLive(String liveId);
+  Future<JoinLiveResult> joinLive(String liveId, {String? campaignId});
 
   Future<void> leaveLive(String liveId);
 
@@ -97,6 +100,9 @@ class FakeLiveRemoteDataSource implements LiveRemoteDataSource {
     int page = 1,
     int limit = 10,
     String? category,
+    bool followingOnly = false,
+    double? latitude,
+    double? longitude,
   }) async {
     await Future.delayed(const Duration(milliseconds: 700));
 
@@ -138,7 +144,7 @@ class FakeLiveRemoteDataSource implements LiveRemoteDataSource {
   }
 
   @override
-  Future<JoinLiveResult> joinLive(String liveId) async {
+  Future<JoinLiveResult> joinLive(String liveId, {String? campaignId}) async {
     // POST /lives/:id/join
     await Future.delayed(const Duration(milliseconds: 550));
     final live = await getLiveById(liveId);

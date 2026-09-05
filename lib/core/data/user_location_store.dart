@@ -33,7 +33,13 @@ class UserLocationStore {
     final lat = latitude;
     final lng = longitude;
     if (lat == null || lng == null) return null;
-    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+    if (!lat.isFinite ||
+        !lng.isFinite ||
+        lat < -90 ||
+        lat > 90 ||
+        lng < -180 ||
+        lng > 180)
+      return null;
     return (latitude: lat, longitude: lng);
   }
 
@@ -43,10 +49,7 @@ class UserLocationStore {
   }) async {
     await _prefs.setDouble(latitudeKey, latitude);
     await _prefs.setDouble(longitudeKey, longitude);
-    await _prefs.setInt(
-      updatedAtKey,
-      DateTime.now().millisecondsSinceEpoch,
-    );
+    await _prefs.setInt(updatedAtKey, DateTime.now().millisecondsSinceEpoch);
   }
 
   Future<void> clear() async {

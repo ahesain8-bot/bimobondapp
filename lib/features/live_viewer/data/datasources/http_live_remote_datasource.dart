@@ -39,13 +39,28 @@ class HttpLiveRemoteDataSource implements LiveRemoteDataSource {
     int page = 1,
     int limit = 10,
     String? category,
+    bool followingOnly = false,
+    double? latitude,
+    double? longitude,
   }) async {
+    final hasCoordinates =
+        latitude != null &&
+        longitude != null &&
+        latitude.isFinite &&
+        longitude.isFinite &&
+        latitude >= -90 &&
+        latitude <= 90 &&
+        longitude >= -180 &&
+        longitude <= 180;
     final payload = await _api.get(
       ApiEndpoints.livesFeed,
       auth: true,
       query: {
         'page': '$page',
         'limit': '$limit',
+        if (followingOnly) 'followingOnly': 'true',
+        if (hasCoordinates) 'latitude': '$latitude',
+        if (hasCoordinates) 'longitude': '$longitude',
         if (category != null && category.isNotEmpty) 'categoryId': category,
       },
     );
@@ -71,9 +86,15 @@ class HttpLiveRemoteDataSource implements LiveRemoteDataSource {
   }
 
   @override
-  Future<JoinLiveResult> joinLive(String liveId) async {
+  Future<JoinLiveResult> joinLive(String liveId, {String? campaignId}) async {
     // POST /lives/:id/join → { live, token, url, role, guest }
-    final payload = await _api.post(ApiEndpoints.liveJoin(liveId));
+    final attribution = campaignId?.trim();
+    final payload = await _api.post(
+      ApiEndpoints.liveJoin(liveId),
+      body: attribution != null && attribution.isNotEmpty
+          ? <String, dynamic>{'campaignId': attribution}
+          : null,
+    );
 
     final nestedLive = payload['live'];
     final liveJson = nestedLive is Map<String, dynamic> ? nestedLive : payload;
@@ -93,10 +114,9 @@ class HttpLiveRemoteDataSource implements LiveRemoteDataSource {
     }
 
     // The socket handshake uses the Firebase ID token itself — no separate
-    // socket token from the backend. Keep a placeholder for contract parity.
-    final socketToken =
-        await _api.idTokenProvider?.call() ??
-        'socket_${liveId}_${DateTime.now().millisecondsSinceEpoch}';
+    // socket token from the backend. Never fabricate credentials.
+    final socketToken = await _api.idTokenProvider?.call() ?? '';
+    if (socketToken.isEmpty) throw Exception('INVALID_JOIN_RESPONSE');
 
     return JoinLiveResult(
       liveId: liveId,

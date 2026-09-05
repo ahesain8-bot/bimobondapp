@@ -41,7 +41,9 @@ class GiftAnimationOverlay extends StatefulWidget {
   static bool _activeIsLarge = false;
 
   /// Recently finished media URLs — blocks late socket duplicates from replaying.
-  static final Map<String, DateTime> _recentlyPlayedUrls = {};
+  // Scope late-duplicate history to the owning room. A gift in another room
+  // must not disappear merely because it uses the same catalog media URL.
+  static final _recentlyPlayedByOwner = Expando<Map<String, DateTime>>();
   static const Duration _recentDedupeWindow = Duration(seconds: 12);
 
   /// LARGE is the default size: only an explicit SMALL/MEDIUM opts out.
@@ -107,8 +109,12 @@ class GiftAnimationOverlay extends StatefulWidget {
     }
 
     // Drop late duplicates of a gift that just finished (lives + auction).
-    _pruneRecentlyPlayed();
-    final lastPlayed = _recentlyPlayedUrls[resolved];
+    final recentlyPlayed = _recentlyPlayedByOwner[owner] ??=
+        <String, DateTime>{};
+    final cutoff = DateTime.now().subtract(_recentDedupeWindow);
+    recentlyPlayed.removeWhere((_, at) => at.isBefore(cutoff));
+    final recentKey = '${dedupeKey ?? ''}|$resolved';
+    final lastPlayed = recentlyPlayed[recentKey];
     if (lastPlayed != null &&
         DateTime.now().difference(lastPlayed) < _recentDedupeWindow) {
       return Future.value();
@@ -165,7 +171,7 @@ class GiftAnimationOverlay extends StatefulWidget {
     _activeKey = dedupeKey;
     _activeUrl = resolved;
     _activeIsLarge = _isLargeSize(size);
-    _recentlyPlayedUrls[resolved] = DateTime.now();
+    recentlyPlayed[recentKey] = DateTime.now();
     overlay.insert(entry);
 
     // Second safety net behind the owner's own dismiss: tie the entry to the
@@ -205,11 +211,6 @@ class GiftAnimationOverlay extends StatefulWidget {
     } catch (_) {}
   }
 
-  static void _pruneRecentlyPlayed() {
-    final cutoff = DateTime.now().subtract(_recentDedupeWindow);
-    _recentlyPlayedUrls.removeWhere((_, at) => at.isBefore(cutoff));
-  }
-
   @override
   State<GiftAnimationOverlay> createState() => _GiftAnimationOverlayState();
 }
@@ -233,10 +234,12 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
   bool _finished = false;
   bool _videoDisposeInFlight = false;
   int _videoGeneration = 0;
+  int _lottieGeneration = 0;
   bool _lottieFailed = false;
   bool _videoFailed = false;
   Timer? _finishTimer;
   Timer? _stallTimer;
+  Timer? _lottieTimeout;
   late final _GiftMediaKind _kind;
   late final bool _isWebp;
 
@@ -292,10 +295,28 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
   }
 
   Future<void> _playLottie() async {
-    final composition = await GiftLottieCache.instance
-        .load(widget.animationUrl)
-        .timeout(const Duration(seconds: 8), onTimeout: () => null);
-    if (!mounted) return;
+    final generation = ++_lottieGeneration;
+    final timeout = Completer<LottieComposition?>();
+    _lottieTimeout?.cancel();
+    _lottieTimeout = Timer(const Duration(seconds: 8), () {
+      if (!timeout.isCompleted) timeout.complete(null);
+    });
+
+    LottieComposition? composition;
+    try {
+      composition = await Future.any<LottieComposition?>([
+        GiftLottieCache.instance.load(widget.animationUrl),
+        timeout.future,
+      ]);
+    } catch (_) {
+      composition = null;
+    } finally {
+      if (generation == _lottieGeneration) {
+        _lottieTimeout?.cancel();
+        _lottieTimeout = null;
+      }
+    }
+    if (!mounted || generation != _lottieGeneration || _finished) return;
 
     if (composition == null) {
       setState(() => _lottieFailed = true);
@@ -465,6 +486,9 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
     _finishTimer = null;
     _stallTimer?.cancel();
     _stallTimer = null;
+    _lottieGeneration++;
+    _lottieTimeout?.cancel();
+    _lottieTimeout = null;
     _lottieController?.dispose();
     _videoGeneration++;
     final video = _videoController;

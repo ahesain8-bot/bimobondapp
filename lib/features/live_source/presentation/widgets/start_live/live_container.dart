@@ -52,7 +52,13 @@ class _LiveContainerState extends State<LiveContainer> {
       // CameraX session to the new GL surface. Emitting LiveCameraHandedOff
       // here used to unmount the old view a frame before the room existed,
       // forcing a cold stop/open cycle on every live start.
-    } else if (runningCamera != null || runningNativeCamera != null) {
+    } else if (runningNativeCamera != null) {
+      // The active host room accepts the Flutter camera only. Release this
+      // legacy preview before the room opens its own camera.
+      await runningNativeCamera.releaseNative();
+      runningNativeCamera.dispose();
+      liveBloc.add(const LiveCameraHandedOff());
+    } else if (runningCamera != null) {
       liveBloc.add(const LiveCameraHandedOff());
     } else {
       liveBloc.add(const LiveAppPaused());
@@ -64,7 +70,7 @@ class _LiveContainerState extends State<LiveContainer> {
         builder: (_) => LiveRoomPage(
           title: title.isEmpty ? null : title,
           initialCamera: useExistingArCamera ? null : runningCamera,
-          initialNativeCamera: useExistingArCamera ? null : runningNativeCamera,
+          useArBeautyCamera: useExistingArCamera,
         ),
       ),
     );

@@ -9544,6 +9544,438 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Coming soon'**
   String get templateEditorClipComingSoon;
+
+  /// No description provided for @livePromotionPromotedLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Promoted'**
+  String get livePromotionPromotedLabel;
+
+  /// No description provided for @lpTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Promote LIVE'**
+  String get lpTitle;
+
+  /// No description provided for @lpMine.
+  ///
+  /// In en, this message translates to:
+  /// **'My LIVE promotions'**
+  String get lpMine;
+
+  /// No description provided for @lpPreLive.
+  ///
+  /// In en, this message translates to:
+  /// **'Start your public LIVE first, then open Share → Promote. This camera preview has no saved LIVE to promote.'**
+  String get lpPreLive;
+
+  /// No description provided for @lpUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'LIVE promotions are temporarily unavailable. Please try again later.'**
+  String get lpUnavailable;
+
+  /// No description provided for @lpEligibility.
+  ///
+  /// In en, this message translates to:
+  /// **'Only the host of a public planned or active LIVE can promote it, using an account that is neither private nor banned. Eligibility must be confirmed.'**
+  String get lpEligibility;
+
+  /// No description provided for @lpDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'LIVE promotions are currently disabled.'**
+  String get lpDisabled;
+
+  /// No description provided for @lpObjective.
+  ///
+  /// In en, this message translates to:
+  /// **'Your goal'**
+  String get lpObjective;
+
+  /// No description provided for @lpViews.
+  ///
+  /// In en, this message translates to:
+  /// **'More viewers'**
+  String get lpViews;
+
+  /// No description provided for @lpFollowers.
+  ///
+  /// In en, this message translates to:
+  /// **'More followers'**
+  String get lpFollowers;
+
+  /// No description provided for @lpAudience.
+  ///
+  /// In en, this message translates to:
+  /// **'Audience'**
+  String get lpAudience;
+
+  /// No description provided for @lpAutomatic.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic audience'**
+  String get lpAutomatic;
+
+  /// No description provided for @lpCustomAudience.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom audience'**
+  String get lpCustomAudience;
+
+  /// No description provided for @lpAutomaticHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Let the service select people likely to watch your LIVE.'**
+  String get lpAutomaticHint;
+
+  /// No description provided for @lpGenders.
+  ///
+  /// In en, this message translates to:
+  /// **'Genders'**
+  String get lpGenders;
+
+  /// No description provided for @lpAgeMin.
+  ///
+  /// In en, this message translates to:
+  /// **'Minimum age (optional)'**
+  String get lpAgeMin;
+
+  /// No description provided for @lpAgeMax.
+  ///
+  /// In en, this message translates to:
+  /// **'Maximum age (optional)'**
+  String get lpAgeMax;
+
+  /// No description provided for @lpCountries.
+  ///
+  /// In en, this message translates to:
+  /// **'Countries'**
+  String get lpCountries;
+
+  /// No description provided for @lpLanguages.
+  ///
+  /// In en, this message translates to:
+  /// **'Languages'**
+  String get lpLanguages;
+
+  /// No description provided for @lpCategories.
+  ///
+  /// In en, this message translates to:
+  /// **'Interests'**
+  String get lpCategories;
+
+  /// No description provided for @lpOptionsUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Audience options are unavailable. Retry to load them.'**
+  String get lpOptionsUnavailable;
+
+  /// No description provided for @lpGeo.
+  ///
+  /// In en, this message translates to:
+  /// **'Geographic targeting (optional)'**
+  String get lpGeo;
+
+  /// No description provided for @lpLatitude.
+  ///
+  /// In en, this message translates to:
+  /// **'Latitude'**
+  String get lpLatitude;
+
+  /// No description provided for @lpLongitude.
+  ///
+  /// In en, this message translates to:
+  /// **'Longitude'**
+  String get lpLongitude;
+
+  /// No description provided for @lpRadius.
+  ///
+  /// In en, this message translates to:
+  /// **'Radius in km'**
+  String get lpRadius;
+
+  /// No description provided for @lpPickMap.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose on map'**
+  String get lpPickMap;
+
+  /// No description provided for @lpClearGeo.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear location'**
+  String get lpClearGeo;
+
+  /// No description provided for @lpBudget.
+  ///
+  /// In en, this message translates to:
+  /// **'Budget'**
+  String get lpBudget;
+
+  /// No description provided for @lpCustomBudget.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom budget'**
+  String get lpCustomBudget;
+
+  /// No description provided for @lpPackage.
+  ///
+  /// In en, this message translates to:
+  /// **'Package'**
+  String get lpPackage;
+
+  /// No description provided for @lpPackagesUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Packages are unavailable. You can prepare a custom budget.'**
+  String get lpPackagesUnavailable;
+
+  /// No description provided for @lpCoins.
+  ///
+  /// In en, this message translates to:
+  /// **'Coins'**
+  String get lpCoins;
+
+  /// No description provided for @lpDuration.
+  ///
+  /// In en, this message translates to:
+  /// **'Duration in days'**
+  String get lpDuration;
+
+  /// No description provided for @lpEstimates.
+  ///
+  /// In en, this message translates to:
+  /// **'Estimated results'**
+  String get lpEstimates;
+
+  /// No description provided for @lpEstimateHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Estimates are not guaranteed. Actual delivery depends on your LIVE and audience.'**
+  String get lpEstimateHint;
+
+  /// No description provided for @lpNoEstimates.
+  ///
+  /// In en, this message translates to:
+  /// **'Estimates are unavailable.'**
+  String get lpNoEstimates;
+
+  /// No description provided for @lpCreate.
+  ///
+  /// In en, this message translates to:
+  /// **'Create campaign'**
+  String get lpCreate;
+
+  /// No description provided for @lpCreateHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Creating a campaign does not pay for it. You will review and confirm payment separately.'**
+  String get lpCreateHint;
+
+  /// No description provided for @lpSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save changes'**
+  String get lpSave;
+
+  /// No description provided for @lpEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit campaign'**
+  String get lpEdit;
+
+  /// No description provided for @lpPay.
+  ///
+  /// In en, this message translates to:
+  /// **'Review payment'**
+  String get lpPay;
+
+  /// No description provided for @lpConfirmPay.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm and pay'**
+  String get lpConfirmPay;
+
+  /// No description provided for @lpCost.
+  ///
+  /// In en, this message translates to:
+  /// **'Campaign cost'**
+  String get lpCost;
+
+  /// No description provided for @lpBalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Current coin balance'**
+  String get lpBalance;
+
+  /// No description provided for @lpUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Unavailable'**
+  String get lpUnknown;
+
+  /// No description provided for @lpRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get lpRetry;
+
+  /// No description provided for @lpRefresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh'**
+  String get lpRefresh;
+
+  /// No description provided for @lpCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel campaign'**
+  String get lpCancel;
+
+  /// No description provided for @lpCancelHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel this campaign? The server refunds unused prepaid coins. The updated balance may take a moment to appear.'**
+  String get lpCancelHint;
+
+  /// No description provided for @lpBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get lpBack;
+
+  /// No description provided for @lpPause.
+  ///
+  /// In en, this message translates to:
+  /// **'Pause'**
+  String get lpPause;
+
+  /// No description provided for @lpResume.
+  ///
+  /// In en, this message translates to:
+  /// **'Resume'**
+  String get lpResume;
+
+  /// No description provided for @lpEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No LIVE promotions yet'**
+  String get lpEmpty;
+
+  /// No description provided for @lpEmptyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Open Share → Promote while hosting a public LIVE.'**
+  String get lpEmptyHint;
+
+  /// No description provided for @lpLoadMore.
+  ///
+  /// In en, this message translates to:
+  /// **'Load more'**
+  String get lpLoadMore;
+
+  /// No description provided for @lpPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending payment'**
+  String get lpPending;
+
+  /// No description provided for @lpActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get lpActive;
+
+  /// No description provided for @lpPaused.
+  ///
+  /// In en, this message translates to:
+  /// **'Paused'**
+  String get lpPaused;
+
+  /// No description provided for @lpCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get lpCompleted;
+
+  /// No description provided for @lpCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get lpCancelled;
+
+  /// No description provided for @lpUnknownStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Status unavailable — refresh'**
+  String get lpUnknownStatus;
+
+  /// No description provided for @lpImpressions.
+  ///
+  /// In en, this message translates to:
+  /// **'Impressions'**
+  String get lpImpressions;
+
+  /// No description provided for @lpSpend.
+  ///
+  /// In en, this message translates to:
+  /// **'Coins spent'**
+  String get lpSpend;
+
+  /// No description provided for @lpRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'Coins remaining'**
+  String get lpRemaining;
+
+  /// No description provided for @lpPaymentUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment is being verified. Refresh campaign and balance before taking further action. Do not pay again while the outcome is unknown.'**
+  String get lpPaymentUnknown;
+
+  /// No description provided for @lpCleanup.
+  ///
+  /// In en, this message translates to:
+  /// **'LIVE has ended. Campaign status and any unused balance refund are being updated.'**
+  String get lpCleanup;
+
+  /// No description provided for @lpInsufficient.
+  ///
+  /// In en, this message translates to:
+  /// **'Your coin balance is insufficient. Top up, then refresh before confirming payment.'**
+  String get lpInsufficient;
+
+  /// No description provided for @lpTopUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Top up coins'**
+  String get lpTopUp;
+
+  /// No description provided for @lpValidation.
+  ///
+  /// In en, this message translates to:
+  /// **'Check the budget mode, minimum 5 coins, duration (1, 3, 7 or 14 days), age order, and complete valid geographic coordinates with a positive radius.'**
+  String get lpValidation;
+
+  /// No description provided for @lpInteger.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a whole number.'**
+  String get lpInteger;
+
+  /// No description provided for @lpNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid finite number.'**
+  String get lpNumber;
+
+  /// No description provided for @lpClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Close promotions'**
+  String get lpClose;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

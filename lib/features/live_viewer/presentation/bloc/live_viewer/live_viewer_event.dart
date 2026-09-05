@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 import 'package:bimobondapp/app/auctions/data/datasources/auction_socket_service.dart';
 import '../../../domain/entities/live_entity.dart';
+import '../../../domain/entities/live_feed_activation.dart';
 import '../../../data/services/fake_livekit_service.dart';
 
 abstract class LiveViewerEvent extends Equatable {
@@ -12,11 +13,12 @@ abstract class LiveViewerEvent extends Equatable {
 
 class LiveViewerActivated extends LiveViewerEvent {
   final LiveEntity live;
+  final LiveFeedActivation? activation;
 
-  const LiveViewerActivated(this.live);
+  const LiveViewerActivated(this.live, {this.activation});
 
   @override
-  List<Object?> get props => [live];
+  List<Object?> get props => [live, activation];
 }
 
 class LiveViewerDeactivated extends LiveViewerEvent {

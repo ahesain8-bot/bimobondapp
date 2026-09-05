@@ -562,7 +562,8 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
   }
 
   List<dynamic>? _opponentListRaw(Map<String, dynamic> json) {
-    final direct = json['data'] ?? json['items'] ?? json['opponents'] ?? json['lives'];
+    final direct =
+        json['data'] ?? json['items'] ?? json['opponents'] ?? json['lives'];
     if (direct is List) return direct;
     if (direct is Map) {
       final nested =
@@ -684,18 +685,16 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
     await _disconnectBattleOpponentMedia();
     if (generation != _battleMediaGeneration) return;
 
+    final json = await _remote.join(opponentLiveId);
+    if (generation != _battleMediaGeneration) return;
+    final creds = _liveKitJoinCredentials(json);
+    if (creds.url.isEmpty || creds.token.isEmpty) {
+      throw StateError('Opponent LiveKit url/token missing from join response');
+    }
     Object? lastError;
     for (var attempt = 1; attempt <= 2; attempt++) {
       if (generation != _battleMediaGeneration) return;
       try {
-        final json = await _remote.join(opponentLiveId);
-        if (generation != _battleMediaGeneration) return;
-        final creds = _liveKitJoinCredentials(json);
-        if (creds.url.isEmpty || creds.token.isEmpty) {
-          throw StateError(
-            'Opponent LiveKit url/token missing from join response',
-          );
-        }
         await _media.connectBattleAndSubscribe(
           url: creds.url,
           token: creds.token,

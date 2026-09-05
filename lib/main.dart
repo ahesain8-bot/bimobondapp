@@ -1,3 +1,5 @@
+import 'package:bimobondapp/app/live_promotions/presentation/di/live_promotions_injector.dart'
+    as live_promotions_di;
 import 'package:bimobondapp/core/routes/app_router.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -88,6 +90,7 @@ void main() async {
     social_di.initSocial(),
     posts_di.initPosts(),
     promotions_di.initPromotions(),
+    live_promotions_di.initLivePromotions(),
     sounds_di.initSounds(),
     search_di.initSearch(),
     categories_di.initCategories(),

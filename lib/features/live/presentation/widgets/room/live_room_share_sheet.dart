@@ -1,4 +1,7 @@
+import 'package:bimobondapp/app/live_promotions/presentation/pages/live_promotions_screen.dart';
+import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../../core/utils/app_colors.dart';
@@ -31,10 +34,10 @@ class LiveShareContact {
 class LiveRoomShareSheet {
   const LiveRoomShareSheet._();
 
-  static Future<void> show(BuildContext context) {
+  static Future<void> show(BuildContext context) async {
     final bloc = context.read<LiveRoomBloc>();
 
-    return showModalBottomSheet<void>(
+    await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
@@ -43,12 +46,13 @@ class LiveRoomShareSheet {
       builder: (_) {
         return BlocProvider.value(
           value: bloc,
-          child: const _LiveRoomShareSheetBody(
-            contacts: <LiveShareContact>[],
-          ),
+          child: const _LiveRoomShareSheetBody(contacts: <LiveShareContact>[]),
         );
       },
     );
+    if (context.mounted && bloc.state is LiveRoomEnded) {
+      if (context.canPop()) { context.pop(); } else { context.go('/'); }
+    }
   }
 }
 
@@ -109,11 +113,11 @@ class _LiveRoomShareSheetBodyState extends State<_LiveRoomShareSheetBody> {
 
   Future<void> _onContact(LiveShareContact contact) async {
     context.read<LiveRoomBloc>().add(
-          LiveRoomShareContactSelected(
-            contactId: contact.id,
-            displayName: contact.displayName,
-          ),
-        );
+      LiveRoomShareContactSelected(
+        contactId: contact.id,
+        displayName: contact.displayName,
+      ),
+    );
     final sessionId = _sessionId;
     if (sessionId != null) {
       await LiveRoomShareActions.copyLink(sessionId);
@@ -189,6 +193,7 @@ class _LiveRoomShareSheetBodyState extends State<_LiveRoomShareSheetBody> {
         _close();
         return;
       case LiveRoomShareChannel.promote:
+        await LivePromotionsScreen.show(context, liveId: sessionId);
         return;
       case LiveRoomShareChannel.search:
         setState(() {
@@ -371,10 +376,7 @@ class _ShareDivider extends StatelessWidget {
 }
 
 class _ContactsRow extends StatelessWidget {
-  const _ContactsRow({
-    required this.contacts,
-    required this.onTap,
-  });
+  const _ContactsRow({required this.contacts, required this.onTap});
 
   final List<LiveShareContact> contacts;
   final ValueChanged<LiveShareContact> onTap;
@@ -383,10 +385,7 @@ class _ContactsRow extends StatelessWidget {
   Widget build(BuildContext context) {
     if (contacts.isEmpty) {
       return const Center(
-        child: Text(
-          'لا توجد نتائج',
-          style: AppTextStyles.shareItemLabel,
-        ),
+        child: Text('لا توجد نتائج', style: AppTextStyles.shareItemLabel),
       );
     }
 
@@ -479,11 +478,7 @@ class _ChannelsRow extends StatelessWidget {
                 color: Colors.white.withValues(alpha: 0.95),
                 size: 26,
               ),
-              const Icon(
-                Icons.add,
-                color: Colors.white,
-                size: 14,
-              ),
+              const Icon(Icons.add, color: Colors.white, size: 14),
             ],
           ),
         ),
@@ -576,11 +571,7 @@ class _InstagramDirectBadge extends StatelessWidget {
         ),
       ),
       alignment: Alignment.center,
-      child: const Icon(
-        Icons.send_outlined,
-        color: Colors.white,
-        size: 26,
-      ),
+      child: const Icon(Icons.send_outlined, color: Colors.white, size: 26),
     );
   }
 }
@@ -622,8 +613,8 @@ class _ActionsRow extends StatelessWidget {
         ),
         const SizedBox(width: AppSpacing.shareItemGap),
         LiveRoomShareOption(
-          label: 'الترويج',
-          enabled: false,
+          label: AppLocalizations.of(context)!.lpTitle,
+          onTap: () => onTap(LiveRoomShareChannel.promote),
           child: LiveRoomShareCircle(
             background: AppColors.shareActionCircle.withValues(alpha: 0.7),
             child: const Icon(

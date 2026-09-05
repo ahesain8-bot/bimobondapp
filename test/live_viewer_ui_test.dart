@@ -34,9 +34,7 @@ void main() {
   ) async {
     await tester.pumpWidget(
       const MaterialApp(
-        home: Scaffold(
-          body: CommentInputBar(onSend: _noop),
-        ),
+        home: Scaffold(body: CommentInputBar(onSend: _noop)),
       ),
     );
     await tester.pump();
@@ -97,12 +95,12 @@ void main() {
     );
 
     expect(tester.takeException(), isNull);
-    expect(find.text('Type...'), findsOneWidget);
+    expect(find.text('Comment'), findsOneWidget);
     expect(find.text('🌹'), findsOneWidget);
     expect(find.byIcon(Icons.card_giftcard_rounded), findsOneWidget);
     expect(find.byIcon(Icons.reply_rounded), findsOneWidget);
 
-    final input = tester.getRect(find.text('Type...'));
+    final input = tester.getRect(find.text('Comment'));
     final gift = tester.getRect(find.byIcon(Icons.card_giftcard_rounded));
     final share = tester.getRect(find.byIcon(Icons.reply_rounded));
     expect(input.left, lessThan(gift.left));

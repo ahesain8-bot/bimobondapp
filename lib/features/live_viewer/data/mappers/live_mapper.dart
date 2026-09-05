@@ -1,4 +1,5 @@
 import '../../domain/entities/live_entity.dart';
+import '../../domain/entities/live_feed_promotion.dart';
 import '../../domain/entities/live_feed_page_result.dart';
 
 /// Maps Nest live JSON (lives/mobile-api.md §5) into [LiveEntity].
@@ -66,6 +67,8 @@ class LiveMapper {
       status: status,
       isLive: status == LiveStatus.live,
       isFollowing: json['isFollowing'] == true,
+      isPromoted: json['isPromoted'] == true,
+      promotion: LiveFeedPromotion.fromJson(json['promotion']),
       metadata: _buildMetadata(json, user, hourlyRank),
     );
   }
@@ -142,6 +145,7 @@ class LiveMapper {
     switch (status?.toUpperCase()) {
       case 'LIVE':
         return LiveStatus.live;
+      case 'PLANNED':
       case 'SCHEDULED':
         return LiveStatus.scheduled;
       case 'PAUSED':

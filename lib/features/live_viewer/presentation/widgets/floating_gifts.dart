@@ -48,6 +48,7 @@ class _FloatingGiftsLayerState extends State<FloatingGiftsLayer> {
   final Map<String, GiftComboItem> _activeCombos = {};
   final Map<String, Timer> _comboTimers = {};
   final Set<String> _playedAnimations = {};
+  final Map<String, Timer> _animationDedupeTimers = {};
   DateTime? _lastOverlayAt;
   final _audioSession = AuctionAudioGiftChipSession();
   String? _audioLabel;
@@ -96,6 +97,8 @@ class _FloatingGiftsLayerState extends State<FloatingGiftsLayer> {
       timer.cancel();
     }
     _comboTimers.clear();
+    for (final timer in _animationDedupeTimers.values) { timer.cancel(); }
+    _animationDedupeTimers.clear();
     _audioSession.dispose();
     super.dispose();
   }
@@ -198,8 +201,10 @@ class _FloatingGiftsLayerState extends State<FloatingGiftsLayer> {
     // Keep medium/large dedupe longer than the combo chip timer so late
     // gift_combo / lastGift / comment duplicates do not replay the animation.
     if (shouldPlay) {
-      Timer(const Duration(seconds: 25), () {
+      _animationDedupeTimers[comboKey]?.cancel();
+      _animationDedupeTimers[comboKey] = Timer(const Duration(seconds: 25), () {
         _playedAnimations.remove(comboKey);
+        _animationDedupeTimers.remove(comboKey);
       });
     }
     if (!shouldPlay || !mounted) return;

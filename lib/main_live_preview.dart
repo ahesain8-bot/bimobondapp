@@ -30,9 +30,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   // The live surface reaches into the auction gift pipeline for combo
   // payloads, which in turn needs the gift catalog and the shared ApiClient.
   final prefs = await SharedPreferences.getInstance();
@@ -86,7 +84,6 @@ class _LivePreviewApp extends StatelessWidget {
     );
   }
 }
-
 
 /// Answers the handful of endpoints the live surface reads directly, so the
 /// preview can render the PK stage and the supporter rings with no backend.
@@ -185,7 +182,8 @@ class _PkFirstDataSource implements LiveRemoteDataSource {
           'phase': 'BATTLE',
           'multiplier': 2,
           'startTime': now.toIso8601String(),
-          'endTime': now.add(const Duration(minutes: 3, seconds: 55))
+          'endTime': now
+              .add(const Duration(minutes: 3, seconds: 55))
               .toIso8601String(),
         },
       },
@@ -197,11 +195,17 @@ class _PkFirstDataSource implements LiveRemoteDataSource {
     int page = 1,
     int limit = 10,
     String? category,
+    bool followingOnly = false,
+    double? latitude,
+    double? longitude,
   }) async {
     final pageResult = await _inner.getLiveFeed(
       page: page,
       limit: limit,
       category: category,
+      followingOnly: followingOnly,
+      latitude: latitude,
+      longitude: longitude,
     );
     if (pageResult.lives.isEmpty) return pageResult;
     final lives = pageResult.lives;
@@ -219,7 +223,8 @@ class _PkFirstDataSource implements LiveRemoteDataSource {
       _asBattle(await _inner.getLiveById(liveId));
 
   @override
-  Future<JoinLiveResult> joinLive(String liveId) => _inner.joinLive(liveId);
+  Future<JoinLiveResult> joinLive(String liveId, {String? campaignId}) =>
+      _inner.joinLive(liveId, campaignId: campaignId);
 
   @override
   Future<void> leaveLive(String liveId) => _inner.leaveLive(liveId);
@@ -242,10 +247,8 @@ class _PkFirstDataSource implements LiveRemoteDataSource {
   }) => _inner.banViewer(liveId: liveId, userId: userId, reason: reason);
 
   @override
-  Future<void> unbanViewer({
-    required String liveId,
-    required String userId,
-  }) => _inner.unbanViewer(liveId: liveId, userId: userId);
+  Future<void> unbanViewer({required String liveId, required String userId}) =>
+      _inner.unbanViewer(liveId: liveId, userId: userId);
 
   @override
   Future<void> muteViewerChat({

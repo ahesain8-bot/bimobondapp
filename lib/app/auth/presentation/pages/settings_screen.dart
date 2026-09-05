@@ -118,6 +118,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: SettingsLayoutConstants.groupSpacing),
           _SettingsSectionTitle(title: l10n.settingsSectionContent),
+          _SettingsTile(
+            icon: LucideIcons.radio,
+            title: l10n.lpMine,
+            onTap: () => context.pushNamed('live_promotions'),
+          ),
           _SettingsGroup(
             children: [
               _SettingsTile(

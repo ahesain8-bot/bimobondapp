@@ -31,22 +31,9 @@ Future<Rect> pumpBar(
   return tester.getRect(of);
 }
 
-/// The seam is painted, not a widget, so it is read off the painter.
-///
-/// [PkSplitPainter] measures its split from the left edge of the canvas, so
-/// this is exactly the number a mirrored layout would get wrong.
-double seamX(WidgetTester tester) {
-  final paint = tester.widget<CustomPaint>(
-    find.descendant(
-      of: find.byType(PkBattleBar),
-      matching: find.byWidgetPredicate(
-        (w) => w is CustomPaint && w.painter is PkSplitPainter,
-      ),
-    ),
-  );
-  final size = tester.getSize(find.byType(PkBattleBar));
-  return (paint.painter as PkSplitPainter).ratio * size.width;
-}
+/// Measure the rendered left segment; implementation no longer uses a painter.
+double seamX(WidgetTester tester) =>
+    tester.getSize(find.byKey(const ValueKey('pk-left-score-fill'))).width;
 
 void main() {
   testWidgets('the left score stays on the left under Arabic RTL', (
@@ -107,7 +94,8 @@ void main() {
     expect(
       seam,
       closeTo(kBarWidth * 0.9, 3.0),
-      reason: 'the split is measured from the left edge, so the bar must be '
+      reason:
+          'the split is measured from the left edge, so the bar must be '
           'painted from the left edge in every locale',
     );
   });
@@ -118,7 +106,7 @@ void main() {
       direction: TextDirection.rtl,
       scoreLeft: 100000,
       scoreRight: 0,
-      of: find.text('100,000'),
+      of: find.text('100.0K'),
     );
 
     final seamShare = seamX(tester) / kBarWidth;

@@ -198,6 +198,9 @@ class _LiveRoomPageState extends State<LiveRoomPage>
                 BlocListener<LiveRoomBloc, LiveRoomState>(
                   listenWhen: (previous, current) => current is LiveRoomEnded,
                   listener: (context, state) {
+                    // Keep the promotion/refund overlay visible at remote end.
+                    // The share sheet closes this ended room after it returns.
+                    if (ModalRoute.of(context)?.isCurrent == false) return;
                     if (context.canPop()) {
                       context.pop();
                     } else {

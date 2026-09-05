@@ -1,3 +1,4 @@
+import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
@@ -138,7 +139,11 @@ class _ViewerEyePill extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.remove_red_eye_outlined, color: Colors.white, size: 15),
+            const Icon(
+              Icons.remove_red_eye_outlined,
+              color: Colors.white,
+              size: 15,
+            ),
             const SizedBox(width: 4),
             AnimatedCounter(
               value: viewerCount,
@@ -191,26 +196,32 @@ class _HostIdentity extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          Expanded(
-            child: SizedBox(
-              height: 18,
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
+          Flexible(
+            child: Text(
+              hostName,
+              maxLines: 1,
+              softWrap: false,
+              overflow: TextOverflow.ellipsis,
+              style: TikTokLiveTokens.hostName,
+            ),
+          ),
+          if (!live.isFollowing) ...[
+            const SizedBox(width: 6),
+            GestureDetector(
+              onTap: onFollow,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                decoration: BoxDecoration(
+                  color: TikTokLiveTokens.followRed,
+                  borderRadius: BorderRadius.circular(TikTokLiveTokens.followR),
+                ),
                 child: Text(
-                  hostName,
-                  maxLines: 1,
-                  softWrap: false,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    shadows: TikTokLiveTokens.glyphShadow,
-                  ),
+                  AppLocalizations.of(context)?.liveFollow ?? 'Follow',
+                  style: const TextStyle(color: Colors.white, fontSize: 11),
                 ),
               ),
             ),
-          ),
+          ],
         ],
       ),
     );
@@ -580,23 +591,18 @@ class _PkBattleBarState extends State<PkBattleBar>
       return;
     }
     final nextRatio = PkBattleBar.ratioFor(widget.scoreLeft, widget.scoreRight);
-    _ratioAnim = Tween<double>(begin: _ratio, end: nextRatio).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
-    );
-    _leftScoreAnim =
-        Tween<double>(
-          begin: _displayLeft,
-          end: widget.scoreLeft.toDouble(),
-        ).animate(
-          CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
-        );
-    _rightScoreAnim =
-        Tween<double>(
-          begin: _displayRight,
-          end: widget.scoreRight.toDouble(),
-        ).animate(
-          CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
-        );
+    _ratioAnim = Tween<double>(
+      begin: _ratio,
+      end: nextRatio,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
+    _leftScoreAnim = Tween<double>(
+      begin: _displayLeft,
+      end: widget.scoreLeft.toDouble(),
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
+    _rightScoreAnim = Tween<double>(
+      begin: _displayRight,
+      end: widget.scoreRight.toDouble(),
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
     _controller
       ..stop()
       ..forward(from: 0);
@@ -631,6 +637,7 @@ class _PkBattleBarState extends State<PkBattleBar>
                   bottom: 0,
                   width: leftW,
                   child: const DecoratedBox(
+                    key: ValueKey('pk-left-score-fill'),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [Color(0xFFFF2D55), Color(0xFFFF5C8A)],
@@ -800,6 +807,8 @@ class TikTokLiveBottomBar extends StatelessWidget {
                                 ),
                                 child: Text(
                                   'Comment',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
                                     color: Colors.white.withValues(alpha: 0.9),
                                     fontSize: 15,
@@ -842,6 +851,17 @@ class TikTokLiveBottomBar extends StatelessWidget {
                           shadows: TikTokLiveTokens.glyphShadow,
                         ),
                       ),
+                    ],
+                    const SizedBox(width: 4),
+                    _BottomAction(
+                      onTap: onShareTap,
+                      scrim: true,
+                      child: const Icon(Icons.reply_rounded, color: Colors.white, size: 26),
+                    ),
+                    if (onRoseTap != null) ...[
+                      const SizedBox(width: 4),
+                      _BottomAction(onTap: onRoseTap!, scrim: true,
+                        child: const Text('🌹', style: TextStyle(fontSize: 24))),
                     ],
                     const SizedBox(width: 4),
                     _BottomAction(

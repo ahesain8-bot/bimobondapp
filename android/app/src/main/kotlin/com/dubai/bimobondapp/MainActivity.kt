@@ -103,6 +103,10 @@ class MainActivity : FlutterActivity() {
             .also { arCameraChannel = it }
             .setMethodCallHandler { call, result ->
                 when (call.method) {
+                    "notifyPermissionsGranted" -> {
+                        ArCameraController.onPermissionGranted()
+                        result.success(null)
+                    }
                     "warmup" -> {
                         warmArCameraPipeline()
                         result.success(null)
