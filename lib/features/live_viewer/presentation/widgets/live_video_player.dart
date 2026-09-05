@@ -39,7 +39,11 @@ class _LiveVideoPlayerState extends State<LiveVideoPlayer> {
   LiveKitService? _liveKit;
   StreamSubscription<LiveKitConnectionState>? _liveKitSub;
   Room? _room;
+  EventsListener<RoomEvent>? _roomEvents;
   RemoteVideoTrack? _track;
+  String? _subscribedSid;
+  String? _activeTrackSid;
+  String? _rendererBindSid;
 
   @override
   void initState() {
@@ -107,12 +111,19 @@ class _LiveVideoPlayerState extends State<LiveVideoPlayer> {
   RemoteTrackPublication<RemoteVideoTrack>? _findVideoPub() {
     final roomObj = _room;
     if (roomObj == null) return null;
+    final boundSid = _activeTrackSid ?? _track?.sid;
+    RemoteTrackPublication<RemoteVideoTrack>? latest;
     for (final p in roomObj.remoteParticipants.values) {
       for (final vp in p.videoTrackPublications) {
-        if (vp.subscribed) return vp;
+        if (!vp.subscribed) continue;
+        latest = vp;
+        if (boundSid != null &&
+            (vp.sid == boundSid || vp.track?.sid == boundSid)) {
+          return vp;
+        }
       }
     }
-    return null;
+    return latest;
   }
 
   Future<void> _applyQualityFloor(bool isActive) async {
@@ -210,7 +221,7 @@ class _LiveVideoPlayerState extends State<LiveVideoPlayer> {
     } else if (state == LiveKitConnectionState.disconnected ||
         state == LiveKitConnectionState.failed) {
       _detachRoom();
-      if (mounted && (_buffering || _initializing)) setState(() {});
+      if (mounted) setState(() {});
     }
   }
 
@@ -219,37 +230,149 @@ class _LiveVideoPlayerState extends State<LiveVideoPlayer> {
     _detachRoom();
     _room = room;
     room.addListener(_onRoomChanged);
-    _refreshTrack();
+    final listener = room.createListener();
+    _roomEvents = listener;
+    listener
+      ..on<TrackSubscribedEvent>(_onTrackSubscribed)
+      ..on<TrackUnsubscribedEvent>(_onTrackUnsubscribed)
+      ..on<TrackUnpublishedEvent>(_onTrackUnpublished);
+    _syncTrackFromRoom();
   }
 
   void _detachRoom() {
+    final listener = _roomEvents;
+    _roomEvents = null;
+    if (listener != null) unawaited(listener.dispose());
     final room = _room;
     _room = null;
     if (room != null) room.removeListener(_onRoomChanged);
     _track = null;
+    _subscribedSid = null;
+    _activeTrackSid = null;
+    _rendererBindSid = null;
   }
 
   void _onRoomChanged() {
-    _refreshTrack();
+    _syncTrackFromRoom();
   }
 
-  void _refreshTrack() {
+  void _onTrackSubscribed(TrackSubscribedEvent event) {
+    if (event.track is! RemoteVideoTrack) return;
+    final track = event.track as RemoteVideoTrack;
+    _adoptTrack(
+      track,
+      subscribedSid: event.publication.sid,
+      source: 'TrackSubscribedEvent',
+    );
+  }
+
+  void _onTrackUnsubscribed(TrackUnsubscribedEvent event) {
+    if (event.track is! RemoteVideoTrack) return;
+    _dropTrackIfCurrent(event.track.sid ?? event.publication.sid);
+  }
+
+  void _onTrackUnpublished(TrackUnpublishedEvent event) {
+    _dropTrackIfCurrent(event.publication.sid);
+  }
+
+  void _syncTrackFromRoom() {
     final room = _room;
-    final next = room == null ? null : _firstSubscribedVideoTrack(room);
-    if (identical(next, _track)) return;
-    _track = next;
-    if (mounted) setState(() {});
+    if (room == null) {
+      _dropTrackIfCurrent(_activeTrackSid ?? _track?.sid);
+      return;
+    }
+    final latest = _latestSubscribedVideoTrack(room);
+    if (latest != null &&
+        (_track == null ||
+            (!identical(latest, _track) && latest.sid != _track!.sid))) {
+      _adoptTrack(
+        latest,
+        subscribedSid: latest.sid,
+        source: 'room_sync',
+      );
+      return;
+    }
+    if (_track != null && _isBoundTrackActive(room, _track!)) {
+      return;
+    }
+    _adoptTrack(
+      latest,
+      subscribedSid: latest?.sid,
+      source: 'room_sync',
+    );
   }
 
-  RemoteVideoTrack? _firstSubscribedVideoTrack(Room room) {
+  bool _isBoundTrackActive(Room room, RemoteVideoTrack track) {
+    final sid = track.sid ?? _activeTrackSid;
     for (final participant in room.remoteParticipants.values) {
       for (final pub in participant.videoTrackPublications) {
-        if (pub.subscribed && pub.track is RemoteVideoTrack) {
-          return pub.track as RemoteVideoTrack;
+        if (!pub.subscribed) continue;
+        final candidate = pub.track;
+        if (identical(candidate, track)) return true;
+        if (sid != null &&
+            (pub.sid == sid || candidate?.sid == sid)) {
+          return true;
         }
       }
     }
-    return null;
+    return false;
+  }
+
+  RemoteVideoTrack? _latestSubscribedVideoTrack(Room room) {
+    RemoteVideoTrack? last;
+    for (final participant in room.remoteParticipants.values) {
+      for (final pub in participant.videoTrackPublications) {
+        if (!pub.subscribed || pub.track is! RemoteVideoTrack) continue;
+        last = pub.track as RemoteVideoTrack;
+      }
+    }
+    return last;
+  }
+
+  void _dropTrackIfCurrent(String? sid) {
+    if (sid == null || sid.isEmpty) return;
+    if (sid != _activeTrackSid &&
+        sid != _subscribedSid &&
+        sid != _track?.sid) {
+      return;
+    }
+    _adoptTrack(null, subscribedSid: null, source: 'drop:$sid');
+  }
+
+  void _adoptTrack(
+    RemoteVideoTrack? track, {
+    required String? subscribedSid,
+    required String source,
+  }) {
+    final nextSid = track?.sid ?? subscribedSid;
+    if (identical(track, _track) &&
+        nextSid == _activeTrackSid &&
+        nextSid == _rendererBindSid) {
+      _subscribedSid = subscribedSid ?? nextSid;
+      return;
+    }
+    _track = track;
+    _subscribedSid = subscribedSid ?? nextSid;
+    _activeTrackSid = nextSid;
+    _rendererBindSid = nextSid;
+    _logOwnershipInvariant(source: source);
+    if (mounted) setState(() {});
+  }
+
+  void _logOwnershipInvariant({String? source}) {
+    final subscribed = _subscribedSid ?? 'null';
+    final active = _activeTrackSid ?? 'null';
+    final renderer = _rendererBindSid ?? 'null';
+    debugPrint('SUBSCRIBED sid=$subscribed');
+    debugPrint('ACTIVE_TRACK sid=$active');
+    debugPrint('RENDERER_BIND sid=$renderer');
+    if (subscribed != active || active != renderer) {
+      debugPrint(
+        '🔴 TRACK_OWNERSHIP_MISMATCH'
+        '${source == null ? '' : ' source=$source'}'
+        ' subscribed=$subscribed active=$active renderer=$renderer',
+      );
+    }
   }
 
   @override
@@ -369,6 +492,7 @@ class _LiveVideoPlayerState extends State<LiveVideoPlayer> {
         color: Colors.black,
         child: VideoTrackRenderer(
           track,
+          key: ValueKey('viewer-host-${track.sid ?? track.hashCode}'),
           fit: widget.fit == BoxFit.cover
               ? VideoViewFit.cover
               : VideoViewFit.contain,

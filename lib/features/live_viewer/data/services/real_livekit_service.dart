@@ -38,6 +38,10 @@ class RealLiveKitService implements LiveKitService {
   bool _primaryHealthCheckInFlight = false;
   bool _battleHealthCheckInFlight = false;
   int _primaryMissingTrackSamples = 0;
+  /// Latest host [RemoteVideoTrack] from [TrackSubscribedEvent]. Sampling the
+  /// first publication in map order bound the previous SID after a republish.
+  RemoteVideoTrack? _activePrimaryVideoTrack;
+  String? _activePrimaryVideoSid;
   // 3 samples at 2s: roughly six seconds of a frozen picture before the room
   // is rebuilt. At the previous 4 samples of 4s a viewer stared at a stopped
   // frame for a quarter of a minute before anything happened.
@@ -273,7 +277,26 @@ class RealLiveKitService implements LiveKitService {
     }
   }
 
-  RemoteVideoTrack? _firstRemoteVideoTrack(Room room) {
+  bool _isRemoteVideoTrackActive(Room room, RemoteVideoTrack track) {
+    final sid = track.sid;
+    for (final participant in room.remoteParticipants.values) {
+      for (final publication in participant.videoTrackPublications) {
+        if (!publication.subscribed) continue;
+        final candidate = publication.track;
+        if (identical(candidate, track)) return true;
+        if (sid != null &&
+            (publication.sid == sid || candidate?.sid == sid)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /// Last subscribed unmuted remote video track. Map iteration is insertion
+  /// order, so the first entry is often a stale publication after republish.
+  RemoteVideoTrack? _latestRemoteVideoTrack(Room room) {
+    RemoteVideoTrack? last;
     final participants = List<RemoteParticipant>.of(
       room.remoteParticipants.values,
     );
@@ -284,11 +307,45 @@ class RealLiveKitService implements LiveKitService {
       for (final publication in pubs) {
         final track = publication.track;
         if (publication.subscribed && !publication.muted && track != null) {
-          return track;
+          last = track;
         }
       }
     }
-    return null;
+    return last;
+  }
+
+  RemoteVideoTrack? _primaryRemoteVideoTrack(Room room) {
+    final latest = _latestRemoteVideoTrack(room);
+    final active = _activePrimaryVideoTrack;
+    if (latest != null &&
+        (active == null ||
+            (!identical(latest, active) && latest.sid != active.sid))) {
+      _adoptPrimaryRemoteVideo(latest, latest.sid);
+      return latest;
+    }
+    if (active != null && _isRemoteVideoTrackActive(room, active)) {
+      return active;
+    }
+    if (latest == null) {
+      _activePrimaryVideoTrack = null;
+      _activePrimaryVideoSid = null;
+    }
+    return latest;
+  }
+
+  void _adoptPrimaryRemoteVideo(RemoteVideoTrack track, String? pubSid) {
+    _activePrimaryVideoTrack = track;
+    _activePrimaryVideoSid = track.sid ?? pubSid;
+  }
+
+  void _dropPrimaryRemoteVideoIfCurrent(String? sid) {
+    if (sid == null || sid.isEmpty) return;
+    if (sid != _activePrimaryVideoSid &&
+        sid != _activePrimaryVideoTrack?.sid) {
+      return;
+    }
+    _activePrimaryVideoTrack = null;
+    _activePrimaryVideoSid = null;
   }
 
   Future<num?> _receiverVideoProgress(RemoteVideoTrack track) async {
@@ -317,7 +374,7 @@ class RealLiveKitService implements LiveKitService {
 
   Future<void> _samplePrimaryVideo(Room room) async {
     try {
-      final track = _firstRemoteVideoTrack(room);
+      final track = _primaryRemoteVideoTrack(room);
       if (_room != room) return;
       if (track == null) {
         await _ensureRemoteTracksSubscribed(room);
@@ -338,6 +395,20 @@ class RealLiveKitService implements LiveKitService {
 
   void _reportPrimaryVideoStall(Room room, String reason) {
     if (_room != room) return;
+    // A camera flip is allowed to freeze the last good frame. Video-only
+    // stall must never leave the live, dispose the room, clear audio, or
+    // reconnect as the first recovery action.
+    if (reason == 'inbound_video_stalled') {
+      debugPrint(
+        '🟡 Viewer video stopped advancing while room remained connected: '
+        '$reason — soft recovery, stay in room',
+      );
+      _pkDiag('primary_stall_soft', detail: 'reason=$reason');
+      unawaited(_softRecoverPrimaryVideo(room));
+      _primaryVideoProgress.reset();
+      _primaryMissingTrackSamples = 0;
+      return;
+    }
     // Mid-PK, replacing the primary room always tore down the battle room
     // (connect() called disconnectBattle). That remounted BOTH tiles and
     // looked like periodic freezes. Soft-resubscribe only while PK is up.
@@ -359,6 +430,16 @@ class RealLiveKitService implements LiveKitService {
     // The BLoC responds by obtaining a fresh join token and replacing the
     // stale Room. Keeping that policy above the SDK avoids reusing dead ICE.
     _setState(LiveKitConnectionState.disconnected);
+  }
+
+  Future<void> _softRecoverPrimaryVideo(Room room) async {
+    if (_room != room) return;
+    await _ensureRemoteTracksSubscribed(room);
+    if (_room != room) return;
+    final latest = _latestRemoteVideoTrack(room);
+    if (latest != null) {
+      _adoptPrimaryRemoteVideo(latest, latest.sid);
+    }
   }
 
   void _stopPrimaryVideoWatchdog() {
@@ -401,7 +482,7 @@ class RealLiveKitService implements LiveKitService {
   }) async {
     final generation = _battleConnectionGeneration;
     try {
-      final track = _firstRemoteVideoTrack(room);
+      final track = _latestRemoteVideoTrack(room);
       if (
         _battleRoom != room ||
         generation != _battleConnectionGeneration
@@ -912,10 +993,13 @@ class RealLiveKitService implements LiveKitService {
           // this is NOT the SFU's actual forwarding decision, which is why
           // the LiveVideoPlayer renderer also probes via getReceiverStats).
           ..on<TrackSubscribedEvent>((ev) {
+            if (_room != room) return;
             if (ev.track is RemoteAudioTrack) {
               unawaited(_preferMediaSpeaker());
             }
             if (ev.track is! RemoteVideoTrack) return;
+            final vtrack = ev.track as RemoteVideoTrack;
+            _adoptPrimaryRemoteVideo(vtrack, ev.publication.sid);
             _pkDiag(
               'primary_track_subscribed',
               roomId: roomName,
@@ -924,7 +1008,6 @@ class RealLiveKitService implements LiveKitService {
             );
             final p = ev.publication;
             final part = ev.participant;
-            final vtrack = ev.track as RemoteVideoTrack;
             final pub = p; // RemoteTrackPublication
             final dims = pub.dimensions; // server-reported published dims
             final mime = pub.mimeType; // 2.11.0 direct getter
@@ -944,6 +1027,17 @@ class RealLiveKitService implements LiveKitService {
               '  videoQualityGetter(preference)=$qualityPref'
               '  (NOTE: decoder-output dims queried separately in VIEWER-RENDERER probe via getReceiverStats())',
             );
+          })
+          ..on<TrackUnsubscribedEvent>((ev) {
+            if (_room != room) return;
+            if (ev.track is! RemoteVideoTrack) return;
+            _dropPrimaryRemoteVideoIfCurrent(
+              ev.track.sid ?? ev.publication.sid,
+            );
+          })
+          ..on<TrackUnpublishedEvent>((ev) {
+            if (_room != room) return;
+            _dropPrimaryRemoteVideoIfCurrent(ev.publication.sid);
           })
           ..on<TrackSubscriptionExceptionEvent>((event) {
             unawaited(_retryRemoteSubscription(room, event));
@@ -1168,6 +1262,8 @@ class RealLiveKitService implements LiveKitService {
 
   Future<void> _disposePrimaryRoom({required bool notify}) async {
     _stopPrimaryVideoWatchdog();
+    _activePrimaryVideoTrack = null;
+    _activePrimaryVideoSid = null;
     final room = _room;
     // Clear identity first so a late RoomDisconnectedEvent from the room being
     // replaced cannot mutate the state of its successor.

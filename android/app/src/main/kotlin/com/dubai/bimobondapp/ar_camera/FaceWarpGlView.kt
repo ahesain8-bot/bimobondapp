@@ -231,6 +231,21 @@ class FaceWarpGlView @JvmOverloads constructor(
         renderer.setCameraTransform(rotationDegrees, frontMirror, bufW, bufH)
     }
 
+    fun invalidateCameraTransformForSwitch() {
+        renderer.invalidateCameraTransformForSwitch()
+    }
+
+    fun markCameraTransformationInfo(
+        rotationDegrees: Int,
+        frontMirror: Boolean,
+        bufW: Int,
+        bufH: Int,
+    ) {
+        renderer.markCameraTransformationInfo(rotationDegrees, frontMirror, bufW, bufH)
+    }
+
+    fun isCameraTransformationInfoReady(): Boolean = renderer.isCameraTransformationInfoReady()
+
     fun cameraRotationDegrees(): Int = renderer.cameraRotationDegrees()
 
     /** Oriented camera buffer size for letterbox-free GL recording. */
@@ -305,6 +320,10 @@ class FaceWarpGlView @JvmOverloads constructor(
         ensureGlInitialized()
         renderer.captureEnabled = enabled
     }
+
+    fun isCaptureEnabled(): Boolean = renderer.captureEnabled
+
+    fun captureGeneration(): Int = renderer.captureGeneration()
 
     fun takeLastFilteredFrame(): Bitmap? {
         if (!glInitialized) return null

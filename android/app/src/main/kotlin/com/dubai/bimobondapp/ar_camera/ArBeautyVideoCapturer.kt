@@ -30,16 +30,29 @@ class ArBeautyVideoCapturer : VideoCapturer {
     private var surfaceTextureHelper: SurfaceTextureHelper? = null
     private var capturerObserver: CapturerObserver? = null
     private var capturing = false
+    /**
+     * When true, live-camera frames are candidates only. The pump keeps
+     * running and publishes [heldBitmap] (last good 720x1280) until the new
+     * lens is confirmed. Never starves VideoSource.
+     */
     @Volatile
-    private var pausedForCameraSwitch = false
-    /** After flip resume, drop a few captures so the first published frame is clean. */
-    private val warmupSkipRemaining = AtomicInteger(0)
+    private var switchPending = false
+    private var expectedFront = true
+    private var consecutiveGood = 0
+    private var switchStartedElapsed = 0L
+    private var timeoutLogged = false
+    private var firstCandidateLogged = false
+    private var lastCountedCaptureGen = -1
+    private var lastGoodBitmap: Bitmap? = null
+    private var heldBitmap: Bitmap? = null
     private var width = 720
     private var height = 1280
     private var frameIntervalMs = 66L
     private val mainHandler = Handler(Looper.getMainLooper())
     private val pumping = AtomicBoolean(false)
     private var rgbaScratch: ByteBuffer? = null
+    private var rgbaScratchW = 0
+    private var rgbaScratchH = 0
     private val framesPushed = AtomicInteger(0)
     private val skippedBad = AtomicInteger(0)
 
@@ -90,6 +103,12 @@ class ArBeautyVideoCapturer : VideoCapturer {
         capturing = true
         framesPushed.set(0)
         skippedBad.set(0)
+        switchPending = false
+        consecutiveGood = 0
+        lastCountedCaptureGen = -1
+        rgbaScratch = null
+        rgbaScratchW = 0
+        rgbaScratchH = 0
 
         val gl = ArCameraBridge.warpGlView
         if (gl == null) {
@@ -130,6 +149,11 @@ class ArBeautyVideoCapturer : VideoCapturer {
             }
         }
         rgbaScratch = null
+        rgbaScratchW = 0
+        rgbaScratchH = 0
+        recycleHeld()
+        lastGoodBitmap?.recycle()
+        lastGoodBitmap = null
         capturerObserver?.onCapturerStopped()
         Log.i(TAG, "bitmap beauty pump stopped after ${framesPushed.get()} frames")
     }
@@ -156,28 +180,90 @@ class ArBeautyVideoCapturer : VideoCapturer {
 
     fun pushedFrameCount(): Int = framesPushed.get()
 
-    fun setPausedForCameraSwitch(paused: Boolean) {
-        pausedForCameraSwitch = paused
-        if (paused) {
-            warmupSkipRemaining.set(0)
-            mainHandler.post {
-                try {
-                    ArCameraBridge.warpGlView?.clearLastCapturedFrame()
-                } catch (_: Throwable) {
-                }
-            }
-        } else {
-            // Drop post-flip captures until the OES transform settles — too few
-            // and viewers still see one corrupt frame; too many feels laggy.
-            warmupSkipRemaining.set(6)
+    fun trackWidth(): Int = width
+
+    fun trackHeight(): Int = height
+
+    fun isPumpRunning(): Boolean = capturing && pumping.get()
+
+    /**
+     * CameraX is about to rebind. Keep pumping the last valid 720x1280 frame
+     * with fresh timestamps. New GL frames are candidates only.
+     */
+    fun beginHoldLastGoodForSwitch(expectedFront: Boolean) {
+        this.expectedFront = expectedFront
+        switchPending = true
+        consecutiveGood = 0
+        lastCountedCaptureGen = try {
+            ArCameraBridge.warpGlView?.captureGeneration() ?: -1
+        } catch (_: Throwable) {
+            -1
         }
-        Log.i(TAG, "pausedForCameraSwitch=$paused")
+        switchStartedElapsed = SystemClock.elapsedRealtime()
+        timeoutLogged = false
+        firstCandidateLogged = false
+        val src = lastGoodBitmap
+        if (src != null && !src.isRecycled) {
+            try {
+                val copy = src.copy(Bitmap.Config.ARGB_8888, false)
+                if (copy != null) {
+                    heldBitmap?.recycle()
+                    heldBitmap = copy
+                }
+            } catch (_: Throwable) {
+            }
+        }
+        mainHandler.post {
+            try {
+                val gl = ArCameraBridge.warpGlView ?: return@post
+                gl.setCaptureEnabled(true)
+                gl.setCaptureMaxEdge(1280)
+                gl.requestCaptureNow()
+            } catch (_: Throwable) {
+            }
+        }
+        Log.i(
+            TAG,
+            "SWITCH_PAUSE expectedLens=${lensName(expectedFront)} " +
+                "held=${heldBitmap?.width ?: 0}x${heldBitmap?.height ?: 0} " +
+                "capturerRunning=$capturing captureLoopRunning=${isPumpRunning()}",
+        )
     }
 
+    private fun recycleHeld() {
+        try {
+            heldBitmap?.recycle()
+        } catch (_: Throwable) {
+        }
+        heldBitmap = null
+    }
+
+    private fun rememberLastGood(src: Bitmap) {
+        if (src.isRecycled || src.width != width || src.height != height) return
+        val copy = try {
+            src.copy(Bitmap.Config.ARGB_8888, false)
+        } catch (_: Throwable) {
+            null
+        } ?: return
+        val previous = lastGoodBitmap
+        lastGoodBitmap = copy
+        if (previous != null && previous !== copy && !previous.isRecycled) {
+            try {
+                previous.recycle()
+            } catch (_: Throwable) {
+            }
+        }
+    }
+
+    private fun lensName(front: Boolean): String = if (front) "front" else "back"
+
     private fun pushOneFrame() {
-        if (pausedForCameraSwitch) return
         val observer = capturerObserver ?: return
-        val gl = ArCameraBridge.warpGlView ?: return
+        val gl = ArCameraBridge.warpGlView
+        if (gl == null) {
+            if (switchPending) publishHeld(observer)
+            return
+        }
 
         mainHandler.post {
             try {
@@ -191,8 +277,134 @@ class ArBeautyVideoCapturer : VideoCapturer {
         } catch (t: Throwable) {
             Log.w(TAG, "copyLastFilteredFrame failed", t)
             null
-        } ?: return
+        }
 
+        if (switchPending) {
+            handleSwitchCandidate(observer, gl, raw)
+            return
+        }
+
+        if (raw == null) return
+        publishLiveOrDrop(observer, raw)
+    }
+
+    private fun handleSwitchCandidate(
+        observer: CapturerObserver,
+        gl: FaceWarpGlView,
+        raw: Bitmap?,
+    ) {
+        val currentFront = ArCameraBridge.isFrontCamera
+        val transformReady = gl.isCameraTransformationInfoReady()
+        val rot = gl.cameraRotationDegrees()
+        val srcW = if (raw != null && !raw.isRecycled) raw.width else 0
+        val srcH = if (raw != null && !raw.isRecycled) raw.height else 0
+        val landscape = srcW >= 2 && srcH >= 2 && srcH < srcW
+        val scaled = if (raw != null && !raw.isRecycled && !landscape) {
+            scaleToExact(raw, width, height)
+        } else {
+            null
+        }
+        try {
+            raw?.recycle()
+        } catch (_: Throwable) {
+        }
+
+        val sizeValid = scaled != null &&
+            !scaled.isRecycled &&
+            scaled.width == width &&
+            scaled.height == height
+        val elapsed = SystemClock.elapsedRealtime() - switchStartedElapsed
+        val timedOut = elapsed >= SWITCH_TIMEOUT_MS
+        // Rotation 90/270 is NOT required. Xiaomi can report 0 after a flip
+        // while the GL output is already a normalized 720x1280 portrait.
+        val rotationValid = sizeValid && !landscape
+        // Prefer TransformationInfo for the new lens. After timeout, portrait
+        // 720x1280 alone is enough — missing metadata must not deadlock.
+        val transformOk = transformReady || timedOut
+        val gen = try {
+            gl.captureGeneration()
+        } catch (_: Throwable) {
+            0
+        }
+        val freshCapture = gen > lastCountedCaptureGen
+        val valid = transformOk && sizeValid && !landscape && freshCapture
+
+        if (!firstCandidateLogged) {
+            firstCandidateLogged = true
+            Log.i(TAG, "SWITCH_FIRST_CANDIDATE src=${srcW}x$srcH rotation=$rot")
+        }
+
+        if (valid) {
+            lastCountedCaptureGen = gen
+            consecutiveGood++
+        } else if (!sizeValid || landscape || !transformOk) {
+            consecutiveGood = 0
+        }
+
+        Log.i(
+            TAG,
+            "SWITCH_CANDIDATE " +
+                "lens=${lensName(currentFront)} " +
+                "expectedLens=${lensName(expectedFront)} " +
+                "src=${srcW}x$srcH " +
+                "bitmap=${scaled?.width ?: srcW}x${scaled?.height ?: srcH} " +
+                "rotation=$rot " +
+                "transformReady=$transformReady " +
+                "sizeValid=$sizeValid " +
+                "rotationValid=$rotationValid " +
+                "consecutiveGood=$consecutiveGood " +
+                "publisherPaused=false " +
+                "captureLoopRunning=${isPumpRunning()} " +
+                "capturerRunning=$capturing",
+        )
+
+        val resumeBitmap = if (valid && consecutiveGood >= REQUIRED_GOOD_FRAMES) {
+            scaled
+        } else {
+            null
+        }
+        if (resumeBitmap != null) {
+            switchPending = false
+            recycleHeld()
+            Log.i(
+                TAG,
+                "SWITCH_RESUME consecutiveGood=$consecutiveGood " +
+                    "lens=${lensName(currentFront)} rotation=$rot " +
+                    "transformReady=$transformReady timedOut=$timedOut " +
+                    "out=${width}x$height",
+            )
+            publishScaled(observer, resumeBitmap, remember = true)
+            return
+        }
+
+        if (scaled != null && scaled !== heldBitmap) {
+            try {
+                scaled.recycle()
+            } catch (_: Throwable) {
+            }
+        }
+
+        if (timedOut && !timeoutLogged) {
+            timeoutLogged = true
+            Log.w(
+                TAG,
+                "SWITCH_TIMEOUT after ${elapsed}ms " +
+                    "failedPredicate=" +
+                    "transformReady=$transformReady " +
+                    "sizeValid=$sizeValid " +
+                    "landscape=$landscape " +
+                    "rotationValid=$rotationValid " +
+                    "rotation=$rot " +
+                    "src=${srcW}x$srcH " +
+                    "captureGen=$gen " +
+                    "consecutiveGood=$consecutiveGood " +
+                    "— keep sending held last-good frame, still evaluating candidates",
+            )
+        }
+        publishHeld(observer)
+    }
+
+    private fun publishLiveOrDrop(observer: CapturerObserver, raw: Bitmap) {
         if (raw.isRecycled || raw.width < 2 || raw.height < 2) {
             try {
                 raw.recycle()
@@ -201,13 +413,10 @@ class ArBeautyVideoCapturer : VideoCapturer {
             return
         }
 
-        // Landscape / tiny buffers must never reach LiveKit — viewers decode
-        // them as horizontal static when the track is negotiated as 720x1280.
-        if (raw.height < raw.width) {
-            val n = skippedBad.incrementAndGet()
-            if (n == 1 || n % 20 == 0) {
-                Log.w(TAG, "skip landscape beauty frame ${raw.width}x${raw.height} #$n")
-            }
+        val srcW = raw.width
+        val srcH = raw.height
+        if (srcH < srcW) {
+            skippedBad.incrementAndGet()
             try {
                 raw.recycle()
             } catch (_: Throwable) {
@@ -215,45 +424,48 @@ class ArBeautyVideoCapturer : VideoCapturer {
             return
         }
 
-        val skip = warmupSkipRemaining.get()
-        if (skip > 0) {
-            warmupSkipRemaining.decrementAndGet()
-            try {
-                raw.recycle()
-            } catch (_: Throwable) {
-            }
-            return
-        }
-
-        // Never publish a non-portrait / wrong-size buffer — that is what turns
-        // into horizontal static on the viewer after a camera flip.
         val scaled = scaleToExact(raw, width, height)
         try {
             raw.recycle()
         } catch (_: Throwable) {
         }
         if (scaled == null) {
-            val n = skippedBad.incrementAndGet()
-            if (n == 1 || n % 30 == 0) {
-                Log.w(TAG, "skipped bad beauty frame #$n (need ${width}x$height)")
-            }
+            skippedBad.incrementAndGet()
             return
         }
+        publishScaled(observer, scaled, remember = true)
+    }
 
+    private fun publishHeld(observer: CapturerObserver) {
+        val held = heldBitmap
+        if (held == null || held.isRecycled) return
+        publishScaled(observer, held, remember = false, recycleAfter = false)
+    }
+
+    private fun publishScaled(
+        observer: CapturerObserver,
+        scaled: Bitmap,
+        remember: Boolean,
+        recycleAfter: Boolean = true,
+    ) {
         val frame = bitmapToVideoFrame(scaled)
-        try {
-            scaled.recycle()
-        } catch (_: Throwable) {
+        if (remember && frame != null) {
+            rememberLastGood(scaled)
+        }
+        if (recycleAfter && scaled !== heldBitmap && scaled !== lastGoodBitmap) {
+            try {
+                scaled.recycle()
+            } catch (_: Throwable) {
+            }
         }
         if (frame == null) return
-
         try {
             observer.onFrameCaptured(frame)
         } finally {
             frame.release()
         }
         val n = framesPushed.incrementAndGet()
-        if (n == 1 || n % 60 == 0) {
+        if (!switchPending && (n == 1 || n % 60 == 0)) {
             Log.i(TAG, "pushed beauty frames=$n out=${width}x$height")
         }
     }
@@ -307,16 +519,27 @@ class ArBeautyVideoCapturer : VideoCapturer {
             val h = bitmap.height
             // Must match the negotiated LiveKit track size exactly.
             if (w != width || h != height) {
-                Log.w(TAG, "reject frame ${w}x$h (track is ${width}x$height)")
+                Log.w(TAG, "DROP reason=track_size bitmap ${w}x$h track=${width}x$height")
                 return null
             }
             if ((w and 1) != 0 || (h and 1) != 0) return null
 
-            val rgbaBytes = w * h * 4
+            val stride = bitmap.rowBytes
+            if (stride < w * 4) {
+                Log.w(TAG, "DROP reason=rowBytes stride=$stride widthBytes=${w * 4}")
+                return null
+            }
+            val rgbaBytes = stride * h
             var rgba = rgbaScratch
-            if (rgba == null || rgba.capacity() < rgbaBytes) {
+            if (rgba == null ||
+                rgbaScratchW != w ||
+                rgbaScratchH != h ||
+                rgba.capacity() < rgbaBytes
+            ) {
                 rgba = ByteBuffer.allocateDirect(rgbaBytes)
                 rgbaScratch = rgba
+                rgbaScratchW = w
+                rgbaScratchH = h
             }
             rgba!!.clear()
             rgba.limit(rgbaBytes)
@@ -331,7 +554,7 @@ class ArBeautyVideoCapturer : VideoCapturer {
             val i420 = JavaI420Buffer.allocate(w, h)
             YuvHelper.ABGRToI420(
                 rgba,
-                w * 4,
+                stride,
                 i420.dataY,
                 i420.strideY,
                 i420.dataU,
@@ -350,5 +573,7 @@ class ArBeautyVideoCapturer : VideoCapturer {
 
     companion object {
         private const val TAG = "ArBeautyCapturer"
+        private const val REQUIRED_GOOD_FRAMES = 3
+        private const val SWITCH_TIMEOUT_MS = 5000L
     }
 }

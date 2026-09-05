@@ -1371,15 +1371,19 @@ class _PkGuestFeed extends StatelessWidget {
 
   VideoTrack? _remoteVideoTrack(Room room) {
     VideoTrack? mutedFallback;
+    VideoTrack? lastUnmuted;
     for (final participant in room.remoteParticipants.values) {
       for (final publication in participant.videoTrackPublications) {
         final track = publication.track;
         if (!publication.subscribed || track == null) continue;
-        if (!publication.muted) return track;
-        mutedFallback ??= track;
+        if (!publication.muted) {
+          lastUnmuted = track;
+        } else {
+          mutedFallback ??= track;
+        }
       }
     }
-    return mutedFallback;
+    return lastUnmuted ?? mutedFallback;
   }
 
   Widget _fallback() {

@@ -814,8 +814,22 @@ class _OpponentVideoState extends State<_OpponentVideo> {
     final listener = room.createListener();
     _listener = listener;
     listener
-      ..on<TrackSubscribedEvent>((_) => _refreshTrack(room))
-      ..on<TrackUnsubscribedEvent>((_) => _refreshTrack(room))
+      ..on<TrackSubscribedEvent>((event) {
+        final track = event.track;
+        if (track is RemoteVideoTrack) {
+          _bindOpponentTrack(track);
+        } else {
+          _refreshTrack(room);
+        }
+      })
+      ..on<TrackUnsubscribedEvent>((event) {
+        final sid = event.track.sid ?? event.publication.sid;
+        if (sid == _trackKey || sid == _track?.sid) {
+          _track = null;
+          _trackKey = null;
+          _refreshTrack(room);
+        }
+      })
       ..on<TrackMutedEvent>((_) => _refreshTrack(room))
       ..on<TrackUnmutedEvent>((_) => _refreshTrack(room))
       ..on<ParticipantConnectedEvent>((_) => _refreshTrack(room))
@@ -837,6 +851,24 @@ class _OpponentVideoState extends State<_OpponentVideo> {
     });
   }
 
+  void _bindOpponentTrack(RemoteVideoTrack track) {
+    final key = track.sid ?? '${track.hashCode}';
+    if (key == _trackKey && identical(track, _track)) return;
+    if (!mounted) {
+      _track = track;
+      _trackKey = key;
+      return;
+    }
+    debugPrint(
+      '[PK-DIAG][${DateTime.now().toIso8601String()}] '
+      'opponent_renderer_track_change from=$_trackKey to=$key',
+    );
+    setState(() {
+      _track = track;
+      _trackKey = key;
+    });
+  }
+
   void _refreshTrack(Room? room) {
     VideoTrack? next;
     VideoTrack? mutedFallback;
@@ -848,11 +880,10 @@ class _OpponentVideoState extends State<_OpponentVideo> {
           if (!publication.subscribed || track == null) continue;
           if (!publication.muted) {
             next = track;
-            break;
+          } else {
+            mutedFallback ??= track;
           }
-          mutedFallback ??= track;
         }
-        if (next != null) break;
       }
     }
     next ??= mutedFallback;
@@ -986,12 +1017,14 @@ class _GuestVideo extends StatelessWidget {
     if (participants == null) return null;
     for (final participant in participants) {
       if (!liveKitParticipantMatches(participant, guest.userId)) continue;
+      VideoTrack? last;
       for (final publication in participant.videoTrackPublications) {
         if (publication.subscribed && !publication.muted) {
           final track = publication.track;
-          if (track != null) return track;
+          if (track != null) last = track;
         }
       }
+      return last;
     }
     return null;
   }

@@ -573,16 +573,14 @@ object ArCameraController {
             return
         }
 
-        // Previous flip still waiting on bind — fail it without resuming
-        // publish; this flip keeps the beauty pump paused.
+        // Previous flip still waiting on bind — fail it; this flip keeps
+        // holding the last-good beauty frame on the same VideoSource.
         val staleWaiter = pendingFlipResult
         pendingFlipResult = null
         staleWaiter?.invoke(false)
 
-        // Stop publishing into LiveKit while CameraX rebinds — otherwise viewers
-        // get sideways/scrambled frames with rotation=0 until transform arrives.
-        // Always pause when a beauty capturer is attached (not only when the
-        // exclusive flag is set — that race left frames pumping during flip).
+        // Do not starve LiveKit. Hold last-good 720x1280 while CameraX rebinds;
+        // new GL frames are candidates only until the new lens is confirmed.
         ArLiveBeautyPublisher.pauseForCameraSwitch()
 
         pendingFlipResult = onResult
@@ -613,8 +611,8 @@ object ArCameraController {
             if (!preferOesBinding) {
                 ArCameraBridge.coverPreviewForRebind()
             }
-            // Resume + onResult happen in finishCameraFlip after bind completes.
-            // Calling them here raced unbindAll and destroyed the viewer stream.
+            // onResult happens in finishCameraFlip after bind completes.
+            // Calling it here raced unbindAll and destroyed the viewer stream.
             bindCamera(lifecycleOwner, previewView, faceOverlay)
             ArCameraBridge.applyCurrentFilter()
         }
@@ -624,9 +622,8 @@ object ArCameraController {
      * Ends a [flipCamera] once CameraX has rebound (or failed).
      *
      * Completes the Dart Future immediately after bind so the host UI can
-     * flip. Beauty publish resumes in the background — waiting on a perfect
-     * portrait snap here left LiveKit muted/paused and made live flip look
-     * like a no-op.
+     * flip. Outbound beauty frames keep flowing (held last-good, then new
+     * lens) on the existing VideoSource — never mute or recreate the track.
      */
     private fun finishCameraFlip(success: Boolean) {
         val waiter = pendingFlipResult ?: return
@@ -634,9 +631,14 @@ object ArCameraController {
         // Tell Flutter the lens switched now; do not block on publish resume.
         waiter.invoke(success)
         if (ArLiveBeautyPublisher.hasActiveCapturer()) {
-            ArLiveBeautyPublisher.resumeAfterCameraSwitch(
-                delayMs = if (success) 400L else 200L,
-            )
+            if (success) {
+                ArLiveBeautyPublisher.resumeAfterCameraSwitch(delayMs = 400L)
+            } else {
+                android.util.Log.w(
+                    "ArLiveBeautyPub",
+                    "SWITCH_TIMEOUT bind failed — keep sending held last-good frame",
+                )
+            }
         }
     }
 
@@ -1049,9 +1051,12 @@ object ArCameraController {
         if (cached != null && !isMostlyEmpty(cached)) {
             oesPhotoReady = true
             cached.recycle()
-            // Stop continuous GPU readback — that was the live-preview lag.
-            // Shutter re-enables capture for a fresh full-res frame.
-            gl.setCaptureEnabled(false)
+            // Beauty live owns glReadPixels for the outbound track. Disabling
+            // capture here left lastCapturedFrame stale after a lens flip, so
+            // the LiveKit pump could never observe new-camera candidates.
+            if (!ArLiveBeautyPublisher.hasActiveCapturer()) {
+                gl.setCaptureEnabled(false)
+            }
             return
         }
         cached?.recycle()
@@ -3433,6 +3438,8 @@ object ArCameraController {
                 0
             }
             val mirrorFront = ArCameraBridge.isFrontCamera
+            // Preview shaders may use this immediately; beauty publish must NOT
+            // treat it as TransformationInfo — that arrives in the listener.
             glView.setCameraTransform(initialRot, frontMirror = mirrorFront, bufW, bufH)
             request.setTransformationInfoListener(executor) { info ->
                 android.util.Log.i(
@@ -3445,7 +3452,7 @@ object ArCameraController {
                     "CAMERA rotation=${info.rotationDegrees} crop=${info.cropRect} " +
                         "SurfaceTextureBuffer=${bufW}x$bufH",
                 )
-                glView.setCameraTransform(
+                glView.markCameraTransformationInfo(
                     info.rotationDegrees,
                     frontMirror = ArCameraBridge.isFrontCamera,
                     bufW,

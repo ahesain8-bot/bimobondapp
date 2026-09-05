@@ -2230,7 +2230,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
             // Wait until beauty pump has pushed at least one post-flip frame
             // (or a short cap) so viewers never decode mid-rebind garbage.
             final deadline = DateTime.now().add(
-              const Duration(milliseconds: 1600),
+              const Duration(milliseconds: 5600),
             );
             while (DateTime.now().isBefore(deadline)) {
               final n = await ArCameraBridge.beautyPushedFrameCount();

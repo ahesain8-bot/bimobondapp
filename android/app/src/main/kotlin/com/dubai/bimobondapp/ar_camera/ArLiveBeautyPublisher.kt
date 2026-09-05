@@ -55,81 +55,38 @@ object ArLiveBeautyPublisher {
     @JvmStatic
     fun hasActiveCapturer(): Boolean = capturer is ArBeautyVideoCapturer
 
-    /** Pause beauty frames during CameraX front/back rebind. */
+    /**
+     * CameraX is rebinding. Do NOT stop the custom frame pump.
+     * Hold last-good 720x1280 on the same VideoSource until new-lens
+     * candidates pass validation.
+     */
     @JvmStatic
     fun pauseForCameraSwitch() {
+        try {
+            ArCameraBridge.warpGlView?.invalidateCameraTransformForSwitch()
+        } catch (_: Throwable) {
+        }
         val c = capturer as? ArBeautyVideoCapturer ?: return
-        c.setPausedForCameraSwitch(true)
-        // Keep the WebRTC track enabled — disabling it can black the viewer.
-        // Pausing frame push freezes the last good encoded frame instead.
-        Log.i(TAG, "beauty publish paused for camera switch")
+        // Flag still points at the current lens; the controller flips it next.
+        c.beginHoldLastGoodForSwitch(expectedFront = !ArCameraBridge.isFrontCamera)
+        Log.i(TAG, "SWITCH_PAUSE")
     }
 
     /**
-     * Resume beauty publish after CameraX flip.
-     *
-     * Waits for a portrait capture (and a sane rotation when available) so
-     * viewers never decode the sideways / horizontal-static garbage that
-     * appears while the new lens is still settling. Dart already completed
-     * the flip Future in [ArCameraController.finishCameraFlip], so this
-     * polling does not block the host UI.
+     * CameraX bind finished. The capturer already holds last-good and evaluates
+     * candidates on its existing pump — do not starve or force-resume here.
      */
     @JvmStatic
     fun resumeAfterCameraSwitch(
         delayMs: Long = 450L,
         onComplete: (() -> Unit)? = null,
     ) {
-        val c = capturer as? ArBeautyVideoCapturer
-        if (c == null) {
-            onComplete?.invoke()
-            return
-        }
-        val main = android.os.Handler(android.os.Looper.getMainLooper())
-        fun attempt(n: Int) {
-            val gl = ArCameraBridge.warpGlView
-            try {
-                gl?.requestCaptureNow()
-            } catch (_: Throwable) {
-            }
-            val rot = gl?.cameraRotationDegrees() ?: 0
-            val snap = try {
-                gl?.copyLastFilteredFrame()
-            } catch (_: Throwable) {
-                null
-            }
-            val portraitOk = snap != null &&
-                !snap.isRecycled &&
-                snap.width >= 2 &&
-                snap.height >= 2 &&
-                snap.height >= snap.width
-            try {
-                snap?.recycle()
-            } catch (_: Throwable) {
-            }
-            // 0 is allowed once a portrait buffer exists (some devices report
-            // 0 briefly after transform); without portrait we keep waiting.
-            val settled = portraitOk || n >= 12
-            if (settled) {
-                try {
-                    gl?.resetAfterRouteResume()
-                    gl?.clearLastCapturedFrame()
-                    gl?.requestCaptureNow()
-                } catch (_: Throwable) {
-                }
-                main.postDelayed({
-                    c.setPausedForCameraSwitch(false)
-                    Log.i(
-                        TAG,
-                        "beauty publish resumed after flip (attempt=$n rot=$rot portrait=$portraitOk)",
-                    )
-                    onComplete?.invoke()
-                }, 100L)
-            } else {
-                Log.i(TAG, "flip resume wait n=$n rot=$rot portrait=$portraitOk")
-                main.postDelayed({ attempt(n + 1) }, 100L)
-            }
-        }
-        main.postDelayed({ attempt(0) }, delayMs.coerceIn(250L, 1200L))
+        Log.i(
+            TAG,
+            "camera rebind finished delayMs=$delayMs — " +
+                "hold-last-good continues until SWITCH_RESUME",
+        )
+        onComplete?.invoke()
     }
 
     /**

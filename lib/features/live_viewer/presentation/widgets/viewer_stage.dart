@@ -246,11 +246,13 @@ class _ParticipantVideo extends StatelessWidget {
 
     for (final participant in current.remoteParticipants.values) {
       if (!liveKitParticipantMatches(participant, identity)) continue;
+      VideoTrack? last;
       for (final pub in participant.videoTrackPublications) {
         if (pub.subscribed && !pub.muted && pub.track != null) {
-          return pub.track;
+          last = pub.track;
         }
       }
+      return last;
     }
     return null;
   }

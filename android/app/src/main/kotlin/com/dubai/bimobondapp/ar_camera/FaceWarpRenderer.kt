@@ -14,6 +14,7 @@ import android.view.Surface
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
+import java.util.concurrent.atomic.AtomicInteger
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 import kotlin.math.pow
@@ -225,12 +226,46 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
     @Volatile
     var onFramePresented: (() -> Unit)? = null
 
+    /**
+     * True only after CameraX [Preview.SurfaceRequest.TransformationInfoListener]
+     * delivered rotation/buffer for the *current* lens. Stale values from the
+     * previous camera must not count as ready during a front/back flip.
+     */
+    @Volatile
+    private var cameraTransformationInfoReady = false
+
     fun setCameraTransform(rotationDegrees: Int, frontMirror: Boolean, bufW: Int, bufH: Int) {
         cameraRotationDegrees = ((rotationDegrees % 360) + 360) % 360
         cameraFrontMirror = frontMirror
         if (bufW > 0) cameraBufW = bufW
         if (bufH > 0) cameraBufH = bufH
     }
+
+    /** Drop previous-lens rotation/buffer so beauty publish cannot resume on stale values. */
+    fun invalidateCameraTransformForSwitch() {
+        cameraTransformationInfoReady = false
+        cameraRotationDegrees = 0
+        cameraBufW = 0
+        cameraBufH = 0
+    }
+
+    /** CameraX TransformationInfo for the lens that just bound — not the speculative initialRot. */
+    fun markCameraTransformationInfo(
+        rotationDegrees: Int,
+        frontMirror: Boolean,
+        bufW: Int,
+        bufH: Int,
+    ) {
+        setCameraTransform(rotationDegrees, frontMirror, bufW, bufH)
+        cameraTransformationInfoReady = true
+        Log.i(
+            "ArLiveBeautyPub",
+            "SWITCH_TRANSFORM_READY rotation=$cameraRotationDegrees " +
+                "buf=${cameraBufW}x$cameraBufH frontMirror=$frontMirror",
+        )
+    }
+
+    fun isCameraTransformationInfoReady(): Boolean = cameraTransformationInfoReady
 
     fun cameraRotationDegrees(): Int = cameraRotationDegrees
 
@@ -1053,6 +1088,10 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
     @Volatile
     var captureEnabled: Boolean = false
 
+    private val captureGeneration = AtomicInteger(0)
+
+    fun captureGeneration(): Int = captureGeneration.get()
+
     @Volatile
     private var encoderAndroidSurface: Surface? = null
 
@@ -1524,7 +1563,9 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
     private var captureReadBuf: ByteBuffer? = null
     private var captureFlipBuf: ByteBuffer? = null
     private var captureRowBuf: ByteArray? = null
-    private var captureBufBytes = 0
+    /** Last allocated CPU readback size — keyed by width AND height, not byte count. */
+    private var captureReadW = 0
+    private var captureReadH = 0
     private var lastCaptureMs = 0L
     /** Idle warm readback — rare enough not to stall the live preview. */
     private val captureMinIntervalMs = 320L
@@ -1577,19 +1618,34 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         clearLastCapturedFrame()
     }
 
-    private fun ensureCaptureBuffers(bytes: Int, rowBytes: Int) {
-        if (captureBufBytes >= bytes && captureReadBuf != null && captureFlipBuf != null) {
+    /**
+     * CPU readback scratch for [width]×[height] RGBA.
+     *
+     * Must NOT reuse a buffer just because `width*height*4` matches — 1280×720
+     * and 720×1280 have the same byte count and that is what packed landscape
+     * pixels into a portrait LiveKit track (horizontal static on viewers).
+     */
+    private fun ensureCaptureBuffers(width: Int, height: Int) {
+        val w = width.coerceAtLeast(2)
+        val h = height.coerceAtLeast(2)
+        val rowBytes = w * 4
+        val bytes = rowBytes * h
+        if (captureReadW == w &&
+            captureReadH == h &&
+            captureReadBuf != null &&
+            captureFlipBuf != null &&
+            captureRowBuf != null &&
+            captureRowBuf!!.size >= rowBytes
+        ) {
             captureReadBuf!!.clear()
             captureFlipBuf!!.clear()
-            if (captureRowBuf == null || captureRowBuf!!.size < rowBytes) {
-                captureRowBuf = ByteArray(rowBytes)
-            }
             return
         }
         captureReadBuf = ByteBuffer.allocateDirect(bytes).order(ByteOrder.nativeOrder())
         captureFlipBuf = ByteBuffer.allocateDirect(bytes).order(ByteOrder.nativeOrder())
         captureRowBuf = ByteArray(rowBytes)
-        captureBufBytes = bytes
+        captureReadW = w
+        captureReadH = h
     }
 
     private var captureScratchBitmap: Bitmap? = null
@@ -2262,8 +2318,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         }
 
         val rowBytes = readW * 4
-        val bytes = rowBytes * readH
-        ensureCaptureBuffers(bytes, rowBytes)
+        ensureCaptureBuffers(readW, readH)
         val buf = captureReadBuf!!
         val flipped = captureFlipBuf!!
         val rowBuf = captureRowBuf!!
@@ -2308,6 +2363,7 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         synchronized(captureLock) {
             val previous = lastCapturedFrame
             lastCapturedFrame = out
+            captureGeneration.incrementAndGet()
             if (previous != null && previous !== out && !previous.isRecycled) {
                 previous.recycle()
             }
@@ -2328,12 +2384,14 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         pendingBitmap = null
         oesEnabled = false
         texMatrixReady = false
+        cameraTransformationInfoReady = false
         captureScratchBitmap?.recycle()
         captureScratchBitmap = null
         captureReadBuf = null
         captureFlipBuf = null
         captureRowBuf = null
-        captureBufBytes = 0
+        captureReadW = 0
+        captureReadH = 0
         releaseCaptureFbo()
         releaseEncoderFbo()
         releaseHistoryBuffers()
