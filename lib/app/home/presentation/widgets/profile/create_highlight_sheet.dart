@@ -7,6 +7,7 @@ import 'package:bimobondapp/app/posts/domain/usecases/upload_media_usecase.dart'
 import 'package:bimobondapp/app/posts/presentation/di/posts_injector.dart' as posts_injector;
 import 'package:bimobondapp/app/stories/domain/entities/highlight_entity.dart';
 import 'package:bimobondapp/core/utils/api_constants.dart';
+import 'package:bimobondapp/core/widgets/app_form_dialog.dart';
 import 'package:bimobondapp/core/widgets/custom_text.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
 import 'package:dio/dio.dart';
@@ -395,28 +396,24 @@ class _CreateHighlightSheetState extends State<CreateHighlightSheet> {
     final l10n = AppLocalizations.of(context)!;
     showDialog<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(l10n.editCover),
-        content: TextField(
-          controller: _coverController,
-          decoration: const InputDecoration(
+      builder: (ctx) => AppFormDialog(
+        title: l10n.editCover,
+        primaryLabel: l10n.templateExportDone == 'Done' ? 'Apply' : 'تطبيق',
+        onPrimary: () {
+          setState(() {
+            _selectedCoverUrl = _coverController.text.trim();
+          });
+          Navigator.pop(ctx);
+        },
+        secondaryLabel: l10n.templateExportDone == 'Done' ? 'Cancel' : 'إلغاء',
+        onSecondary: () => Navigator.pop(ctx),
+        children: [
+          AppFormField(
+            controller: _coverController,
+            label: 'Cover URL',
             hintText: 'Paste cover image URL',
-            labelText: 'Cover URL',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(l10n.templateExportDone == 'Done' ? 'Cancel' : 'إلغاء'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              setState(() {
-                _selectedCoverUrl = _coverController.text.trim();
-              });
-              Navigator.pop(ctx);
-            },
-            child: Text(l10n.templateExportDone == 'Done' ? 'Apply' : 'تطبيق'),
+            keyboardType: TextInputType.url,
+            bottomGap: 0,
           ),
         ],
       ),

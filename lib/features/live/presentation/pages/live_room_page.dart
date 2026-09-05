@@ -10,13 +10,16 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/network/live_api_client.dart';
+import '../../data/datasources/live_interactive_remote_datasource.dart';
 import '../../data/datasources/lives_media_datasource.dart';
 import '../../data/datasources/lives_remote_datasource.dart';
 import '../../data/datasources/lives_socket_datasource.dart';
 import '../../data/repositories/camera_repository_impl.dart';
+import '../../data/repositories/live_interactive_repository_impl.dart';
 import '../../data/repositories/live_session_repository_impl.dart';
 import '../../domain/effects/live_effects_catalog.dart';
 import '../../domain/repositories/camera_repository.dart';
+import '../../domain/repositories/live_interactive_repository.dart';
 import '../../domain/repositories/live_session_repository.dart';
 import '../../domain/usecases/dispose_camera.dart';
 import '../../domain/usecases/end_live_session.dart';
@@ -25,14 +28,16 @@ import '../../domain/usecases/like_live_session.dart';
 import '../../domain/usecases/send_live_comment.dart';
 import '../../domain/usecases/start_live_session.dart';
 import '../../domain/usecases/update_live_title.dart';
+import '../bloc/live_interactive/live_interactive_bloc.dart';
+import '../bloc/live_interactive/live_interactive_event.dart';
 import '../bloc/live_room/live_room_bloc.dart';
 import '../bloc/live_room/live_room_event.dart';
 import '../bloc/live_room/live_room_state.dart';
 import '../effects/live_face_tracker.dart';
 import '../effects/live_face_tracker_scope.dart';
+import '../widgets/room/live_interactive_host_toolbar.dart';
 import '../widgets/room/live_room_bottom_bar.dart';
 import '../widgets/room/live_room_camera_layer.dart';
-import '../widgets/room/live_room_chat_composer.dart';
 import '../widgets/room/live_room_chat_feed.dart';
 import '../widgets/room/live_room_competition_request_prompt.dart';
 import '../widgets/room/live_room_guest_invite_prompt.dart';
@@ -44,6 +49,7 @@ import '../widgets/room/live_room_info_row.dart';
 import '../widgets/room/live_starting_indicator.dart';
 import '../widgets/vignette_layer.dart';
 import '../utils/live_screen_wakelock.dart';
+import 'live_summary_page.dart';
 import '../../../live_viewer/presentation/widgets/floating_hearts.dart';
 import '../../../live_viewer/presentation/widgets/floating_gifts.dart';
 
@@ -73,6 +79,8 @@ class LiveRoomPage extends StatefulWidget {
 class _LiveRoomPageState extends State<LiveRoomPage>
     with WidgetsBindingObserver {
   LiveRoomBloc? _bloc;
+  LiveInteractiveBloc? _interactiveBloc;
+  LiveInteractiveRepository? _interactiveRepository;
   LiveSessionRepository? _sessionRepository;
   late final CameraRepository _cameraRepository;
   late final LiveFaceTracker _faceTracker;
@@ -117,6 +125,15 @@ class _LiveRoomPageState extends State<LiveRoomPage>
       socket: socket,
       media: media,
     );
+    _interactiveRepository = LiveInteractiveRepositoryImpl(
+      remote: LiveInteractiveRemoteDataSource(apiClient: apiClient),
+    );
+    // The room's own HUD socket already carries the interactive pushes, so the
+    // BLoC listens to it instead of opening a second connection.
+    _interactiveBloc = LiveInteractiveBloc(
+      repository: _interactiveRepository!,
+      socketEvents: socket.events,
+    );
 
     _bloc =
         LiveRoomBloc(
@@ -158,6 +175,7 @@ class _LiveRoomPageState extends State<LiveRoomPage>
     WidgetsBinding.instance.removeObserver(this);
     _faceTracker.dispose();
     _bloc?.close();
+    _interactiveBloc?.close();
     LiveScreenWakelock.disable();
     super.dispose();
   }
@@ -172,8 +190,11 @@ class _LiveRoomPageState extends State<LiveRoomPage>
       );
     }
 
-    return BlocProvider.value(
-      value: bloc,
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider<LiveRoomBloc>.value(value: bloc),
+        BlocProvider<LiveInteractiveBloc>.value(value: _interactiveBloc!),
+      ],
       child: RepositoryProvider<LiveSessionRepository>.value(
         value: _sessionRepository!,
         child: LiveFaceTrackerScope(
@@ -197,12 +218,37 @@ class _LiveRoomPageState extends State<LiveRoomPage>
               listeners: [
                 BlocListener<LiveRoomBloc, LiveRoomState>(
                   listenWhen: (previous, current) => current is LiveRoomEnded,
-                  listener: (context, state) {
+                  listener: (context, state) async {
+                    // The recap sits on top of the finished room and the room
+                    // still leaves through its usual exit once it is dismissed.
+                    final liveId = (state as LiveRoomEnded).liveId;
+                    if (liveId != null && liveId.isNotEmpty) {
+                      await Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => LiveSummaryPage(
+                            liveId: liveId,
+                            repository: _interactiveRepository!,
+                          ),
+                        ),
+                      );
+                      if (!context.mounted) return;
+                    }
                     if (context.canPop()) {
                       context.pop();
                     } else {
                       context.go('/');
                     }
+                  },
+                ),
+                BlocListener<LiveRoomBloc, LiveRoomState>(
+                  listenWhen: (previous, current) =>
+                      current is LiveRoomReady &&
+                      (previous is! LiveRoomReady ||
+                          previous.session.id != current.session.id),
+                  listener: (context, state) {
+                    context.read<LiveInteractiveBloc>().add(
+                      LiveInteractiveStarted((state as LiveRoomReady).session.id),
+                    );
                   },
                 ),
                 BlocListener<LiveRoomBloc, LiveRoomState>(
@@ -491,7 +537,7 @@ class _LiveRoomBody extends StatelessWidget {
                     LiveRoomCompetitionRequestPrompt(),
                     LiveRoomGuestRequestPrompt(),
                     LiveRoomGuestInvitePrompt(),
-                    LiveRoomChatComposer(),
+                    _LiveInteractiveOverlay(),
                     LiveRoomBottomBar(),
                     LiveRoomEffectsPanel(),
                   ],
@@ -541,6 +587,25 @@ class _LiveRoomBody extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+/// Host status strip for the interactive room features. It measures zero while
+/// nothing is running, so the camera stays unobstructed until the host starts
+/// a poll, a Q&A or an auction from the interactions sheet.
+class _LiveInteractiveOverlay extends StatelessWidget {
+  const _LiveInteractiveOverlay();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        left: AppSpacing.roomHorizontal,
+        right: AppSpacing.roomHorizontal,
+        bottom: 6,
+      ),
+      child: const LiveInteractiveHostToolbar(),
     );
   }
 }

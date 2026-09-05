@@ -2,6 +2,7 @@ import '../../domain/entities/comment_entity.dart';
 import '../../domain/entities/gift_entity.dart';
 import '../../domain/entities/socket_event.dart';
 import '../../../../core/models/live_battle.dart';
+import '../../../live/domain/entities/live_interactive.dart';
 import 'hourly_ranking_mapper.dart';
 
 /// Converts Socket.IO payloads (lives/mobile-api.md §16) into typed
@@ -308,6 +309,26 @@ class SocketMapper {
     return LiveTopGiftersUpdatedEvent(
       liveId: liveId,
       avatarUrls: avatarUrlsFrom(map['data'] ?? map['gifters']),
+      timestamp: DateTime.now(),
+    );
+  }
+
+  static LiveInteractiveSocketEvent? interactiveEvent(
+    dynamic data,
+    String eventName,
+    String? fallbackLiveId,
+  ) {
+    final map = _asMap(data);
+    if (map == null) return null;
+    final liveId = map['liveId']?.toString() ?? fallbackLiveId ?? '';
+    if (liveId.isEmpty) return null;
+    return LiveInteractiveSocketEvent(
+      liveId: liveId,
+      payload: LiveInteractiveSocketPayload(
+        event: eventName,
+        liveId: liveId,
+        payload: map,
+      ),
       timestamp: DateTime.now(),
     );
   }

@@ -14,6 +14,9 @@ import '../../core/theme/app_colors.dart';
 import '../../domain/entities/live_entity.dart';
 import '../../domain/entities/live_session_entity.dart';
 import '../../domain/repositories/guest_repository.dart';
+import '../../../live/domain/repositories/live_interactive_repository.dart';
+import '../../../live/presentation/bloc/live_interactive/live_interactive_bloc.dart';
+import '../../../live/presentation/bloc/live_interactive/live_interactive_event.dart';
 import '../bloc/live_viewer/live_viewer_bloc.dart';
 import '../bloc/live_viewer/live_viewer_event.dart';
 import '../bloc/live_viewer/live_viewer_state.dart';
@@ -25,8 +28,10 @@ import 'floating_gifts.dart';
 import 'floating_hearts.dart';
 import 'gift_goal_card.dart';
 import '../../data/services/fake_livekit_service.dart' show LiveKitService;
+import '../../data/services/fake_socket_service.dart' show SocketService;
 import '../di/live_viewer_injector.dart' as di;
 import 'guest_panel.dart';
+import 'live_interactive_viewer_panel.dart';
 import 'viewer_stage.dart';
 import 'guest_stage_prompt.dart';
 import 'league_overlay.dart';
@@ -56,7 +61,12 @@ class LiveRoomPage extends StatefulWidget {
 class _LiveRoomPageState extends State<LiveRoomPage> {
   bool _showComposer = false;
   bool _giftGoalDismissed = false;
+  bool _showLiveFeatures = false;
   final List<FloatingHeart> _tapHearts = [];
+  late final LiveInteractiveBloc _interactiveBloc = LiveInteractiveBloc(
+    repository: di.sl<LiveInteractiveRepository>(),
+    socketEvents: di.sl<SocketService>().events,
+  );
 
   @override
   void initState() {
@@ -77,6 +87,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   @override
   void dispose() {
     _deactivateIfThis();
+    _interactiveBloc.close();
     super.dispose();
   }
 
@@ -94,6 +105,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !widget.isActive) return;
       context.read<LiveViewerBloc>().add(LiveViewerActivated(widget.live));
+      _interactiveBloc.add(LiveInteractiveStarted(widget.live.id));
     });
   }
 
@@ -137,6 +149,20 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
 
   void _sendRose() {
     _openGifts();
+  }
+
+  /// Single entry point for everything the viewer can do beyond chatting —
+  /// gifts included, so the sheet is the one place interactions live.
+  void _openInteractiveTools() {
+    LiveInteractiveViewerToolsSheet.show(
+      context,
+      bloc: _interactiveBloc,
+      onSendGift: _openGifts,
+      onShowActivity: () {
+        if (!mounted) return;
+        setState(() => _showLiveFeatures = true);
+      },
+    );
   }
 
   Future<void> _openGuestRequest(LiveEntity live) async {
@@ -291,6 +317,13 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
 
   @override
   Widget build(BuildContext context) {
+    return BlocProvider<LiveInteractiveBloc>.value(
+      value: _interactiveBloc,
+      child: _buildRoom(),
+    );
+  }
+
+  Widget _buildRoom() {
     return BlocBuilder<LiveViewerBloc, LiveViewerState>(
       buildWhen: (prev, curr) {
         final prevLive = prev.live;
@@ -1019,6 +1052,23 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                   ),
                 ),
               if (widget.isActive && isThisRoom)
+                Positioned(
+                  left: 12,
+                  right: 12,
+                  bottom: barTotalH + keyboardInset + giftGoalH + 18,
+                  child: AnimatedSize(
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOut,
+                    alignment: Alignment.bottomCenter,
+                    child: _showLiveFeatures
+                        ? LiveInteractiveViewerPanel(
+                            onClose: () =>
+                                setState(() => _showLiveFeatures = false),
+                          )
+                        : const SizedBox(width: double.infinity),
+                  ),
+                ),
+              if (widget.isActive && isThisRoom)
                 BlocBuilder<LiveViewerBloc, LiveViewerState>(
                   buildWhen: (prev, curr) =>
                       prev.recentGifts != curr.recentGifts ||
@@ -1177,6 +1227,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                               );
                             },
                       onRoseTap: widget.isActive ? _sendRose : null,
+                      onToolsTap: widget.isActive
+                          ? _openInteractiveTools
+                          : null,
                       onMultiGuestTap: canRequestGuest
                           ? () => _openGuestRequest(live)
                           : null,

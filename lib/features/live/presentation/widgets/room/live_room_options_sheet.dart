@@ -5,6 +5,7 @@ import '../../../../../core/utils/app_colors.dart';
 import '../../../../../core/utils/app_sizes.dart';
 import '../../../../../core/constants/app_spacing.dart';
 import '../../../../../core/utils/app_text_styles.dart';
+import '../../../../../core/widgets/app_form_dialog.dart';
 import '../../../domain/repositories/live_session_repository.dart';
 import '../../bloc/live_room/live_room_bloc.dart';
 import '../../bloc/live_room/live_room_event.dart';
@@ -300,26 +301,21 @@ class _OptionsContent extends StatelessWidget {
                 final result = await showDialog<String>(
                   context: context,
                   builder: (dialogContext) {
-                    return AlertDialog(
-                      title: const Text('عنوان البث'),
-                      content: TextField(
-                        controller: controller,
-                        autofocus: true,
-                        maxLength: 120,
-                        decoration: const InputDecoration(
+                    return AppFormDialog(
+                      title: 'عنوان البث',
+                      primaryLabel: 'حفظ',
+                      onPrimary: () => Navigator.of(dialogContext)
+                          .pop(controller.text.trim()),
+                      secondaryLabel: 'إلغاء',
+                      onSecondary: () => Navigator.of(dialogContext).pop(),
+                      children: [
+                        AppFormField(
+                          controller: controller,
                           hintText: 'أدخل عنوان البث',
-                        ),
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () =>
-                              Navigator.of(dialogContext).pop(),
-                          child: const Text('إلغاء'),
-                        ),
-                        TextButton(
-                          onPressed: () => Navigator.of(dialogContext)
-                              .pop(controller.text.trim()),
-                          child: const Text('حفظ'),
+                          autofocus: true,
+                          maxLength: 120,
+                          maxLines: 2,
+                          bottomGap: 0,
                         ),
                       ],
                     );

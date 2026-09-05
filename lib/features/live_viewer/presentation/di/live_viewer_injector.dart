@@ -2,6 +2,9 @@ import 'package:firebase_auth/firebase_auth.dart' as fb;
 import 'package:get_it/get_it.dart';
 import 'package:bimobondapp/app/auctions/data/datasources/auction_socket_service.dart';
 import '../../../../core/network/live_api_client.dart';
+import '../../../live/data/datasources/live_interactive_remote_datasource.dart';
+import '../../../live/data/repositories/live_interactive_repository_impl.dart';
+import '../../../live/domain/repositories/live_interactive_repository.dart';
 import '../../data/datasources/http_live_remote_datasource.dart';
 import '../../data/datasources/http_ranking_remote_datasource.dart';
 import '../../data/datasources/live_remote_datasource.dart';
@@ -91,6 +94,12 @@ Future<void> initLiveViewer() async {
 
   sl.registerLazySingleton<RankingRepository>(
     () => RealRankingRepository(remote: sl(), socket: sl()),
+  );
+
+  sl.registerLazySingleton<LiveInteractiveRepository>(
+    () => LiveInteractiveRepositoryImpl(
+      remote: LiveInteractiveRemoteDataSource(apiClient: sl()),
+    ),
   );
 
   sl.registerLazySingleton(() => GetLiveFeedUseCase(sl()));

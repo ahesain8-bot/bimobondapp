@@ -79,6 +79,23 @@ class ApiEndpoints {
   static String liveBattleEnd(String id, String battleId) =>
       '/lives/$id/battle/$battleId/end';
   static String liveGallery(String id) => '/lives/$id/gallery';
+  static String liveGiftGoal(String id) => '/lives/$id/gift-goal';
+  static String livePolls(String id) => '/lives/$id/polls';
+  static String livePollsActive(String id) => '/lives/$id/polls/active';
+  static String livePollVote(String liveId, String pollId) =>
+      '/lives/$liveId/polls/$pollId/vote';
+  static String livePollEnd(String liveId, String pollId) =>
+      '/lives/$liveId/polls/$pollId/end';
+  static String liveQuestions(String id) => '/lives/$id/qa';
+  static String liveQuestionPin(String liveId, String questionId) =>
+      '/lives/$liveId/qa/$questionId/pin';
+  static String liveQuestionAnswer(String liveId, String questionId) =>
+      '/lives/$liveId/qa/$questionId/answer';
+  static String liveTreasureBoxes(String id) => '/lives/$id/treasure-boxes';
+  static String liveTreasureBoxClaim(String liveId, String boxId) =>
+      '/lives/$liveId/treasure-boxes/$boxId/claim';
+  static String liveAuctions(String id) => '/lives/$id/auctions';
+  static String liveActiveAuctions(String id) => '/lives/$id/auctions/active';
   static String liveAuctionPin(String liveId, String auctionId) =>
       '/lives/$liveId/auctions/$auctionId/pin';
   static String liveAuctionsReorder(String liveId) =>

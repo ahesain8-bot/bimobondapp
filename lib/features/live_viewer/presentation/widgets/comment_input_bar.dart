@@ -2,9 +2,58 @@ import 'package:flutter/material.dart';
 
 import 'tiktok_live_tokens.dart';
 
+/// Collapsed state of the comment composer — the tap target that swaps itself
+/// for a [CommentInputBar]. Shared so the host bar and the viewer bar open chat
+/// from the same affordance.
+class CommentPromptPill extends StatelessWidget {
+  const CommentPromptPill({
+    super.key,
+    required this.onTap,
+    this.label = 'Comment',
+  });
+
+  final VoidCallback onTap;
+  final String label;
+
+  static const double height = 42;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: height,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        alignment: Alignment.centerLeft,
+        decoration: BoxDecoration(
+          color: const Color(0xCC1C1C1E),
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.85),
+            width: 1.2,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.9),
+            fontSize: 15,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class CommentInputBar extends StatefulWidget {
   final ValueChanged<String> onSend;
   final VoidCallback? onEmojiTap;
+
+  /// Fired when the field loses focus without a send in flight, for callers
+  /// that keep the composer's visibility in a BLoC rather than local state.
+  final VoidCallback? onDismiss;
+
   final bool enabled;
   final bool isSending;
   final String hintText;
@@ -13,6 +62,7 @@ class CommentInputBar extends StatefulWidget {
     super.key,
     required this.onSend,
     this.onEmojiTap,
+    this.onDismiss,
     this.enabled = true,
     this.isSending = false,
     this.hintText = 'Write...',
@@ -36,9 +86,7 @@ class _CommentInputBarState extends State<CommentInputBar> {
       final has = _controller.text.trim().isNotEmpty;
       if (has != _hasText) setState(() => _hasText = has);
     });
-    _focusNode.addListener(() {
-      if (mounted) setState(() {});
-    });
+    _focusNode.addListener(_onFocusChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _focusNode.requestFocus();
     });
@@ -46,9 +94,18 @@ class _CommentInputBarState extends State<CommentInputBar> {
 
   @override
   void dispose() {
+    _focusNode.removeListener(_onFocusChanged);
     _controller.dispose();
     _focusNode.dispose();
     super.dispose();
+  }
+
+  void _onFocusChanged() {
+    if (!mounted) return;
+    setState(() {});
+    // A send disables the field, which drops focus on its own — that is not
+    // the user walking away from the composer.
+    if (!_focusNode.hasFocus && !widget.isSending) widget.onDismiss?.call();
   }
 
   void _submit() {

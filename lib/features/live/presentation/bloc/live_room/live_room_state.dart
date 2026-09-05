@@ -297,5 +297,9 @@ class LivePendingGuestInvite {
 }
 
 class LiveRoomEnded extends LiveRoomState {
-  const LiveRoomEnded();
+  const LiveRoomEnded({this.liveId});
+
+  /// The session that just ended, when one had started. Null when the room was
+  /// closed before a live existed, in which case there is no summary to show.
+  final String? liveId;
 }
