@@ -14,8 +14,6 @@ abstract class LiveRepository {
     int limit = 10,
     String? category,
     bool followingOnly = false,
-    double? latitude,
-    double? longitude,
     bool forceRefresh = false,
   });
 

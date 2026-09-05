@@ -13,8 +13,6 @@ class GetLiveFeedUseCase {
     int limit = 10,
     String? category,
     bool followingOnly = false,
-    double? latitude,
-    double? longitude,
     bool forceRefresh = false,
   }) {
     return repository.getLiveFeed(
@@ -22,8 +20,6 @@ class GetLiveFeedUseCase {
       limit: limit,
       category: category,
       followingOnly: followingOnly,
-      latitude: latitude,
-      longitude: longitude,
       forceRefresh: forceRefresh,
     );
   }

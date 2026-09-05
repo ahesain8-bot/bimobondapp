@@ -30,9 +30,7 @@ class FakeLiveRepository implements LiveRepository {
     required int limit,
     String? category,
     bool followingOnly = false,
-    double? latitude,
-    double? longitude,
-  }) => '$page|$limit|${category ?? ''}|$followingOnly|$latitude|$longitude';
+  }) => '$page|$limit|${category ?? ''}|$followingOnly';
 
   @override
   Future<Either<Failure, LiveFeedPageResult>> getLiveFeed({
@@ -40,8 +38,6 @@ class FakeLiveRepository implements LiveRepository {
     int limit = 10,
     String? category,
     bool followingOnly = false,
-    double? latitude,
-    double? longitude,
     bool forceRefresh = false,
   }) async {
     final key = _feedKey(
@@ -49,8 +45,6 @@ class FakeLiveRepository implements LiveRepository {
       limit: limit,
       category: category,
       followingOnly: followingOnly,
-      latitude: latitude,
-      longitude: longitude,
     );
 
     if (!forceRefresh &&
@@ -72,8 +66,6 @@ class FakeLiveRepository implements LiveRepository {
       limit: limit,
       category: category,
       followingOnly: followingOnly,
-      latitude: latitude,
-      longitude: longitude,
       cacheKey: key,
     );
     _feedInFlight = future;
@@ -93,8 +85,6 @@ class FakeLiveRepository implements LiveRepository {
     required int limit,
     String? category,
     bool followingOnly = false,
-    double? latitude,
-    double? longitude,
     required String cacheKey,
   }) async {
     try {
@@ -103,8 +93,6 @@ class FakeLiveRepository implements LiveRepository {
         limit: limit,
         category: category,
         followingOnly: followingOnly,
-        latitude: latitude,
-        longitude: longitude,
       );
       final activeLives = pageResult.lives
           .where((l) => l.status == LiveStatus.live)

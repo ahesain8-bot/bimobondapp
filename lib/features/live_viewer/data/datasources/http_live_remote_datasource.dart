@@ -40,18 +40,7 @@ class HttpLiveRemoteDataSource implements LiveRemoteDataSource {
     int limit = 10,
     String? category,
     bool followingOnly = false,
-    double? latitude,
-    double? longitude,
   }) async {
-    final hasCoordinates =
-        latitude != null &&
-        longitude != null &&
-        latitude.isFinite &&
-        longitude.isFinite &&
-        latitude >= -90 &&
-        latitude <= 90 &&
-        longitude >= -180 &&
-        longitude <= 180;
     final payload = await _api.get(
       ApiEndpoints.livesFeed,
       auth: true,
@@ -59,8 +48,6 @@ class HttpLiveRemoteDataSource implements LiveRemoteDataSource {
         'page': '$page',
         'limit': '$limit',
         if (followingOnly) 'followingOnly': 'true',
-        if (hasCoordinates) 'latitude': '$latitude',
-        if (hasCoordinates) 'longitude': '$longitude',
         if (category != null && category.isNotEmpty) 'categoryId': category,
       },
     );

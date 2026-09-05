@@ -196,16 +196,12 @@ class _PkFirstDataSource implements LiveRemoteDataSource {
     int limit = 10,
     String? category,
     bool followingOnly = false,
-    double? latitude,
-    double? longitude,
   }) async {
     final pageResult = await _inner.getLiveFeed(
       page: page,
       limit: limit,
       category: category,
       followingOnly: followingOnly,
-      latitude: latitude,
-      longitude: longitude,
     );
     if (pageResult.lives.isEmpty) return pageResult;
     final lives = pageResult.lives;

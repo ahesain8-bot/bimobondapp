@@ -14,8 +14,6 @@ abstract class LiveRemoteDataSource {
     int limit = 10,
     String? category,
     bool followingOnly = false,
-    double? latitude,
-    double? longitude,
   });
 
   Future<LiveEntity> getLiveById(String liveId);
@@ -101,8 +99,6 @@ class FakeLiveRemoteDataSource implements LiveRemoteDataSource {
     int limit = 10,
     String? category,
     bool followingOnly = false,
-    double? latitude,
-    double? longitude,
   }) async {
     await Future.delayed(const Duration(milliseconds: 700));
 

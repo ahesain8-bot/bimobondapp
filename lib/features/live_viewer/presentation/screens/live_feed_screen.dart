@@ -1,4 +1,3 @@
-import 'package:bimobondapp/core/data/user_location_store.dart';
 import 'dart:async';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import '../../domain/entities/live_feed_activation.dart';
@@ -79,16 +78,7 @@ class _LiveFeedViewState extends State<LiveFeedScreen>
     Future.microtask(() {
       // Uses the repository TTL cache — reopening Lives does not re-hit
       // the network when a fresh page-1 response is already available.
-      final coordinates = di.sl.isRegistered<UserLocationStore>()
-          ? di.sl<UserLocationStore>().viewerCoordinates
-          : null;
-      _feedBloc.add(
-        LiveFeedLoadRequested(
-          refresh: true,
-          latitude: coordinates?.latitude,
-          longitude: coordinates?.longitude,
-        ),
-      );
+      _feedBloc.add(const LiveFeedLoadRequested(refresh: true));
     });
 
     LiveFeedRefreshBus.instance.addListener(_onLiveEndedSignal);
