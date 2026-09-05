@@ -10,6 +10,7 @@ import 'package:bimobondapp/app/shop/presentation/widgets/product_skeleton.dart'
 import 'package:bimobondapp/app/shop/presentation/widgets/shop_back_button.dart';
 import 'package:bimobondapp/core/error/error_message_resolver.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
+import 'package:bimobondapp/core/widgets/app_form_dialog.dart';
 import 'package:bimobondapp/core/widgets/safe_network_image.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -91,35 +92,25 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   Future<void> _shipOrder() async {
     final trackingController = TextEditingController();
     final noteController = TextEditingController();
-    final theme = ShopTheme.of(context);
     final l10n = AppLocalizations.of(context)!;
 
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: theme.surface,
-        title: Text(l10n.shopShipOrder, style: TextStyle(color: theme.onSurface)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: trackingController,
-              decoration: InputDecoration(labelText: l10n.shopTrackingNumber),
-            ),
-            TextField(
-              controller: noteController,
-              decoration: InputDecoration(labelText: l10n.shopShippingNote),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(l10n.shopCancel),
+      builder: (ctx) => AppFormDialog(
+        title: l10n.shopShipOrder,
+        primaryLabel: l10n.shopShip,
+        onPrimary: () => Navigator.pop(ctx, true),
+        secondaryLabel: l10n.shopCancel,
+        onSecondary: () => Navigator.pop(ctx, false),
+        children: [
+          AppFormField(
+            controller: trackingController,
+            label: l10n.shopTrackingNumber,
           ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(l10n.shopShip),
+          AppFormField(
+            controller: noteController,
+            label: l10n.shopShippingNote,
+            bottomGap: 0,
           ),
         ],
       ),
@@ -150,27 +141,22 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 
   Future<void> _disputeOrder() async {
     final noteController = TextEditingController();
-    final theme = ShopTheme.of(context);
     final l10n = AppLocalizations.of(context)!;
 
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: theme.surface,
-        title: Text(l10n.shopDisputeOrder, style: TextStyle(color: theme.onSurface)),
-        content: TextField(
-          controller: noteController,
-          maxLines: 3,
-          decoration: InputDecoration(labelText: l10n.shopNoteOptional),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(l10n.shopCancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(l10n.shopDispute),
+      builder: (ctx) => AppFormDialog(
+        title: l10n.shopDisputeOrder,
+        primaryLabel: l10n.shopDispute,
+        onPrimary: () => Navigator.pop(ctx, true),
+        secondaryLabel: l10n.shopCancel,
+        onSecondary: () => Navigator.pop(ctx, false),
+        children: [
+          AppFormField(
+            controller: noteController,
+            label: l10n.shopNoteOptional,
+            maxLines: 3,
+            bottomGap: 0,
           ),
         ],
       ),

@@ -20,6 +20,7 @@ import 'package:bimobondapp/app/posts/presentation/utils/post_view_recorder.dart
 import 'package:bimobondapp/core/utils/app_sizes.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
 import 'package:bimobondapp/core/utils/post_story_filter.dart';
+import 'package:bimobondapp/core/widgets/app_form_dialog.dart';
 import 'package:bimobondapp/core/widgets/custom_loading_widget.dart';
 import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
@@ -689,68 +690,37 @@ class _StoriesViewerScreenState extends State<StoriesViewerScreen>
 
     await showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF2C2C2E),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        title: const Text(
-          'Name Highlight',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
-          ),
-        ),
-        content: TextField(
-          controller: titleCtrl,
-          autofocus: true,
-          style: const TextStyle(color: Colors.white),
-          decoration: InputDecoration(
+      builder: (ctx) => AppFormDialog(
+        // The stories viewer is always dark, so the modal is pinned rather
+        // than following the app's light/dark mode.
+        brightness: Brightness.dark,
+        title: 'Name Highlight',
+        primaryLabel: 'Add',
+        onPrimary: () async {
+          final title = titleCtrl.text.trim();
+          if (title.isEmpty) return;
+          Navigator.pop(ctx);
+          try {
+            final ds = ProfileRemoteDataSourceImpl();
+            final highlight = await ds.createHighlight(title, storyCover, 0);
+            await _addStoryToHighlight(highlight.id, post.id, title);
+          } catch (e) {
+            if (mounted) {
+              PopupDialogs.showErrorDialog(
+                context,
+                'Failed to create highlight: $e',
+              );
+            }
+          }
+        },
+        secondaryLabel: 'Cancel',
+        onSecondary: () => Navigator.pop(ctx),
+        children: [
+          AppFormField(
+            controller: titleCtrl,
             hintText: 'Highlight Name',
-            hintStyle: const TextStyle(color: Colors.white38),
-            enabledBorder: UnderlineInputBorder(
-              borderSide: BorderSide(
-                color: Colors.white.withValues(alpha: 0.3),
-              ),
-            ),
-            focusedBorder: const UnderlineInputBorder(
-              borderSide: BorderSide(color: Colors.blueAccent),
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child:
-                const Text('Cancel', style: TextStyle(color: Colors.white70)),
-          ),
-          TextButton(
-            onPressed: () async {
-              final title = titleCtrl.text.trim();
-              if (title.isEmpty) return;
-              Navigator.pop(ctx);
-              try {
-                final ds = ProfileRemoteDataSourceImpl();
-                final highlight =
-                    await ds.createHighlight(title, storyCover, 0);
-                await _addStoryToHighlight(highlight.id, post.id, title);
-              } catch (e) {
-                if (mounted) {
-                  PopupDialogs.showErrorDialog(
-                    context,
-                    'Failed to create highlight: $e',
-                  );
-                }
-              }
-            },
-            child: const Text(
-              'Add',
-              style: TextStyle(
-                color: Colors.blueAccent,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            autofocus: true,
+            bottomGap: 0,
           ),
         ],
       ),

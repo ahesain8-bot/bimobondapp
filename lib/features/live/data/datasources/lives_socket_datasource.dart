@@ -7,6 +7,7 @@ import 'package:socket_io_client/socket_io_client.dart' as io;
 
 import '../../../../core/network/api_endpoints.dart';
 import '../../../../core/models/live_battle.dart';
+import '../../domain/entities/live_interactive.dart';
 import '../../domain/repositories/live_session_repository.dart';
 import '../mappers/live_session_mapper.dart';
 
@@ -343,6 +344,31 @@ class LivesSocketDataSource {
         ),
       );
     });
+
+    // Interactive room features. The documented payload is forwarded intact so
+    // the interactive BLoC applies the server-authoritative update without
+    // opening a second socket.
+    for (final eventName in const [
+      'livePollUpdated',
+      'liveQAUpdated',
+      'liveTreasureBoxSpawned',
+      'liveTreasureBoxClaimed',
+      'liveAuction',
+    ]) {
+      _on(socket, eventName, (data) {
+        final map = _asMap(data);
+        if (map == null) return;
+        _controller.add(
+          LiveHudInteractiveEvent(
+            LiveInteractiveSocketPayload(
+              event: eventName,
+              liveId: map['liveId']?.toString() ?? liveId,
+              payload: map,
+            ),
+          ),
+        );
+      });
+    }
 
     socket.connect();
     await connected.future.timeout(const Duration(seconds: 10));

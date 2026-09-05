@@ -1,9 +1,10 @@
-import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
+import '../../../live/presentation/widgets/room/live_interactive_tools.dart';
 import '../../domain/entities/live_entity.dart';
 import 'animated_counter.dart';
+import 'comment_input_bar.dart';
 import 'fallback_media.dart';
 import 'tiktok_live_tokens.dart';
 
@@ -139,11 +140,7 @@ class _ViewerEyePill extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
-              Icons.remove_red_eye_outlined,
-              color: Colors.white,
-              size: 15,
-            ),
+            const Icon(Icons.remove_red_eye_outlined, color: Colors.white, size: 15),
             const SizedBox(width: 4),
             AnimatedCounter(
               value: viewerCount,
@@ -196,32 +193,26 @@ class _HostIdentity extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          Flexible(
-            child: Text(
-              hostName,
-              maxLines: 1,
-              softWrap: false,
-              overflow: TextOverflow.ellipsis,
-              style: TikTokLiveTokens.hostName,
-            ),
-          ),
-          if (!live.isFollowing) ...[
-            const SizedBox(width: 6),
-            GestureDetector(
-              onTap: onFollow,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                decoration: BoxDecoration(
-                  color: TikTokLiveTokens.followRed,
-                  borderRadius: BorderRadius.circular(TikTokLiveTokens.followR),
-                ),
+          Expanded(
+            child: SizedBox(
+              height: 18,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
                 child: Text(
-                  AppLocalizations.of(context)?.liveFollow ?? 'Follow',
-                  style: const TextStyle(color: Colors.white, fontSize: 11),
+                  hostName,
+                  maxLines: 1,
+                  softWrap: false,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    shadows: TikTokLiveTokens.glyphShadow,
+                  ),
                 ),
               ),
             ),
-          ],
+          ),
         ],
       ),
     );
@@ -591,18 +582,23 @@ class _PkBattleBarState extends State<PkBattleBar>
       return;
     }
     final nextRatio = PkBattleBar.ratioFor(widget.scoreLeft, widget.scoreRight);
-    _ratioAnim = Tween<double>(
-      begin: _ratio,
-      end: nextRatio,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
-    _leftScoreAnim = Tween<double>(
-      begin: _displayLeft,
-      end: widget.scoreLeft.toDouble(),
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
-    _rightScoreAnim = Tween<double>(
-      begin: _displayRight,
-      end: widget.scoreRight.toDouble(),
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
+    _ratioAnim = Tween<double>(begin: _ratio, end: nextRatio).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
+    );
+    _leftScoreAnim =
+        Tween<double>(
+          begin: _displayLeft,
+          end: widget.scoreLeft.toDouble(),
+        ).animate(
+          CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
+        );
+    _rightScoreAnim =
+        Tween<double>(
+          begin: _displayRight,
+          end: widget.scoreRight.toDouble(),
+        ).animate(
+          CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
+        );
     _controller
       ..stop()
       ..forward(from: 0);
@@ -637,7 +633,6 @@ class _PkBattleBarState extends State<PkBattleBar>
                   bottom: 0,
                   width: leftW,
                   child: const DecoratedBox(
-                    key: ValueKey('pk-left-score-fill'),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [Color(0xFFFF2D55), Color(0xFFFF5C8A)],
@@ -734,6 +729,11 @@ class TikTokLiveBottomBar extends StatelessWidget {
   final VoidCallback? onMultiGuestTap;
   final VoidCallback? onEmojiTap;
   final VoidCallback? onLikeTap;
+
+  /// Opens the interactions panel. Omitted in rooms that have no interactive
+  /// session behind them.
+  final VoidCallback? onToolsTap;
+
   final ValueChanged<String>? onQuickReact;
   final int? shareCount;
   final Widget? commentField;
@@ -749,6 +749,7 @@ class TikTokLiveBottomBar extends StatelessWidget {
     this.onMultiGuestTap,
     this.onEmojiTap,
     this.onLikeTap,
+    this.onToolsTap,
     this.onQuickReact,
     this.shareCount,
     this.commentField,
@@ -789,34 +790,7 @@ class TikTokLiveBottomBar extends StatelessWidget {
                   children: [
                     Expanded(
                       child: commentField == null
-                          ? GestureDetector(
-                              onTap: onTypeTap,
-                              child: Container(
-                                height: 42,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                ),
-                                alignment: Alignment.centerLeft,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xCC1C1C1E),
-                                  borderRadius: BorderRadius.circular(22),
-                                  border: Border.all(
-                                    color: Colors.white.withValues(alpha: 0.85),
-                                    width: 1.2,
-                                  ),
-                                ),
-                                child: Text(
-                                  'Comment',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.9),
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ),
-                            )
+                          ? CommentPromptPill(onTap: onTypeTap)
                           : Align(
                               alignment: Alignment.bottomCenter,
                               child: commentField,
@@ -852,16 +826,19 @@ class TikTokLiveBottomBar extends StatelessWidget {
                         ),
                       ),
                     ],
-                    const SizedBox(width: 4),
-                    _BottomAction(
-                      onTap: onShareTap,
-                      scrim: true,
-                      child: const Icon(Icons.reply_rounded, color: Colors.white, size: 26),
-                    ),
-                    if (onRoseTap != null) ...[
+                    if (onToolsTap != null) ...[
                       const SizedBox(width: 4),
-                      _BottomAction(onTap: onRoseTap!, scrim: true,
-                        child: const Text('🌹', style: TextStyle(fontSize: 24))),
+                      _BottomAction(
+                        onTap: onToolsTap!,
+                        scrim: true,
+                        semanticsLabel: LiveInteractiveTools.label,
+                        child: const Icon(
+                          LiveInteractiveTools.icon,
+                          color: Colors.white,
+                          size: 22,
+                          shadows: TikTokLiveTokens.glyphShadow,
+                        ),
+                      ),
                     ],
                     const SizedBox(width: 4),
                     _BottomAction(
@@ -949,6 +926,7 @@ class _BottomAction extends StatelessWidget {
     required this.onTap,
     required this.child,
     this.scrim = false,
+    this.semanticsLabel,
   });
 
   final VoidCallback onTap;
@@ -957,29 +935,35 @@ class _BottomAction extends StatelessWidget {
   /// TikTok gives the action controls a quiet circular scrim over live video.
   final bool scrim;
 
+  final String? semanticsLabel;
+
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: SizedBox(
-        width: TikTokLiveTokens.bottomHit,
-        height: TikTokLiveTokens.inputH,
-        child: Stack(
-          alignment: Alignment.center,
-          clipBehavior: Clip.none,
-          children: [
-            if (scrim)
-              Container(
-                width: TikTokLiveTokens.bottomScrimDisc,
-                height: TikTokLiveTokens.bottomScrimDisc,
-                decoration: BoxDecoration(
-                  color: TikTokLiveTokens.frost(0.28),
-                  shape: BoxShape.circle,
+    return Semantics(
+      button: true,
+      label: semanticsLabel,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: SizedBox(
+          width: TikTokLiveTokens.bottomHit,
+          height: TikTokLiveTokens.inputH,
+          child: Stack(
+            alignment: Alignment.center,
+            clipBehavior: Clip.none,
+            children: [
+              if (scrim)
+                Container(
+                  width: TikTokLiveTokens.bottomScrimDisc,
+                  height: TikTokLiveTokens.bottomScrimDisc,
+                  decoration: BoxDecoration(
+                    color: TikTokLiveTokens.frost(0.28),
+                    shape: BoxShape.circle,
+                  ),
                 ),
-              ),
-            child,
-          ],
+              child,
+            ],
+          ),
         ),
       ),
     );

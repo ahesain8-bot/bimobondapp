@@ -820,7 +820,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     if (isClosed) return;
     // Tell the LIVE feed screen this live ended so it disappears immediately.
     LiveFeedRefreshBus.instance.notifyLiveEnded(current.session.id);
-    emit(const LiveRoomEnded());
+    emit(LiveRoomEnded(liveId: current.session.id));
 
     if (endFailure != null) {
       // The live may still be open on the server; the next start attempt
@@ -852,7 +852,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     if (isClosed) return;
     // Tell the LIVE feed screen this live ended so it disappears immediately.
     LiveFeedRefreshBus.instance.notifyLiveEnded(current.session.id);
-    emit(const LiveRoomEnded());
+    emit(LiveRoomEnded(liveId: current.session.id));
   }
 
   Future<void> _onAppPaused(
@@ -1935,6 +1935,10 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
             ),
           ),
         );
+      case LiveHudInteractiveEvent():
+        // Polls, Q&A, treasure boxes and auctions are owned by
+        // LiveInteractiveBloc, which listens to the same HUD stream.
+        break;
     }
   }
 

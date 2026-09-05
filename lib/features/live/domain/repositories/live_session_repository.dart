@@ -1,6 +1,7 @@
 import '../entities/live_chat_message.dart';
 import '../entities/live_gallery_item.dart';
 import '../entities/live_guest.dart';
+import '../entities/live_interactive.dart';
 import '../entities/live_leaderboard_entry.dart';
 import '../entities/live_session.dart';
 import '../../../../core/models/live_media_hints.dart';
@@ -163,6 +164,15 @@ class LiveHudBattleEvent extends LiveHudEvent {
 
   final String type;
   final LiveBattle battle;
+}
+
+/// A server push for one of the interactive room features (poll, Q&A, treasure
+/// box, auction). The payload is forwarded untouched so the interactive BLoC
+/// can apply the server-authoritative update.
+class LiveHudInteractiveEvent extends LiveHudEvent {
+  const LiveHudInteractiveEvent(this.payload);
+
+  final LiveInteractiveSocketPayload payload;
 }
 
 /// The HUD socket came up, or refused to. Comments, the viewer counter and

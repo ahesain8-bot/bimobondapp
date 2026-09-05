@@ -2836,6 +2836,11 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
 
           // Keep ArCameraPreview at a fixed full-screen layout size. Layout mode
           // only changes clip + translate — resizing SurfaceView blacks it out.
+          // Measured off the window rather than the incoming constraints: the
+          // soft keyboard shrinks this Scaffold's body, and letting that reach
+          // the AndroidView reconfigures the SurfaceView mid-session.
+          final previewSize = MediaQuery.sizeOf(context);
+
           return TweenAnimationBuilder<double>(
             duration: CameraRatioLetterbox.chromeAnimDuration,
             curve: CameraRatioLetterbox.chromeAnimCurve,
@@ -2854,9 +2859,12 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
                 child: child,
               );
             },
-            child: SizedBox(
-              width: screen.width,
-              height: screen.height,
+            child: OverflowBox(
+              alignment: Alignment.topCenter,
+              minWidth: previewSize.width,
+              maxWidth: previewSize.width,
+              minHeight: previewSize.height,
+              maxHeight: previewSize.height,
               child: ArCameraPreview(key: _arPreviewKey),
             ),
           );

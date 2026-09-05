@@ -250,6 +250,19 @@ class RealSocketService implements SocketService {
       if (event != null) _controller.add(event);
     });
 
+    for (final eventName in const [
+      'livePollUpdated',
+      'liveQAUpdated',
+      'liveTreasureBoxSpawned',
+      'liveTreasureBoxClaimed',
+      'liveAuction',
+    ]) {
+      _on(socket, eventName, (data) {
+        final event = SocketMapper.interactiveEvent(data, eventName, _liveId);
+        if (event != null) _controller.add(event);
+      });
+    }
+
     socket.connect();
     await connected.future.timeout(const Duration(seconds: 10));
   }
