@@ -15,11 +15,15 @@ sealed class LiveRoomEvent {
 class LiveRoomStarted extends LiveRoomEvent {
   const LiveRoomStarted({
     this.title,
+    this.coverUrl,
+    this.categoryId,
     this.initialCamera,
     this.initialNativeCamera,
   });
 
   final String? title;
+  final String? coverUrl;
+  final String? categoryId;
 
   /// Reuses the camera already running on the start screen.
   final CameraController? initialCamera;
@@ -100,6 +104,18 @@ class LiveRoomTitleSubmitted extends LiveRoomEvent {
   const LiveRoomTitleSubmitted(this.title);
 
   final String title;
+}
+
+class LiveRoomChatRulesSubmitted extends LiveRoomEvent {
+  const LiveRoomChatRulesSubmitted({
+    this.chatMode,
+    this.slowModeSeconds,
+    required this.blockedKeywords,
+  });
+
+  final String? chatMode;
+  final int? slowModeSeconds;
+  final List<String> blockedKeywords;
 }
 
 class LiveRoomHudEventReceived extends LiveRoomEvent {

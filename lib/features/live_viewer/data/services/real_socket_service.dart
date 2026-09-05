@@ -35,6 +35,7 @@ class RealSocketService implements SocketService {
   io.Socket? _socket;
   String? _liveId;
   String? _desiredLiveId;
+  bool _includeUserIdInLiveJoin = false;
   bool _connected = false;
   Completer<void>? _connectionReady;
   bool _authRefreshInFlight = false;
@@ -50,7 +51,12 @@ class RealSocketService implements SocketService {
   String? get currentLiveId => _liveId;
 
   @override
-  Future<void> connect({required String liveId, required String token}) async {
+  Future<void> connect({
+    required String liveId,
+    required String token,
+    String? userId,
+    bool includeUserIdInLiveJoin = false,
+  }) async {
     // Let Socket.IO finish its own reconnect rather than replacing the manager
     // every time the caller retries a handshake.
     final existing = _socket;
@@ -68,6 +74,8 @@ class RealSocketService implements SocketService {
 
     _desiredLiveId = liveId;
     _liveId = liveId;
+    _desiredUserId = userId;
+    _includeUserIdInLiveJoin = includeUserIdInLiveJoin;
 
     final fbToken = await _idTokenProvider();
     final authToken = (fbToken != null && fbToken.isNotEmpty)
@@ -105,7 +113,12 @@ class RealSocketService implements SocketService {
       if (_socket != socket || _liveId != liveId) return;
       debugPrint('🔌 Live viewer socket connected');
       _connected = true;
-      _joinRooms(socket, liveId);
+      _joinRooms(
+        socket,
+        liveId,
+        userId: userId,
+        includeUserIdInLiveJoin: includeUserIdInLiveJoin,
+      );
       if (!connected.isCompleted) connected.complete();
       _controller.add(
         ReconnectedEvent(liveId: liveId, timestamp: DateTime.now()),
@@ -151,7 +164,12 @@ class RealSocketService implements SocketService {
     socket.onReconnect((_) {
       if (_socket != socket || _liveId != liveId) return;
       _connected = true;
-      _joinRooms(socket, liveId);
+      _joinRooms(
+        socket,
+        liveId,
+        userId: userId,
+        includeUserIdInLiveJoin: includeUserIdInLiveJoin,
+      );
       if (!connected.isCompleted) connected.complete();
     });
 
@@ -250,13 +268,45 @@ class RealSocketService implements SocketService {
       if (event != null) _controller.add(event);
     });
 
+    for (final eventName in const [
+      'liveGiftGoalUpdate',
+      'livePollUpdated',
+      'liveQAUpdated',
+      'liveTreasureBoxSpawned',
+      'liveTreasureBoxClaimed',
+      'liveAuction',
+      'hostLeagueUpdated',
+      'userLevelUp',
+    ]) {
+      _on(socket, eventName, (data) {
+        final event = SocketMapper.interactiveEvent(data, eventName, _liveId);
+        if (event != null) _controller.add(event);
+      });
+    }
+
     socket.connect();
     await connected.future.timeout(const Duration(seconds: 10));
   }
 
-  void _joinRooms(io.Socket socket, String liveId) {
-    socket.emit('joinLive', {'liveId': liveId});
-    socket.emit('joinUser', {});
+  String? _desiredUserId;
+
+  void _joinRooms(
+    io.Socket socket,
+    String liveId, {
+    String? userId,
+    bool includeUserIdInLiveJoin = false,
+  }) {
+    // Normal mobile joins use only the live id because the server derives the
+    // caller from the authenticated socket session. The admin inspection
+    // flow can explicitly include its staff id per the D2 contract.
+    socket.emit('joinLive', {
+      'liveId': liveId,
+      if (includeUserIdInLiveJoin && userId != null && userId.isNotEmpty)
+        'userId': userId,
+    });
+    socket.emit('joinUser', {
+      if (userId != null && userId.isNotEmpty) 'userId': userId,
+    });
   }
 
   Future<void> _rebuildWithFreshAuth(
@@ -280,7 +330,12 @@ class RealSocketService implements SocketService {
           (_liveId != null && _liveId != liveId)) {
         return;
       }
-      await connect(liveId: liveId, token: fallbackToken);
+      await connect(
+        liveId: liveId,
+        token: fallbackToken,
+        userId: _desiredUserId,
+        includeUserIdInLiveJoin: _includeUserIdInLiveJoin,
+      );
     } catch (e) {
       debugPrint('Live viewer socket fresh-auth reconnect failed: $e');
     } finally {
@@ -311,6 +366,8 @@ class RealSocketService implements SocketService {
     _socket = null;
     _liveId = null;
     _desiredLiveId = null;
+    _desiredUserId = null;
+    _includeUserIdInLiveJoin = false;
     _connected = false;
     _connectionReady = null;
     if (socket != null) {
@@ -325,22 +382,34 @@ class RealSocketService implements SocketService {
 
   @override
   Future<void> emitComment(CommentEntity comment) async {
+    throw UnsupportedError(
+      'RealSocketService is receive-only; send comments through CommentRepository.',
+    );
     // Comments are sent over HTTP (POST /lives/:id/comments) in the real
     // implementation — the socket is receive-only for the viewer.
   }
 
   @override
   Future<void> emitLike({required int likeCount, int delta = 1}) async {
+    throw UnsupportedError(
+      'RealSocketService is receive-only; send likes through LikeRepository.',
+    );
     // Likes are sent over HTTP (POST /lives/:id/like) — receive-only here.
   }
 
   @override
   Future<void> emitGift(GiftSentEntity gift) async {
+    throw UnsupportedError(
+      'RealSocketService is receive-only; send gifts through GiftRepository.',
+    );
     // Gifts are sent over HTTP (POST /gifts/send) — receive-only here.
   }
 
   @override
   void simulateNetworkLoss() {
+    throw UnsupportedError(
+      'simulateNetworkLoss is available only on FakeSocketService.',
+    );
     // Not supported for the real socket — UI triggers a manual reconnect.
   }
 

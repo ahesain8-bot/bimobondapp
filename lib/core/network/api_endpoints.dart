@@ -79,6 +79,29 @@ class ApiEndpoints {
   static String liveBattleEnd(String id, String battleId) =>
       '/lives/$id/battle/$battleId/end';
   static String liveGallery(String id) => '/lives/$id/gallery';
+  static String liveGiftGoal(String id) => '/lives/$id/gift-goal';
+  static String livePolls(String id) => '/lives/$id/polls';
+  static String livePoll(String liveId, String pollId) =>
+      '/lives/$liveId/polls/$pollId';
+  static String livePollVote(String liveId, String pollId) =>
+      '/lives/$liveId/polls/$pollId/vote';
+  static String livePollEnd(String liveId, String pollId) =>
+      '/lives/$liveId/polls/$pollId/end';
+  static String livePollsActive(String id) => '/lives/$id/polls/active';
+  static String liveQuestions(String id) => '/lives/$id/qa';
+  static String liveQuestion(String liveId, String questionId) =>
+      '/lives/$liveId/qa/$questionId';
+  static String liveQuestionPin(String liveId, String questionId) =>
+      '/lives/$liveId/qa/$questionId/pin';
+  static String liveQuestionAnswer(String liveId, String questionId) =>
+      '/lives/$liveId/qa/$questionId/answer';
+  static String liveTreasureBoxes(String id) => '/lives/$id/treasure-boxes';
+  static String liveTreasureBoxClaim(String liveId, String boxId) =>
+      '/lives/$liveId/treasure-boxes/$boxId/claim';
+  static String liveAuctions(String id) => '/lives/$id/auctions';
+  static String liveActiveAuctions(String id) => '/lives/$id/auctions/active';
+  static String liveAuctionById(String liveId, String auctionId) =>
+      '/lives/$liveId/auctions/$auctionId';
   static String liveAuctionPin(String liveId, String auctionId) =>
       '/lives/$liveId/auctions/$auctionId/pin';
   static String liveAuctionsReorder(String liveId) =>
@@ -88,6 +111,8 @@ class ApiEndpoints {
   static String liveGiftersLeaderboard(String id) =>
       '/lives/$id/leaderboard/gifters';
   static const String livesHourlyLeaderboard = '/lives/leaderboard/hourly';
+  static const String livesLeagues = '/lives/leagues';
+  static String liveHostLeague(String userId) => '/lives/host-league/$userId';
   static String liveViewerMuteChat(String liveId, String userId) =>
       '/lives/$liveId/viewers/$userId/mute-chat';
   static String liveViewerUnmuteChat(String liveId, String userId) =>
@@ -96,8 +121,18 @@ class ApiEndpoints {
       '/lives/$liveId/viewers/$userId/ban';
   static String liveViewerUnban(String liveId, String userId) =>
       '/lives/$liveId/viewers/$userId/unban';
+  static String liveChatRules(String id) => '/lives/$id/chat-rules';
   static String liveSummary(String id) => '/lives/$id/summary';
   static const String giftsSend = '/gifts/send';
+  static const String rbacMe = '/rbac/me';
+
+  // ── Live administration (lives/mobile-api.md §22) ──
+  static const String adminLives = '/lives/admin/all';
+  static String adminLiveEnd(String id) => '/lives/admin/$id/end';
+  static String adminLiveBan(String id) => '/lives/admin/$id/ban';
+  static String adminLiveKickGuest(String liveId, String userId) =>
+      '/lives/admin/$liveId/guests/$userId/kick';
+  static String adminLiveBoost(String id) => '/lives/admin/$id/boost';
 
   // ── Fan Club (lives/mobile-api.md §20) ────────────────
   static String creatorsFanClub(String creatorId) =>

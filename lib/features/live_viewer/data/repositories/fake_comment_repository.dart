@@ -92,6 +92,38 @@ class FakeCommentRepository implements CommentRepository {
   }
 
   @override
+  Future<Either<Failure, void>> pinComment({
+    required String liveId,
+    required String commentId,
+  }) async {
+    final list = _comments[liveId];
+    if (list == null) return const Right(null);
+    for (var i = 0; i < list.length; i++) {
+      list[i] = list[i].copyWith(
+        isPinned: list[i].id == commentId,
+      );
+    }
+    _controllers[liveId]?.add(List.unmodifiable(list));
+    return const Right(null);
+  }
+
+  @override
+  Future<Either<Failure, void>> unpinComment({
+    required String liveId,
+    required String commentId,
+  }) async {
+    final list = _comments[liveId];
+    if (list == null) return const Right(null);
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].id == commentId) {
+        list[i] = list[i].copyWith(isPinned: false);
+      }
+    }
+    _controllers[liveId]?.add(List.unmodifiable(list));
+    return const Right(null);
+  }
+
+  @override
   Future<Either<Failure, void>> reportComment({
     required String commentId,
     required String reason,

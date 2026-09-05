@@ -19,6 +19,7 @@ import '../mappers/live_host_extras_mapper.dart';
 import '../mappers/live_session_mapper.dart';
 import '../../domain/entities/live_viewer.dart';
 import '../../domain/entities/live_battle_errors.dart';
+import '../../domain/entities/live_chat_rules.dart';
 
 /// Remote live-session repository backed by Nest `/lives` + Socket.IO + LiveKit.
 class LiveSessionRepositoryImpl implements LiveSessionRepository {
@@ -107,10 +108,18 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
   Object? get battleMediaRoom => _media.battleRoom;
 
   @override
-  Future<LiveSession> startHostSession({required String title}) async {
+  Future<LiveSession> startHostSession({
+    required String title,
+    String? coverUrl,
+    String? categoryId,
+  }) async {
     final trimmed = title.trim().isEmpty ? 'بث مباشر' : title.trim();
     try {
-      return await _createLive(trimmed);
+      return await _createLive(
+        trimmed,
+        coverUrl: coverUrl,
+        categoryId: categoryId,
+      );
     } on BadRequestException catch (e) {
       // Server refuses: "You already have an active live." (stale live left
       // from a previous session). End it automatically, then retry ONCE so
@@ -121,17 +130,61 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
       if (stale != null) {
         await endSession(stale.id);
       }
-      return _createLive(trimmed);
+      return _createLive(
+        trimmed,
+        coverUrl: coverUrl,
+        categoryId: categoryId,
+      );
     }
   }
 
-  Future<LiveSession> _createLive(String title) async {
-    final response = await _remote.createAndStart(title: title);
+  Future<LiveSession> _createLive(
+    String title, {
+    String? coverUrl,
+    String? categoryId,
+  }) async {
+    final response = await _remote.createAndStart(
+      title: title,
+      coverUrl: coverUrl,
+      categoryId: categoryId,
+    );
 
-    final liveMap = (response['live'] as Map<String, dynamic>?) ?? response;
+    final rawLive = response['live'];
+    if (rawLive is! Map) {
+      throw StateError(
+        'POST /lives did not return the documented live object. '
+        'Response keys: ${response.keys.join(', ')}',
+      );
+    }
+    final liveMap = Map<String, dynamic>.from(rawLive);
+    final liveId = liveMap['id']?.toString().trim() ?? '';
+    final status = liveMap['status']?.toString().trim().toUpperCase();
     final token = response['token']?.toString();
     final url = response['url']?.toString();
     final role = response['role']?.toString() ?? 'host';
+
+    if (liveId.isEmpty) {
+      throw StateError('POST /lives returned a live without an id.');
+    }
+    if (status != 'LIVE') {
+      throw StateError(
+        'POST /lives returned live $liveId with status '
+        '${status ?? '(missing)'}, expected LIVE for startNow=true.',
+      );
+    }
+    if (token == null || token.isEmpty || url == null || url.isEmpty) {
+      throw StateError(
+        'POST /lives returned live $liveId but no LiveKit credentials.',
+      );
+    }
+    if (kDebugMode) {
+      // Never log the token. The id/status are enough to correlate host and
+      // viewer traces while keeping credentials out of debug output.
+      debugPrint(
+        '[LiveStart] POST /lives liveId=$liveId status=$status '
+        'role=$role responseKeys=${response.keys.join(',')}',
+      );
+    }
 
     // Camera/LiveKit publish and HUD enrichment are intentionally NOT done
     // here — the BLoC starts the local preview immediately and connects
@@ -283,6 +336,22 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
   }
 
   @override
+  Future<LiveChatRules> updateChatRules({
+    required String liveId,
+    String? chatMode,
+    int? slowModeSeconds,
+    List<String>? blockedKeywords,
+  }) async {
+    final response = await _remote.updateChatRules(
+      liveId,
+      chatMode: chatMode,
+      slowModeSeconds: slowModeSeconds,
+      blockedKeywords: blockedKeywords,
+    );
+    return LiveSessionMapper.chatRulesFromJson(response, liveId: liveId);
+  }
+
+  @override
   Future<void> banViewer({
     required String liveId,
     required String userId,
@@ -309,8 +378,15 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
   Future<LiveSession> updateTitle({
     required String liveId,
     required String title,
+    String? coverUrl,
+    String? categoryId,
   }) async {
-    final live = await _remote.updateLive(liveId, title: title);
+    final live = await _remote.updateLive(
+      liveId,
+      title: title,
+      coverUrl: coverUrl,
+      categoryId: categoryId,
+    );
     return LiveSessionMapper.fromLiveJson(live);
   }
 
@@ -743,7 +819,8 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
   }
 
   @override
-  Future<void> connectRealtime(String liveId) => _socket.connectAndJoin(liveId);
+  Future<void> connectRealtime(String liveId, {String? userId}) =>
+      _socket.connectAndJoin(liveId, userId: userId);
 
   @override
   Future<void> disconnectRealtime() => _socket.disconnect();

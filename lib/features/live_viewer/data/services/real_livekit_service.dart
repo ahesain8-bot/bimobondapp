@@ -7,18 +7,32 @@ import 'package:permission_handler/permission_handler.dart';
 import '../../../../core/models/live_media_hints.dart';
 import '../../../../core/services/live_audio_session.dart';
 import '../../../../core/services/media_progress_watchdog.dart';
-import 'fake_livekit_service.dart' show LiveKitConnectionState, LiveKitService;
+import 'fake_livekit_service.dart'
+    show LiveKitConnectionState, LiveKitService, LiveKitSessionUpdate;
+import 'live_session_diagnostics.dart';
 
-/// Real LiveKit implementation of [LiveKitService] using `livekit_client`.
-///
-/// The viewer connects **subscribe-only** — never publishes camera/mic.
-/// `url` + `token` must come from `POST /lives/:id/join` (mobile-api.md §15).
-/// Token TTL ≈ 6h — reconnect means re-joining to refresh the token.
-/// How often the viewer health watchdogs sample inbound media counters.
+/// How often the viewer health watchdog samples inbound media counters.
 const Duration _kMediaHealthTick = Duration(seconds: 2);
 
+/// Consecutive stalled samples before a connected-but-frozen room is reported.
+/// At [_kMediaHealthTick] this is ten seconds of a picture that is not
+/// advancing while the track is subscribed, unmuted, un-paused by the SFU and
+/// attached to a renderer — every legitimate reason for frames to stop has
+/// already been excluded by then.
+const int _kStalledSampleLimit = 5;
+
+/// Upper bound on the graceful leave of a room we are throwing away.
+///
+/// `Room.disconnect()` in livekit_client 2.11 awaits `EngineDisconnectedEvent`
+/// for ten seconds (`core/room.dart`) and then throws. A socket that is
+/// already dead never delivers that event, which is exactly the situation when
+/// a viewer swipes away from a broken live. Bounding the polite leave keeps a
+/// dead room from delaying the next join; `dispose()` afterwards tears the
+/// engine down unconditionally either way.
+const Duration _kGracefulLeaveTimeout = Duration(seconds: 2);
+
 class RealLiveKitService implements LiveKitService {
-  final _stateController = StreamController<LiveKitConnectionState>.broadcast();
+  final _sessionController = StreamController<LiveKitSessionUpdate>.broadcast();
   final _battleStateController =
       StreamController<LiveKitConnectionState>.broadcast();
 
@@ -28,7 +42,27 @@ class RealLiveKitService implements LiveKitService {
   String? _url;
   String? _token;
   LiveMediaHints? _mediaHints;
+
+  // ── Primary room ownership ────────────────────────────────────────────────
+  //
+  // Exactly one primary Room is authoritative at a time, identified by
+  // [_primaryGeneration]. The counter is bumped synchronously by every caller
+  // that intends to replace or close the room, *before* any await, so a
+  // callback belonging to a superseded attempt can recognise itself and return
+  // without touching shared state. Room identity alone is not enough: the same
+  // object can be current for one generation and retired for the next.
   Room? _room;
+  int _primaryGeneration = 0;
+  int _roomGeneration = -1;
+  LiveSessionTrace? _trace;
+
+  /// Serializes primary connect/disconnect so two operations can never
+  /// interleave their teardown and setup phases.
+  Future<void> _primaryQueue = Future<void>.value();
+
+  /// Room releases that were allowed to finish in the background.
+  final Set<Future<void>> _pendingReleases = <Future<void>>{};
+
   Room? _battleRoom;
   Room? _battleRecoveryRoom;
   Future<void> _battleOperationQueue = Future<void>.value();
@@ -37,11 +71,9 @@ class RealLiveKitService implements LiveKitService {
   Timer? _battleVideoHealthTimer;
   bool _primaryHealthCheckInFlight = false;
   bool _battleHealthCheckInFlight = false;
-  int _primaryMissingTrackSamples = 0;
-  // 3 samples at 2s: roughly six seconds of a frozen picture before the room
-  // is rebuilt. At the previous 4 samples of 4s a viewer stared at a stopped
-  // frame for a quarter of a minute before anything happened.
-  final _primaryVideoProgress = MediaProgressWatchdog(stalledSampleLimit: 3);
+  final _primaryVideoProgress = MediaProgressWatchdog(
+    stalledSampleLimit: _kStalledSampleLimit,
+  );
   final _battleVideoProgress = MediaProgressWatchdog(stalledSampleLimit: 5);
 
   /// Whether this service currently holds [LiveAudioSession]. The battle room
@@ -92,7 +124,11 @@ class RealLiveKitService implements LiveKitService {
   LiveKitConnectionState get state => _state;
 
   @override
-  Stream<LiveKitConnectionState> get stateStream => _stateController.stream;
+  Stream<LiveKitConnectionState> get stateStream =>
+      _sessionController.stream.map((update) => update.state);
+
+  @override
+  Stream<LiveKitSessionUpdate> get sessionStream => _sessionController.stream;
 
   @override
   Stream<LiveKitConnectionState> get battleStateStream =>
@@ -107,13 +143,18 @@ class RealLiveKitService implements LiveKitService {
   @override
   LiveMediaHints? get mediaHints => _mediaHints;
 
-  /// The underlying LiveKit room — exposed for future `LiveKitVideoView`
-  /// rendering of subscribed remote tracks.
+  /// The underlying LiveKit room the renderer subscribes to.
   @override
   Room? get room => _room;
 
   @override
   Room? get battleRoom => _battleRoom;
+
+  /// True while [room] is the room belonging to the newest connect request.
+  bool _isCurrent(Room room, int generation) =>
+      generation == _primaryGeneration &&
+      identical(_room, room) &&
+      _roomGeneration == generation;
 
   Future<void> _acquireAudioSession() async {
     if (_holdsAudioSession) return;
@@ -127,56 +168,117 @@ class RealLiveKitService implements LiveKitService {
     _holdsAudioSession = false;
   }
 
+  Future<T> _serializePrimary<T>(Future<T> Function() operation) {
+    final previous = _primaryQueue;
+    final result = previous.then((_) => operation());
+    // A failed connect must not wedge the queue for the next live.
+    _primaryQueue = result.then<void>((_) {}, onError: (_, _) {});
+    return result;
+  }
+
   Future<T> _serializeBattleOperation<T>(Future<T> Function() operation) {
     final previous = _battleOperationQueue;
     final result = previous.then((_) => operation());
     // Keep a failed reconnect from blocking a later battle-end/disconnect,
     // while preserving the original error for its caller.
-    _battleOperationQueue = result.then<void>((_) {}, onError: (_, __) {});
+    _battleOperationQueue = result.then<void>((_) {}, onError: (_, _) {});
     return result;
   }
 
-  void _queueBattleRecovery({
-    required Room room,
-    required String url,
-    required String token,
-    required String roomName,
+  // ── Lifecycle emission ────────────────────────────────────────────────────
+
+  void _emit(
+    LiveKitConnectionState next, {
+    required int generation,
+    LiveKitDisconnectCause? cause,
+    String? detail,
   }) {
-    final generation = _battleConnectionGeneration;
-    unawaited(
-      _serializeBattleOperation(() async {
-        await _recoverBattleRoom(
-          room: room,
-          url: url,
-          token: token,
-          roomName: roomName,
-          generation: generation,
-        );
-        if (generation == _battleConnectionGeneration &&
-            _battleRoom == room &&
-            room.connectionState == ConnectionState.connected) {
-          _setBattleState(LiveKitConnectionState.connected);
-        } else if (generation == _battleConnectionGeneration &&
-            _battleRoom == room &&
-            room.connectionState == ConnectionState.disconnected) {
-          _setBattleState(LiveKitConnectionState.failed);
-        }
-      }),
+    if (generation != _primaryGeneration) return;
+    if (_sessionController.isClosed) return;
+    _state = next;
+    _sessionController.add(
+      LiveKitSessionUpdate(
+        state: next,
+        generation: generation,
+        roomName: _roomName,
+        cause: cause,
+        detail: detail,
+      ),
     );
   }
 
-  Future<void> _preferMediaSpeaker() async {
-    try {
-      await AudioManager.instance.setSpeakerOutputPreferred(true, force: false);
-    } catch (error) {
-      debugPrint('Live audio route selection failed: $error');
+  static LiveKitDisconnectCause _causeFor(DisconnectReason? reason) {
+    switch (reason) {
+      case DisconnectReason.clientInitiated:
+      case DisconnectReason.migration:
+        return LiveKitDisconnectCause.clientInitiated;
+      case DisconnectReason.duplicateIdentity:
+        return LiveKitDisconnectCause.duplicateIdentity;
+      case DisconnectReason.roomDeleted:
+      case DisconnectReason.roomClosed:
+      case DisconnectReason.participantRemoved:
+      case DisconnectReason.serverShutdown:
+        return LiveKitDisconnectCause.roomClosed;
+      case DisconnectReason.joinFailure:
+        // The server refused the join outright. On this backend that is
+        // almost always an expired or revoked join token, and only a fresh
+        // `POST /lives/:id/join` can fix it.
+        return LiveKitDisconnectCause.unauthorized;
+      case DisconnectReason.disconnected:
+      case DisconnectReason.signalingConnectionFailure:
+      case DisconnectReason.signalClose:
+      case DisconnectReason.reconnectAttemptsExceeded:
+      case DisconnectReason.stateMismatch:
+      case DisconnectReason.connectionTimeout:
+      case DisconnectReason.mediaFailure:
+        return LiveKitDisconnectCause.network;
+      case null:
+      case DisconnectReason.unknown:
+      default:
+        return LiveKitDisconnectCause.unknown;
     }
   }
 
-  /// Stable LiveKit 2.11 profile. Dynamic codec/dynacast changes caused the
-  /// host track to disappear on Android, so mediaHints are retained for role
-  /// authorization but never allowed to renegotiate the active video codec.
-  RoomOptions _roomOptions(LiveMediaHints _) => const RoomOptions(
+  static LiveKitDisconnectCause _causeForConnectError(Object error) {
+    if (error is ConnectException) {
+      switch (error.reason) {
+        case ConnectionErrorReason.NotAllowed:
+          // 401/403 from the signalling handshake: the join token is expired,
+          // revoked, or lacks the grant. Only a fresh `POST /lives/:id/join`
+          // can fix it, so retrying this token would loop forever.
+          return LiveKitDisconnectCause.unauthorized;
+        case ConnectionErrorReason.Timeout:
+        case ConnectionErrorReason.InternalError:
+          return LiveKitDisconnectCause.network;
+      }
+    }
+    if (error is MediaConnectException || error is NegotiationError) {
+      return LiveKitDisconnectCause.network;
+    }
+    // `dart:async` and `livekit_client` both declare a `TimeoutException`;
+    // matching on the name classifies either without an ambiguous import.
+    if (error.runtimeType.toString().contains('TimeoutException')) {
+      return LiveKitDisconnectCause.network;
+    }
+    return LiveKitDisconnectCause.unknown;
+  }
+
+  // ── Room configuration ────────────────────────────────────────────────────
+
+  /// Stable LiveKit 2.11 viewer profile.
+  ///
+  /// `adaptiveStream` is what picks the simulcast layer: the SDK measures the
+  /// mounted `VideoTrackRenderer`, converts it to physical pixels and asks the
+  /// SFU for the matching layer. Nothing else may call `setVideoQuality` or
+  /// `setVideoDimensions` on a remote publication — 2.11 merges a manual
+  /// preference with the adaptive dimensions by taking the *smaller* of the
+  /// two (`publication/track_settings.dart`), so any manual value is a ceiling,
+  /// never a floor.
+  ///
+  /// `dynacast` stays off: it is a publisher-side optimisation with no benefit
+  /// to a subscribe-only viewer, and enabling it previously made the host track
+  /// disappear on Android when the codec was renegotiated.
+  static const _roomOptions = RoomOptions(
     adaptiveStream: true,
     dynacast: false,
     defaultAudioCaptureOptions: AudioCaptureOptions(
@@ -193,16 +295,40 @@ class RealLiveKitService implements LiveKitService {
     ),
   );
 
+  /// `autoSubscribe` is the default and is what makes the viewer receive the
+  /// host track without a round trip; the explicit value documents that the
+  /// subscribe-only viewer depends on it. Timeouts are left at the SDK
+  /// defaults (10s connection) rather than tuned to a number we cannot
+  /// justify on a mobile network.
+  static const _connectOptions = ConnectOptions(autoSubscribe: true);
+
+  Future<void> _preferMediaSpeaker() async {
+    try {
+      await AudioManager.instance.setSpeakerOutputPreferred(true, force: false);
+    } catch (error) {
+      debugPrint('Live audio route selection failed: $error');
+    }
+  }
+
+  // ── Track helpers ─────────────────────────────────────────────────────────
+
   Future<void> _retryRemoteSubscription(
     Room room,
     TrackSubscriptionExceptionEvent event, {
     int? battleGeneration,
+    int? primaryGeneration,
   }) async {
+    // The SDK raises this when a track arrives before its metadata. Retrying
+    // immediately loses to the same race, so wait for the metadata round trip
+    // the SDK is already waiting on before asking again.
     await Future<void>.delayed(const Duration(milliseconds: 350));
-    if (_room != room && _battleRoom != room) return;
-    if (battleGeneration != null &&
-        battleGeneration != _battleConnectionGeneration) {
+    if (primaryGeneration != null &&
+        !_isCurrent(room, primaryGeneration)) {
       return;
+    }
+    if (battleGeneration != null) {
+      if (battleGeneration != _battleConnectionGeneration) return;
+      if (!identical(_battleRoom, room)) return;
     }
     final participant = event.participant;
     if (participant == null) return;
@@ -217,6 +343,8 @@ class RealLiveKitService implements LiveKitService {
     }
   }
 
+  /// Safety net for publications the server did not auto-subscribe us to.
+  /// With [ConnectOptions.autoSubscribe] this is normally a no-op.
   Future<void> _ensureRemoteTracksSubscribed(Room room) async {
     for (final participant in room.remoteParticipants.values) {
       for (final publication in participant.trackPublications.values) {
@@ -224,10 +352,29 @@ class RealLiveKitService implements LiveKitService {
         try {
           await publication.subscribe();
         } catch (error) {
-          debugPrint('Battle LiveKit track restore failed: $error');
+          debugPrint('LiveKit remote track subscribe failed: $error');
         }
       }
     }
+  }
+
+  /// The publication the viewer is actually watching, or null.
+  ///
+  /// Muted and SFU-paused publications are deliberately included: they are
+  /// still the active track, the renderer stays attached to them, and treating
+  /// them as "gone" is what previously tore down healthy rooms whenever a host
+  /// covered their camera.
+  RemoteTrackPublication<RemoteVideoTrack>? _primaryVideoPublication(
+    Room room,
+  ) {
+    for (final participant in room.remoteParticipants.values) {
+      for (final publication in participant.videoTrackPublications) {
+        if (publication.subscribed && publication.track != null) {
+          return publication;
+        }
+      }
+    }
+    return null;
   }
 
   RemoteVideoTrack? _firstRemoteVideoTrack(Room room) {
@@ -266,58 +413,456 @@ class RealLiveKitService implements LiveKitService {
         stats.bytesReceived;
   }
 
-  void _startPrimaryVideoWatchdog(Room room) {
+  // ── Primary media watchdog ────────────────────────────────────────────────
+
+  void _startPrimaryVideoWatchdog(Room room, int generation) {
     _stopPrimaryVideoWatchdog();
     _primaryVideoProgress.reset();
-    _primaryMissingTrackSamples = 0;
     _primaryVideoHealthTimer = Timer.periodic(_kMediaHealthTick, (_) {
-      if (_primaryHealthCheckInFlight || _room != room) return;
+      if (_primaryHealthCheckInFlight || !_isCurrent(room, generation)) return;
       _primaryHealthCheckInFlight = true;
       unawaited(
-        _samplePrimaryVideo(room).whenComplete(() {
+        _samplePrimaryVideo(room, generation).whenComplete(() {
           _primaryHealthCheckInFlight = false;
         }),
       );
     });
   }
 
-  Future<void> _samplePrimaryVideo(Room room) async {
+  /// Samples inbound video only when every non-failure explanation for frames
+  /// not advancing has been ruled out:
+  ///
+  /// * the room is connected (a reconnect handles itself),
+  /// * a video publication exists and is subscribed,
+  /// * the host has not muted it,
+  /// * the SFU has not paused it for bandwidth (`StreamState.paused`),
+  /// * a renderer is attached, so adaptive stream has not paused it for
+  ///   invisibility.
+  ///
+  /// Anything else is a legitimate reason for a still picture and must never
+  /// cost the viewer their connection.
+  Future<void> _samplePrimaryVideo(Room room, int generation) async {
     try {
-      final track = _firstRemoteVideoTrack(room);
-      if (_room != room) return;
-      if (track == null) {
-        await _ensureRemoteTracksSubscribed(room);
-        _primaryMissingTrackSamples++;
-        final stalledAfterMedia = _primaryVideoProgress.addMissingTrackSample();
-        if (!stalledAfterMedia && _primaryMissingTrackSamples < 12) return;
-        _reportPrimaryVideoStall(room, 'remote_video_missing');
+      if (room.connectionState != ConnectionState.connected) return;
+      final publication = _primaryVideoPublication(room);
+      final track = publication?.track;
+      if (publication == null || track == null) {
+        _primaryVideoProgress.reset();
         return;
       }
-      _primaryMissingTrackSamples = 0;
+      // `enabled` is false exactly when adaptive stream has told the SFU to
+      // stop sending because no visible renderer is registered for the track.
+      if (publication.muted ||
+          !publication.enabled ||
+          publication.streamState == StreamState.paused) {
+        _primaryVideoProgress.reset();
+        return;
+      }
       final progress = await _receiverVideoProgress(track);
-      if (_room != room || !_primaryVideoProgress.addSample(progress)) return;
-      _reportPrimaryVideoStall(room, 'inbound_video_stalled');
+      if (!_isCurrent(room, generation)) return;
+      if (!_primaryVideoProgress.addSample(progress)) return;
+      _reportPrimaryVideoStall(room, generation);
     } catch (error) {
       debugPrint('Viewer inbound health sample unavailable: $error');
     }
   }
 
-  void _reportPrimaryVideoStall(Room room, String reason) {
-    if (_room != room) return;
-    debugPrint(
-      '🔴 Viewer video stopped advancing while room remained connected: $reason',
-    );
+  void _reportPrimaryVideoStall(Room room, int generation) {
+    if (!_isCurrent(room, generation)) return;
     _stopPrimaryVideoWatchdog();
-    // The BLoC responds by obtaining a fresh join token and replacing the
-    // stale Room. Keeping that policy above the SDK avoids reusing dead ICE.
-    _setState(LiveKitConnectionState.disconnected);
+    _trace?.markDisconnect(
+      LiveKitDisconnectCause.mediaStalled,
+      detail: 'framesDecoded frozen for '
+          '${_kStalledSampleLimit * _kMediaHealthTick.inSeconds}s '
+          'while room=connected',
+    );
+    // Policy lives above the SDK: the viewer BLoC obtains a fresh join token
+    // and replaces the Room. livekit_client 2.11 exposes no ICE-restart
+    // trigger, so reusing dead transport is not an option.
+    _emit(
+      LiveKitConnectionState.disconnected,
+      generation: generation,
+      cause: LiveKitDisconnectCause.mediaStalled,
+      detail: 'inbound_video_stalled',
+    );
   }
 
   void _stopPrimaryVideoWatchdog() {
     _primaryVideoHealthTimer?.cancel();
     _primaryVideoHealthTimer = null;
     _primaryVideoProgress.reset();
-    _primaryMissingTrackSamples = 0;
+  }
+
+  // ── Room release ──────────────────────────────────────────────────────────
+
+  /// Closes a room we no longer own, without letting it delay anything.
+  Future<void> _releaseRoom(Room room, {required String label}) async {
+    try {
+      await room
+          .disconnect()
+          .timeout(_kGracefulLeaveTimeout, onTimeout: () {});
+    } catch (error) {
+      debugPrint('LiveKit $label graceful leave failed: $error');
+    }
+    try {
+      await room.dispose();
+    } catch (error) {
+      debugPrint('LiveKit $label dispose failed: $error');
+    }
+  }
+
+  /// Retires the current primary room.
+  ///
+  /// While [LiveAudioSession] is held, LiveKit's Android audio session is in
+  /// manual mode and `Room._cleanUp()` can no longer stop it, so the release
+  /// shares no mutable state with the room that replaces it and is allowed to
+  /// finish in the background. That is what keeps a dead socket from adding
+  /// seconds to the next join. Without the session held, the release is
+  /// awaited so teardown ordering stays exactly as the SDK expects.
+  Future<void> _retirePrimaryRoom() async {
+    _stopPrimaryVideoWatchdog();
+    final room = _room;
+    _room = null;
+    _roomGeneration = -1;
+    _publishing = false;
+    _streamUrl = null;
+    if (room == null) return;
+    final release = _releaseRoom(room, label: 'primary');
+    if (_holdsAudioSession) {
+      _trackBackgroundRelease(release);
+      return;
+    }
+    await release;
+  }
+
+  void _trackBackgroundRelease(Future<void> release) {
+    late final Future<void> tracked;
+    tracked = release.whenComplete(() => _pendingReleases.remove(tracked));
+    _pendingReleases.add(tracked);
+  }
+
+  Future<void> _drainPendingReleases() async {
+    while (_pendingReleases.isNotEmpty) {
+      await Future.wait(_pendingReleases.toList(growable: false));
+    }
+  }
+
+  // ── Primary connect ───────────────────────────────────────────────────────
+
+  @override
+  Future<void> connect({
+    required String url,
+    required String token,
+    required String roomName,
+    String? mockStreamUrl,
+    LiveMediaHints? mediaHints,
+  }) {
+    // Bumped before any await so a connect already in flight — including one
+    // still queued behind a teardown — recognises itself as superseded.
+    final generation = ++_primaryGeneration;
+    _roomName = roomName;
+    final trace = LiveSessionTrace(
+      liveId: roomName,
+      roomName: roomName,
+      generation: generation,
+    );
+    _trace = trace;
+    trace.mark(
+      'connect requested',
+      detail: 'urlPresent=${url.isNotEmpty} tokenPresent=${token.isNotEmpty}',
+    );
+    _emit(LiveKitConnectionState.connecting, generation: generation);
+    return _serializePrimary(
+      () => _connectPrimary(
+        url: url,
+        token: token,
+        roomName: roomName,
+        mockStreamUrl: mockStreamUrl,
+        mediaHints: mediaHints,
+        generation: generation,
+        trace: trace,
+      ),
+    );
+  }
+
+  Future<void> _connectPrimary({
+    required String url,
+    required String token,
+    required String roomName,
+    required String? mockStreamUrl,
+    required LiveMediaHints? mediaHints,
+    required int generation,
+    required LiveSessionTrace trace,
+  }) async {
+    if (generation != _primaryGeneration) {
+      trace.mark('connect superseded before start');
+      return;
+    }
+
+    // Taken before the old room is retired: a guest upgrade replaces the
+    // primary room mid-live and that teardown must not drop the session.
+    // Holding the session is also what makes the background release safe.
+    try {
+      await _acquireAudioSession();
+    } catch (error) {
+      debugPrint('LiveKit audio session unavailable: $error');
+    }
+
+    await _retireBattleRoom();
+    await _retirePrimaryRoom();
+    trace.mark('previous room released');
+
+    if (generation != _primaryGeneration) {
+      trace.mark('connect superseded during release');
+      return;
+    }
+
+    if (url.isEmpty || token.isEmpty) {
+      await _releaseAudioSession();
+      _emit(
+        LiveKitConnectionState.failed,
+        generation: generation,
+        cause: LiveKitDisconnectCause.unauthorized,
+        detail: 'missing url/token',
+      );
+      throw StateError('LiveKit url/token missing — re-join the live');
+    }
+
+    _url = url;
+    _token = token;
+    _mediaHints = mediaHints ?? LiveMediaHints.defaultsForRole('viewer');
+    _roomName = roomName;
+
+    final room = Room(roomOptions: _roomOptions);
+    _attachPrimaryListeners(room, generation, trace);
+    // Own the room before connect() starts emitting lifecycle callbacks.
+    _room = room;
+    _roomGeneration = generation;
+
+    try {
+      await _runWithLiveKitErrorGuard(
+        () => room.connect(url, token, connectOptions: _connectOptions),
+      );
+    } catch (error, stackTrace) {
+      final cause = _causeForConnectError(error);
+      trace.markDisconnect(cause, detail: 'connect threw ${error.runtimeType}');
+      debugPrint('❌ LiveKit connect failed: $error\n$stackTrace');
+      if (generation == _primaryGeneration) {
+        _room = null;
+        _roomGeneration = -1;
+        await _releaseAudioSession();
+        _emit(
+          LiveKitConnectionState.failed,
+          generation: generation,
+          cause: cause,
+          detail: error.toString(),
+        );
+      }
+      // Never dispose through `_room`: by this point it may already belong to
+      // a newer attempt. Only the room this call created is released.
+      unawaited(_releaseRoom(room, label: 'failed primary'));
+      rethrow;
+    }
+
+    if (generation != _primaryGeneration) {
+      trace.mark('connect superseded after signalling');
+      unawaited(_releaseRoom(room, label: 'superseded primary'));
+      return;
+    }
+
+    _streamUrl = mockStreamUrl;
+    unawaited(_preferMediaSpeaker());
+    // Publications that already existed when we joined are auto-subscribed by
+    // the server; this covers the rare case where one was rejected.
+    unawaited(_ensureRemoteTracksSubscribed(room));
+    // `RoomConnectedEvent` has normally already emitted `connected`; this
+    // makes the post-condition of connect() explicit for callers that awaited
+    // it and covers an event delivered before our listener was attached.
+    _emit(LiveKitConnectionState.connected, generation: generation);
+    _startPrimaryVideoWatchdog(room, generation);
+    trace.mark('connect completed');
+  }
+
+  void _attachPrimaryListeners(
+    Room room,
+    int generation,
+    LiveSessionTrace trace,
+  ) {
+    room.events
+      ..on<RoomConnectedEvent>((_) {
+        if (!_isCurrent(room, generation)) return;
+        trace.mark('room connected');
+        // Signalling is up: release the renderer now so texture creation
+        // overlaps track subscription instead of following it. The renderer
+        // paints the live's poster through VideoTrackRenderer's
+        // placeholderBuilder until the first decoded frame arrives.
+        _emit(LiveKitConnectionState.connected, generation: generation);
+      })
+      ..on<RoomDisconnectedEvent>((event) {
+        if (!_isCurrent(room, generation)) return;
+        final cause = _causeFor(event.reason);
+        trace.markDisconnect(cause, detail: 'sdkReason=${event.reason?.name}');
+        _stopPrimaryVideoWatchdog();
+        _emit(
+          LiveKitConnectionState.disconnected,
+          generation: generation,
+          cause: cause,
+          detail: event.reason?.name,
+        );
+      })
+      ..on<ReconnectingEvent>((_) {
+        if (!_isCurrent(room, generation)) return;
+        trace.mark('reconnecting');
+        _stopPrimaryVideoWatchdog();
+        _emit(LiveKitConnectionState.reconnecting, generation: generation);
+      })
+      ..on<RoomReconnectedEvent>((_) {
+        if (!_isCurrent(room, generation)) return;
+        trace.mark('reconnected');
+        unawaited(_completePrimaryReconnect(room, generation));
+      })
+      ..on<ParticipantConnectedEvent>((event) {
+        if (!_isCurrent(room, generation)) return;
+        trace.mark(
+          'participant connected',
+          detail: 'identity=${event.participant.identity}',
+        );
+      })
+      ..on<ParticipantDisconnectedEvent>((event) {
+        if (!_isCurrent(room, generation)) return;
+        // The host leaving is not a viewer disconnect. The room stays up and
+        // the poster is shown until a track returns or the backend ends the
+        // live over Socket.IO.
+        trace.mark(
+          'participant disconnected',
+          detail: 'identity=${event.participant.identity}',
+        );
+      })
+      ..on<TrackPublishedEvent>((event) {
+        if (!_isCurrent(room, generation)) return;
+        trace.mark(
+          'track published',
+          detail: 'sid=${event.publication.sid} kind=${event.publication.kind}',
+        );
+        if (!event.publication.subscribed) {
+          unawaited(_ensureRemoteTracksSubscribed(room));
+        }
+      })
+      ..on<TrackSubscribedEvent>((event) {
+        if (!_isCurrent(room, generation)) return;
+        if (event.track is RemoteAudioTrack) {
+          unawaited(_preferMediaSpeaker());
+          return;
+        }
+        if (event.track is! RemoteVideoTrack) return;
+        final publication = event.publication;
+        trace.mark(
+          'video track subscribed',
+          detail:
+              'sid=${publication.sid}'
+              ' mime=${publication.mimeType}'
+              ' simulcast=${publication.simulcasted}'
+              ' published=${publication.dimensions?.width}'
+              'x${publication.dimensions?.height}',
+        );
+        // A track that arrives before the renderer is mounted is fine: the
+        // publication is held by the Room, the player picks it up from the
+        // Room's ChangeNotifier on the next frame, and adaptive stream
+        // recomputes the layer as soon as a view registers.
+        _primaryVideoProgress.reset();
+      })
+      ..on<TrackUnsubscribedEvent>((event) {
+        if (!_isCurrent(room, generation)) return;
+        trace.mark('track unsubscribed', detail: 'sid=${event.publication.sid}');
+        _primaryVideoProgress.reset();
+      })
+      ..on<TrackMutedEvent>((event) {
+        if (!_isCurrent(room, generation)) return;
+        trace.mark('track muted', detail: 'sid=${event.publication.sid}');
+        _primaryVideoProgress.reset();
+      })
+      ..on<TrackUnmutedEvent>((event) {
+        if (!_isCurrent(room, generation)) return;
+        trace.mark('track unmuted', detail: 'sid=${event.publication.sid}');
+        _primaryVideoProgress.reset();
+      })
+      ..on<TrackStreamStateUpdatedEvent>((event) {
+        if (!_isCurrent(room, generation)) return;
+        trace.mark(
+          'stream state',
+          detail:
+              'sid=${event.publication.sid} state=${event.streamState.name}',
+        );
+        // The SFU pausing a layer for bandwidth is normal behaviour, not a
+        // stall. Restart the baseline so resuming does not look frozen.
+        _primaryVideoProgress.reset();
+      })
+      ..on<TrackSubscriptionExceptionEvent>((event) {
+        if (!_isCurrent(room, generation)) return;
+        trace.mark(
+          'track subscription failed',
+          detail: 'sid=${event.sid} reason=${event.reason.name}',
+        );
+        unawaited(
+          _retryRemoteSubscription(
+            room,
+            event,
+            primaryGeneration: generation,
+          ),
+        );
+      });
+  }
+
+  /// A native reconnect preserves the Room, its participants and its
+  /// subscriptions. Nothing needs rebuilding — re-assert the audio route,
+  /// restore this device's publications if it is on stage, and resume health
+  /// sampling. Absence of a remote video track here is not a failure: the host
+  /// may simply have their camera off.
+  Future<void> _completePrimaryReconnect(Room room, int generation) async {
+    if (!_isCurrent(room, generation)) return;
+    _emit(LiveKitConnectionState.connected, generation: generation);
+    _startPrimaryVideoWatchdog(room, generation);
+    unawaited(_preferMediaSpeaker());
+    unawaited(_ensureRemoteTracksSubscribed(room));
+    if (_publishing) {
+      final hints = _mediaHints ?? LiveMediaHints.defaultsForRole('guest');
+      try {
+        await _restoreStageTracks(room, hints);
+      } catch (error) {
+        debugPrint('Guest republish after reconnect failed: $error');
+      }
+    }
+  }
+
+  // ── Battle room ───────────────────────────────────────────────────────────
+
+  void _queueBattleRecovery({
+    required Room room,
+    required String url,
+    required String token,
+    required String roomName,
+  }) {
+    final generation = _battleConnectionGeneration;
+    unawaited(
+      _serializeBattleOperation(() async {
+        await _recoverBattleRoom(
+          room: room,
+          url: url,
+          token: token,
+          roomName: roomName,
+          generation: generation,
+        );
+        if (generation == _battleConnectionGeneration &&
+            _battleRoom == room &&
+            room.connectionState == ConnectionState.connected) {
+          _setBattleState(LiveKitConnectionState.connected);
+        } else if (generation == _battleConnectionGeneration &&
+            _battleRoom == room &&
+            room.connectionState == ConnectionState.disconnected) {
+          _setBattleState(LiveKitConnectionState.failed);
+        }
+      }),
+    );
   }
 
   void _startBattleVideoWatchdog({
@@ -398,14 +943,18 @@ class RealLiveKitService implements LiveKitService {
     _battleRecoveryRoom = room;
     var failed = false;
     try {
-      await room.disconnect();
-      await Future<void>.delayed(const Duration(milliseconds: 250));
+      await room.disconnect().timeout(
+        _kGracefulLeaveTimeout,
+        onTimeout: () {},
+      );
       if (_battleRoom != room || generation != _battleConnectionGeneration) {
         return;
       }
-      await _runWithLiveKitErrorGuard(() => room.connect(url, token));
+      await _runWithLiveKitErrorGuard(
+        () => room.connect(url, token, connectOptions: _connectOptions),
+      );
       if (_battleRoom != room || generation != _battleConnectionGeneration) {
-        await room.disconnect();
+        unawaited(_releaseRoom(room, label: 'stale battle'));
         return;
       }
       await _ensureRemoteTracksSubscribed(room);
@@ -481,10 +1030,12 @@ class RealLiveKitService implements LiveKitService {
             '🔄 Battle LiveKit terminal reconnect '
             '${attempt + 1}/${retryDelays.length}: $roomName',
           );
-          await _runWithLiveKitErrorGuard(() => room.connect(url, token));
+          await _runWithLiveKitErrorGuard(
+            () => room.connect(url, token, connectOptions: _connectOptions),
+          );
           if (_battleRoom != room ||
               generation != _battleConnectionGeneration) {
-            await room.disconnect();
+            unawaited(_releaseRoom(room, label: 'stale battle'));
             return;
           }
           await _ensureRemoteTracksSubscribed(room);
@@ -508,7 +1059,7 @@ class RealLiveKitService implements LiveKitService {
     LiveMediaHints? mediaHints,
   }) {
     final generation = ++_battleConnectionGeneration;
-    _battleStateController.add(LiveKitConnectionState.connecting);
+    _setBattleState(LiveKitConnectionState.connecting);
     return _serializeBattleOperation(
       () => _connectBattle(
         url: url,
@@ -527,91 +1078,82 @@ class RealLiveKitService implements LiveKitService {
     LiveMediaHints? mediaHints,
     required int generation,
   }) async {
-    await _disconnectBattle();
+    await _retireBattleRoom();
     if (url.isEmpty || token.isEmpty) {
       throw StateError('Opponent LiveKit url/token missing');
     }
-    final room = await _runWithLiveKitErrorGuard(() async {
-      final hints = mediaHints ?? LiveMediaHints.defaultsForRole('viewer');
-      final guardedRoom = Room(roomOptions: _roomOptions(hints));
-      guardedRoom.events
-        ..on<RoomDisconnectedEvent>((_) {
-          if (_battleRoom != guardedRoom ||
-              generation != _battleConnectionGeneration) {
-            return;
-          }
-          _setBattleState(LiveKitConnectionState.disconnected);
-          debugPrint('🔴 Battle LiveKit terminal disconnect: $roomName');
+    final room = Room(roomOptions: _roomOptions);
+    room.events
+      ..on<RoomDisconnectedEvent>((event) {
+        if (_battleRoom != room ||
+            generation != _battleConnectionGeneration) {
+          return;
+        }
+        _setBattleState(LiveKitConnectionState.disconnected);
+        debugPrint(
+          '🔴 Battle LiveKit terminal disconnect: $roomName '
+          'reason=${event.reason?.name}',
+        );
+        if (_causeFor(event.reason).isRecoverable) {
           _queueBattleRecovery(
-            room: guardedRoom,
+            room: room,
             url: url,
             token: token,
             roomName: roomName,
           );
-        })
-        ..on<ReconnectingEvent>((_) {
-          if (_battleRoom != guardedRoom ||
-              generation != _battleConnectionGeneration) {
-            return;
-          }
-          _setBattleState(LiveKitConnectionState.reconnecting);
-          debugPrint('🔄 Battle LiveKit reconnecting: $roomName');
-        })
-        ..on<RoomReconnectedEvent>((_) {
-          if (_battleRoom != guardedRoom ||
-              generation != _battleConnectionGeneration) {
-            return;
-          }
-          _setBattleState(LiveKitConnectionState.connected);
-          debugPrint('🔗 Battle LiveKit reconnected: $roomName');
-          unawaited(_preferMediaSpeaker());
-          unawaited(_ensureRemoteTracksSubscribed(guardedRoom));
-          if (_battleRoom == guardedRoom) {
-            _startBattleVideoWatchdog(
-              room: guardedRoom,
-              url: url,
-              token: token,
-              roomName: roomName,
-            );
-          }
-        })
-        ..on<TrackSubscribedEvent>((event) {
-          if (_battleRoom != guardedRoom ||
-              generation != _battleConnectionGeneration) {
-            return;
-          }
-          if (event.track is RemoteAudioTrack) {
-            unawaited(_preferMediaSpeaker());
-          }
-        })
-        ..on<TrackSubscriptionExceptionEvent>((event) {
-          if (_battleRoom != guardedRoom ||
-              generation != _battleConnectionGeneration) {
-            return;
-          }
-          unawaited(
-            _retryRemoteSubscription(
-              guardedRoom,
-              event,
-              battleGeneration: generation,
-            ),
-          );
-        });
-      await guardedRoom.connect(url, token);
-      await _preferMediaSpeaker();
-      return guardedRoom;
-    });
-    if (generation != _battleConnectionGeneration) {
-      try {
-        await _runWithLiveKitErrorGuard(() async {
-          await room.disconnect();
-          await room.dispose();
-        });
-      } catch (error, stackTrace) {
-        debugPrint(
-          'Stale battle LiveKit room cleanup failed: $error\n$stackTrace',
+        }
+      })
+      ..on<ReconnectingEvent>((_) {
+        if (_battleRoom != room ||
+            generation != _battleConnectionGeneration) {
+          return;
+        }
+        _setBattleState(LiveKitConnectionState.reconnecting);
+      })
+      ..on<RoomReconnectedEvent>((_) {
+        if (_battleRoom != room ||
+            generation != _battleConnectionGeneration) {
+          return;
+        }
+        _setBattleState(LiveKitConnectionState.connected);
+        unawaited(_preferMediaSpeaker());
+        unawaited(_ensureRemoteTracksSubscribed(room));
+        _startBattleVideoWatchdog(
+          room: room,
+          url: url,
+          token: token,
+          roomName: roomName,
         );
-      }
+      })
+      ..on<TrackSubscribedEvent>((event) {
+        if (_battleRoom != room ||
+            generation != _battleConnectionGeneration) {
+          return;
+        }
+        if (event.track is RemoteAudioTrack) unawaited(_preferMediaSpeaker());
+      })
+      ..on<TrackSubscriptionExceptionEvent>((event) {
+        if (_battleRoom != room ||
+            generation != _battleConnectionGeneration) {
+          return;
+        }
+        unawaited(
+          _retryRemoteSubscription(room, event, battleGeneration: generation),
+        );
+      });
+
+    try {
+      await _runWithLiveKitErrorGuard(
+        () => room.connect(url, token, connectOptions: _connectOptions),
+      );
+      await _preferMediaSpeaker();
+    } catch (_) {
+      unawaited(_releaseRoom(room, label: 'failed battle'));
+      rethrow;
+    }
+
+    if (generation != _battleConnectionGeneration) {
+      unawaited(_releaseRoom(room, label: 'superseded battle'));
       return;
     }
     _battleRoom = room;
@@ -623,7 +1165,7 @@ class RealLiveKitService implements LiveKitService {
           : 'Battle video not published within preload window: $roomName',
     );
     if (generation != _battleConnectionGeneration) {
-      await _disconnectBattle();
+      await _retireBattleRoom();
       return;
     }
     _setBattleState(LiveKitConnectionState.connected);
@@ -638,194 +1180,31 @@ class RealLiveKitService implements LiveKitService {
   @override
   Future<void> disconnectBattle() {
     _battleConnectionGeneration++;
-    _battleStateController.add(LiveKitConnectionState.disconnected);
-    return _serializeBattleOperation(_disconnectBattle);
+    if (_battleRoom != null) {
+      _battleStateController.add(LiveKitConnectionState.disconnected);
+    }
+    return _serializeBattleOperation(_retireBattleRoom);
   }
 
-  Future<void> _disconnectBattle() async {
+  Future<void> _retireBattleRoom() async {
     _stopBattleVideoWatchdog();
     final room = _battleRoom;
     _battleRoom = null;
     if (room == null) return;
-    try {
-      await room.disconnect();
-      await room.dispose();
-    } catch (e, st) {
-      debugPrint('Battle LiveKit disconnect error: $e\n$st');
+    final release = _releaseRoom(room, label: 'battle');
+    if (_holdsAudioSession) {
+      _trackBackgroundRelease(release);
+      return;
     }
-  }
-
-  void _setState(LiveKitConnectionState next) {
-    _state = next;
-    _stateController.add(next);
+    await release;
   }
 
   void _setBattleState(LiveKitConnectionState next) {
+    if (_battleStateController.isClosed) return;
     _battleStateController.add(next);
   }
 
-  @override
-  Future<void> connect({
-    required String url,
-    required String token,
-    required String roomName,
-    String? mockStreamUrl,
-    LiveMediaHints? mediaHints,
-  }) async {
-    // Replacing the viewer JWT with the accepted guest JWT is an intentional
-    // in-room upgrade. Emitting `disconnected` here lets the viewer BLoC start
-    // its recovery path concurrently, which can dispose the brand-new guest
-    // room and produces "room unavailable after joining the stage". Retire
-    // the old primary room silently; only a real user/network disconnect is
-    // exposed through [disconnect] or the Room lifecycle callbacks.
-    // Taken before the old room is disposed: a guest upgrade replaces the
-    // primary room mid-live, and that teardown must not drop the session.
-    await _acquireAudioSession();
-    await disconnectBattle();
-    await _disposePrimaryRoom(notify: false);
-
-    if (url.isEmpty || token.isEmpty) {
-      await _releaseAudioSession();
-      _setState(LiveKitConnectionState.failed);
-      throw StateError('LiveKit url/token missing — re-join the live');
-    }
-
-    _url = url;
-    _token = token;
-    _mediaHints = mediaHints ?? LiveMediaHints.defaultsForRole('viewer');
-    _roomName = roomName;
-    _setState(LiveKitConnectionState.connecting);
-
-    try {
-      await _runWithLiveKitErrorGuard(() async {
-        final hints = _mediaHints!;
-        final room = Room(roomOptions: _roomOptions(hints));
-        // Own the room before connect() starts emitting lifecycle callbacks.
-        // Every listener below checks identity so a late disconnect from the
-        // room we just replaced cannot mark the new room disconnected.
-        _room = room;
-        room.events
-          ..on<RoomDisconnectedEvent>((event) {
-            if (_room != room) return;
-            debugPrint('🔴 LiveKit room disconnected: $roomName');
-            _setState(LiveKitConnectionState.disconnected);
-          })
-          ..on<ReconnectingEvent>((event) {
-            if (_room != room) return;
-            debugPrint('🔄 LiveKit reconnecting: $roomName');
-            _setState(LiveKitConnectionState.reconnecting);
-          })
-          ..on<RoomReconnectedEvent>((event) {
-            if (_room != room) return;
-            debugPrint('🔗 LiveKit reconnected: $roomName');
-            _setState(LiveKitConnectionState.connected);
-            _startPrimaryVideoWatchdog(room);
-            unawaited(_preferMediaSpeaker());
-            if (_publishing) {
-              unawaited(_restoreStageTracks(room, hints));
-            }
-          })
-          ..on<RoomConnectedEvent>((event) {
-            if (_room != room) return;
-            debugPrint('🔌 LiveKit connected: $roomName');
-            _setState(LiveKitConnectionState.connected);
-          })
-          // [DEBUG-QOS VIEWER 1/3] Remote track subscribed: print what
-          // simulcast layers the remote publication actually advertises,
-          // which codec is in use, and — critically — what VideoQuality
-          // the viewer is currently scheduled to receive BEFORE any UI
-          // touches it.  This line isolates whether adaptiveStream has
-          // already picked the wrong layer before the widget tree builds.
-          // NOTE: For 2.11.0, remote tracks do NOT expose `options.encodings`;
-          // instead we read: publication.dimensions (from server TrackInfo),
-          // publication.mimeType (direct String getter, no .codec wrapper),
-          // and publication.videoQuality getter which returns the user's
-          // explicit setVideoQuality preference (or HIGH if unset — note
-          // this is NOT the SFU's actual forwarding decision, which is why
-          // the LiveVideoPlayer renderer also probes via getReceiverStats).
-          ..on<TrackSubscribedEvent>((ev) {
-            if (ev.track is RemoteAudioTrack) {
-              unawaited(_preferMediaSpeaker());
-            }
-            if (ev.track is! RemoteVideoTrack) return;
-            final p = ev.publication;
-            final part = ev.participant;
-            final vtrack = ev.track as RemoteVideoTrack;
-            final pub = p; // RemoteTrackPublication
-            final dims = pub.dimensions; // server-reported published dims
-            final mime = pub.mimeType; // 2.11.0 direct getter
-            final qualityPref = pub.videoQuality.name.toUpperCase();
-            // Remote tracks don't expose encodings list; actual decoder dims
-            // are queried via getReceiverStats() in the LiveVideoPlayer renderer
-            // probe block (VIEWER-RENDERER DEBUG-QOS).
-            debugPrint(
-              '[DEBUG-QOS] VIEWER-TRACK-SUBSCRIBED:'
-              '  room=$roomName'
-              '  hostId=${part.identity}'
-              '  trackSid=${vtrack.sid}'
-              '  pubSid=${pub.sid}'
-              '  simulcasted=${pub.simulcasted}'
-              '  mime=$mime'
-              '  pubDimensions=${dims?.width}x${dims?.height}'
-              '  videoQualityGetter(preference)=$qualityPref'
-              '  (NOTE: decoder-output dims queried separately in VIEWER-RENDERER probe via getReceiverStats())',
-            );
-          })
-          ..on<TrackSubscriptionExceptionEvent>((event) {
-            unawaited(_retryRemoteSubscription(room, event));
-          })
-          // [DEBUG-QOS VIEWER 2/3] TrackStreamStateUpdatedEvent fires when the
-          // SFU pauses the track due to bandwidth limits or resumes it.
-          // (Replaces non-existent RemoteVideoTrackEvent listener that would
-          // have caused compile error on livekit_client <2.13.)
-          ..on<TrackStreamStateUpdatedEvent>((ev) {
-            try {
-              final p = ev.publication;
-              debugPrint(
-                '[DEBUG-QOS] VIEWER-TRACK-STREAM-STATE:'
-                '  streamState=${ev.streamState.name.toUpperCase()}'
-                '  pubSid=${p.sid}'
-                '  videoQuality(preference)=${p.videoQuality.name.toUpperCase()}'
-                '  simulcasted=${p.simulcasted}',
-              );
-            } catch (_) {}
-          });
-
-        await room.connect(url, token);
-        await _preferMediaSpeaker();
-      });
-      // Viewer: subscribe only — no local publish.
-      //
-      // NOTE: We intentionally do NOT call setVideoQuality() here anymore.
-      // Previously `setVideoQuality(VideoQuality.MEDIUM)` was hard-capped on
-      // every remote subscribed publication after 400 ms — this forced the
-      // SFU to serve the 360p (mid) simulcast layer even on good Wi-Fi and
-      // when the renderer is full-screen, causing heavy upscaling blur on
-      // all viewer devices.  RoomOptions.adaptiveStream = true (configured
-      // above) tells the engine to request the appropriate layer based on
-      // the actual VideoTrackRenderer viewport dimensions (full-screen →
-      // HIGH / 720p automatically) and the current available downlink.
-      // This yields the same or better quality as an explicit HIGH request,
-      // but still falls back cleanly on weak networks — no manual toggle
-      // required and no artificial cap on good links.
-      _streamUrl = mockStreamUrl;
-      _setState(LiveKitConnectionState.connected);
-      final connectedRoom = _room;
-      if (connectedRoom != null) {
-        _startPrimaryVideoWatchdog(connectedRoom);
-      }
-    } catch (e, st) {
-      debugPrint('❌ LiveKit connect failed: $e\n$st');
-      final failedRoom = _room;
-      _room = null;
-      await _releaseAudioSession();
-      try {
-        await failedRoom?.dispose();
-      } catch (_) {}
-      _setState(LiveKitConnectionState.failed);
-      rethrow;
-    }
-  }
+  // ── Guest stage ───────────────────────────────────────────────────────────
 
   var _publishing = false;
 
@@ -882,7 +1261,7 @@ class RealLiveKitService implements LiveKitService {
   }
 
   Future<void> _restoreStageTracks(Room room, LiveMediaHints hints) async {
-    if (_room != room) return;
+    if (!identical(_room, room)) return;
     final local = room.localParticipant;
     if (local == null) {
       throw StateError('LiveKit local participant unavailable');
@@ -894,14 +1273,8 @@ class RealLiveKitService implements LiveKitService {
     await local.setCameraEnabled(true);
 
     for (var attempt = 0; attempt < 10; attempt++) {
-      if (_room != room) return;
-      final audioReady = local.audioTrackPublications.any(
-        (publication) => !publication.muted && publication.track != null,
-      );
-      final videoReady = local.videoTrackPublications.any(
-        (publication) => !publication.muted && publication.track != null,
-      );
-      if (audioReady && videoReady) {
+      if (!identical(_room, room)) return;
+      if (_stagePublicationsReady(local)) {
         await _preferMediaSpeaker();
         return;
       }
@@ -913,23 +1286,26 @@ class RealLiveKitService implements LiveKitService {
     await local.setCameraEnabled(false);
     await Future<void>.delayed(const Duration(milliseconds: 150));
     await local.setCameraEnabled(true);
-    var audioReady = false;
-    var videoReady = false;
     for (var attempt = 0; attempt < 8; attempt++) {
-      audioReady = local.audioTrackPublications.any(
-        (publication) => !publication.muted && publication.track != null,
-      );
-      videoReady = local.videoTrackPublications.any(
-        (publication) => !publication.muted && publication.track != null,
-      );
-      if (audioReady && videoReady) break;
+      if (_stagePublicationsReady(local)) return;
       await Future<void>.delayed(const Duration(milliseconds: 200));
     }
-    if (!audioReady || !videoReady) {
-      throw StateError(
-        'لم يكتمل نشر ${!videoReady ? 'الكاميرا' : 'المايك'} للضيف.',
-      );
-    }
+    final videoReady = local.videoTrackPublications.any(
+      (publication) => !publication.muted && publication.track != null,
+    );
+    throw StateError(
+      'لم يكتمل نشر ${!videoReady ? 'الكاميرا' : 'المايك'} للضيف.',
+    );
+  }
+
+  static bool _stagePublicationsReady(LocalParticipant local) {
+    final audioReady = local.audioTrackPublications.any(
+      (publication) => !publication.muted && publication.track != null,
+    );
+    final videoReady = local.videoTrackPublications.any(
+      (publication) => !publication.muted && publication.track != null,
+    );
+    return audioReady && videoReady;
   }
 
   /// Requests camera + mic, throwing a message the room can show verbatim.
@@ -982,39 +1358,32 @@ class RealLiveKitService implements LiveKitService {
     await _room?.localParticipant?.setCameraEnabled(enabled);
   }
 
-  @override
-  Future<void> disconnect() async {
-    // The battle room closes while we still own the session; only after that
-    // is management handed back, so the primary room's own teardown below is
-    // what actually frees it.
-    await disconnectBattle();
-    await _releaseAudioSession();
-    await _disposePrimaryRoom(notify: true);
-  }
+  // ── Teardown ──────────────────────────────────────────────────────────────
 
-  Future<void> _disposePrimaryRoom({required bool notify}) async {
+  @override
+  Future<void> disconnect() {
+    final generation = ++_primaryGeneration;
+    _trace?.mark('disconnect requested');
     _stopPrimaryVideoWatchdog();
-    final room = _room;
-    // Clear identity first so a late RoomDisconnectedEvent from the room being
-    // replaced cannot mutate the state of its successor.
-    _room = null;
-    _publishing = false;
-    _streamUrl = null;
-    _roomName = null;
-    _url = null;
-    _token = null;
-    _mediaHints = null;
-    if (notify) {
-      _setState(LiveKitConnectionState.disconnected);
-    }
-    if (room != null) {
-      try {
-        await room.disconnect();
-        await room.dispose();
-      } catch (e, st) {
-        debugPrint('LiveKit disconnect error: $e\n$st');
-      }
-    }
+    _emit(
+      LiveKitConnectionState.disconnected,
+      generation: generation,
+      cause: LiveKitDisconnectCause.clientInitiated,
+    );
+    return _serializePrimary(() async {
+      await _retireBattleRoom();
+      // Ownership of the Android audio session goes back to LiveKit *before*
+      // the last room closes, so the SDK's own automatic teardown is what
+      // finally frees it (see LiveAudioSession).
+      await _releaseAudioSession();
+      await _retirePrimaryRoom();
+      await _drainPendingReleases();
+      _roomName = null;
+      _url = null;
+      _token = null;
+      _mediaHints = null;
+      _trace = null;
+    });
   }
 
   @override
@@ -1025,11 +1394,24 @@ class RealLiveKitService implements LiveKitService {
     final mediaHints = _mediaHints;
     final wasPublishing = _publishing;
     if (url == null || token == null || roomName == null) {
-      _setState(LiveKitConnectionState.failed);
+      _emit(
+        LiveKitConnectionState.failed,
+        generation: _primaryGeneration,
+        cause: LiveKitDisconnectCause.unauthorized,
+        detail: 'no stored credentials',
+      );
       return;
     }
-    _setState(LiveKitConnectionState.reconnecting);
     try {
+      if (wasPublishing) {
+        await joinStage(
+          url: url,
+          token: token,
+          roomName: roomName,
+          mediaHints: mediaHints,
+        );
+        return;
+      }
       await connect(
         url: url,
         token: token,
@@ -1037,25 +1419,15 @@ class RealLiveKitService implements LiveKitService {
         mockStreamUrl: _streamUrl,
         mediaHints: mediaHints,
       );
-      if (wasPublishing) {
-        final room = _room;
-        if (room == null) {
-          throw StateError('LiveKit room unavailable after reconnect');
-        }
-        final hints = mediaHints ?? LiveMediaHints.defaultsForRole('guest');
-        await _restoreStageTracks(room, hints);
-        _publishing = true;
-      }
-    } catch (e) {
-      debugPrint('LiveKit reconnect failed: $e');
-      _setState(LiveKitConnectionState.failed);
+    } catch (error) {
+      debugPrint('LiveKit reconnect failed: $error');
     }
   }
 
   void dispose() {
     _stopPrimaryVideoWatchdog();
     _stopBattleVideoWatchdog();
-    _stateController.close();
+    _sessionController.close();
     _battleStateController.close();
   }
 }

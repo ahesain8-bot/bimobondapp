@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:dartz/dartz.dart';
+import 'package:bimobondapp/app/gifts/domain/entities/gift_entity.dart' as catalog;
+import 'package:bimobondapp/app/gifts/domain/repositories/gifts_repository.dart';
 
 import '../../../../core/network/api_endpoints.dart';
 import '../../../../core/network/live_api_client.dart';
@@ -8,8 +10,7 @@ import 'package:bimobondapp/features/live_viewer/core/errors/failures.dart';
 import '../../domain/entities/gift_entity.dart';
 import '../../domain/entities/socket_event.dart';
 import '../../domain/repositories/gift_repository.dart';
-import '../services/fake_socket_service.dart'
-    show MockGiftCatalog, SocketService;
+import '../services/fake_socket_service.dart' show SocketService;
 
 /// Real [GiftRepository] backed by the backend:
 /// - `GET  /auth/me`           → coin balance (`wallet.balanceCoins`)
@@ -17,33 +18,43 @@ import '../services/fake_socket_service.dart'
 /// - `GET  /lives/:id/leaderboard/gifters` → top gifters
 /// - Socket `liveGift` events  → incoming gifts stream
 ///
-/// Gift catalog has no public endpoint in mobile-api.md — reuses the local
-/// mock catalog for the picker UI.
+/// Gift catalog is loaded through the app's existing GiftsRepository, which
+/// owns the catalog API. Live-specific sending remains on `/gifts/send`.
 class RealGiftRepository implements GiftRepository {
   RealGiftRepository({
     required LiveApiClient apiClient,
     required SocketService socket,
+    required GiftsRepository catalogRepository,
   }) : _api = apiClient,
-       _socket = socket;
+       _socket = socket,
+       _catalogRepository = catalogRepository;
 
   final LiveApiClient _api;
   final SocketService _socket;
+  final GiftsRepository _catalogRepository;
 
   final Map<String, StreamController<GiftSentEntity>> _incoming = {};
 
   @override
   Future<Either<Failure, List<GiftEntity>>> getAllGifts() async {
-    return Right(List.unmodifiable(MockGiftCatalog.gifts));
+    try {
+      return Right(await _loadCatalog());
+    } catch (e) {
+      return Left(ServerFailure('Failed to load gift catalog: $e'));
+    }
   }
 
   @override
   Future<Either<Failure, List<GiftEntity>>> getGiftsByRarity(
     GiftRarity rarity,
   ) async {
-    final gifts = MockGiftCatalog.gifts
-        .where((g) => g.rarity == rarity)
-        .toList();
-    return Right(gifts);
+    try {
+      // Rarity is not part of the documented catalog response. Do not invent
+      // a client-side catalog partition.
+      return Right(await _loadCatalog());
+    } catch (e) {
+      return Left(ServerFailure('Failed to load gift catalog: $e'));
+    }
   }
 
   @override
@@ -72,7 +83,14 @@ class RealGiftRepository implements GiftRepository {
     String? receiverId,
   }) async {
     try {
-      final gift = MockGiftCatalog.byId(giftId);
+      final catalogGifts = await _loadCatalog();
+      GiftEntity? gift;
+      for (final item in catalogGifts) {
+        if (item.id == giftId) {
+          gift = item;
+          break;
+        }
+      }
       if (gift == null) {
         return const Left(NotFoundFailure('Gift not found'));
       }
@@ -123,7 +141,9 @@ class RealGiftRepository implements GiftRepository {
     int limit = 20,
   }) async {
     // No dedicated history endpoint for the viewer — return empty.
-    return const Right([]);
+    return const Left(
+      ServerFailure('Gift history endpoint is not documented by the API.'),
+    );
   }
 
   @override
@@ -173,8 +193,10 @@ class RealGiftRepository implements GiftRepository {
 
   @override
   Future<Either<Failure, int>> purchaseCoins(int amount) async {
-    // No purchase endpoint in the current backend scope — no-op.
-    return const Right(0);
+    // No purchase endpoint is defined in the current backend scope.
+    return const Left(
+      ServerFailure('Coin purchase endpoint is not documented by the API.'),
+    );
   }
 
   @override
@@ -193,6 +215,31 @@ class RealGiftRepository implements GiftRepository {
     });
 
     return controller.stream.map(Right.new);
+  }
+
+  Future<List<GiftEntity>> _loadCatalog() async {
+    final result = await _catalogRepository.getGifts();
+    return result.fold(
+      (failure) => throw StateError(failure.message),
+      (gifts) => gifts.map(_mapCatalogGift).toList(growable: false),
+    );
+  }
+
+  GiftEntity _mapCatalogGift(catalog.GiftEntity gift) {
+    return GiftEntity(
+      id: gift.id,
+      name: gift.name,
+      iconUrl: gift.displayImageUrl ?? gift.icon,
+      animationUrl: gift.animationUrl,
+      coinCost: gift.priceCoins,
+      hasAnimation: gift.animationUrl != null,
+      metadata: {
+        if (gift.thumbnailUrl != null) 'thumbnailUrl': gift.thumbnailUrl,
+        if (gift.audioUrl != null) 'audioUrl': gift.audioUrl,
+        'type': gift.type.name,
+        'size': gift.size.name,
+      },
+    );
   }
 
   int? _asInt(dynamic value) {

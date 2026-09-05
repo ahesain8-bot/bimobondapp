@@ -14,11 +14,15 @@ import '../../../../core/network/live_api_client.dart';
 import '../../data/datasources/lives_media_datasource.dart';
 import '../../data/datasources/lives_remote_datasource.dart';
 import '../../data/datasources/lives_socket_datasource.dart';
+import '../../data/datasources/live_interactive_remote_datasource.dart';
 import '../../data/repositories/camera_repository_impl.dart';
 import '../../data/repositories/live_session_repository_impl.dart';
+import '../../data/repositories/live_interactive_repository_impl.dart';
 import '../../domain/effects/live_effects_catalog.dart';
 import '../../domain/repositories/camera_repository.dart';
 import '../../domain/repositories/live_session_repository.dart';
+import '../../domain/repositories/live_interactive_repository.dart';
+import '../../domain/usecases/live_interactive_usecases.dart';
 import '../../domain/usecases/dispose_camera.dart';
 import '../../domain/usecases/end_live_session.dart';
 import '../../domain/usecases/initialize_camera.dart';
@@ -26,9 +30,12 @@ import '../../domain/usecases/like_live_session.dart';
 import '../../domain/usecases/send_live_comment.dart';
 import '../../domain/usecases/start_live_session.dart';
 import '../../domain/usecases/update_live_title.dart';
+import '../../domain/usecases/update_live_chat_rules.dart';
 import '../bloc/live_room/live_room_bloc.dart';
 import '../bloc/live_room/live_room_event.dart';
 import '../bloc/live_room/live_room_state.dart';
+import '../bloc/live_interactive/live_interactive_bloc.dart';
+import '../bloc/live_interactive/live_interactive_event.dart';
 import '../effects/live_face_tracker.dart';
 import '../effects/live_face_tracker_scope.dart';
 import '../widgets/room/live_room_bottom_bar.dart';
@@ -43,6 +50,8 @@ import '../widgets/room/live_room_header.dart';
 import '../widgets/room/live_room_info_row.dart';
 import '../widgets/live_countdown_overlay.dart';
 import '../widgets/room/live_starting_indicator.dart';
+import '../widgets/room/live_interactive_host_toolbar.dart';
+import 'live_summary_page.dart';
 import '../widgets/vignette_layer.dart';
 import '../utils/live_screen_wakelock.dart';
 import '../../../live_viewer/presentation/widgets/floating_hearts.dart';
@@ -53,12 +62,16 @@ class LiveRoomPage extends StatefulWidget {
   const LiveRoomPage({
     super.key,
     this.title,
+    this.coverUrl,
+    this.categoryId,
     this.initialCamera,
     this.initialNativeCamera,
   });
 
   /// Optional title entered on the start screen.
   final String? title;
+  final String? coverUrl;
+  final String? categoryId;
 
   /// The camera that was ALREADY running on the start screen.
   /// Handed over so the room reuses the same lens (no reopen, no flicker).
@@ -74,12 +87,15 @@ class LiveRoomPage extends StatefulWidget {
 class _LiveRoomPageState extends State<LiveRoomPage>
     with WidgetsBindingObserver {
   LiveRoomBloc? _bloc;
+  LiveInteractiveBloc? _interactiveBloc;
+  LiveInteractiveRepository? _interactiveRepository;
   LiveSessionRepository? _sessionRepository;
   late final CameraRepository _cameraRepository;
   late final LiveFaceTracker _faceTracker;
   late final DateTime _startIndicatorDeadline;
   var _depsReady = false;
   var _showStartCountdown = true;
+  var _showLiveFeatures = false;
 
   @override
   void initState() {
@@ -119,6 +135,13 @@ class _LiveRoomPageState extends State<LiveRoomPage>
       socket: socket,
       media: media,
     );
+    _interactiveRepository = LiveInteractiveRepositoryImpl(
+      remote: LiveInteractiveRemoteDataSource(apiClient: apiClient),
+    );
+    _interactiveBloc = LiveInteractiveBloc(
+      useCases: LiveInteractiveUseCases(_interactiveRepository!),
+      socketEvents: socket.events,
+    );
 
     _bloc =
         LiveRoomBloc(
@@ -129,11 +152,14 @@ class _LiveRoomPageState extends State<LiveRoomPage>
           sendLiveComment: SendLiveComment(_sessionRepository!),
           likeLiveSession: LikeLiveSession(_sessionRepository!),
           updateLiveTitle: UpdateLiveTitle(_sessionRepository!),
+          updateLiveChatRules: UpdateLiveChatRules(_sessionRepository!),
           sessionRepository: _sessionRepository!,
           giftSocketService: auctions_di.sl<AuctionSocketService>(),
         )..add(
           LiveRoomStarted(
             title: widget.title,
+            coverUrl: widget.coverUrl,
+            categoryId: widget.categoryId,
             initialCamera: widget.initialCamera,
             initialNativeCamera: widget.initialNativeCamera,
           ),
@@ -160,6 +186,7 @@ class _LiveRoomPageState extends State<LiveRoomPage>
     WidgetsBinding.instance.removeObserver(this);
     _faceTracker.dispose();
     _bloc?.close();
+    _interactiveBloc?.close();
     LiveScreenWakelock.disable();
     super.dispose();
   }
@@ -174,8 +201,11 @@ class _LiveRoomPageState extends State<LiveRoomPage>
       );
     }
 
-    return BlocProvider.value(
-      value: bloc,
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider<LiveRoomBloc>.value(value: bloc),
+        BlocProvider<LiveInteractiveBloc>.value(value: _interactiveBloc!),
+      ],
       child: RepositoryProvider<LiveSessionRepository>.value(
         value: _sessionRepository!,
         child: LiveFaceTrackerScope(
@@ -198,13 +228,42 @@ class _LiveRoomPageState extends State<LiveRoomPage>
             child: MultiBlocListener(
               listeners: [
                 BlocListener<LiveRoomBloc, LiveRoomState>(
-                  listenWhen: (previous, current) => current is LiveRoomEnded,
+                  listenWhen: (previous, current) =>
+                      current is LiveRoomEnded,
                   listener: (context, state) {
-                    if (context.canPop()) {
+                    final ended = state as LiveRoomEnded;
+                    final liveId = ended.liveId;
+                    if (ended.serverEnded && liveId != null && liveId.isNotEmpty) {
+                      Navigator.of(context).pushReplacement(
+                        MaterialPageRoute<void>(
+                          builder: (_) => LiveSummaryPage(
+                            liveId: liveId,
+                            useCases: LiveInteractiveUseCases(
+                              _interactiveRepository!,
+                            ),
+                          ),
+                        ),
+                      );
+                    } else if (context.canPop()) {
                       context.pop();
                     } else {
                       context.go('/');
                     }
+                  },
+                ),
+                BlocListener<LiveRoomBloc, LiveRoomState>(
+                  listenWhen: (previous, current) =>
+                      current is LiveRoomReady &&
+                      (previous is! LiveRoomReady ||
+                          previous.session.id != current.session.id),
+                  listener: (context, state) {
+                    final ready = state as LiveRoomReady;
+                    context.read<LiveInteractiveBloc>().add(
+                    LiveInteractiveStarted(
+                      ready.session.id,
+                      userId: ready.session.host.id,
+                    ),
+                    );
                   },
                 ),
                 BlocListener<LiveRoomBloc, LiveRoomState>(
@@ -280,6 +339,36 @@ class _LiveRoomPageState extends State<LiveRoomPage>
                           setState(() => _showStartCountdown = false);
                         },
                       ),
+                    Positioned(
+                      left: 12,
+                      right: 12,
+                      bottom: 94,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          AnimatedSize(
+                            duration: const Duration(milliseconds: 180),
+                            curve: Curves.easeOut,
+                            alignment: Alignment.bottomCenter,
+                            child: Visibility(
+                              visible: _showLiveFeatures,
+                              maintainState: true,
+                              child: const LiveInteractiveHostToolbar(),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: LiveInteractiveToggleButton(
+                              onTap: () => setState(
+                                () => _showLiveFeatures = !_showLiveFeatures,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),

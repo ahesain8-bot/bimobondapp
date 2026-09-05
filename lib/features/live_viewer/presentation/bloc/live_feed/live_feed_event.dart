@@ -9,21 +9,27 @@ abstract class LiveFeedEvent extends Equatable {
 
 class LiveFeedLoadRequested extends LiveFeedEvent {
   final String? category;
+  final bool followingOnly;
   final bool refresh;
 
-  const LiveFeedLoadRequested({this.category, this.refresh = false});
+  const LiveFeedLoadRequested({
+    this.category,
+    this.followingOnly = false,
+    this.refresh = false,
+  });
 
   @override
-  List<Object?> get props => [category, refresh];
+  List<Object?> get props => [category, followingOnly, refresh];
 }
 
 class LiveFeedLoadMoreRequested extends LiveFeedEvent {
   final String? category;
+  final bool? followingOnly;
 
-  const LiveFeedLoadMoreRequested({this.category});
+  const LiveFeedLoadMoreRequested({this.category, this.followingOnly});
 
   @override
-  List<Object?> get props => [category];
+  List<Object?> get props => [category, followingOnly];
 }
 
 class LiveFeedRefreshRequested extends LiveFeedEvent {

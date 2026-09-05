@@ -17,6 +17,7 @@ import 'package:bimobondapp/app/auth/presentation/pages/splash_screen.dart';
 import 'package:bimobondapp/app/auth/presentation/pages/personal_info_screen.dart';
 import 'package:bimobondapp/app/auth/presentation/pages/privacy_settings_screen.dart';
 import 'package:bimobondapp/app/auth/presentation/pages/admin_user_activity_screen.dart';
+import 'package:bimobondapp/features/live/presentation/pages/admin_live_dashboard_page.dart';
 import 'package:bimobondapp/app/auth/presentation/pages/settings_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/chat_wallpaper_settings_screen.dart';
 import 'package:bimobondapp/app/auth/presentation/pages/change_avatar_screen.dart';
@@ -266,6 +267,11 @@ class AppRouter {
           final userId = state.uri.queryParameters['userId'];
           return AdminUserActivityScreen(userId: userId);
         },
+      ),
+      GoRoute(
+        path: '/admin/lives',
+        name: 'admin_lives',
+        builder: (context, state) => const AdminLiveDashboardPage(),
       ),
       GoRoute(
         path: '/change-avatar',

@@ -8,6 +8,7 @@ import 'package:socket_io_client/socket_io_client.dart' as io;
 import '../../../../core/network/api_endpoints.dart';
 import '../../../../core/models/live_battle.dart';
 import '../../domain/repositories/live_session_repository.dart';
+import '../../domain/entities/live_interactive.dart';
 import '../mappers/live_session_mapper.dart';
 
 /// Socket.IO HUD client for `live_{id}` (lives/mobile-api.md §16).
@@ -39,7 +40,7 @@ class LivesSocketDataSource {
 
   bool get isConnected => _socket?.connected ?? false;
 
-  Future<void> connectAndJoin(String liveId) async {
+  Future<void> connectAndJoin(String liveId, {String? userId}) async {
     // A timed-out handshake may still reconnect successfully. Reuse it instead
     // of disposing the manager on every BLoC retry, which previously prevented
     // Socket.IO's own reconnection loop from ever completing.
@@ -57,6 +58,7 @@ class LivesSocketDataSource {
     await disconnect();
     _desiredLiveId = liveId;
     _liveId = liveId;
+    _desiredUserId = userId;
 
     final token = await _idTokenProvider();
     if (token == null || token.isEmpty) {
@@ -89,7 +91,7 @@ class LivesSocketDataSource {
     socket.onConnect((_) {
       if (_socket != socket || _liveId != liveId) return;
       debugPrint('Socket.IO connected');
-      _joinRooms(socket, liveId);
+      _joinRooms(socket, liveId, userId: userId);
       if (!connected.isCompleted) connected.complete();
       _controller.add(const LiveHudConnectionEvent(connected: true));
     });
@@ -121,7 +123,7 @@ class LivesSocketDataSource {
     socket.onReconnect((_) {
       if (_socket != socket || _liveId != liveId) return;
       debugPrint('Socket.IO reconnected; rejoining live room');
-      _joinRooms(socket, liveId);
+      _joinRooms(socket, liveId, userId: userId);
       if (!connected.isCompleted) connected.complete();
       _controller.add(const LiveHudConnectionEvent(connected: true));
     });
@@ -343,6 +345,34 @@ class LivesSocketDataSource {
       );
     });
 
+    // M6–M11 interactive room events. Keep the complete documented payload
+    // intact so the presentation BLoC can apply the server-authoritative
+    // update without a second socket connection.
+    for (final eventName in const [
+      'liveGiftGoalUpdate',
+      'livePollUpdated',
+      'liveQAUpdated',
+      'liveTreasureBoxSpawned',
+      'liveTreasureBoxClaimed',
+      'liveAuction',
+      'hostLeagueUpdated',
+      'userLevelUp',
+    ]) {
+      _on(socket, eventName, (data) {
+        final map = _asMap(data);
+        if (map == null) return;
+        _controller.add(
+          LiveHudInteractiveEvent(
+            LiveInteractiveSocketPayload(
+              event: eventName,
+              liveId: map['liveId']?.toString() ?? liveId,
+              payload: map,
+            ),
+          ),
+        );
+      });
+    }
+
     socket.connect();
     await connected.future.timeout(const Duration(seconds: 10));
   }
@@ -383,7 +413,7 @@ class LivesSocketDataSource {
           (_liveId != null && _liveId != liveId)) {
         return;
       }
-      await connectAndJoin(liveId);
+      await connectAndJoin(liveId, userId: _desiredUserId);
     } catch (e) {
       debugPrint('Socket.IO fresh-auth reconnect failed: $e');
     } finally {
@@ -391,9 +421,13 @@ class LivesSocketDataSource {
     }
   }
 
-  void _joinRooms(io.Socket socket, String liveId) {
+  String? _desiredUserId;
+
+  void _joinRooms(io.Socket socket, String liveId, {String? userId}) {
     socket.emit('joinLive', {'liveId': liveId});
-    socket.emit('joinUser', {});
+    socket.emit('joinUser', {
+      if (userId != null && userId.isNotEmpty) 'userId': userId,
+    });
   }
 
   void _handleGiftPayload(

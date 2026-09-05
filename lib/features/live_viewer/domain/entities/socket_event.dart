@@ -3,6 +3,7 @@ import 'comment_entity.dart';
 import 'gift_entity.dart';
 import 'hourly_ranking_entity.dart';
 import '../../../../core/models/live_battle.dart';
+import '../../../live/domain/entities/live_interactive.dart';
 
 /// Socket event types matching the backend contract.
 enum SocketEventType {
@@ -21,6 +22,7 @@ enum SocketEventType {
   liveBattle,
   liveHourlyRank,
   liveTopGifters,
+  liveInteractive,
   reconnecting,
   reconnected,
   networkLost,
@@ -279,6 +281,22 @@ class LiveTopGiftersUpdatedEvent extends SocketEvent {
 
   @override
   List<Object?> get props => [...super.props, avatarUrls];
+}
+
+/// M6–M11 server-pushed updates (`liveGiftGoalUpdate`, `livePollUpdated`,
+/// `liveQAUpdated`, `liveTreasureBox*`, `liveAuction`, and
+/// `hostLeagueUpdated`). The payload is preserved exactly as received.
+class LiveInteractiveSocketEvent extends SocketEvent {
+  const LiveInteractiveSocketEvent({
+    required super.liveId,
+    required this.payload,
+    required super.timestamp,
+  }) : super(type: SocketEventType.liveInteractive);
+
+  final LiveInteractiveSocketPayload payload;
+
+  @override
+  List<Object?> get props => [...super.props, payload.event, payload.payload];
 }
 
 class NetworkLostEvent extends SocketEvent {

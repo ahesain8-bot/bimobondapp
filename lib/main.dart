@@ -1,3 +1,4 @@
+import 'package:bimobondapp/core/utils/google_maps_bootstrap.dart';
 import 'package:bimobondapp/core/routes/app_router.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -64,11 +65,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Google Maps and the camera/beauty stack are deliberately lazy. Native
-  // warm-up work still competes for the Android platform thread even when its
-  // Dart Future is not awaited, which previously kept the native splash on
-  // screen for ~30 seconds on a cold start. The map screen and camera screen
-  // initialise their own dependencies immediately before first use.
+  await configureGoogleMaps();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await PushNotificationService.instance.initializeEarly();
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);

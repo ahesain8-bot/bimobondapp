@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:livekit_client/livekit_client.dart' show Room;
 import '../../../../core/models/live_media_hints.dart';
+import 'live_session_diagnostics.dart';
 
 /// Connection states mirroring a LiveKit room lifecycle.
 enum LiveKitConnectionState {
@@ -12,10 +13,55 @@ enum LiveKitConnectionState {
   failed,
 }
 
+/// A room lifecycle transition, with everything a caller needs to decide what
+/// to do about it.
+///
+/// A bare [LiveKitConnectionState] cannot distinguish "we closed this room to
+/// open another one" from "the network dropped", and reacting to both the same
+/// way is what makes a swipe look like a crash. [generation] identifies the
+/// connection attempt that produced the update so a caller can discard
+/// anything that belongs to a session it has already replaced.
+class LiveKitSessionUpdate {
+  const LiveKitSessionUpdate({
+    required this.state,
+    required this.generation,
+    this.roomName,
+    this.cause,
+    this.detail,
+  });
+
+  final LiveKitConnectionState state;
+  final int generation;
+  final String? roomName;
+
+  /// Set only for [LiveKitConnectionState.disconnected] and
+  /// [LiveKitConnectionState.failed].
+  final LiveKitDisconnectCause? cause;
+
+  /// SDK-provided specifics: the `DisconnectReason` name, an error string, or
+  /// the watchdog signal that fired.
+  final String? detail;
+
+  @override
+  String toString() =>
+      'LiveKitSessionUpdate(${state.name}, gen=$generation, '
+      'room=$roomName, cause=${cause?.name}, detail=$detail)';
+}
+
 /// Abstraction over LiveKit so the UI never talks to the SDK directly.
 abstract class LiveKitService {
   LiveKitConnectionState get state;
   Stream<LiveKitConnectionState> get stateStream;
+
+  /// Lifecycle transitions of the primary room, including why it ended.
+  ///
+  /// Implementations that cannot report a cause derive this from
+  /// [stateStream]; the viewer then falls back to treating every disconnect as
+  /// recoverable, which is the pre-existing behaviour.
+  Stream<LiveKitSessionUpdate> get sessionStream => stateStream.map(
+    (state) => LiveKitSessionUpdate(state: state, generation: 0),
+  );
+
   Stream<LiveKitConnectionState> get battleStateStream =>
       const Stream<LiveKitConnectionState>.empty();
   String? get roomName;
@@ -90,6 +136,22 @@ class FakeLiveKitService implements LiveKitService {
   String? _url;
   String? _token;
   LiveMediaHints? _mediaHints;
+  var _generation = 0;
+
+  @override
+  Stream<LiveKitSessionUpdate> get sessionStream => _stateController.stream.map(
+    (state) => LiveKitSessionUpdate(
+      state: state,
+      generation: _generation,
+      roomName: _roomName,
+      cause: switch (state) {
+        LiveKitConnectionState.disconnected =>
+          LiveKitDisconnectCause.clientInitiated,
+        LiveKitConnectionState.failed => LiveKitDisconnectCause.network,
+        _ => null,
+      },
+    ),
+  );
 
   @override
   LiveMediaHints? get mediaHints => _mediaHints;
@@ -188,6 +250,7 @@ class FakeLiveKitService implements LiveKitService {
     String? mockStreamUrl,
     LiveMediaHints? mediaHints,
   }) async {
+    _generation++;
     _url = url;
     _token = token;
     _mediaHints = mediaHints;
@@ -208,6 +271,7 @@ class FakeLiveKitService implements LiveKitService {
 
   @override
   Future<void> disconnect() async {
+    _generation++;
     _setState(LiveKitConnectionState.disconnected);
     await Future.delayed(const Duration(milliseconds: 150));
     _roomName = null;

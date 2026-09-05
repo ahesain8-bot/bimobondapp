@@ -6,6 +6,8 @@ import '../entities/live_session.dart';
 import '../../../../core/models/live_media_hints.dart';
 import '../entities/live_viewer.dart';
 import '../../../../core/models/live_battle.dart';
+import '../entities/live_interactive.dart';
+import '../entities/live_chat_rules.dart';
 
 /// Real-time HUD events from Socket.IO (`live_{id}` room).
 sealed class LiveHudEvent {
@@ -115,6 +117,14 @@ class LiveHudHourlyRankEvent extends LiveHudEvent {
   final String? label;
 }
 
+/// Normalized payload for M6–M11 Socket.IO events. The interactive BLoC owns
+/// the domain mapping while the existing host HUD stream remains typed.
+class LiveHudInteractiveEvent extends LiveHudEvent {
+  const LiveHudInteractiveEvent(this.payload);
+
+  final LiveInteractiveSocketPayload payload;
+}
+
 /// `liveTopGiftersUpdated` — the supporters strip under each PK tile, and the
 /// avatar row in the header of a plain live. Carries the whole ordered list;
 /// the stage takes the first three (mobile-api.md §19).
@@ -213,7 +223,11 @@ class LiveGuestStageCredentials {
 /// Contract for loading and updating an active live session.
 abstract class LiveSessionRepository {
   /// Creates and starts a host live (`POST /lives` with `startNow: true`).
-  Future<LiveSession> startHostSession({required String title});
+  Future<LiveSession> startHostSession({
+    required String title,
+    String? coverUrl,
+    String? categoryId,
+  });
 
   /// Reconnects to an existing LIVE as host (`POST /lives/:id/start`).
   Future<LiveSession> reconnectHostSession(String liveId);
@@ -265,6 +279,14 @@ abstract class LiveSessionRepository {
     required String userId,
   });
 
+  /// Updates chat mode, slow mode and blocked keywords.
+  Future<LiveChatRules> updateChatRules({
+    required String liveId,
+    String? chatMode,
+    int? slowModeSeconds,
+    List<String>? blockedKeywords,
+  });
+
   /// Bans a viewer from this live.
   Future<void> banViewer({
     required String liveId,
@@ -282,6 +304,8 @@ abstract class LiveSessionRepository {
   Future<LiveSession> updateTitle({
     required String liveId,
     required String title,
+    String? coverUrl,
+    String? categoryId,
   });
 
   /// Updates guest policy (`PATCH /lives/:id/settings`).
@@ -402,7 +426,7 @@ abstract class LiveSessionRepository {
   });
 
   /// Connects Socket.IO and joins `live_{id}`.
-  Future<void> connectRealtime(String liveId);
+  Future<void> connectRealtime(String liveId, {String? userId});
 
   /// Leaves the socket room and disconnects.
   Future<void> disconnectRealtime();

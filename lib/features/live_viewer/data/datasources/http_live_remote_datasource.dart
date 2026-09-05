@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart' as fb;
+import 'package:flutter/foundation.dart';
 
 import '../../../../core/network/api_endpoints.dart';
 import '../../../../core/network/live_api_client.dart';
@@ -36,8 +37,9 @@ class HttpLiveRemoteDataSource implements LiveRemoteDataSource {
   @override
   Future<List<LiveEntity>> getLiveFeed({
     int page = 1,
-    int limit = 10,
+    int limit = 20,
     String? category,
+    bool followingOnly = false,
   }) async {
     final payload = await _api.get(
       ApiEndpoints.livesFeed,
@@ -46,27 +48,79 @@ class HttpLiveRemoteDataSource implements LiveRemoteDataSource {
         'page': '$page',
         'limit': '$limit',
         if (category != null && category.isNotEmpty) 'categoryId': category,
+        // The API documents followingOnly as optional and defaults it to
+        // false. Omitting false is important because query values arrive at
+        // Nest as strings; a server that checks the raw value would treat
+        // the string "false" as truthy and incorrectly return Following.
+        if (followingOnly) 'followingOnly': 'true',
       },
     );
-    return LiveMapper.listFromPayload(payload);
+    final lives = LiveMapper.listFromPayload(payload);
+    if (kDebugMode) {
+      final data = payload['data'];
+      final ids = data is List
+          ? data
+                .whereType<Map>()
+                .map((item) => item['id']?.toString() ?? '')
+                .where((id) => id.isNotEmpty)
+                .toList(growable: false)
+          : const <String>[];
+      final statuses = data is List
+          ? data
+                .whereType<Map>()
+                .map((item) => item['status']?.toString() ?? '(missing)')
+                .toList(growable: false)
+          : const <String>[];
+      debugPrint(
+        '[LiveFeed] GET ${ApiEndpoints.livesFeed} '
+        'page=$page limit=$limit category=${category ?? "none"} '
+        'followingOnly=$followingOnly rawCount=${data is List ? data.length : 0} '
+        'mappedCount=${lives.length} ids=$ids statuses=$statuses',
+      );
+      // Decides "the server sent one live" versus "the client lost one"
+      // without a second run: `meta` carries the server's own total, and the
+      // payload keys expose a response envelope this mapper does not read.
+      if (data is! List || data.length != lives.length) {
+        debugPrint(
+          '[LiveFeed] payload shape payloadKeys=${payload.keys.toList()}'
+          ' dataType=${data.runtimeType}'
+          ' meta=${payload['meta']}',
+        );
+      }
+    }
+    return lives;
   }
 
   @override
   Future<LiveEntity> getLiveById(String liveId) async {
     final payload = await _api.get(ApiEndpoints.liveById(liveId));
-    final live = LiveMapper.fromJson(payload);
+    var live = LiveMapper.fromJson(payload);
     if (live.id.isEmpty) {
       // Backend may return { live: {...} } wrapping.
       final nested = payload['live'];
       if (nested is Map<String, dynamic>) {
-        return LiveMapper.fromJson(nested);
+        live = LiveMapper.fromJson(nested);
       }
+    }
+    if (kDebugMode) {
+      final auctions = live.metadata?['activeAuctions'];
+      debugPrint(
+        '[ViewerLive] detail success liveId=$liveId'
+        ' mappedId=${live.id}'
+        ' status=${live.status.name}'
+        ' activeAuctions=${auctions is List ? auctions.length : 0}'
+        ' pinnedComment=${live.metadata?['pinnedComment'] != null}'
+        ' isPopular=${live.metadata?['isPopular'] == true}',
+      );
     }
     return live;
   }
 
   @override
   Future<JoinLiveResult> joinLive(String liveId) async {
+    if (kDebugMode) {
+      debugPrint('[ViewerLive] join started liveId=$liveId');
+    }
     // POST /lives/:id/join → { live, token, url, role, guest }
     final payload = await _api.post(ApiEndpoints.liveJoin(liveId));
 
@@ -76,6 +130,19 @@ class HttpLiveRemoteDataSource implements LiveRemoteDataSource {
     final live = LiveMapper.fromJson(liveJson);
     final liveKitUrl = payload['url']?.toString() ?? '';
     final liveKitToken = payload['token']?.toString() ?? '';
+    if (kDebugMode) {
+      final auctions = live.metadata?['activeAuctions'];
+      debugPrint(
+        '[ViewerLive] join response liveId=$liveId'
+        ' mappedId=${live.id}'
+        ' status=${live.status.name}'
+        ' urlPresent=${liveKitUrl.isNotEmpty}'
+        ' tokenPresent=${liveKitToken.isNotEmpty}'
+        ' activeAuctions=${auctions is List ? auctions.length : 0}'
+        ' pinnedComment=${live.metadata?['pinnedComment'] != null}'
+        ' isPopular=${live.metadata?['isPopular'] == true}',
+      );
+    }
 
     if (live.status == LiveStatus.banned) {
       throw Exception('BANNED');
@@ -113,28 +180,12 @@ class HttpLiveRemoteDataSource implements LiveRemoteDataSource {
 
   @override
   Future<List<String>> getTrendingCategories() async {
-    try {
-      final payload = await _api.get(
-        ApiEndpoints.livesFeed,
-        auth: true,
-        query: {'page': '1', 'limit': '50'},
-      );
-      final categories = LiveMapper.categoriesFromPayload(payload);
-      if (categories.isNotEmpty) return categories;
-    } catch (_) {
-      // Fall through to defaults when the feed is unreachable.
-    }
-    return const [
-      'Music',
-      'Gaming',
-      'Talk Show',
-      'Food',
-      'Fashion',
-      'Sports',
-      'Education',
-      'Comedy',
-      'Dance',
-    ];
+    final payload = await _api.get(
+      ApiEndpoints.livesFeed,
+      auth: true,
+      query: {'page': '1', 'limit': '50'},
+    );
+    return LiveMapper.categoriesFromPayload(payload);
   }
 
   @override

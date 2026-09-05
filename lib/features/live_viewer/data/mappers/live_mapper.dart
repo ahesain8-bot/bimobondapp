@@ -181,6 +181,9 @@ class LiveMapper {
     }
 
     // Popular badge (TikTok parity §20).
+    if (json['isPopular'] is bool) {
+      meta['isPopular'] = json['isPopular'];
+    }
     if (json['isPopular'] == true || hourlyRank != null) {
       meta['isPopular'] = true;
       meta['popularReason'] =
@@ -216,6 +219,14 @@ class LiveMapper {
     final pinned = _asMap(json['pinnedComment']);
     if (pinned != null) {
       meta['pinnedComment'] = pinned;
+    }
+
+    // Detail and join responses include the active auction list. LiveEntity
+    // keeps the feature snapshot in metadata so the existing viewer layers
+    // can consume it without changing the domain shape.
+    final activeAuctions = json['activeAuctions'];
+    if (activeAuctions is List) {
+      meta['activeAuctions'] = activeAuctions;
     }
 
     // PK battle snapshot.

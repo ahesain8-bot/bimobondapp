@@ -40,14 +40,16 @@ class RealLikeRepository implements LikeRepository {
 
   @override
   Future<Either<Failure, void>> unlikeLive(String liveId) async {
-    // No unlike endpoint in mobile-api.md — no-op.
-    return const Right(null);
+    return const Left(
+      ServerFailure('Unlike endpoint is not documented by the API.'),
+    );
   }
 
   @override
   Future<Either<Failure, bool>> hasLikedLive(String liveId) async {
-    // No dedicated endpoint — optimistic local answer.
-    return const Right(false);
+    return const Left(
+      ServerFailure('Like-status endpoint is not documented by the API.'),
+    );
   }
 
   @override
@@ -57,7 +59,9 @@ class RealLikeRepository implements LikeRepository {
       final count = payload['likeCount'];
       if (count is int) return Right(count);
       if (count is num) return Right(count.toInt());
-      return const Right(0);
+      return const Left(
+        ServerFailure('Like count missing from the live detail response.'),
+      );
     } catch (e) {
       return Left(ServerFailure('Failed to get like count: $e'));
     }
@@ -96,7 +100,9 @@ class RealLikeRepository implements LikeRepository {
 
   @override
   Stream<Either<Failure, bool>> watchHasLiked(String liveId) async* {
-    yield Right(false);
+    yield const Left(
+      ServerFailure('Like-status endpoint is not documented by the API.'),
+    );
   }
 
   void dispose() {

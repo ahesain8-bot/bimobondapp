@@ -10,9 +10,15 @@ class GetLiveFeedUseCase {
 
   Future<Either<Failure, List<LiveEntity>>> call({
     int page = 1,
-    int limit = 10,
+    int limit = 20,
     String? category,
+    bool followingOnly = false,
   }) {
-    return repository.getLiveFeed(page: page, limit: limit, category: category);
+    return repository.getLiveFeed(
+      page: page,
+      limit: limit,
+      category: category,
+      followingOnly: followingOnly,
+    );
   }
 }

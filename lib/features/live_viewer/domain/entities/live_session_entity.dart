@@ -103,7 +103,7 @@ class LiveSessionEntity extends Equatable {
     this.isLiveKitConnected = false,
     this.reconnectAttempt = 0,
     this.errorMessage,
-    this.coinBalance = 1250,
+    this.coinBalance = 0,
     this.hasLiked = false,
   });
 

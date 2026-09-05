@@ -30,12 +30,23 @@ void main() {
     expect(find.byType(CircularProgressIndicator), findsNothing);
   });
 
-  testWidgets('viewer never sees network-lost indicator', (tester) async {
+  testWidgets('network-lost state provides recovery actions', (tester) async {
     await tester.pumpWidget(subject(LiveConnectionState.networkLost));
+    await tester.pumpAndSettle();
 
-    expect(find.textContaining('Network lost'), findsNothing);
-    expect(find.textContaining('انقطع'), findsNothing);
-    expect(find.byIcon(Icons.wifi_off_rounded), findsNothing);
+    expect(find.text('Network lost'), findsOneWidget);
+    expect(find.text('Retry'), findsOneWidget);
+    expect(find.text('Leave'), findsOneWidget);
+    expect(find.byIcon(Icons.wifi_off_rounded), findsOneWidget);
+  });
+
+  testWidgets('connected state has no fullscreen grey overlay', (tester) async {
+    await tester.pumpWidget(subject(LiveConnectionState.connected));
+
+    expect(find.byType(Positioned), findsNothing);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.text('Connecting'), findsNothing);
+    expect(find.text('Loading live'), findsNothing);
   });
 
   testWidgets('terminal live-ended state remains visible', (tester) async {

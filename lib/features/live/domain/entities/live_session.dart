@@ -1,5 +1,6 @@
 import 'live_chat_message.dart';
 import 'live_host.dart';
+import 'live_chat_rules.dart';
 import '../../../../core/models/live_media_hints.dart';
 
 /// Snapshot of an active live broadcasting session (fields from mobile-api.md §5).
@@ -26,6 +27,7 @@ class LiveSession {
     this.layout,
     this.allowGuestCamera,
     this.moderatorsCanManageGuests,
+    this.chatRules,
     this.liveKitToken,
     this.liveKitUrl,
     this.liveKitRole,
@@ -64,6 +66,7 @@ class LiveSession {
   final String? layout;
   final bool? allowGuestCamera;
   final bool? moderatorsCanManageGuests;
+  final LiveChatRules? chatRules;
 
   /// LiveKit JWT from start/join (never mint on device).
   final String? liveKitToken;
@@ -106,6 +109,7 @@ class LiveSession {
     String? layout,
     bool? allowGuestCamera,
     bool? moderatorsCanManageGuests,
+    LiveChatRules? chatRules,
     String? liveKitToken,
     String? liveKitUrl,
     String? liveKitRole,
@@ -138,6 +142,7 @@ class LiveSession {
       allowGuestCamera: allowGuestCamera ?? this.allowGuestCamera,
       moderatorsCanManageGuests:
           moderatorsCanManageGuests ?? this.moderatorsCanManageGuests,
+      chatRules: chatRules ?? this.chatRules,
       liveKitToken: liveKitToken ?? this.liveKitToken,
       liveKitUrl: liveKitUrl ?? this.liveKitUrl,
       liveKitRole: liveKitRole ?? this.liveKitRole,

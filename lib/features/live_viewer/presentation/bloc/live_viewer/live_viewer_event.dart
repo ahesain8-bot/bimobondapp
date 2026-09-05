@@ -19,8 +19,22 @@ class LiveViewerActivated extends LiveViewerEvent {
   List<Object?> get props => [live];
 }
 
+/// Stop watching.
+///
+/// [liveId] names the live the caller believes is active. A PageView page that
+/// is being disposed during a swipe must always pass it: without it, the
+/// teardown request from the page the viewer just left arrives while the
+/// incoming page is still connecting and closes the room it just opened. The
+/// BLoC drops any request that does not name the live it currently wants.
+/// Screen-level teardown (navigating away, app backgrounded) passes null,
+/// which always applies.
 class LiveViewerDeactivated extends LiveViewerEvent {
-  const LiveViewerDeactivated();
+  const LiveViewerDeactivated({this.liveId});
+
+  final String? liveId;
+
+  @override
+  List<Object?> get props => [liveId];
 }
 
 class LiveViewerRetryRequested extends LiveViewerEvent {
@@ -111,6 +125,19 @@ class LiveViewerCommentDeletedRequested extends LiveViewerEvent {
 
   @override
   List<Object?> get props => [commentId, targetUserId];
+}
+
+class LiveViewerCommentPinToggledRequested extends LiveViewerEvent {
+  const LiveViewerCommentPinToggledRequested(
+    this.commentId, {
+    required this.pinned,
+  });
+
+  final String commentId;
+  final bool pinned;
+
+  @override
+  List<Object?> get props => [commentId, pinned];
 }
 
 class LiveViewerViewerChatMuteRequested extends LiveViewerEvent {
@@ -226,12 +253,19 @@ class LiveViewerGuestApprovalChecked extends LiveViewerEvent {
 /// Socket.IO and LiveKit reconnect independently, so socket recovery must not
 /// be allowed to claim that the video room recovered too.
 class LiveViewerLiveKitStateChanged extends LiveViewerEvent {
-  const LiveViewerLiveKitStateChanged(this.state);
+  const LiveViewerLiveKitStateChanged(this.update);
 
-  final LiveKitConnectionState state;
+  final LiveKitSessionUpdate update;
+
+  LiveKitConnectionState get state => update.state;
 
   @override
-  List<Object?> get props => [state];
+  List<Object?> get props => [
+    update.state,
+    update.generation,
+    update.cause,
+    update.detail,
+  ];
 }
 
 /// Internal bridge from the separate battle LiveKit room into presentation

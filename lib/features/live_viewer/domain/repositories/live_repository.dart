@@ -7,8 +7,9 @@ abstract class LiveRepository {
   /// GET /lives/feed
   Future<Either<Failure, List<LiveEntity>>> getLiveFeed({
     int page = 1,
-    int limit = 10,
+    int limit = 20,
     String? category,
+    bool followingOnly = false,
   });
 
   /// GET /lives/{id}

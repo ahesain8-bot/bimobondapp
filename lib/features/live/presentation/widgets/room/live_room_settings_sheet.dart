@@ -7,6 +7,7 @@ import '../../bloc/live_room/live_room_bloc.dart';
 import '../../bloc/live_room/live_room_state.dart';
 import 'live_room_host_sheet_chrome.dart';
 import 'live_room_multi_guest_settings_sheet.dart';
+import 'live_room_chat_rules_sheet.dart';
 
 /// Host stream settings. Guest policy lives one level deeper, in
 /// [LiveRoomMultiGuestSettingsSheet], so a single screen owns
@@ -48,6 +49,12 @@ class _LiveRoomSettingsSheetBody extends StatelessWidget {
             title: 'إعدادات وضع تعدد الضيوف',
             subtitle: 'التخطيط وأذونات الانضمام إلى المسرح.',
             onTap: () => LiveRoomMultiGuestSettingsSheet.show(context),
+          ),
+          _SettingsNavRow(
+            icon: Icons.chat_bubble_outline,
+            title: 'Comment settings',
+            subtitle: 'Control who can comment, slow mode and blocked keywords.',
+            onTap: () => LiveRoomChatRulesSheet.show(context),
           ),
         ],
       ),

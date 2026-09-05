@@ -10,8 +10,9 @@ import '../services/fake_livekit_service.dart';
 abstract class LiveRemoteDataSource {
   Future<List<LiveEntity>> getLiveFeed({
     int page = 1,
-    int limit = 10,
+    int limit = 20,
     String? category,
+    bool followingOnly = false,
   });
 
   Future<LiveEntity> getLiveById(String liveId);
@@ -96,6 +97,7 @@ class FakeLiveRemoteDataSource implements LiveRemoteDataSource {
     int page = 1,
     int limit = 10,
     String? category,
+    bool followingOnly = false,
   }) async {
     await Future.delayed(const Duration(milliseconds: 700));
 

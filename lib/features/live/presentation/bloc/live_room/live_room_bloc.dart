@@ -27,6 +27,7 @@ import '../../../domain/usecases/like_live_session.dart';
 import '../../../domain/usecases/send_live_comment.dart';
 import '../../../domain/usecases/start_live_session.dart';
 import '../../../domain/usecases/update_live_title.dart';
+import '../../../domain/usecases/update_live_chat_rules.dart';
 import 'live_room_event.dart';
 import 'live_room_state.dart';
 import '../../../domain/entities/live_gift_banner.dart';
@@ -41,6 +42,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     required SendLiveComment sendLiveComment,
     required LikeLiveSession likeLiveSession,
     required UpdateLiveTitle updateLiveTitle,
+    required UpdateLiveChatRules updateLiveChatRules,
     required LiveSessionRepository sessionRepository,
     required AuctionSocketService giftSocketService,
   }) : _startLiveSession = startLiveSession,
@@ -50,6 +52,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
        _sendLiveComment = sendLiveComment,
        _likeLiveSession = likeLiveSession,
        _updateLiveTitle = updateLiveTitle,
+       _updateLiveChatRules = updateLiveChatRules,
        _sessionRepository = sessionRepository,
        _giftSocketService = giftSocketService,
        super(const LiveRoomInitial()) {
@@ -78,6 +81,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     on<LiveRoomGiftComboReceived>(_onGiftComboReceived);
     on<LiveRoomGiftComboConsumed>(_onGiftComboConsumed);
     on<LiveRoomTitleSubmitted>(_onTitleSubmitted);
+    on<LiveRoomChatRulesSubmitted>(_onChatRulesSubmitted);
     on<LiveRoomEffectsPanelModeChanged>(_onEffectsPanelModeChanged);
     on<LiveRoomEffectSelected>(_onEffectSelected);
     on<LiveRoomEffectsCategorySelected>(_onEffectsCategorySelected);
@@ -115,6 +119,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
   final SendLiveComment _sendLiveComment;
   final LikeLiveSession _likeLiveSession;
   final UpdateLiveTitle _updateLiveTitle;
+  final UpdateLiveChatRules _updateLiveChatRules;
   final LiveSessionRepository _sessionRepository;
 
   StreamSubscription<LiveHudEvent>? _hudSub;
@@ -195,7 +200,11 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         : event.initialCamera != null
         ? Future<CameraController?>.value(event.initialCamera)
         : _initializeCamera(useFront: true);
-    final sessionFuture = _startLiveSession(title: title);
+    final sessionFuture = _startLiveSession(
+      title: title,
+      coverUrl: event.coverUrl,
+      categoryId: event.categoryId,
+    );
 
     final controller = await cameraFuture;
     if (isClosed) {
@@ -220,7 +229,6 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     }
 
     late final LiveSession session;
-    var startedOnServer = true;
     try {
       session = await sessionFuture;
     } catch (e) {
@@ -231,8 +239,21 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         }
         return;
       }
-      final conflict = e is ApiException && _isActiveLiveConflict(e);
-      if (conflict) {
+      if (e is ApiException) {
+        final conflict = _isActiveLiveConflict(e);
+        if (!conflict) {
+          if (controller != null) await _disposeCamera(controller);
+          if (nativeController != null) {
+            await _releaseNativeCamera(nativeController);
+          }
+          emit(
+            LiveRoomFailure(
+              message: _mapStartFailureMessage(e),
+              pendingTitle: title,
+            ),
+          );
+          return;
+        }
         if (controller != null) await _disposeCamera(controller);
         if (nativeController != null) {
           await _releaseNativeCamera(nativeController);
@@ -247,26 +268,19 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         );
         return;
       }
-      // Fallback to local session if backend server is offline so camera preview remains active.
-      startedOnServer = false;
-      session = LiveSession(
-        id: 'local_live_${DateTime.now().millisecondsSinceEpoch}',
-        host: const LiveHost(
-          id: 'local_host',
-          displayName: 'المستضيف',
-          avatarUrl: '',
+      if (controller != null) await _disposeCamera(controller);
+      if (nativeController != null) {
+        await _releaseNativeCamera(nativeController);
+      }
+      emit(
+        LiveRoomFailure(
+          message: e.toString(),
+          pendingTitle: title,
         ),
-        viewerCount: 1,
-        likeCount: 0,
-        galleryCurrent: 0,
-        galleryTotal: 0,
-        guestInviteCount: 0,
-        hourlyRankingLabel: '',
-        messages: const [],
-        title: title,
-        status: 'LIVE',
       );
+      return;
     }
+
     if (isClosed) {
       if (controller != null) await _disposeCamera(controller);
       if (nativeController != null) {
@@ -280,7 +294,6 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
       session: session,
       controller: controller,
       nativeController: nativeController,
-      startedOnServer: startedOnServer,
     );
   }
 
@@ -424,7 +437,6 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     required LiveSession session,
     required CameraController? controller,
     NativeCameraController? nativeController,
-    bool startedOnServer = true,
   }) async {
     await _hudSub?.cancel();
     _hudSub = _sessionRepository.hudEvents.listen((hudEvent) {
@@ -457,7 +469,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
       ),
     );
 
-    if (startedOnServer && session.id.isNotEmpty) {
+    if (session.id.isNotEmpty) {
       _giftJoinedLiveId = session.id;
       unawaited(
         _giftSocketService.ensureJoined(liveId: session.id).catchError((error) {
@@ -469,14 +481,17 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     // Skipped for the offline fallback below: a `local_live_<ts>` id means
     // POST /lives never succeeded, so there is no room on the server and the
     // join would subscribe to nothing.
-    if (startedOnServer && session.id.isNotEmpty) {
-      unawaited(_connectRealtimeInBackground(session.id));
+    if (session.id.isNotEmpty) {
+      unawaited(
+        _connectRealtimeInBackground(session.id, userId: session.host.id),
+      );
     }
 
     // The offline fallback invents a `local_live_…` id, so there is no room on
     // the server to join: viewers, comments and likes would all stay empty with
     // nothing on screen explaining why. Tell the host instead of pretending.
-    if (!startedOnServer) {
+    /*
+    if (false) {
       final ready = _readyOrNull;
       if (ready != null && !isClosed) {
         emit(
@@ -491,6 +506,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
       // the live id the server never issued.
       return;
     }
+    */
 
     // Publishing is the critical path. Waiting for four HUD HTTP requests here
     // delayed the first outgoing frame by several seconds.
@@ -506,7 +522,10 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
   /// socket costs comments and the viewer counter — surfaced by the standing
   /// warning in the chat feed — but never the ability to broadcast. Without the
   /// retry a single failed handshake left the room silent for its whole run.
-  Future<void> _connectRealtimeInBackground(String liveId) async {
+  Future<void> _connectRealtimeInBackground(
+    String liveId, {
+    String? userId,
+  }) async {
     const delays = [
       Duration.zero,
       Duration(seconds: 2),
@@ -524,7 +543,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
       if (ready == null || ready.session.id != liveId) return;
 
       try {
-        await _sessionRepository.connectRealtime(liveId);
+        await _sessionRepository.connectRealtime(liveId, userId: userId);
         return;
       } catch (e) {
         debugPrint('HUD socket connect failed for $liveId: $e');
@@ -783,7 +802,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
   ) async {
     final current = _readyOrNull;
     if (current == null) {
-      emit(const LiveRoomEnded());
+      emit(const LiveRoomEnded(serverEnded: false));
       return;
     }
 
@@ -832,7 +851,12 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     if (isClosed) return;
     // Tell the LIVE feed screen this live ended so it disappears immediately.
     LiveFeedRefreshBus.instance.notifyLiveEnded(current.session.id);
-    emit(const LiveRoomEnded());
+    emit(
+      LiveRoomEnded(
+        liveId: current.session.id,
+        serverEnded: endFailure == null,
+      ),
+    );
 
     if (endFailure != null) {
       // The live may still be open on the server; the next start attempt
@@ -874,7 +898,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     if (isClosed) return;
     // Tell the LIVE feed screen this live ended so it disappears immediately.
     LiveFeedRefreshBus.instance.notifyLiveEnded(current.session.id);
-    emit(const LiveRoomEnded());
+    emit(LiveRoomEnded(liveId: current.session.id));
   }
 
   Future<void> _onAppPaused(
@@ -1976,6 +2000,10 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
             ),
           ),
         );
+      case LiveHudInteractiveEvent():
+        // Handled separately by the interactive bloc; keep the host HUD stream
+        // focused on human-facing real-time room events.
+        break;
     }
   }
 
@@ -2387,6 +2415,55 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
       emit(current.copyWith(actionMessage: e.message));
     } catch (e) {
       emit(current.copyWith(actionMessage: e.toString()));
+    }
+  }
+
+  Future<void> _onChatRulesSubmitted(
+    LiveRoomChatRulesSubmitted event,
+    Emitter<LiveRoomState> emit,
+  ) async {
+    final current = _readyOrNull;
+    if (current == null) return;
+    emit(
+      current.copyWith(
+        isUpdatingChatRules: true,
+        clearActionMessage: true,
+      ),
+    );
+    try {
+      final rules = await _updateLiveChatRules(
+        liveId: current.session.id,
+        chatMode: event.chatMode,
+        slowModeSeconds: event.slowModeSeconds,
+        blockedKeywords: event.blockedKeywords,
+      );
+      if (isClosed) return;
+      final ready = _readyOrNull ?? current;
+      emit(
+        ready.copyWith(
+          session: ready.session.copyWith(chatRules: rules),
+          isUpdatingChatRules: false,
+          actionMessage: 'Chat rules updated',
+        ),
+      );
+    } on ApiException catch (e) {
+      if (!isClosed) {
+        emit(
+          current.copyWith(
+            isUpdatingChatRules: false,
+            actionMessage: e.message,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!isClosed) {
+        emit(
+          current.copyWith(
+            isUpdatingChatRules: false,
+            actionMessage: e.toString(),
+          ),
+        );
+      }
     }
   }
 

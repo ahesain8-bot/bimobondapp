@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:video_player/video_player.dart';
 
@@ -13,6 +14,21 @@ import '../../domain/entities/live_entity.dart';
 import '../di/live_viewer_injector.dart' as di;
 import 'fallback_media.dart';
 
+/// Renders the active live's remote video.
+///
+/// There is exactly one LiveKit [Room] in the process and every page of the
+/// feed's PageView builds one of these. Only the page the viewer is actually
+/// watching may observe that room: an off-screen instance that attaches to it
+/// registers listeners and issues subscription calls against media it is not
+/// showing. Binding is therefore gated on [isActive] and torn down the moment
+/// the page stops being active.
+///
+/// Subscription quality is left entirely to `adaptiveStream`. livekit_client
+/// 2.11 merges any manual `setVideoQuality` / `setVideoDimensions` preference
+/// with the dimensions it computes from the mounted renderer and sends the
+/// *smaller* of the two, so a manual value can only ever cap the picture — it
+/// cannot raise it. Letting the SDK measure the real renderer is both simpler
+/// and strictly higher quality.
 class LiveVideoPlayer extends StatefulWidget {
   final LiveEntity live;
   final bool isActive;
@@ -45,175 +61,118 @@ class _LiveVideoPlayerState extends State<LiveVideoPlayer> {
   StreamSubscription<LiveKitConnectionState>? _liveKitSub;
   Room? _room;
   RemoteVideoTrack? _track;
+  String? _lastTrackDiagnostic;
+  bool _trackRebuildScheduled = false;
 
   @override
   void initState() {
     super.initState();
-    final liveKit = di.sl<LiveKitService>();
-    _liveKit = liveKit;
-    _liveKitSub = liveKit.stateStream.listen(_onLiveKitState);
-    final room = liveKit.room;
-    if (room != null) _attachRoom(room);
-    if (widget.isActive && !widget.liveKitOnly) _init();
-
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (!mounted) return;
-      try {
-        final rb = context.findRenderObject() as RenderBox?;
-        final size = rb?.hasSize == true ? rb!.size : Size.zero;
-        final px = MediaQuery.of(context).devicePixelRatio;
-        final track = _track;
-        final pub = _findVideoPub();
-
-        int? decW;
-        int? decH;
-        num? decFps;
-        String? decMime;
-        num? decKbps;
-        String? statsErr;
-        if (track != null) {
-          try {
-            final s = await track.getReceiverStats();
-            if (s != null) {
-              decW = s.frameWidth?.toInt();
-              decH = s.frameHeight?.toInt();
-              decFps = s.framesPerSecond;
-              decMime = s.mimeType;
-              decKbps = track.currentBitrate == null
-                  ? null
-                  : (track.currentBitrate! / 1000).round();
-            }
-          } catch (e) {
-            statsErr = e.toString();
-          }
-        }
-        debugPrint(
-          '[DEBUG-QOS] VIEWER-RENDERER (before-floor):'
-          '  liveId=${widget.live.id}'
-          '  isActive=${widget.isActive}'
-          '  logicalPx=${size.width.toStringAsFixed(0)}x${size.height.toStringAsFixed(0)}'
-          '  pixelRatio=${px.toStringAsFixed(2)}'
-          '  physicalPx=${(size.width * px).toStringAsFixed(0)}x${(size.height * px).toStringAsFixed(0)}'
-          '  pubDims(WxH)=${pub?.dimensions?.width ?? "?"}x${pub?.dimensions?.height ?? "?"}'
-          '  decoder(WxH)=${decW ?? "?"}x${decH ?? "?"}'
-          '  decoderFps=${decFps ?? "?"}'
-          '  decoderCodec=${decMime ?? "?"}'
-          '  decoderBitrateKbps=${decKbps ?? "?"}'
-          '  decoderErr=${statsErr ?? "none"}',
-        );
-      } catch (e) {
-        debugPrint('[DEBUG-QOS] VIEWER-RENDERER (before-floor err): $e');
-      } finally {
-        unawaited(_applyQualityFloor(widget.isActive));
-      }
-    });
-  }
-
-  RemoteTrackPublication<RemoteVideoTrack>? _findVideoPub() {
-    final roomObj = _room;
-    if (roomObj == null) return null;
-    for (final p in roomObj.remoteParticipants.values) {
-      for (final vp in p.videoTrackPublications) {
-        if (vp.subscribed) return vp;
-      }
+    _liveKit = di.sl<LiveKitService>();
+    if (widget.isActive) {
+      _bindLiveKit();
+      if (!widget.liveKitOnly) _init();
     }
-    return null;
   }
 
-  Future<void> _applyQualityFloor(bool isActive) async {
-    final pub = _findVideoPub();
-    if (pub == null) return;
-    try {
-      final hints = _liveKit?.mediaHints;
-      final capWidth = hints?.subscribeWidth ?? 1280;
-      final capHeight = hints?.subscribeHeight ?? 720;
-      final dims = isActive
-          ? widget.compact
-                ? const VideoDimensions(640, 960)
-                : VideoDimensions(capWidth, capHeight)
-          : const VideoDimensions(854, 480);
-      final quality = isActive
-          ? widget.compact
-                ? VideoQuality.MEDIUM
-                : VideoQuality.HIGH
-          : VideoQuality.LOW;
-      debugPrint(
-        '[VIDEO-FIX] VIEWER-FLOOR: liveId=${widget.live.id}'
-        '  isActive=$isActive'
-        '  → setVideoDimensions(${dims.width}x${dims.height})'
-        ' + setVideoQuality(${quality.name.toUpperCase()})',
-      );
-      await pub.setVideoDimensions(dims);
-      await pub.setVideoQuality(quality);
+  @override
+  void didUpdateWidget(covariant LiveVideoPlayer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final liveChanged = oldWidget.live.id != widget.live.id;
+    final activeChanged = oldWidget.isActive != widget.isActive;
+    if (!liveChanged && !activeChanged) return;
 
-      await Future<void>.delayed(const Duration(milliseconds: 500));
-      final track = _track;
-      int? aftDecW;
-      int? aftDecH;
-      String? aftDecMime;
-      num? aftDecKbps;
-      if (track != null) {
-        try {
-          final s2 = await track.getReceiverStats();
-          if (s2 != null) {
-            aftDecW = s2.frameWidth?.toInt();
-            aftDecH = s2.frameHeight?.toInt();
-            aftDecMime = s2.mimeType;
-            aftDecKbps = track.currentBitrate == null
-                ? null
-                : (track.currentBitrate! / 1000).round();
-          }
-        } catch (_) {}
+    if (widget.isActive) {
+      _bindLiveKit();
+      if (!widget.liveKitOnly) {
+        if (liveChanged) {
+          _disposeController();
+          _init();
+        } else if (_controller == null) {
+          _init();
+        } else {
+          _controller?.play();
+        }
       }
-      final afterDims = pub.videoDimensions;
-      debugPrint(
-        '[DEBUG-QOS] VIEWER-RENDERER (after-floor):'
-        '  liveId=${widget.live.id}'
-        '  pub.videoDimensionsAfter=${afterDims == null ? "null" : "${afterDims.width}x${afterDims.height}"}'
-        '  decoderFrameAfter(WxH)=${aftDecW ?? "?"}x${aftDecH ?? "?"}'
-        '  decoderCodecAfter=$aftDecMime'
-        '  decoderBitrateAfterKbps=$aftDecKbps'
-        '  SUBSCRIBE_CAP_RESULT=${aftDecW == null || aftDecH == null ? "NOT_YET_DECODED" : "${aftDecW}x$aftDecH (cap ${dims.width}x${dims.height})"}',
-      );
-    } catch (e) {
-      debugPrint('[VIDEO-FIX] VIEWER-FLOOR apply failed: $e');
+      return;
+    }
+
+    _unbindLiveKit();
+    _controller?.pause();
+    _disposeController();
+    if (mounted) {
+      setState(() {
+        _initializing = false;
+        _buffering = false;
+      });
     }
   }
 
   @override
   void dispose() {
-    _liveKitSub?.cancel();
-    _liveKitSub = null;
-    _detachRoom();
+    _unbindLiveKit();
     _disposeController();
     super.dispose();
   }
 
+  // ── LiveKit binding ───────────────────────────────────────────────────────
+
+  void _bindLiveKit() {
+    final liveKit = _liveKit;
+    if (liveKit == null || _liveKitSub != null) return;
+    _liveKitSub = liveKit.stateStream.listen(_onLiveKitState);
+    _attachRoomIfOwned();
+  }
+
+  /// Attaches only to the room that belongs to *this* live.
+  ///
+  /// The page becomes active before the service has finished swapping rooms,
+  /// so for a short window `liveKit.room` is still the previous live's. The
+  /// room name is the live id, which makes ownership checkable without
+  /// reaching into the SDK.
+  void _attachRoomIfOwned() {
+    final liveKit = _liveKit;
+    if (liveKit == null) return;
+    final room = liveKit.room;
+    if (room == null || liveKit.roomName != widget.live.id) return;
+    _attachRoom(room);
+  }
+
+  void _unbindLiveKit() {
+    _liveKitSub?.cancel();
+    _liveKitSub = null;
+    _detachRoom();
+  }
+
   void _onLiveKitState(LiveKitConnectionState state) {
-    if (!mounted) return;
+    if (!mounted || !widget.isActive) return;
     final liveKit = _liveKit;
     if (liveKit == null) return;
 
-    if (state == LiveKitConnectionState.connected) {
-      final room = liveKit.room;
-      if (room != null && room != _room) _attachRoom(room);
-      if (!widget.liveKitOnly &&
-          widget.isActive &&
-          _controller == null &&
-          !_initializing &&
-          !_hasError) {
-        _init();
-      }
-      unawaited(_applyQualityFloor(widget.isActive));
-    } else if (state == LiveKitConnectionState.disconnected ||
-        state == LiveKitConnectionState.failed) {
-      _detachRoom();
-      if (mounted && (_buffering || _initializing)) setState(() {});
+    switch (state) {
+      case LiveKitConnectionState.connected:
+        _attachRoomIfOwned();
+        if (!widget.liveKitOnly &&
+            _controller == null &&
+            !_initializing &&
+            !_hasError) {
+          _init();
+        }
+      case LiveKitConnectionState.reconnecting:
+      case LiveKitConnectionState.connecting:
+        // A native reconnect keeps the Room, its participants and its
+        // subscriptions alive. Detaching here would destroy a renderer that is
+        // about to resume with the same track and replace the last frame with
+        // the poster for no reason.
+        break;
+      case LiveKitConnectionState.disconnected:
+      case LiveKitConnectionState.failed:
+        _detachRoom();
+        _requestSafeRebuild();
     }
   }
 
   void _attachRoom(Room room) {
-    if (_room == room) return;
+    if (identical(_room, room)) return;
     _detachRoom();
     _room = room;
     room.addListener(_onRoomChanged);
@@ -224,59 +183,96 @@ class _LiveVideoPlayerState extends State<LiveVideoPlayer> {
     final room = _room;
     _room = null;
     if (room != null) room.removeListener(_onRoomChanged);
+    if (_track != null) {
+      debugPrint(
+        '[VIDEO-DIAG] renderer released liveId=${widget.live.id}',
+      );
+    }
     _track = null;
+    _lastTrackDiagnostic = null;
   }
 
-  void _onRoomChanged() {
-    _refreshTrack();
-  }
+  void _onRoomChanged() => _refreshTrack();
 
+  /// Resolves the single track this player renders.
+  ///
+  /// Muted publications are kept: the host turning their camera off must not
+  /// tear the renderer down and rebuild it a moment later, and
+  /// `VideoTrackRenderer` already paints [placeholderBuilder] while no frames
+  /// arrive. Only a genuinely different track — or no subscribed track at all
+  /// — changes what is mounted.
   void _refreshTrack() {
     final room = _room;
     final next = room == null ? null : _firstSubscribedVideoTrack(room);
+    _logTrackDiagnostic(room, next);
     if (identical(next, _track)) return;
+    if (next != null) {
+      debugPrint(
+        '[VIDEO-DIAG] renderer mounting liveId=${widget.live.id}'
+        ' sid=${next.sid}'
+        ' replacing=${_track?.sid ?? "none"}',
+      );
+    }
     _track = next;
-    if (mounted) setState(() {});
+    _requestSafeRebuild();
+  }
+
+  void _requestSafeRebuild() {
+    if (!mounted) return;
+
+    final phase = SchedulerBinding.instance.schedulerPhase;
+    final isBuilding =
+        phase == SchedulerPhase.persistentCallbacks ||
+        phase == SchedulerPhase.midFrameMicrotasks;
+    if (!isBuilding) {
+      setState(() {});
+      return;
+    }
+
+    if (_trackRebuildScheduled) return;
+    _trackRebuildScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _trackRebuildScheduled = false;
+      if (mounted) setState(() {});
+    });
+  }
+
+  void _logTrackDiagnostic(Room? room, RemoteVideoTrack? track) {
+    var videoPublications = 0;
+    var subscribedVideoPublications = 0;
+    final participants = room?.remoteParticipants.values;
+    if (participants != null) {
+      for (final participant in participants) {
+        for (final publication in participant.videoTrackPublications) {
+          videoPublications++;
+          if (publication.subscribed) subscribedVideoPublications++;
+        }
+      }
+    }
+    final signature =
+        '${room?.connectionState.name}|${room?.remoteParticipants.length ?? 0}'
+        '|$videoPublications|$subscribedVideoPublications|${track != null}';
+    if (_lastTrackDiagnostic == signature) return;
+    _lastTrackDiagnostic = signature;
+    debugPrint(
+      '[LiveKit] room=${room?.connectionState.name ?? "none"}'
+      ' remoteParticipants=${room?.remoteParticipants.length ?? 0}'
+      ' videoTrack=${track != null}'
+      ' subscribed=$subscribedVideoPublications/$videoPublications',
+    );
   }
 
   RemoteVideoTrack? _firstSubscribedVideoTrack(Room room) {
     for (final participant in room.remoteParticipants.values) {
       for (final pub in participant.videoTrackPublications) {
-        if (pub.subscribed && pub.track is RemoteVideoTrack) {
-          return pub.track as RemoteVideoTrack;
-        }
+        final track = pub.track;
+        if (pub.subscribed && track != null) return track;
       }
     }
     return null;
   }
 
-  @override
-  void didUpdateWidget(covariant LiveVideoPlayer oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.live.id != widget.live.id) {
-      _disposeController();
-      if (widget.isActive && !widget.liveKitOnly) _init();
-    } else if (oldWidget.isActive != widget.isActive ||
-        oldWidget.compact != widget.compact) {
-      unawaited(_applyQualityFloor(widget.isActive));
-      if (widget.isActive && !widget.liveKitOnly) {
-        if (_controller == null) {
-          _init();
-        } else {
-          _controller?.play();
-        }
-      } else {
-        _controller?.pause();
-        _disposeController();
-        if (mounted) {
-          setState(() {
-            _initializing = false;
-            _buffering = false;
-          });
-        }
-      }
-    }
-  }
+  // ── HTTP fallback (non-LiveKit sources only) ──────────────────────────────
 
   Future<void> _init() async {
     if (widget.liveKitOnly) return;
@@ -352,6 +348,8 @@ class _LiveVideoPlayerState extends State<LiveVideoPlayer> {
     c?.dispose();
   }
 
+  // ── Build ─────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
     return Stack(
@@ -365,8 +363,12 @@ class _LiveVideoPlayerState extends State<LiveVideoPlayer> {
   }
 
   Widget _buildMedia() {
-    final room = widget.isActive ? _room : null;
-    final track = room == null ? null : _track;
+    // Mount as soon as LiveKit gives us a subscribed remote track. Receiver
+    // stats are not a reliable readiness signal on every platform, and
+    // livekit_client 2.11 exposes no first-frame callback: the honest signal
+    // is "renderer attached to a subscribed track", with the poster painted
+    // underneath until the decoder produces something.
+    final track = _track;
     if (track != null) {
       return ColoredBox(
         color: Colors.black,

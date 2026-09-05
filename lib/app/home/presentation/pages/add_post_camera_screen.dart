@@ -41,7 +41,7 @@ import 'package:bimobondapp/app/video_templates/presentation/widgets/video_templ
 import 'package:bimobondapp/core/services/feed_playback_gate.dart';
 import 'package:bimobondapp/core/utils/native_video_processor.dart';
 import 'package:bimobondapp/core/widgets/popup_dialogs.dart';
-import 'package:bimobondapp/features/live_source/presentation/pages/live_start_page.dart';
+import 'package:bimobondapp/features/live/presentation/pages/live_start_page.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:camerawesome/camerawesome_plugin.dart';
 import 'package:flutter/foundation.dart';
@@ -1853,7 +1853,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     unawaited(_beginVideoRecording());
   }
 
-  /// Opens the LiveStartPage from lib/features/live_source/.
+  /// Opens the backend-connected LiveStartPage from lib/features/live/.
   Future<void> _handleGoLiveTap() async {
     if (_isRecording || _isBusy || _isProcessingCapture) return;
     try {

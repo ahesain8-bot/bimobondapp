@@ -24,6 +24,17 @@ abstract class CommentRepository {
     String? liveId,
   });
 
+  /// Pin or unpin a comment (`POST /lives/:id/comments/:commentId/pin|unpin`).
+  Future<Either<Failure, void>> pinComment({
+    required String liveId,
+    required String commentId,
+  });
+
+  Future<Either<Failure, void>> unpinComment({
+    required String liveId,
+    required String commentId,
+  });
+
   /// Report a comment
   Future<Either<Failure, void>> reportComment({
     required String commentId,

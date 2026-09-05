@@ -24,10 +24,11 @@ class LiveStateOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (state == LiveConnectionState.connected ||
+    final visible = !(state == LiveConnectionState.connected ||
         state == LiveConnectionState.idle ||
-        state == LiveConnectionState.reconnecting ||
-        state == LiveConnectionState.networkLost) {
+        state == LiveConnectionState.reconnecting);
+    debugPrint('[LiveRoom] overlay state=${state.name} visible=$visible');
+    if (!visible) {
       return const SizedBox.shrink();
     }
 
@@ -62,10 +63,23 @@ class LiveStateOverlay extends StatelessWidget {
           ),
         );
       case LiveConnectionState.reconnecting:
-      case LiveConnectionState.networkLost:
         // The player keeps the last rendered frame while LiveKit/Socket.IO
         // recover in the background. Do not expose transient disconnect UI.
         return const SizedBox.shrink();
+      case LiveConnectionState.networkLost:
+        return _Scrim(
+          key: const ValueKey('network-lost'),
+          child: _StatusBody(
+            icon: Icons.wifi_off_rounded,
+            title: 'Network lost',
+            subtitle: message ?? 'The live video connection was lost',
+            iconColor: AppColors.error,
+            primaryLabel: 'Retry',
+            onPrimary: onRetry,
+            secondaryLabel: 'Leave',
+            onSecondary: onLeave,
+          ),
+        );
       case LiveConnectionState.liveEnded:
         return _Scrim(
           key: const ValueKey('ended'),
@@ -130,6 +144,7 @@ class _Scrim extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    debugPrint('[LiveRoom] greyScrim=true blur=$blur');
     return Container(
       color: Colors.black.withValues(alpha: blur ? 0.72 : 0.55),
       alignment: Alignment.center,

@@ -7,14 +7,17 @@ import 'package:shimmer/shimmer.dart';
 
 import '../../../../core/services/live_feed_refresh_bus.dart';
 import '../../../live/presentation/utils/live_screen_wakelock.dart';
+import '../../data/services/live_viewer_media_preloader.dart';
 import '../bloc/live_feed/live_feed_bloc.dart';
 import '../bloc/live_feed/live_feed_event.dart';
 import '../bloc/live_feed/live_feed_state.dart';
 import '../bloc/live_viewer/live_viewer_bloc.dart';
 import '../bloc/live_viewer/live_viewer_event.dart';
+import '../bloc/live_viewer/live_viewer_state.dart';
 import '../di/live_viewer_injector.dart' as di;
 import '../widgets/live_room_page.dart';
 import '../../domain/entities/live_entity.dart';
+import '../../domain/entities/live_session_entity.dart';
 import 'package:bimobondapp/features/live_viewer/core/errors/failures.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -24,7 +27,9 @@ import '../../core/theme/app_text_styles.dart';
 /// Now uses BLoC (LiveFeedBloc + LiveViewerBloc) instead of Riverpod.
 /// Both blocs are wired here so their lifecycle matches the feed screen.
 class LiveFeedScreen extends StatefulWidget {
-  const LiveFeedScreen({super.key});
+  const LiveFeedScreen({super.key, this.followingOnly = false});
+
+  final bool followingOnly;
 
   @override
   State<LiveFeedScreen> createState() => _LiveFeedViewState();
@@ -48,11 +53,25 @@ class _LiveFeedViewState extends State<LiveFeedScreen>
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     LiveScreenWakelock.enable();
     Future.microtask(() {
-      _feedBloc.add(const LiveFeedLoadRequested(refresh: true));
+      _feedBloc.add(
+        LiveFeedLoadRequested(
+          refresh: true,
+          followingOnly: widget.followingOnly,
+        ),
+      );
     });
 
     LiveFeedRefreshBus.instance.addListener(_onLiveEndedSignal);
 
+    _startRefreshTimer();
+  }
+
+  /// Polls page 1 so lives that started or ended appear without a manual pull.
+  /// Only runs while the screen is in the foreground: a backgrounded viewer has
+  /// nothing to show and its requests compete with whatever the user is
+  /// actually doing.
+  void _startRefreshTimer() {
+    _refreshTimer?.cancel();
     _refreshTimer = Timer.periodic(
       const Duration(seconds: 8),
       (_) => _silentRefresh(),
@@ -71,10 +90,19 @@ class _LiveFeedViewState extends State<LiveFeedScreen>
     _feedBloc.add(LiveFeedLiveRemoved(endedId));
   }
 
+  /// `inactive` is deliberately ignored. iOS reports it for a notification
+  /// shade pull or an incoming call that is never answered, and tearing the
+  /// room down for those means a reconnect for something the viewer never
+  /// left. Only `paused`/`hidden`, which mean the surface is really gone,
+  /// release the room.
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       LiveScreenWakelock.enable();
+      _startRefreshTimer();
+      // The feed is as stale as the time spent away; reconcile before
+      // re-activating so a live that ended meanwhile is not rejoined.
+      _silentRefresh();
       final lives = _feedBloc.state.lives;
       if (lives.isNotEmpty) {
         final index = _currentIndex.clamp(0, lives.length - 1);
@@ -82,6 +110,9 @@ class _LiveFeedViewState extends State<LiveFeedScreen>
       }
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden) {
+      _refreshTimer?.cancel();
+      _refreshTimer = null;
+      LiveViewerMediaPreloader.instance.cancelPending();
       _viewerBloc.add(const LiveViewerDeactivated());
       LiveScreenWakelock.disable();
     }
@@ -91,6 +122,7 @@ class _LiveFeedViewState extends State<LiveFeedScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _refreshTimer?.cancel();
+    LiveViewerMediaPreloader.instance.cancelPending();
     LiveFeedRefreshBus.instance.removeListener(_onLiveEndedSignal);
     _viewerBloc.add(const LiveViewerDeactivated());
     _pageController.dispose();
@@ -100,59 +132,80 @@ class _LiveFeedViewState extends State<LiveFeedScreen>
     super.dispose();
   }
 
+  /// Neighbour offsets warmed around the current page, in download priority
+  /// order. Mirrors the home feed's FeedMediaPreloader ±2 window.
+  static const List<int> _preloadOffsets = <int>[1, -1, 2, -2];
+
+  /// Warms the neighbouring pages' HTTP media (thumbnail + avatars) so a swipe
+  /// lands on the poster frame instead of the animated gradient while LiveKit
+  /// connects. Images only: the active room is the sole LiveKit connection.
+  ///
+  /// Offset 0 is excluded because [LiveViewerBloc] already prefetches the live
+  /// it activates.
+  ///
+  /// Only ever called once the active room reports `connected`. A join
+  /// negotiates ICE/DTLS and subscribes tracks; letting a burst of neighbour
+  /// image downloads share that window slows the live the viewer is waiting on.
+  void _preloadNeighborLives(List<LiveEntity> lives, int index) {
+    for (final offset in _preloadOffsets) {
+      final neighbor = index + offset;
+      if (neighbor < 0 || neighbor >= lives.length) continue;
+      unawaited(
+        LiveViewerMediaPreloader.instance.prefetchLive(lives[neighbor]),
+      );
+    }
+  }
+
   void _onPageChanged(int index) {
     setState(() => _currentIndex = index);
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
+    // Deferred one frame so the PageView has settled and `_currentIndex` is
+    // visible to the page widgets before their session starts. Rapid swipes
+    // simply queue more activations; the BLoC serializes them and discards
+    // every one that a later swipe has already superseded.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final feed = _feedBloc.state;
       final lives = feed.lives;
 
+      // The trailing sentinel page. There is nothing to watch here, so either
+      // fetch the next page or bounce back to the last real live rather than
+      // leaving the viewer on a spinner.
       if (index >= lives.length) {
-        final before = lives.length;
-        _feedBloc.add(const LiveFeedSilentRefreshRequested());
-        await Future.delayed(const Duration(milliseconds: 600));
-        if (!mounted) return;
-        final after = _feedBloc.state.lives.length;
-        if (after == before) {
-          final target = (after - 1).clamp(0, double.maxFinite.toInt());
-          if (target >= 0) {
-            _pageController.jumpToPage(target);
-            setState(() => _currentIndex = target);
-            final newLives = _feedBloc.state.lives;
-            if (target < newLives.length) {
-              _viewerBloc.add(LiveViewerActivated(newLives[target]));
-            }
+        if (feed.hasMore) {
+          if (!feed.isLoadingMore) {
+            _feedBloc.add(const LiveFeedLoadMoreRequested());
           }
-        } else {
-          final newLives = _feedBloc.state.lives;
-          if (index < newLives.length) {
-            _viewerBloc.add(LiveViewerActivated(newLives[index]));
-          }
+          return;
         }
+        _snapToLastLive();
         return;
       }
 
-      if (index >= lives.length - 2 && feed.hasMore) {
+      if (index >= lives.length - 2 && feed.hasMore && !feed.isLoadingMore) {
         _feedBloc.add(const LiveFeedLoadMoreRequested());
       }
 
-      final current = lives[index];
       // Activation tears down the old room as one serialized operation. A
       // separate Deactivated event can race it and disconnect the new page.
-      _viewerBloc.add(LiveViewerActivated(current));
+      _viewerBloc.add(LiveViewerActivated(lives[index]));
     });
   }
 
+  /// Returns the viewer to the last real live when the sentinel page has
+  /// nothing behind it.
+  void _snapToLastLive() {
+    final lives = _feedBloc.state.lives;
+    if (lives.isEmpty) return;
+    final target = lives.length - 1;
+    _pageController.jumpToPage(target);
+    setState(() => _currentIndex = target);
+    _viewerBloc.add(LiveViewerActivated(lives[target]));
+  }
+
+  /// Pull-to-refresh. Re-anchoring is left to the feed listener, which reacts
+  /// to the rooms actually changing instead of to a guessed delay.
   Future<void> _refresh() async {
     _feedBloc.add(const LiveFeedRefreshRequested());
-    await Future.delayed(const Duration(milliseconds: 50));
-    if (!mounted) return;
-    final lives = _feedBloc.state.lives;
-    if (lives.isNotEmpty) {
-      _pageController.jumpToPage(0);
-      setState(() => _currentIndex = 0);
-      _viewerBloc.add(LiveViewerActivated(lives.first));
-    }
   }
 
   @override
@@ -166,27 +219,59 @@ class _LiveFeedViewState extends State<LiveFeedScreen>
       ],
       child: MultiBlocListener(
         listeners: [
+          // Re-anchors the viewer whenever the set of rooms changes: a live
+          // ending, a refresh reordering page 1, or a new page arriving can
+          // all move or remove the room that is currently on screen.
           BlocListener<LiveFeedBloc, LiveFeedState>(
-            listenWhen: (prev, next) {
-              if (prev.lives.length == next.lives.length) return false;
-              return true;
-            },
+            listenWhen: (prev, next) => !_sameRooms(prev.lives, next.lives),
             listener: (context, next) {
-              if (next.lives.isEmpty) return;
-              if (_viewerBloc.activeLiveId == null ||
-                  !next.lives.any((l) => l.id == _viewerBloc.activeLiveId)) {
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (!mounted) return;
-                  final lives = _feedBloc.state.lives;
-                  if (lives.isEmpty) return;
-                  final target = _currentIndex.clamp(0, lives.length - 1);
-                  if (_currentIndex != target) {
-                    _pageController.jumpToPage(target);
-                    setState(() => _currentIndex = target);
-                  }
-                  _viewerBloc.add(LiveViewerActivated(lives[target]));
-                });
+              if (next.lives.isEmpty) {
+                // Nothing left to watch and no page will be disposed to say
+                // so, which would otherwise leave a room connected to a live
+                // the viewer can no longer see.
+                _viewerBloc.add(const LiveViewerDeactivated());
+                return;
               }
+              // A newly loaded page brings the next rooms' media into reach,
+              // but only warm it while no join is competing for the network.
+              if (_viewerBloc.state.connectionState ==
+                  LiveConnectionState.connected) {
+                _preloadNeighborLives(
+                  next.lives,
+                  _currentIndex.clamp(0, next.lives.length - 1),
+                );
+              }
+              final active = _viewerBloc.requestedLiveId;
+              if (active != null && next.lives.any((l) => l.id == active)) {
+                return;
+              }
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (!mounted) return;
+                final lives = _feedBloc.state.lives;
+                if (lives.isEmpty) return;
+                final target = _currentIndex.clamp(0, lives.length - 1);
+                if (_currentIndex != target) {
+                  _pageController.jumpToPage(target);
+                  setState(() => _currentIndex = target);
+                }
+                _viewerBloc.add(LiveViewerActivated(lives[target]));
+              });
+            },
+          ),
+          // The active room owns the network until it is connected. Warming
+          // neighbours on that transition keeps swipes instant while never
+          // competing with the join the viewer is waiting on.
+          BlocListener<LiveViewerBloc, LiveViewerState>(
+            listenWhen: (prev, next) =>
+                prev.connectionState != next.connectionState &&
+                next.connectionState == LiveConnectionState.connected,
+            listener: (context, _) {
+              final lives = _feedBloc.state.lives;
+              if (lives.isEmpty) return;
+              _preloadNeighborLives(
+                lives,
+                _currentIndex.clamp(0, lives.length - 1),
+              );
             },
           ),
         ],
@@ -247,9 +332,7 @@ class _LiveFeedViewState extends State<LiveFeedScreen>
         RefreshIndicator(
           color: AppColors.primary,
           backgroundColor: Colors.black,
-          onRefresh: () async {
-            _refresh();
-          },
+          onRefresh: _refresh,
           displacement: 60,
           strokeWidth: 2.5,
           child: PageView.builder(
@@ -257,7 +340,10 @@ class _LiveFeedViewState extends State<LiveFeedScreen>
             scrollDirection: Axis.vertical,
             allowImplicitScrolling: false,
             physics: const PageScrollPhysics(parent: BouncingScrollPhysics()),
-            itemCount: feed.lives.length + 1,
+            // The trailing spinner only exists while there is another page to
+            // fetch. Keeping it unconditionally meant every feed ended on a
+            // blank loading page the viewer had to swipe back out of.
+            itemCount: feed.lives.length + (feed.hasMore ? 1 : 0),
             onPageChanged: _onPageChanged,
             itemBuilder: (context, index) {
               if (index >= feed.lives.length) {
@@ -288,6 +374,7 @@ class _LiveFeedViewState extends State<LiveFeedScreen>
             bottom: MediaQuery.paddingOf(context).bottom + 70,
             child: IgnorePointer(
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
                     Icons.keyboard_arrow_up,

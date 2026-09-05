@@ -10,22 +10,26 @@ import '../../domain/entities/live_session_entity.dart';
 import '../../domain/repositories/live_repository.dart';
 import '../datasources/live_remote_datasource.dart';
 
-class FakeLiveRepository implements LiveRepository {
+/// Shared error translation/delegation used by the real HTTP adapter and the
+/// explicitly opt-in preview adapter below.
+class LiveRepositoryDelegate implements LiveRepository {
   final LiveRemoteDataSource _remote;
 
-  FakeLiveRepository(this._remote);
+  LiveRepositoryDelegate(this._remote);
 
   @override
   Future<Either<Failure, List<LiveEntity>>> getLiveFeed({
     int page = 1,
     int limit = 10,
     String? category,
+    bool followingOnly = false,
   }) async {
     try {
       final lives = await _remote.getLiveFeed(
         page: page,
         limit: limit,
         category: category,
+        followingOnly: followingOnly,
       );
       final activeLives = lives
           .where((l) => l.status == LiveStatus.live)
@@ -370,4 +374,9 @@ class FakeLiveRepository implements LiveRepository {
       return Left(ServerFailure('Failed to unmute viewer chat: $e'));
     }
   }
+}
+
+/// Preview/test-only name retained for the local seeded-data entry point.
+class FakeLiveRepository extends LiveRepositoryDelegate {
+  FakeLiveRepository(super.remote);
 }

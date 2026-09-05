@@ -27,6 +27,7 @@ class CommentsSection extends StatefulWidget {
   final Set<String> bannedUserIds;
 
   final void Function(String commentId, String? targetUserId)? onDeleteComment;
+  final void Function(String commentId, bool pinned)? onPinComment;
   final void Function(String userId, String? username, String? reason)?
   onMuteUser;
   final void Function(String userId, String? username)? onUnmuteUser;
@@ -46,6 +47,7 @@ class CommentsSection extends StatefulWidget {
     this.mutedUserIds = const {},
     this.bannedUserIds = const {},
     this.onDeleteComment,
+    this.onPinComment,
     this.onMuteUser,
     this.onUnmuteUser,
     this.onBanUser,
@@ -146,6 +148,9 @@ class _CommentsSectionState extends State<CommentsSection> {
                               comment.id,
                               comment.userId,
                             ),
+                      onPin: widget.onPinComment == null
+                          ? null
+                          : () => widget.onPinComment!(comment.id, !comment.isPinned),
                       onMute: widget.onMuteUser == null
                           ? null
                           : () => widget.onMuteUser!(
@@ -199,6 +204,7 @@ class TikTokCommentBubble extends StatelessWidget {
   final bool isMuted;
   final bool isBanned;
   final VoidCallback? onDelete;
+  final VoidCallback? onPin;
   final VoidCallback? onMute;
   final VoidCallback? onUnmute;
   final VoidCallback? onBan;
@@ -214,6 +220,7 @@ class TikTokCommentBubble extends StatelessWidget {
     this.isMuted = false,
     this.isBanned = false,
     this.onDelete,
+    this.onPin,
     this.onMute,
     this.onUnmute,
     this.onBan,
@@ -428,7 +435,9 @@ class TikTokCommentBubble extends StatelessWidget {
               _CommentModerationMenu(
                 isMuted: isMuted,
                 isBanned: isBanned,
+                isPinned: comment.isPinned,
                 onDelete: onDelete,
+                onPin: onPin,
                 onMute: onMute,
                 onUnmute: onUnmute,
                 onBan: onBan,
@@ -465,7 +474,9 @@ class _CommentRoleTag extends StatelessWidget {
 class _CommentModerationMenu extends StatelessWidget {
   final bool isMuted;
   final bool isBanned;
+  final bool isPinned;
   final VoidCallback? onDelete;
+  final VoidCallback? onPin;
   final VoidCallback? onMute;
   final VoidCallback? onUnmute;
   final VoidCallback? onBan;
@@ -474,7 +485,9 @@ class _CommentModerationMenu extends StatelessWidget {
   const _CommentModerationMenu({
     required this.isMuted,
     required this.isBanned,
+    required this.isPinned,
     this.onDelete,
+    this.onPin,
     this.onMute,
     this.onUnmute,
     this.onBan,
@@ -509,6 +522,12 @@ class _CommentModerationMenu extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 16),
+                _MenuTile(
+                  icon: isPinned ? Icons.push_pin : Icons.push_pin_outlined,
+                  label: isPinned ? 'Unpin comment' : 'Pin comment',
+                  color: Colors.white,
+                  onTap: () => Navigator.pop(ctx, isPinned ? 'unpin' : 'pin'),
+                ),
                 _MenuTile(
                   icon: Icons.delete_outline,
                   label: 'Delete comment',
@@ -546,6 +565,10 @@ class _CommentModerationMenu extends StatelessWidget {
     switch (result) {
       case 'delete':
         onDelete?.call();
+        break;
+      case 'pin':
+      case 'unpin':
+        onPin?.call();
         break;
       case 'mute':
         onMute?.call();

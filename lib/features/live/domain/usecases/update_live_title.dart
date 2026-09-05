@@ -9,7 +9,14 @@ class UpdateLiveTitle {
   Future<LiveSession> call({
     required String liveId,
     required String title,
+    String? coverUrl,
+    String? categoryId,
   }) {
-    return _repository.updateTitle(liveId: liveId, title: title);
+    return _repository.updateTitle(
+      liveId: liveId,
+      title: title,
+      coverUrl: coverUrl,
+      categoryId: categoryId,
+    );
   }
 }

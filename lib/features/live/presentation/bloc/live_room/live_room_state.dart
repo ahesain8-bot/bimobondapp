@@ -84,6 +84,7 @@ class LiveRoomReady extends LiveRoomState {
     this.isMediaConnected = false,
     this.isChatComposerVisible = false,
     this.isSendingChat = false,
+    this.isUpdatingChatRules = false,
     this.isEnding = false,
     this.actionMessage,
     this.floatingHeartBurst = 0,
@@ -130,6 +131,7 @@ class LiveRoomReady extends LiveRoomState {
 
   final bool isChatComposerVisible;
   final bool isSendingChat;
+  final bool isUpdatingChatRules;
   final bool isEnding;
 
   /// Transient user-facing message (missing API / errors).
@@ -213,6 +215,7 @@ class LiveRoomReady extends LiveRoomState {
     bool? isMediaConnected,
     bool? isChatComposerVisible,
     bool? isSendingChat,
+    bool? isUpdatingChatRules,
     bool? isEnding,
     String? actionMessage,
     bool clearActionMessage = false,
@@ -259,6 +262,7 @@ class LiveRoomReady extends LiveRoomState {
       isChatComposerVisible:
           isChatComposerVisible ?? this.isChatComposerVisible,
       isSendingChat: isSendingChat ?? this.isSendingChat,
+      isUpdatingChatRules: isUpdatingChatRules ?? this.isUpdatingChatRules,
       isEnding: isEnding ?? this.isEnding,
       actionMessage: clearActionMessage
           ? null
@@ -308,5 +312,8 @@ class LivePendingGuestInvite {
 }
 
 class LiveRoomEnded extends LiveRoomState {
-  const LiveRoomEnded();
+  const LiveRoomEnded({this.liveId, this.serverEnded = true});
+
+  final String? liveId;
+  final bool serverEnded;
 }

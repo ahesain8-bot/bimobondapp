@@ -67,7 +67,9 @@ class RealCommentRepository implements CommentRepository {
 
       final meta = payload['meta'];
       final hasMore = meta is Map<String, dynamic>
-          ? (meta['hasMore'] == true || meta['totalPages'] is int)
+          ? meta['hasMore'] == true ||
+              (meta['totalPages'] is num &&
+                  page < (meta['totalPages'] as num).toInt())
           : comments.length >= limit;
 
       return Right(
@@ -94,18 +96,15 @@ class RealCommentRepository implements CommentRepository {
         body: {'content': content},
       );
 
-      // Backend returns the comment directly or wrapped.
-      final comment =
-          _commentFromJson(payload, liveId) ??
-          CommentEntity(
-            id: 'c_${DateTime.now().microsecondsSinceEpoch}',
-            liveId: liveId,
-            userId: '',
-            username: 'You',
-            content: content,
-            createdAt: DateTime.now(),
-            replyToUserId: replyToUserId,
-          );
+      // Backend returns the comment directly or wrapped. A successful HTTP
+      // response with no comment object is still a contract failure; do not
+      // fabricate a local comment that was never persisted by the server.
+      final comment = _commentFromJson(payload, liveId);
+      if (comment == null) {
+        return const Left(
+          ServerFailure('Comment missing from the send response.'),
+        );
+      }
 
       // Local echo for instant UI (the server also broadcasts liveComment).
       _append(liveId, comment);
@@ -147,6 +146,32 @@ class RealCommentRepository implements CommentRepository {
   }
 
   @override
+  Future<Either<Failure, void>> pinComment({
+    required String liveId,
+    required String commentId,
+  }) async {
+    try {
+      await _api.post(ApiEndpoints.liveCommentPin(liveId, commentId));
+      return const Right(null);
+    } catch (e) {
+      return Left(ServerFailure('Failed to pin comment: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> unpinComment({
+    required String liveId,
+    required String commentId,
+  }) async {
+    try {
+      await _api.post(ApiEndpoints.liveCommentUnpin(liveId, commentId));
+      return const Right(null);
+    } catch (e) {
+      return Left(ServerFailure('Failed to unpin comment: $e'));
+    }
+  }
+
+  @override
   Future<Either<Failure, void>> reportComment({
     required String commentId,
     required String reason,
@@ -176,7 +201,9 @@ class RealCommentRepository implements CommentRepository {
 
   @override
   Future<Either<Failure, void>> markCommentsAsRead(String liveId) async {
-    return const Right(null);
+    return const Left(
+      ServerFailure('Mark-comments-read endpoint is not documented by the API.'),
+    );
   }
 
   @override

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
@@ -10,10 +11,35 @@ class LiveApiClient {
   LiveApiClient({
     http.Client? httpClient,
     this.idTokenProvider,
+    this.timeout = _defaultTimeout,
   }) : _http = httpClient ?? http.Client();
+
+  /// Deadline for a single JSON request.
+  ///
+  /// Every endpoint reached through this client is a small JSON call — joins,
+  /// feeds, comments, moderation — and none of them legitimately take this
+  /// long. Media uploads use a separate data source and are unaffected.
+  /// Fifteen seconds is above the worst realistic mobile round trip and well
+  /// below the point where a viewer concludes the app is broken.
+  static const _defaultTimeout = Duration(seconds: 15);
 
   final http.Client _http;
   IdTokenProvider? idTokenProvider;
+  final Duration timeout;
+
+  /// Turns a stalled socket into an ordinary failure the caller can render.
+  ///
+  /// `TimeoutException` is deliberate: every repository already maps it to a
+  /// user-facing network failure, so no call site needs to learn a new type.
+  Future<http.Response> _send(
+    Future<http.Response> Function() request,
+    String description,
+  ) {
+    return request().timeout(
+      timeout,
+      onTimeout: () => throw TimeoutException(description, timeout),
+    );
+  }
 
   Future<Map<String, String>> _headers({bool auth = true}) async {
     final headers = <String, String>{
@@ -40,7 +66,10 @@ class LiveApiClient {
       uri = uri.replace(queryParameters: query);
     }
     final headers = await _headers(auth: auth);
-    final response = await _http.get(uri, headers: headers);
+    final response = await _send(
+      () => _http.get(uri, headers: headers),
+      'GET $path',
+    );
     return _handleResponse(response);
   }
 
@@ -51,10 +80,13 @@ class LiveApiClient {
   }) async {
     final uri = ApiEndpoints.uri(path);
     final headers = await _headers(auth: auth);
-    final response = await _http.post(
-      uri,
-      headers: headers,
-      body: body != null ? jsonEncode(body) : null,
+    final response = await _send(
+      () => _http.post(
+        uri,
+        headers: headers,
+        body: body != null ? jsonEncode(body) : null,
+      ),
+      'POST $path',
     );
     return _handleResponse(response);
   }
@@ -66,10 +98,13 @@ class LiveApiClient {
   }) async {
     final uri = ApiEndpoints.uri(path);
     final headers = await _headers(auth: auth);
-    final response = await _http.patch(
-      uri,
-      headers: headers,
-      body: body != null ? jsonEncode(body) : null,
+    final response = await _send(
+      () => _http.patch(
+        uri,
+        headers: headers,
+        body: body != null ? jsonEncode(body) : null,
+      ),
+      'PATCH $path',
     );
     return _handleResponse(response);
   }
@@ -81,10 +116,13 @@ class LiveApiClient {
   }) async {
     final uri = ApiEndpoints.uri(path);
     final headers = await _headers(auth: auth);
-    final response = await _http.put(
-      uri,
-      headers: headers,
-      body: body != null ? jsonEncode(body) : null,
+    final response = await _send(
+      () => _http.put(
+        uri,
+        headers: headers,
+        body: body != null ? jsonEncode(body) : null,
+      ),
+      'PUT $path',
     );
     return _handleResponse(response);
   }
@@ -95,7 +133,10 @@ class LiveApiClient {
   }) async {
     final uri = ApiEndpoints.uri(path);
     final headers = await _headers(auth: auth);
-    final response = await _http.delete(uri, headers: headers);
+    final response = await _send(
+      () => _http.delete(uri, headers: headers),
+      'DELETE $path',
+    );
     return _handleResponse(response);
   }
 

@@ -1,6 +1,7 @@
 import '../../domain/entities/live_chat_message.dart';
 import '../../domain/entities/live_host.dart';
 import '../../domain/entities/live_session.dart';
+import '../../domain/entities/live_chat_rules.dart';
 import '../../../../core/models/live_media_hints.dart';
 
 /// Maps Nest live / comment JSON (lives/mobile-api.md) into domain entities.
@@ -44,6 +45,8 @@ class LiveSessionMapper {
         hourlyRankingLabel ??
         (hourlyRank != null ? 'ترتيب #$hourlyRank' : 'ترتيب كل ساعة');
 
+    final status = live['status']?.toString().trim().toUpperCase() ?? 'LIVE';
+
     return LiveSession(
       id: live['id']?.toString() ?? '',
       host: hostFromUser(
@@ -65,7 +68,7 @@ class LiveSessionMapper {
       hourlyRankingLabel: label,
       messages: messages,
       title: live['title']?.toString(),
-      status: live['status']?.toString() ?? 'LIVE',
+      status: status,
       roomName: live['roomName']?.toString(),
       streamUrl: live['streamUrl']?.toString(),
       coverUrl: live['coverUrl']?.toString(),
@@ -76,6 +79,9 @@ class LiveSessionMapper {
       layout: live['layout']?.toString(),
       allowGuestCamera: live['allowGuestCamera'] as bool?,
       moderatorsCanManageGuests: live['moderatorsCanManageGuests'] as bool?,
+      chatRules: _hasChatRules(live)
+          ? chatRulesFromJson(live, liveId: live['id']?.toString())
+          : null,
       liveKitToken: liveKitToken,
       liveKitUrl: liveKitUrl,
       liveKitRole: liveKitRole,
@@ -85,6 +91,35 @@ class LiveSessionMapper {
       isPopular: live['isPopular'] as bool?,
       popularReason: live['popularReason']?.toString(),
     );
+  }
+
+  static LiveChatRules chatRulesFromJson(
+    Map<String, dynamic> json, {
+    String? liveId,
+  }) {
+    final nested = json['chatRules'];
+    final rules = nested is Map
+        ? nested.map((key, value) => MapEntry(key.toString(), value))
+        : json;
+    final keywords = rules['blockedKeywords'];
+    return LiveChatRules(
+      liveId: rules['id']?.toString() ?? liveId ?? '',
+      chatMode: rules['chatMode']?.toString() ?? 'EVERYONE',
+      slowModeSeconds: _asInt(rules['slowModeSeconds']) ?? 0,
+      blockedKeywords: keywords is List
+          ? keywords.map((keyword) => keyword.toString()).toList(growable: false)
+          : const [],
+    );
+  }
+
+  static bool _hasChatRules(Map<String, dynamic> live) {
+    final nested = live['chatRules'];
+    final rules = nested is Map
+        ? nested.map((key, value) => MapEntry(key.toString(), value))
+        : live;
+    return rules.containsKey('chatMode') ||
+        rules.containsKey('slowModeSeconds') ||
+        rules.containsKey('blockedKeywords');
   }
 
   static LiveChatMessage commentFromJson(Map<String, dynamic> json) {

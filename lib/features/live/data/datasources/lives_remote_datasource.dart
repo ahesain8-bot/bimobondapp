@@ -79,12 +79,14 @@ class LivesRemoteDataSource {
     String liveId, {
     String? title,
     String? coverUrl,
+    String? categoryId,
   }) {
     return _api.patch(
       ApiEndpoints.liveById(liveId),
       body: {
         if (title != null) 'title': title,
         if (coverUrl != null) 'coverUrl': coverUrl,
+        if (categoryId != null) 'categoryId': categoryId,
       },
     );
   }
@@ -151,6 +153,23 @@ class LivesRemoteDataSource {
     required String userId,
   }) {
     return _api.post(ApiEndpoints.liveViewerUnmuteChat(liveId, userId));
+  }
+
+  /// `PATCH /lives/:id/chat-rules`.
+  Future<Map<String, dynamic>> updateChatRules(
+    String liveId, {
+    String? chatMode,
+    int? slowModeSeconds,
+    List<String>? blockedKeywords,
+  }) {
+    return _api.patch(
+      ApiEndpoints.liveChatRules(liveId),
+      body: {
+        if (chatMode != null) 'chatMode': chatMode,
+        if (slowModeSeconds != null) 'slowModeSeconds': slowModeSeconds,
+        if (blockedKeywords != null) 'blockedKeywords': blockedKeywords,
+      },
+    );
   }
 
   Future<Map<String, dynamic>> banViewer({

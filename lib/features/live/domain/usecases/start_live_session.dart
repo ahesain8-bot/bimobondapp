@@ -7,7 +7,15 @@ class StartLiveSession {
 
   final LiveSessionRepository _repository;
 
-  Future<LiveSession> call({required String title}) {
-    return _repository.startHostSession(title: title);
+  Future<LiveSession> call({
+    required String title,
+    String? coverUrl,
+    String? categoryId,
+  }) {
+    return _repository.startHostSession(
+      title: title,
+      coverUrl: coverUrl,
+      categoryId: categoryId,
+    );
   }
 }

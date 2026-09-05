@@ -1,6 +1,6 @@
 import 'dart:async';
-import 'dart:convert';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:livekit_client/livekit_client.dart' show ConnectionState;
 import 'package:bimobondapp/app/auctions/data/datasources/auction_socket_service.dart';
@@ -9,6 +9,7 @@ import '../../../../../core/network/live_api_client.dart';
 import '../../../../../core/models/live_battle.dart';
 import '../../../../../core/models/live_competition_request.dart';
 import '../../../data/services/fake_livekit_service.dart';
+import '../../../data/services/live_session_diagnostics.dart';
 import '../../../data/services/live_viewer_media_preloader.dart';
 import '../../../data/services/fake_socket_service.dart';
 import '../../../domain/entities/comment_entity.dart';
@@ -22,6 +23,7 @@ import '../../../domain/repositories/live_repository.dart';
 import '../../../domain/repositories/like_repository.dart';
 import '../../../domain/usecases/ban_viewer_usecase.dart';
 import '../../../domain/usecases/delete_comment_usecase.dart';
+import '../../../domain/usecases/pin_comment_usecase.dart';
 import '../../../domain/usecases/join_live_usecase.dart';
 import '../../../domain/usecases/leave_live_usecase.dart';
 import '../../../domain/usecases/like_live_usecase.dart';
@@ -42,6 +44,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     required this.muteViewerChatUseCase,
     required this.unmuteViewerChatUseCase,
     required this.deleteCommentUseCase,
+    required this.pinCommentUseCase,
     required this.liveRepository,
     required this.commentRepository,
     required this.giftRepository,
@@ -69,6 +72,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     );
     on<LiveViewerSocketEventReceived>(_onSocketEventReceived);
     on<LiveViewerCommentDeletedRequested>(_onCommentDeletedRequested);
+    on<LiveViewerCommentPinToggledRequested>(_onCommentPinToggledRequested);
     on<LiveViewerViewerChatMuteRequested>(_onViewerChatMuteRequested);
     on<LiveViewerViewerChatUnmuteRequested>(_onViewerChatUnmuteRequested);
     on<LiveViewerViewerBannedRequested>(_onViewerBannedRequested);
@@ -83,8 +87,8 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     on<LiveViewerLiveKitStateChanged>(_onLiveKitStateChanged);
     on<LiveViewerBattleRoomStateChanged>(_onBattleRoomStateChanged);
 
-    _liveKitSub = liveKitService.stateStream.listen((mediaState) {
-      if (!isClosed) add(LiveViewerLiveKitStateChanged(mediaState));
+    _liveKitSub = liveKitService.sessionStream.listen((update) {
+      if (!isClosed) add(LiveViewerLiveKitStateChanged(update));
     });
     _battleSub = liveKitService.battleStateStream.listen((mediaState) {
       if (!isClosed) add(LiveViewerBattleRoomStateChanged(mediaState));
@@ -99,6 +103,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
   final MuteViewerChatUseCase muteViewerChatUseCase;
   final UnmuteViewerChatUseCase unmuteViewerChatUseCase;
   final DeleteCommentUseCase deleteCommentUseCase;
+  final PinCommentUseCase pinCommentUseCase;
   final GuestRepository guestRepository;
   final LiveRepository liveRepository;
   final CommentRepository commentRepository;
@@ -110,12 +115,31 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
 
   StreamSubscription<SocketEvent>? _socketSub;
   StreamSubscription<GiftComboPayload>? _giftComboSub;
-  StreamSubscription<LiveKitConnectionState>? _liveKitSub;
+  StreamSubscription<LiveKitSessionUpdate>? _liveKitSub;
   StreamSubscription<LiveKitConnectionState>? _battleSub;
+
+  /// The live the viewer is currently watching, once its session has started.
   String? _activeLiveId;
-  bool _busy = false;
-  LiveEntity? _pendingActivate;
-  bool _deactivateRequested = false;
+
+  /// The live the viewer *wants* to be watching.
+  ///
+  /// Set synchronously at the top of every activation, before any await, so a
+  /// teardown request that arrives afterwards can tell whether it refers to
+  /// the current intent or to a page that has already been replaced. This is
+  /// the single source of truth for "is this async continuation still
+  /// relevant"; [_activeLiveId] only follows it once the work has begun.
+  String? _requestedLiveId;
+
+  /// Incremented whenever the intended live changes. Async continuations
+  /// captured before the change compare against it instead of against
+  /// [_activeLiveId], which cannot distinguish A → B → A.
+  int _sessionGeneration = 0;
+
+  /// Serializes activation and teardown. Both are multi-step network
+  /// operations against shared singletons (socket, LiveKit service), so
+  /// interleaving them lets one live's teardown land on another live's setup.
+  Future<void> _sessionQueue = Future<void>.value();
+
   String? _currentUserId;
   Timer? _bannerClearTimer;
   Timer? _joinSuccessClearTimer;
@@ -133,7 +157,27 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
   bool _recoveringMedia = false;
   int _mediaRecoveryAttempt = 0;
 
+  /// The live whose session has actually started.
   String? get activeLiveId => _activeLiveId;
+
+  /// The live the viewer is meant to be watching, known from the instant an
+  /// activation is dispatched rather than once it has done any work. Callers
+  /// deciding whether the on-screen room still exists must use this, not
+  /// [activeLiveId], which lags by one network round trip.
+  String? get requestedLiveId => _requestedLiveId;
+
+  /// Runs [body] with exclusive ownership of the session.
+  ///
+  /// The BLoC event transformer is concurrent, so `Activated` and
+  /// `Deactivated` handlers start as soon as their events arrive. The handler
+  /// awaits this, which keeps its `Emitter` alive for the whole body while
+  /// guaranteeing that no other session operation runs at the same time.
+  Future<T> _runExclusive<T>(Future<T> Function() body) {
+    final result = _sessionQueue.then<T>((_) => body());
+    // A failed operation must not wedge the queue for the next live.
+    _sessionQueue = result.then<void>((_) {}, onError: (_, _) {});
+    return result;
+  }
 
   // ---------- Event handlers ----------
 
@@ -141,24 +185,59 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     LiveViewerActivated event,
     Emitter<LiveViewerState> emit,
   ) async {
-    if (_busy) {
-      _pendingActivate = event.live;
-      // The newest visible page wins over an older close/deactivate request.
-      _deactivateRequested = false;
+    final live = event.live;
+    if (_requestedLiveId == live.id && _activeLiveId == live.id) {
+      // Both the PageView and the room widget announce the visible page, and
+      // an app resume announces it again. Re-running activation on a session
+      // that is already the intended one would tear down a working room.
       return;
     }
-    if (_activeLiveId == event.live.id &&
-        state.connectionState == LiveConnectionState.connected) {
-      return;
-    }
+    _requestedLiveId = live.id;
+    final generation = ++_sessionGeneration;
 
-    _busy = true;
-    _pendingActivate = null;
-    try {
-      await _teardown(silent: true, emit: emit);
-      _activeLiveId = event.live.id;
-      final live = event.live;
-      unawaited(LiveViewerMediaPreloader.instance.prefetchLive(live));
+    // Only the part that mutates shared singletons — the room, the socket, the
+    // audio session — is exclusive. Chat history, coin balance, the guest
+    // roster and the battle snapshot are per-session reads; holding the lock
+    // across them would make the next swipe wait for the previous live's REST
+    // enrichment before it could even start connecting.
+    final joined = await _runExclusive(
+      () => _startSession(live, generation, emit),
+    );
+    if (joined == null || generation != _sessionGeneration) return;
+    await _enrichSession(
+      live: live,
+      result: joined,
+      generation: generation,
+      emit: emit,
+    );
+  }
+
+  /// Brings up the room, the socket and the visible session state.
+  ///
+  /// Returns the join payload when the viewer is watching, or null when the
+  /// activation ended in a terminal state or was superseded.
+  Future<JoinLiveResult?> _startSession(
+    LiveEntity live,
+    int generation,
+    Emitter<LiveViewerState> emit,
+  ) async {
+    {
+      if (generation != _sessionGeneration) return null;
+
+      // The LiveKit room is owned by the media service and replaced
+      // atomically inside its own connect(); tearing it down here as well
+      // would release and re-acquire the audio session and add the old
+      // room's teardown to the critical path of the new join.
+      await _teardown(silent: true, releaseMedia: false, emit: emit);
+      if (generation != _sessionGeneration) return null;
+
+      _activeLiveId = live.id;
+      // The previous neighbour window is now worthless, and this live's poster
+      // is what the viewer is about to look at.
+      LiveViewerMediaPreloader.instance.cancelPending();
+      unawaited(
+        LiveViewerMediaPreloader.instance.prefetchLive(live, urgent: true),
+      );
 
       final isPk = live.metadata?['isPk'] == true;
       final initialAvatars = _avatarsFromLive(live);
@@ -181,8 +260,14 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
           currentUserId: _currentUserId,
         ),
       );
+      debugPrint(
+        '[LiveRoom] state=connecting liveId=${live.id}'
+        ' gen=$generation source=viewer_activation',
+      );
 
       if (live.status == LiveStatus.ended) {
+        await _releaseMediaForFailedActivation();
+        if (generation != _sessionGeneration) return null;
         emit(
           state.copyWith(
             session: state.session!.copyWith(
@@ -190,9 +275,11 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
             ),
           ),
         );
-        return;
+        return null;
       }
       if (live.status == LiveStatus.banned) {
+        await _releaseMediaForFailedActivation();
+        if (generation != _sessionGeneration) return null;
         emit(
           state.copyWith(
             session: state.session!.copyWith(
@@ -200,14 +287,16 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
             ),
           ),
         );
-        return;
+        return null;
       }
 
       final joinResult = await joinLiveUseCase(live.id);
-      if (_activeLiveId != live.id) return;
+      if (generation != _sessionGeneration) return null;
 
-      await joinResult.fold(
+      return joinResult.fold(
         (failure) async {
+          await _releaseMediaForFailedActivation();
+          if (generation != _sessionGeneration) return null;
           final msg = failure.message;
           final banned = msg.toLowerCase().contains('banned');
           final ended = msg.toLowerCase().contains('ended');
@@ -223,30 +312,16 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
               ),
             ),
           );
+          return null;
         },
         (result) async {
           try {
-            final tok = result.liveKitToken;
-            final parts = tok.split('.');
-            if (parts.length >= 2) {
-              String payload = parts[1];
-              while (payload.length % 4 != 0) {
-                payload += '=';
-              }
-              final bytes = base64Url.decode(payload);
-              final Map<String, dynamic> claims =
-                  jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>;
-              final subClaims = Map<String, dynamic>.of(claims);
-              subClaims.remove('secret');
-              subClaims.remove('apiKey');
-              subClaims.remove('apiSecret');
-              subClaims.remove('privateKey');
-            }
-          } catch (_) {
-            // Diagnostics only; token parsing must never block joining.
-          }
-
-          try {
+            debugPrint(
+              '[LiveKit] join credentials present'
+              ' liveId=${result.liveId}'
+              ' urlPresent=${result.liveKitUrl.isNotEmpty}'
+              ' tokenPresent=${result.liveKitToken.isNotEmpty}',
+            );
             await liveKitService.connect(
               url: result.liveKitUrl,
               token: result.liveKitToken,
@@ -254,8 +329,12 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
               mockStreamUrl: result.live.streamUrl,
               mediaHints: result.mediaHints,
             );
-          } catch (_) {
-            if (_activeLiveId != live.id) return;
+          } catch (error) {
+            debugPrint(
+              '[LiveKit] connect failed step=room.connect'
+              ' errorType=${error.runtimeType}',
+            );
+            if (generation != _sessionGeneration) return null;
             emit(
               state.copyWith(
                 session: state.session!.copyWith(
@@ -264,29 +343,35 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
                 ),
               ),
             );
-            return;
+            return null;
           }
-          if (_activeLiveId != live.id) return;
+          if (generation != _sessionGeneration) return null;
 
           final joinedAvatars = _avatarsFromLive(result.live);
           emit(
             state.copyWith(
               session: state.session!.copyWith(
                 live: result.live.copyWith(
-                  metadata: live.metadata,
+                  // Keep feed/detail metadata while retaining fields that are
+                  // only present on the join payload, such as activeAuctions.
+                  metadata: {...?live.metadata, ...?result.live.metadata},
                   isFollowing: live.isFollowing,
                 ),
                 connectionState: LiveConnectionState.connected,
                 isLiveKitConnected: true,
                 socketToken: result.socketToken,
                 liveKitToken: result.liveKitToken,
-                coinBalance: 1250,
+                coinBalance: 0,
               ),
               showJoinSuccess: true,
               topViewerAvatars: joinedAvatars.isNotEmpty
                   ? joinedAvatars
                   : state.topViewerAvatars,
             ),
+          );
+          debugPrint(
+            '[LiveRoom] state=connected liveId=${live.id}'
+            ' liveKitConnected=true',
           );
           _joinSuccessClearTimer?.cancel();
           _joinSuccessClearTimer = Timer(
@@ -311,75 +396,82 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
           unawaited(
             giftSocketService.ensureJoined(liveId: live.id).catchError((_) {}),
           );
-          final coinsFuture = giftRepository.getCoinBalance();
-          final commentsFuture = commentRepository.getComments(
-            liveId: live.id,
-            limit: 20,
-          );
-          final meFuture = _loadCurrentUserId();
-          final guestsFuture = guestRepository.listGuests(live.id);
-          final topGiftersFuture = _loadTopGifterAvatars(live.id);
-
-          try {
-            final results = await Future.wait<dynamic>([
-              coinsFuture,
-              commentsFuture,
-              meFuture,
-              guestsFuture,
-              topGiftersFuture,
-            ]);
-            if (_activeLiveId != live.id) return;
-
-            final coins = results[0];
-            final commentsResult = results[1];
-            _currentUserId = results[2] as String? ?? _currentUserId;
-            final guestsResult = results[3];
-            final topGifters = results[4] as List<String>?;
-            final comments = commentsResult
-                .fold(
-                  (_) => <CommentEntity>[],
-                  (batch) => batch.comments.reversed.toList(),
-                )
-                .cast<CommentEntity>();
-            CommentEntity? pinned;
-            for (final c in comments) {
-              if (c.isPinned) pinned = c;
-            }
-            pinned ??= _pinnedFromLiveMetadata(result.live);
-
-            emit(
-              state.copyWith(
-                session: state.session!.copyWith(
-                  isSocketConnected: socketService.isConnected,
-                  coinBalance: coins.getOrElse(() => 1250),
-                ),
-                comments: comments,
-                pinnedComment: pinned,
-                currentUserId: _currentUserId,
-                guests: guestsResult.fold(
-                  (_) => state.guests,
-                  (items) => items,
-                ),
-                topViewerAvatars: topGifters ?? state.topViewerAvatars,
-              ),
-            );
-          } catch (_) {}
-          await _refreshBattle(live.id, emit);
+          return result;
         },
       );
-    } finally {
-      final shouldDeactivate = _deactivateRequested;
-      _deactivateRequested = false;
-      if (shouldDeactivate) {
-        _pendingActivate = null;
-        await _teardown(silent: false, emit: emit);
+    }
+  }
+
+  /// Loads everything the room shows around the video.
+  ///
+  /// Runs outside the session lock: none of it touches the room, the socket or
+  /// the audio session, and all of it is discarded if the viewer has moved on.
+  Future<void> _enrichSession({
+    required LiveEntity live,
+    required JoinLiveResult result,
+    required int generation,
+    required Emitter<LiveViewerState> emit,
+  }) async {
+    try {
+      final results = await Future.wait<dynamic>([
+        giftRepository.getCoinBalance(),
+        commentRepository.getComments(liveId: live.id, limit: 20),
+        _loadCurrentUserId(),
+        guestRepository.listGuests(live.id),
+        _loadTopGifterAvatars(live.id),
+      ]);
+      if (generation != _sessionGeneration || state.session == null) return;
+
+      final coins = results[0];
+      final commentsResult = results[1];
+      _currentUserId = results[2] as String? ?? _currentUserId;
+      final guestsResult = results[3];
+      final topGifters = results[4] as List<String>?;
+      final comments = commentsResult
+          .fold(
+            (_) => <CommentEntity>[],
+            (batch) => batch.comments.reversed.toList(),
+          )
+          .cast<CommentEntity>();
+      CommentEntity? pinned;
+      for (final c in comments) {
+        if (c.isPinned) pinned = c;
       }
-      _busy = false;
-      final pending = _pendingActivate;
-      _pendingActivate = null;
-      if (pending != null && pending.id != _activeLiveId) {
-        add(LiveViewerActivated(pending));
-      }
+      pinned ??= _pinnedFromLiveMetadata(result.live);
+
+      emit(
+        state.copyWith(
+          session: state.session!.copyWith(
+            isSocketConnected: socketService.isConnected,
+            coinBalance: coins.getOrElse(() => 0),
+          ),
+          comments: comments,
+          pinnedComment: pinned,
+          currentUserId: _currentUserId,
+          guests: guestsResult.fold((_) => state.guests, (items) => items),
+          topViewerAvatars: topGifters ?? state.topViewerAvatars,
+        ),
+      );
+    } catch (error) {
+      debugPrint('[LiveRoom] session enrichment failed: $error');
+    }
+    if (generation != _sessionGeneration) return;
+    await _refreshBattle(live.id, emit);
+  }
+
+  /// Closes the media room after an activation that never reached
+  /// `liveKitService.connect()`.
+  ///
+  /// Activation deliberately leaves the previous room running so the new join
+  /// is not delayed by its teardown, on the assumption that connect() will
+  /// replace it. When the join never happens — ended live, banned viewer,
+  /// failed join request — that assumption no longer holds and the previous
+  /// live would keep playing underneath the error.
+  Future<void> _releaseMediaForFailedActivation() async {
+    try {
+      await liveKitService.disconnect();
+    } catch (error) {
+      debugPrint('[LiveKit] release after failed activation: $error');
     }
   }
 
@@ -387,23 +479,23 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     LiveViewerDeactivated event,
     Emitter<LiveViewerState> emit,
   ) async {
-    // Activated/Deactivated have separate BLoC event types and can otherwise
-    // run concurrently. A late teardown from the previous PageView page would
-    // then disconnect the brand-new room opened by the visible page.
-    if (_busy) {
-      _pendingActivate = null;
-      _deactivateRequested = true;
+    // A page being disposed during a swipe emits this for the live it was
+    // showing, which by then is no longer the one the viewer wants. Honouring
+    // it would close the room the incoming page just opened.
+    final target = event.liveId;
+    if (target != null && target != _requestedLiveId) {
+      debugPrint(
+        '[LiveRoom] ignored stale deactivate liveId=$target'
+        ' requested=$_requestedLiveId',
+      );
       return;
     }
-    _busy = true;
-    try {
-      await _teardown(silent: false, emit: emit);
-    } finally {
-      _busy = false;
-      final pending = _pendingActivate;
-      _pendingActivate = null;
-      if (pending != null) add(LiveViewerActivated(pending));
-    }
+    _requestedLiveId = null;
+    final generation = ++_sessionGeneration;
+    await _runExclusive(() async {
+      if (generation != _sessionGeneration) return;
+      await _teardown(silent: false, releaseMedia: true, emit: emit);
+    });
   }
 
   Future<void> _onRetryRequested(
@@ -412,7 +504,9 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
   ) async {
     final live = state.live;
     if (live == null) return;
+    _mediaRecoveryAttempt = 0;
     _activeLiveId = null;
+    _requestedLiveId = null;
     add(LiveViewerActivated(live));
   }
 
@@ -634,6 +728,57 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     );
     await result.fold((failure) async {
       emit(state.copyWith(moderationBanner: 'Failed to delete comment'));
+      _scheduleBannerClear();
+    }, (_) async {});
+  }
+
+  Future<void> _onCommentPinToggledRequested(
+    LiveViewerCommentPinToggledRequested event,
+    Emitter<LiveViewerState> emit,
+  ) async {
+    final liveId = _activeLiveId;
+    if (liveId == null) return;
+    final originalComments = List<CommentEntity>.from(state.comments);
+    CommentEntity? comment;
+    for (final item in state.comments) {
+      if (item.id == event.commentId) {
+        comment = item;
+        break;
+      }
+    }
+    if (comment == null) return;
+    final updated = comment.copyWith(isPinned: event.pinned);
+    final nextComments = state.comments
+        .map(
+          (item) => event.pinned
+              ? (item.id == event.commentId
+                    ? updated
+                    : item.copyWith(isPinned: false))
+              : (item.id == event.commentId ? updated : item),
+        )
+        .toList(growable: false);
+    emit(
+      state.copyWith(
+        comments: nextComments,
+        pinnedComment: event.pinned ? updated : null,
+        clearPinnedComment: !event.pinned,
+      ),
+    );
+    final result = await pinCommentUseCase(
+      liveId: liveId,
+      commentId: event.commentId,
+      pinned: event.pinned,
+    );
+    await result.fold((failure) async {
+      emit(
+        state.copyWith(
+          comments: originalComments,
+          pinnedComment: _firstPinnedComment(originalComments),
+          clearPinnedComment: !originalComments.any((item) => item.isPinned),
+          moderationBanner:
+              'Failed to update pinned comment: ${failure.message}',
+        ),
+      );
       _scheduleBannerClear();
     }, (_) async {});
   }
@@ -1038,6 +1183,16 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
       return;
     }
 
+    final update = event.update;
+    debugPrint(
+      '[LiveRoom] LiveKit event=${event.state.name}'
+      ' blocState=${session.connectionState.name}'
+      ' liveId=$liveId'
+      ' mediaGen=${update.generation}'
+      '${update.cause == null ? '' : ' cause=${update.cause!.name}'}'
+      '${update.detail == null ? '' : ' detail=${update.detail}'}',
+    );
+
     switch (event.state) {
       case LiveKitConnectionState.connected:
         _mediaRecoveryAttempt = 0;
@@ -1052,8 +1207,23 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
         );
         return;
       case LiveKitConnectionState.connecting:
+        // The service emits this at the start of the connect the BLoC itself
+        // just requested. Only a room that had already reached `connected`
+        // going back to `connecting` is worth surfacing.
+        if (session.connectionState != LiveConnectionState.connected) return;
+        emit(
+          state.copyWith(
+            session: session.copyWith(
+              connectionState: LiveConnectionState.reconnecting,
+              isLiveKitConnected: false,
+            ),
+          ),
+        );
+        return;
       case LiveKitConnectionState.reconnecting:
-        if (_busy || _recoveringMedia) return;
+        // LiveKit's own reconnect keeps the Room, its participants and its
+        // subscriptions. Show the state and let the SDK finish; a manual
+        // rebuild here would throw away a session that is about to resume.
         emit(
           state.copyWith(
             session: session.copyWith(
@@ -1065,21 +1235,82 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
         return;
       case LiveKitConnectionState.disconnected:
       case LiveKitConnectionState.failed:
-        // connect() deliberately disconnects the previous Room first. Ignore
-        // that internal transition while activation/recovery is in flight.
-        if (_busy || _recoveringMedia) return;
-        emit(
-          state.copyWith(
-            session: session.copyWith(
-              connectionState: LiveConnectionState.reconnecting,
-              isLiveKitConnected: false,
-            ),
-          ),
+        await _handleMediaDisconnect(
+          liveId: liveId,
+          session: session,
+          cause: update.cause ?? LiveKitDisconnectCause.unknown,
+          emit: emit,
         );
-        await _recoverMedia(liveId, emit);
         return;
     }
   }
+
+  /// Decides what a dead room means for the viewer.
+  ///
+  /// The three groups need opposite responses and conflating them is what
+  /// made the viewer both retry rooms that would never come back and give up
+  /// on rooms that only needed a fresh token.
+  Future<void> _handleMediaDisconnect({
+    required String liveId,
+    required LiveSessionEntity session,
+    required LiveKitDisconnectCause cause,
+    required Emitter<LiveViewerState> emit,
+  }) async {
+    if (cause == LiveKitDisconnectCause.clientInitiated) return;
+
+    if (cause == LiveKitDisconnectCause.roomClosed) {
+      emit(
+        state.copyWith(
+          session: session.copyWith(
+            connectionState: LiveConnectionState.liveEnded,
+            isLiveKitConnected: false,
+          ),
+        ),
+      );
+      return;
+    }
+
+    if (cause == LiveKitDisconnectCause.duplicateIdentity) {
+      emit(
+        state.copyWith(
+          session: session.copyWith(
+            connectionState: LiveConnectionState.error,
+            isLiveKitConnected: false,
+            errorMessage:
+                'تم فتح هذا البث على جهاز آخر. أغلقه ثم أعد المحاولة هنا.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    if (_recoveringMedia) return;
+    emit(
+      state.copyWith(
+        session: session.copyWith(
+          connectionState: LiveConnectionState.reconnecting,
+          isLiveKitConnected: false,
+        ),
+      ),
+    );
+    await _recoverMedia(liveId, emit);
+  }
+
+  /// Backoff schedule for rebuilding a dead room.
+  ///
+  /// The first attempt is immediate because the common case — a token that
+  /// aged out, a signalling socket the OS killed on resume — succeeds at once
+  /// and any wait is UX the viewer pays for nothing. Subsequent attempts back
+  /// off so a server-side outage cannot turn a feed full of viewers into a
+  /// retry storm. Five attempts spans ~15s, after which a human being told
+  /// "tap to retry" is better than an indefinite spinner.
+  static const _mediaRecoveryBackoff = <Duration>[
+    Duration.zero,
+    Duration(seconds: 1),
+    Duration(seconds: 2),
+    Duration(seconds: 4),
+    Duration(seconds: 8),
+  ];
 
   /// A terminal LiveKit disconnect cannot safely reuse its old JWT (tokens
   /// expire and ICE restarts can outlive them). Re-join REST to obtain fresh
@@ -1090,15 +1321,25 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     Emitter<LiveViewerState> emit,
   ) async {
     if (_recoveringMedia || _tearingDown || _activeLiveId != liveId) return;
+    final generation = _sessionGeneration;
     _recoveringMedia = true;
     try {
-      for (var attempt = 1; attempt <= 4; attempt++) {
-        if (_tearingDown || isClosed || _activeLiveId != liveId) return;
-        _mediaRecoveryAttempt = attempt;
-        if (attempt > 1) {
-          await Future<void>.delayed(Duration(seconds: attempt - 1));
+      for (
+        var attempt = 1;
+        attempt <= _mediaRecoveryBackoff.length;
+        attempt++
+      ) {
+        if (_tearingDown || isClosed || generation != _sessionGeneration) {
+          return;
         }
-        if (_tearingDown || isClosed || _activeLiveId != liveId) return;
+        _mediaRecoveryAttempt = attempt;
+        final backoff = _mediaRecoveryBackoff[attempt - 1];
+        if (backoff > Duration.zero) {
+          await Future<void>.delayed(backoff);
+        }
+        if (_tearingDown || isClosed || generation != _sessionGeneration) {
+          return;
+        }
 
         try {
           if (state.isOnStage) {
@@ -1109,6 +1350,10 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
               (_) => null,
               (value) => value,
             );
+            // Fetching credentials is a network round trip, and the viewer can
+            // swipe during it. Without this check the recovery would rebuild
+            // the room it was asked to abandon, on top of the new one.
+            if (generation != _sessionGeneration) return;
             if (creds == null || !creds.isUsable) continue;
             await liveKitService.joinStage(
               url: creds.url,
@@ -1122,6 +1367,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
               (_) => null,
               (value) => value,
             );
+            if (generation != _sessionGeneration) return;
             if (result == null) continue;
             await liveKitService.connect(
               url: result.liveKitUrl,
@@ -1131,7 +1377,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
               mediaHints: result.mediaHints,
             );
           }
-          if (isClosed || _activeLiveId != liveId) return;
+          if (isClosed || generation != _sessionGeneration) return;
           final current = state.session;
           if (current != null) {
             emit(
@@ -1147,6 +1393,9 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
               ),
             );
           }
+          debugPrint(
+            '[VIDEO-DIAG] media recovered liveId=$liveId attempt=$attempt',
+          );
           _mediaRecoveryAttempt = 0;
           return;
         } catch (_) {
@@ -1166,7 +1415,11 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
       }
 
       final current = state.session;
-      if (current != null && !isClosed && _activeLiveId == liveId) {
+      if (current != null && !isClosed && generation == _sessionGeneration) {
+        debugPrint(
+          '[VIDEO-DIAG] media recovery exhausted liveId=$liveId'
+          ' attempts=${_mediaRecoveryBackoff.length}',
+        );
         emit(
           state.copyWith(
             session: current.copyWith(
@@ -1191,6 +1444,13 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
       if (_activeLiveId != liveId || event.liveId != liveId) return;
       add(LiveViewerSocketEventReceived(event));
     });
+  }
+
+  CommentEntity? _firstPinnedComment(Iterable<CommentEntity> comments) {
+    for (final comment in comments) {
+      if (comment.isPinned) return comment;
+    }
+    return null;
   }
 
   void _listenGiftSocket(String liveId) {
@@ -2012,8 +2272,16 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     );
   }
 
+  /// Ends the current session's non-media resources, and optionally its room.
+  ///
+  /// [releaseMedia] is false when a new live is being activated: that
+  /// activation's `liveKitService.connect()` replaces the room atomically, so
+  /// closing it here would only add a full audio-session release plus a
+  /// socket teardown to the critical path of the join the viewer is waiting
+  /// for. It is true whenever no new room is coming.
   Future<void> _teardown({
     required bool silent,
+    required bool releaseMedia,
     required Emitter<LiveViewerState> emit,
   }) async {
     _tearingDown = true;
@@ -2032,16 +2300,19 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     _activeLiveId = null;
     if (id != null) {
       giftSocketService.leaveLive(id);
-      try {
-        await leaveLiveUseCase(id);
-      } catch (_) {}
+      // A viewer-count decrement. Nothing in the next session depends on its
+      // response, and awaiting it puts a REST round trip between the viewer's
+      // swipe and the new room's connect.
+      unawaited(leaveLiveUseCase(id).then<void>((_) {}, onError: (_, _) {}));
     }
     try {
       await socketService.disconnect();
     } catch (_) {}
-    try {
-      await liveKitService.disconnect();
-    } catch (_) {}
+    if (releaseMedia) {
+      try {
+        await liveKitService.disconnect();
+      } catch (_) {}
+    }
     _tearingDown = false;
     _recoveringMedia = false;
     _mediaRecoveryAttempt = 0;

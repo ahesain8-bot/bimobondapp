@@ -12,7 +12,12 @@ abstract class SocketService {
   bool get isConnected;
   String? get currentLiveId;
 
-  Future<void> connect({required String liveId, required String token});
+  Future<void> connect({
+    required String liveId,
+    required String token,
+    String? userId,
+    bool includeUserIdInLiveJoin = false,
+  });
 
   Future<void> disconnect();
 
@@ -113,7 +118,12 @@ class FakeSocketService implements SocketService {
   }
 
   @override
-  Future<void> connect({required String liveId, required String token}) async {
+  Future<void> connect({
+    required String liveId,
+    required String token,
+    String? userId,
+    bool includeUserIdInLiveJoin = false,
+  }) async {
     await Future.delayed(const Duration(milliseconds: 400));
     _liveId = liveId;
     _connected = true;
