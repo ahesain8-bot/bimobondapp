@@ -200,6 +200,16 @@ class LiveMapper {
     meta['showFanClub'] =
         json['fanClub'] != null || json['showFanClub'] == true;
 
+    // Paid entry is a server policy.  Do not infer it from a price alone: a
+    // zero price can be a valid value while the flag itself controls the gate.
+    if (json['ticketEnabled'] is bool) {
+      meta['ticketEnabled'] = json['ticketEnabled'];
+      final ticketPrice = _asInt(json['ticketPriceCoins']);
+      if (ticketPrice != null && ticketPrice >= 0) {
+        meta['ticketPriceCoins'] = ticketPrice;
+      }
+    }
+
     final fanClub = _asMap(json['fanClub']);
     if (fanClub != null) {
       meta['fanClub'] = fanClub;
@@ -209,10 +219,9 @@ class LiveMapper {
     }
 
     // Popular badge (TikTok parity §20).
-    if (json['isPopular'] == true || hourlyRank != null) {
-      meta['isPopular'] = true;
-      meta['popularReason'] =
-          json['popularReason']?.toString() ?? 'hourly_rank';
+    if (json['isPopular'] is bool) {
+      meta['isPopular'] = json['isPopular'];
+      meta['popularReason'] = json['popularReason']?.toString();
     }
 
     // Host league tier from the user object.
@@ -224,7 +233,8 @@ class LiveMapper {
     // Gift goal (gallery/auction driven).
     if (json['giftGoalCurrent'] != null || json['giftGoalTarget'] != null) {
       meta['showGiftGoal'] = true;
-      meta['giftGoalCurrent'] = _asInt(json['giftGoalCurrent']) ?? 0;
+      meta['giftGoalTitle'] = json['giftGoalTitle'];
+      meta['giftGoalCurrent'] = _asInt(json['giftGoalCurrent']);
       meta['giftGoalTarget'] = _asInt(json['giftGoalTarget']) ?? 0;
     }
 

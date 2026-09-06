@@ -35,6 +35,8 @@ abstract class ShopRemoteDataSource {
     required List<CheckoutItemInput> items,
     ProductPaymentMethod? paymentMethod,
     List<CheckoutGiftPaymentInput> giftPayments = const [],
+    String? couponCode,
+    String? liveId,
   });
   Future<ProductOrderModel> checkout({
     required List<CheckoutItemInput> items,
@@ -312,12 +314,12 @@ class ShopRemoteDataSourceImpl implements ShopRemoteDataSource {
         final list = body is List
             ? body
             : body is Map
-                ? (body['data'] is List
-                    ? body['data'] as List
-                    : body['items'] is List
-                        ? body['items'] as List
-                        : const [])
-                : const [];
+            ? (body['data'] is List
+                  ? body['data'] as List
+                  : body['items'] is List
+                  ? body['items'] as List
+                  : const [])
+            : const [];
         final categories = list
             .whereType<Map>()
             .map(
@@ -463,6 +465,8 @@ class ShopRemoteDataSourceImpl implements ShopRemoteDataSource {
     required List<CheckoutItemInput> items,
     ProductPaymentMethod? paymentMethod,
     List<CheckoutGiftPaymentInput> giftPayments = const [],
+    String? couponCode,
+    String? liveId,
   }) async {
     try {
       final body = <String, dynamic>{
@@ -471,6 +475,9 @@ class ShopRemoteDataSourceImpl implements ShopRemoteDataSource {
           'paymentMethod': shopPaymentMethodToApi(paymentMethod),
         if (giftPayments.isNotEmpty)
           'giftPayments': giftPayments.map((e) => e.toJson()).toList(),
+        if (couponCode != null && couponCode.trim().isNotEmpty)
+          'couponCode': couponCode.trim(),
+        if (liveId != null && liveId.trim().isNotEmpty) 'liveId': liveId.trim(),
       };
       final response = await apiClient.dio.post(
         ApiConstants.productsCheckoutPreview,
@@ -518,7 +525,13 @@ class ShopRemoteDataSourceImpl implements ShopRemoteDataSource {
       final response = await apiClient.dio.post(
         ApiConstants.productsCheckout,
         data: body,
-        options: Options(headers: await _authHeaders(required: true)),
+        // A checkout can charge coins or create a paid order. Auth refresh
+        // must not replay it; the caller's idempotency key remains the one
+        // reconciliation path for an interrupted request.
+        options: Options(
+          headers: await _authHeaders(required: true),
+          extra: const {ApiClient.noAutomaticRetry: true},
+        ),
       );
       if (response.statusCode == 200 || response.statusCode == 201) {
         return ProductOrderModel.fromJson(_asMap(response.data));
@@ -821,13 +834,18 @@ class ShopRemoteDataSourceImpl implements ShopRemoteDataSource {
         final map = _asMap(response.data);
         final data = map['data'] ?? response.data;
         final list = data is List ? data : const [];
-        return list
-            .whereType<Map>()
-            .map(
-              (e) => LiveProductPinModel.fromJson(Map<String, dynamic>.from(e)),
-            )
-            .where((p) => p.productId.isNotEmpty)
-            .toList();
+        final products = <LiveProductPinModel>[];
+        for (final item in list.whereType<Map>()) {
+          try {
+            products.add(
+              LiveProductPinModel.fromJson(Map<String, dynamic>.from(item)),
+            );
+          } on FormatException {
+            // Do not manufacture a purchasable product from an incomplete
+            // bag record. Other valid bag entries can still be displayed.
+          }
+        }
+        return products;
       }
       throw ServerException(
         message:

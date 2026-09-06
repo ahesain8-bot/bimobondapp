@@ -1,3 +1,4 @@
+import '../../../live/domain/entities/live_interactive.dart';
 import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart';
 
@@ -23,6 +24,28 @@ class LiveEntity extends Equatable {
   final Map<String, dynamic>? metadata;
   final bool isPromoted;
   final LiveFeedPromotion? promotion;
+
+  LiveGiftGoal? get giftGoal {
+    final target = metadata?['giftGoalTarget'];
+    final current = metadata?['giftGoalCurrent'];
+    if (target is! int || target <= 0 || current is! int || current < 0)
+      return null;
+    return LiveGiftGoal(
+      id: id,
+      title: metadata?['giftGoalTitle'] as String?,
+      target: target,
+      current: current,
+    );
+  }
+
+  /// The card can say that a room is ticketed, but access itself must always
+  /// be confirmed by `GET /lives/:id/ticket` before a viewer joins.
+  bool get ticketEnabled => metadata?['ticketEnabled'] == true;
+
+  int? get ticketPriceCoins {
+    final value = metadata?['ticketPriceCoins'];
+    return value is int && value >= 0 ? value : null;
+  }
 
   /// Feed occurrences have distinct identities even when they share a room.
   String get feedEntryKey =>

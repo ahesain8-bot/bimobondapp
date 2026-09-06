@@ -1,3 +1,5 @@
+import '../../../live/data/mappers/live_host_extras_mapper.dart';
+import '../../../live/domain/entities/live_host_league.dart';
 import '../../../../core/network/api_endpoints.dart';
 import '../../../../core/network/live_api_client.dart';
 import '../../domain/entities/hourly_ranking_entity.dart';
@@ -14,6 +16,17 @@ class HttpRankingRemoteDataSource implements RankingRemoteDataSource {
     : _api = apiClient;
 
   final LiveApiClient _api;
+
+  @override
+  Future<List<LiveLeagueTier>> loadLeagueTiers() async =>
+      LiveHostExtrasMapper.leagueTiersFromJson(await _api.get(ApiEndpoints.livesLeagues));
+
+  @override
+  Future<LiveHostLeague?> loadHostLeague(String userId) async {
+    final league = LiveHostExtrasMapper.hostLeagueFromJson(await _api.get(ApiEndpoints.liveHostLeague(userId)));
+    if (league?.userId != userId) throw const FormatException('Invalid host league identity.');
+    return league;
+  }
 
   @override
   Future<HourlyLeaderboard> getHourlyLeaderboard({int limit = 20}) async {

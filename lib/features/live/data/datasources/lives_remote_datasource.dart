@@ -465,6 +465,8 @@ class LivesRemoteDataSource {
     String? layout,
     bool? allowGuestCamera,
     bool? moderatorsCanManageGuests,
+    bool? ticketEnabled,
+    int? ticketPriceCoins,
   }) {
     return _api.patch(
       ApiEndpoints.liveSettings(liveId),
@@ -476,6 +478,8 @@ class LivesRemoteDataSource {
         if (allowGuestCamera != null) 'allowGuestCamera': allowGuestCamera,
         if (moderatorsCanManageGuests != null)
           'moderatorsCanManageGuests': moderatorsCanManageGuests,
+        if (ticketEnabled != null) 'ticketEnabled': ticketEnabled,
+        if (ticketPriceCoins != null) 'ticketPriceCoins': ticketPriceCoins,
       },
     );
   }

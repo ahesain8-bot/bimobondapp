@@ -77,6 +77,8 @@ class LiveSessionMapper {
       layout: live['layout']?.toString(),
       allowGuestCamera: live['allowGuestCamera'] as bool?,
       moderatorsCanManageGuests: live['moderatorsCanManageGuests'] as bool?,
+      ticketEnabled: live['ticketEnabled'] as bool?,
+      ticketPriceCoins: _nonNegativeInt(live['ticketPriceCoins']),
       liveKitToken: liveKitToken,
       liveKitUrl: liveKitUrl,
       liveKitRole: liveKitRole,
@@ -153,5 +155,10 @@ class LiveSessionMapper {
     if (value is int) return value;
     if (value is num) return value.toInt();
     return int.tryParse(value.toString());
+  }
+
+  static int? _nonNegativeInt(dynamic value) {
+    final parsed = _asInt(value);
+    return parsed != null && parsed >= 0 ? parsed : null;
   }
 }

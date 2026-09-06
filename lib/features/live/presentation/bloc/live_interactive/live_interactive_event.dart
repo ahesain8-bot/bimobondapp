@@ -155,3 +155,13 @@ class LiveInteractiveErrorCleared extends LiveInteractiveEvent {
 class LiveInteractiveClaimShown extends LiveInteractiveEvent {
   const LiveInteractiveClaimShown();
 }
+
+/// A join snapshot may seed the goal, but may not overwrite a socket update
+/// received while join was in flight.
+class LiveInteractiveGiftGoalSnapshotReceived extends LiveInteractiveEvent {
+  const LiveInteractiveGiftGoalSnapshotReceived(this.liveId, this.goal);
+  final String liveId;
+  final LiveGiftGoal? goal;
+  @override
+  List<Object?> get props => [liveId, goal];
+}

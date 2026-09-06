@@ -55,6 +55,7 @@ abstract class LiveRepository {
   Future<Either<Failure, JoinLiveResult>> joinLive(
     String liveId, {
     String? campaignId,
+    String? trafficSource,
   });
 
   /// POST /lives/{id}/leave

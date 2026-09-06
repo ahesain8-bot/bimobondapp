@@ -1,3 +1,5 @@
+import '../../../live/presentation/widgets/room/live_host_league_sheet.dart';
+import '../../domain/repositories/ranking_repository.dart';
 import 'dart:math' as math;
 
 import 'package:cached_network_image/cached_network_image.dart';
@@ -29,12 +31,12 @@ import 'floating_hearts.dart';
 import 'gift_goal_card.dart';
 import '../../data/services/fake_livekit_service.dart' show LiveKitService;
 import '../../data/services/fake_socket_service.dart' show SocketService;
+import '../../data/services/live_ticket_service.dart';
 import '../di/live_viewer_injector.dart' as di;
 import 'guest_panel.dart';
 import 'live_interactive_viewer_panel.dart';
 import 'viewer_stage.dart';
 import 'guest_stage_prompt.dart';
-import 'league_overlay.dart';
 import 'live_state_overlay.dart';
 import 'live_video_player.dart';
 import 'multi_guest_grid.dart';
@@ -62,6 +64,11 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   bool _showComposer = false;
   bool _giftGoalDismissed = false;
   bool _showLiveFeatures = false;
+  _TicketGateState _ticketGateState = _TicketGateState.open;
+  LiveTicketAccess? _ticketAccess;
+  String? _ticketMessage;
+  int _ticketRequestGeneration = 0;
+  String? _activatedLiveId;
   final List<FloatingHeart> _tapHearts = [];
   late final LiveInteractiveBloc _interactiveBloc = LiveInteractiveBloc(
     repository: di.sl<LiveInteractiveRepository>(),
@@ -77,7 +84,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   @override
   void didUpdateWidget(covariant LiveRoomPage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.live.id != widget.live.id) {
+    if (oldWidget.live.id != widget.live.id ||
+        oldWidget.live.ticketEnabled != widget.live.ticketEnabled ||
+        oldWidget.live.ticketPriceCoins != widget.live.ticketPriceCoins) {
       _scheduleActivate();
     } else if (widget.isActive && !oldWidget.isActive) {
       _scheduleActivate();
@@ -102,11 +111,109 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     // PageView keeps neighbouring TikTok-style pages mounted. An off-screen
     // page must never replace the one LiveKit room owned by the visible page.
     if (!widget.isActive) return;
+    final live = widget.live;
+    if (live.ticketEnabled) {
+      _checkTicketAccess(live);
+      return;
+    }
+    _ticketRequestGeneration++;
+    _ticketAccess = null;
+    _ticketMessage = null;
+    _ticketGateState = _TicketGateState.open;
+    _activateRoom(live);
+  }
+
+  void _activateRoom(LiveEntity live) {
+    if (!widget.isActive) return;
+    final viewerBloc = context.read<LiveViewerBloc>();
+    if (_activatedLiveId == live.id && viewerBloc.activeLiveId == live.id) {
+      return;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !widget.isActive) return;
-      context.read<LiveViewerBloc>().add(LiveViewerActivated(widget.live));
-      _interactiveBloc.add(LiveInteractiveStarted(widget.live.id));
+      if (!mounted || !widget.isActive || widget.live.id != live.id) return;
+      final viewerBloc = context.read<LiveViewerBloc>();
+      if (_activatedLiveId == live.id && viewerBloc.activeLiveId == live.id) {
+        return;
+      }
+      _activatedLiveId = live.id;
+      viewerBloc.add(LiveViewerActivated(live));
+      _interactiveBloc.add(
+        LiveInteractiveStarted(live.id, giftGoal: live.giftGoal),
+      );
     });
+  }
+
+  Future<void> _checkTicketAccess(LiveEntity live) async {
+    final request = ++_ticketRequestGeneration;
+    if (mounted) {
+      setState(() {
+        _ticketGateState = _TicketGateState.checking;
+        _ticketMessage = null;
+      });
+    }
+    try {
+      final access = await di.sl<LiveTicketService>().status(live.id);
+      if (!mounted ||
+          request != _ticketRequestGeneration ||
+          widget.live.id != live.id) {
+        return;
+      }
+      setState(() {
+        _ticketAccess = access;
+        _ticketGateState = access.hasTicket
+            ? _TicketGateState.open
+            : _TicketGateState.required;
+      });
+      if (access.hasTicket) {
+        _activateRoom(live);
+      }
+    } catch (_) {
+      if (!mounted ||
+          request != _ticketRequestGeneration ||
+          widget.live.id != live.id) {
+        return;
+      }
+      setState(() {
+        _ticketGateState = _TicketGateState.unavailable;
+        _ticketMessage =
+            'Could not verify ticket access. Refresh to try again.';
+      });
+    }
+  }
+
+  Future<void> _purchaseTicket() async {
+    final live = widget.live;
+    if (!live.ticketEnabled ||
+        _ticketGateState == _TicketGateState.purchasing) {
+      return;
+    }
+    setState(() {
+      _ticketGateState = _TicketGateState.purchasing;
+      _ticketMessage = null;
+    });
+    try {
+      final access = await di.sl<LiveTicketService>().purchase(live.id);
+      if (!mounted || widget.live.id != live.id) return;
+      setState(() {
+        _ticketAccess = access;
+        _ticketGateState = access.hasTicket
+            ? _TicketGateState.open
+            : _TicketGateState.unavailable;
+        _ticketMessage = access.hasTicket
+            ? null
+            : 'Payment needs server confirmation before entry.';
+      });
+      if (access.hasTicket) _activateRoom(live);
+    } catch (_) {
+      if (!mounted || widget.live.id != live.id) return;
+      // Do not send a second charge after an uncertain result. A read-only
+      // status request is the only reconciliation action offered here.
+      setState(() {
+        _ticketGateState = _TicketGateState.unavailable;
+        _ticketMessage =
+            'Payment is awaiting server confirmation. Refresh before trying again.';
+      });
+    }
   }
 
   void _spawnHearts(int count) {
@@ -188,7 +295,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       onJoinFanClub: () {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Joined Fan Club'),
+            content: Text('Subscription prices are not verified yet.'),
             backgroundColor: AppColors.surface,
             behavior: SnackBarBehavior.floating,
           ),
@@ -198,27 +305,11 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   }
 
   void _openLeague(LiveEntity live) {
-    final entries = List.generate(6, (i) {
-      return RankingEntry(
-        rank: i + 1,
-        userId: 'lg_$i',
-        username: 'League Star ${i + 1}',
-        avatarUrl: 'https://i.pravatar.cc/150?u=lg_${live.id}_$i',
-        score: 8300000 - i * 900000,
-      );
-    });
-    showLeagueMatchOverlay(
+    final repository = di.sl<RankingRepository>();
+    LiveHostLeagueSheet.show(
       context,
-      entries: entries,
-      myEntry: const RankingEntry(
-        rank: 99,
-        userId: 'me',
-        username: 'You',
-        avatarUrl: 'https://i.pravatar.cc/150?u=me',
-        score: 1100000,
-      ),
-      pointsToNext: 1100000,
-      onSendGift: _openGifts,
+      loadLeague: () => repository.loadHostLeague(live.hostId),
+      loadTiers: repository.loadLeagueTiers,
     );
   }
 
@@ -324,7 +415,20 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   }
 
   Widget _buildRoom() {
-    return BlocBuilder<LiveViewerBloc, LiveViewerState>(
+    return BlocConsumer<LiveViewerBloc, LiveViewerState>(
+      listenWhen: (previous, current) =>
+          current.live?.id == widget.live.id &&
+          current.connectionState == LiveConnectionState.connected &&
+          previous.connectionState != LiveConnectionState.connected,
+      listener: (context, state) {
+        final live = state.live;
+        if (live != null &&
+            live.metadata?.containsKey('giftGoalTarget') == true) {
+          _interactiveBloc.add(
+            LiveInteractiveGiftGoalSnapshotReceived(live.id, live.giftGoal),
+          );
+        }
+      },
       buildWhen: (prev, curr) {
         final prevLive = prev.live;
         final currLive = curr.live;
@@ -372,7 +476,8 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
             prev.isOnStage != curr.isOnStage ||
             // Score ticks update via nested PkBattleBar — do not rebuild
             // the whole stage (VideoTrackRenderer flash).
-            (prev.battle?.isActive == true) != (curr.battle?.isActive == true) ||
+            (prev.battle?.isActive == true) !=
+                (curr.battle?.isActive == true) ||
             prev.battle?.id != curr.battle?.id ||
             prev.battle?.live1Id != curr.battle?.live1Id ||
             prev.battle?.live2Id != curr.battle?.live2Id ||
@@ -492,9 +597,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                               live: live,
                               opponentLive: state.battleOpponentLive,
                               isActive: widget.isActive && connected,
-                              battleRoom: isThisRoom
-                                  ? state.battleRoom
-                                  : null,
+                              battleRoom: isThisRoom ? state.battleRoom : null,
                             ),
                             if (isThisRoom)
                               Positioned(
@@ -564,26 +667,33 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                               ),
                             if (isThisRoom)
                               Positioned.fill(
-                                child: BlocBuilder<LiveViewerBloc, LiveViewerState>(
-                                  buildWhen: (prev, curr) =>
-                                      prev.battle?.id != curr.battle?.id ||
-                                      prev.battle?.status !=
-                                          curr.battle?.status,
-                                  builder: (context, state) {
-                                    final battle = state.battle;
-                                    if (battle == null || !battle.isActive) {
-                                      return const SizedBox.shrink();
-                                    }
-                                    return _PkBattleStartGate(
-                                      battle: battle,
-                                      leftAvatarUrl: live.hostAvatar,
-                                      rightAvatarUrl:
-                                          state.battleOpponentLive?.hostAvatar ??
-                                          live.metadata?['guestAvatar']
-                                              as String?,
-                                    );
-                                  },
-                                ),
+                                child:
+                                    BlocBuilder<
+                                      LiveViewerBloc,
+                                      LiveViewerState
+                                    >(
+                                      buildWhen: (prev, curr) =>
+                                          prev.battle?.id != curr.battle?.id ||
+                                          prev.battle?.status !=
+                                              curr.battle?.status,
+                                      builder: (context, state) {
+                                        final battle = state.battle;
+                                        if (battle == null ||
+                                            !battle.isActive) {
+                                          return const SizedBox.shrink();
+                                        }
+                                        return _PkBattleStartGate(
+                                          battle: battle,
+                                          leftAvatarUrl: live.hostAvatar,
+                                          rightAvatarUrl:
+                                              state
+                                                  .battleOpponentLive
+                                                  ?.hostAvatar ??
+                                              live.metadata?['guestAvatar']
+                                                  as String?,
+                                        );
+                                      },
+                                    ),
                               ),
                           ],
                         ),
@@ -899,7 +1009,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                     onTap: () {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('Joined Fan Club'),
+                          content: Text(
+                            'Subscription prices are not verified yet.',
+                          ),
                           backgroundColor: AppColors.surface,
                           behavior: SnackBarBehavior.floating,
                         ),
@@ -1277,10 +1389,125 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                     );
                   },
                 ),
+              if (widget.isActive &&
+                  widget.live.ticketEnabled &&
+                  _ticketGateState != _TicketGateState.open)
+                Positioned.fill(
+                  child: _LiveTicketGate(
+                    state: _ticketGateState,
+                    priceCoins:
+                        _ticketAccess?.priceCoins ??
+                        widget.live.ticketPriceCoins,
+                    message: _ticketMessage,
+                    onPurchase: _ticketGateState == _TicketGateState.required
+                        ? _purchaseTicket
+                        : null,
+                    onRefresh: () => _checkTicketAccess(widget.live),
+                    onClose: widget.onClose,
+                  ),
+                ),
             ],
           ),
         );
       },
+    );
+  }
+}
+
+enum _TicketGateState { open, checking, required, purchasing, unavailable }
+
+class _LiveTicketGate extends StatelessWidget {
+  const _LiveTicketGate({
+    required this.state,
+    required this.priceCoins,
+    required this.message,
+    required this.onPurchase,
+    required this.onRefresh,
+    required this.onClose,
+  });
+
+  final _TicketGateState state;
+  final int? priceCoins;
+  final String? message;
+  final VoidCallback? onPurchase;
+  final VoidCallback onRefresh;
+  final VoidCallback? onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    final checking =
+        state == _TicketGateState.checking ||
+        state == _TicketGateState.purchasing;
+    final purchaseLabel = priceCoins == null
+        ? 'Buy ticket'
+        : 'Buy ticket for $priceCoins coins';
+    final detail =
+        message ??
+        (state == _TicketGateState.required
+            ? 'This LIVE requires a ticket before you can enter.'
+            : 'Checking ticket access…');
+    return Material(
+      color: Colors.black.withValues(alpha: 0.94),
+      child: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 360),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.confirmation_number_outlined,
+                    color: Colors.white,
+                    size: 42,
+                  ),
+                  const SizedBox(height: 14),
+                  const Text(
+                    'Ticket required',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    detail,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.white70, height: 1.35),
+                  ),
+                  if (checking) ...[
+                    const SizedBox(height: 22),
+                    const CircularProgressIndicator(color: Colors.white),
+                  ] else ...[
+                    const SizedBox(height: 22),
+                    if (onPurchase != null)
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton(
+                          onPressed: onPurchase,
+                          child: Text(purchaseLabel),
+                        ),
+                      ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton(
+                        onPressed: onRefresh,
+                        child: const Text('Refresh ticket status'),
+                      ),
+                    ),
+                    if (onClose != null)
+                      TextButton(onPressed: onClose, child: const Text('Back')),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

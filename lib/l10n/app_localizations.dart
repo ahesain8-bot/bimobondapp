@@ -62,7 +62,8 @@ import 'app_localizations_en.dart';
 /// be consistent with the languages listed in the AppLocalizations.supportedLocales
 /// property.
 abstract class AppLocalizations {
-  AppLocalizations(String locale) : localeName = intl.Intl.canonicalizedLocale(locale.toString());
+  AppLocalizations(String locale)
+    : localeName = intl.Intl.canonicalizedLocale(locale.toString());
 
   final String localeName;
 
@@ -70,7 +71,8 @@ abstract class AppLocalizations {
     return Localizations.of<AppLocalizations>(context, AppLocalizations);
   }
 
-  static const LocalizationsDelegate<AppLocalizations> delegate = _AppLocalizationsDelegate();
+  static const LocalizationsDelegate<AppLocalizations> delegate =
+      _AppLocalizationsDelegate();
 
   /// A list of this localizations delegate along with the default localizations
   /// delegates.
@@ -82,17 +84,18 @@ abstract class AppLocalizations {
   /// Additional delegates can be added by appending to this list in
   /// MaterialApp. This list does not have to be used at all if a custom list
   /// of delegates is preferred or required.
-  static const List<LocalizationsDelegate<dynamic>> localizationsDelegates = <LocalizationsDelegate<dynamic>>[
-    delegate,
-    GlobalMaterialLocalizations.delegate,
-    GlobalCupertinoLocalizations.delegate,
-    GlobalWidgetsLocalizations.delegate,
-  ];
+  static const List<LocalizationsDelegate<dynamic>> localizationsDelegates =
+      <LocalizationsDelegate<dynamic>>[
+        delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+      ];
 
   /// A list of this localizations delegate's supported locales.
   static const List<Locale> supportedLocales = <Locale>[
     Locale('ar'),
-    Locale('en')
+    Locale('en'),
   ];
 
   /// No description provided for @appTitle.
@@ -7647,7 +7650,11 @@ abstract class AppLocalizations {
   ///
   /// In en, this message translates to:
   /// **'{town} · {region} · {country}'**
-  String promoteLocationRegionalSummary(String town, String region, String country);
+  String promoteLocationRegionalSummary(
+    String town,
+    String region,
+    String country,
+  );
 
   /// No description provided for @promoteLocationCountryRequired.
   ///
@@ -9976,9 +9983,286 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Close promotions'**
   String get lpClose;
+
+  /// No description provided for @liveMetricUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Not available'**
+  String get liveMetricUnavailable;
+
+  /// No description provided for @liveSummaryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'LIVE summary'**
+  String get liveSummaryTitle;
+
+  /// No description provided for @liveSummaryEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No summary available.'**
+  String get liveSummaryEmpty;
+
+  /// No description provided for @liveSummaryDuration.
+  ///
+  /// In en, this message translates to:
+  /// **'Duration (seconds)'**
+  String get liveSummaryDuration;
+
+  /// No description provided for @liveSummaryPeak.
+  ///
+  /// In en, this message translates to:
+  /// **'Peak viewers'**
+  String get liveSummaryPeak;
+
+  /// No description provided for @liveSummarySessions.
+  ///
+  /// In en, this message translates to:
+  /// **'Viewer sessions'**
+  String get liveSummarySessions;
+
+  /// No description provided for @liveSummaryLikes.
+  ///
+  /// In en, this message translates to:
+  /// **'Likes'**
+  String get liveSummaryLikes;
+
+  /// No description provided for @liveSummaryComments.
+  ///
+  /// In en, this message translates to:
+  /// **'Comments'**
+  String get liveSummaryComments;
+
+  /// No description provided for @liveSummaryCoins.
+  ///
+  /// In en, this message translates to:
+  /// **'Earned coins'**
+  String get liveSummaryCoins;
+
+  /// No description provided for @liveSummaryGifters.
+  ///
+  /// In en, this message translates to:
+  /// **'Top gifters'**
+  String get liveSummaryGifters;
+
+  /// No description provided for @liveSummaryUnique.
+  ///
+  /// In en, this message translates to:
+  /// **'Unique viewers'**
+  String get liveSummaryUnique;
+
+  /// No description provided for @liveSummaryWatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Watch time (seconds)'**
+  String get liveSummaryWatch;
+
+  /// No description provided for @liveSummaryAverage.
+  ///
+  /// In en, this message translates to:
+  /// **'Average watch time (seconds)'**
+  String get liveSummaryAverage;
+
+  /// No description provided for @liveSummaryFollowers.
+  ///
+  /// In en, this message translates to:
+  /// **'New followers'**
+  String get liveSummaryFollowers;
+
+  /// No description provided for @liveSummaryShares.
+  ///
+  /// In en, this message translates to:
+  /// **'Shares'**
+  String get liveSummaryShares;
+
+  /// No description provided for @liveSummaryOrders.
+  ///
+  /// In en, this message translates to:
+  /// **'Shop orders'**
+  String get liveSummaryOrders;
+
+  /// No description provided for @liveSummaryRevenue.
+  ///
+  /// In en, this message translates to:
+  /// **'Shop revenue (coins)'**
+  String get liveSummaryRevenue;
+
+  /// No description provided for @liveSummaryTraffic.
+  ///
+  /// In en, this message translates to:
+  /// **'Traffic sources'**
+  String get liveSummaryTraffic;
+
+  /// No description provided for @liveGiftGoalLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Gift goal'**
+  String get liveGiftGoalLabel;
+
+  /// No description provided for @liveFanClubPriceUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Subscription prices are not verified yet. Joining is unavailable.'**
+  String get liveFanClubPriceUnavailable;
+
+  /// No description provided for @liveDiscoveryForYou.
+  ///
+  /// In en, this message translates to:
+  /// **'For You'**
+  String get liveDiscoveryForYou;
+
+  /// No description provided for @liveDiscoveryFollowing.
+  ///
+  /// In en, this message translates to:
+  /// **'Following'**
+  String get liveDiscoveryFollowing;
+
+  /// No description provided for @liveDiscoveryNearby.
+  ///
+  /// In en, this message translates to:
+  /// **'Nearby'**
+  String get liveDiscoveryNearby;
+
+  /// No description provided for @liveDiscoveryAudio.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio'**
+  String get liveDiscoveryAudio;
+
+  /// No description provided for @liveDiscoveryFilter.
+  ///
+  /// In en, this message translates to:
+  /// **'Filter LIVE'**
+  String get liveDiscoveryFilter;
+
+  /// No description provided for @liveDiscoveryTopic.
+  ///
+  /// In en, this message translates to:
+  /// **'Topic'**
+  String get liveDiscoveryTopic;
+
+  /// No description provided for @liveDiscoveryCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'Category ID'**
+  String get liveDiscoveryCategory;
+
+  /// No description provided for @liveLocationUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable location services and allow location access to see nearby LIVE streams.'**
+  String get liveLocationUnavailable;
+
+  /// No description provided for @liveGalleryReorder.
+  ///
+  /// In en, this message translates to:
+  /// **'Drag to reorder'**
+  String get liveGalleryReorder;
+
+  /// No description provided for @liveLeagueTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Host league'**
+  String get liveLeagueTitle;
+
+  /// No description provided for @liveLeagueProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Progress to next tier'**
+  String get liveLeagueProgress;
+
+  /// No description provided for @liveReplayTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Replay and clips'**
+  String get liveReplayTitle;
+
+  /// No description provided for @liveRecordingStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording status'**
+  String get liveRecordingStatus;
+
+  /// No description provided for @liveReplayStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Replay status'**
+  String get liveReplayStatus;
+
+  /// No description provided for @liveReplayUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Playback needs a verified response from the replay service.'**
+  String get liveReplayUnavailable;
+
+  /// No description provided for @liveCouponCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Coupon code'**
+  String get liveCouponCode;
+
+  /// No description provided for @liveApplyCoupon.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply coupon'**
+  String get liveApplyCoupon;
+
+  /// No description provided for @liveDeal.
+  ///
+  /// In en, this message translates to:
+  /// **'LIVE deal'**
+  String get liveDeal;
+
+  /// No description provided for @liveDealPrice.
+  ///
+  /// In en, this message translates to:
+  /// **'Flash price (coins)'**
+  String get liveDealPrice;
+
+  /// No description provided for @liveDealEnd.
+  ///
+  /// In en, this message translates to:
+  /// **'Flash ends at (ISO time)'**
+  String get liveDealEnd;
+
+  /// No description provided for @liveDealDiscount.
+  ///
+  /// In en, this message translates to:
+  /// **'Coupon discount (coins)'**
+  String get liveDealDiscount;
+
+  /// No description provided for @liveDealSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save deal'**
+  String get liveDealSave;
+
+  /// No description provided for @liveDealSold.
+  ///
+  /// In en, this message translates to:
+  /// **'Sold'**
+  String get liveDealSold;
+
+  /// No description provided for @liveCouponAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Coupon available'**
+  String get liveCouponAvailable;
+
+  /// No description provided for @liveTicketEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid entry'**
+  String get liveTicketEnabled;
+
+  /// No description provided for @liveTicketPrice.
+  ///
+  /// In en, this message translates to:
+  /// **'Ticket price (coins)'**
+  String get liveTicketPrice;
 }
 
-class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
+class _AppLocalizationsDelegate
+    extends LocalizationsDelegate<AppLocalizations> {
   const _AppLocalizationsDelegate();
 
   @override
@@ -9987,25 +10271,26 @@ class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> 
   }
 
   @override
-  bool isSupported(Locale locale) => <String>['ar', 'en'].contains(locale.languageCode);
+  bool isSupported(Locale locale) =>
+      <String>['ar', 'en'].contains(locale.languageCode);
 
   @override
   bool shouldReload(_AppLocalizationsDelegate old) => false;
 }
 
 AppLocalizations lookupAppLocalizations(Locale locale) {
-
-
   // Lookup logic when only language code is specified.
   switch (locale.languageCode) {
-    case 'ar': return AppLocalizationsAr();
-    case 'en': return AppLocalizationsEn();
+    case 'ar':
+      return AppLocalizationsAr();
+    case 'en':
+      return AppLocalizationsEn();
   }
 
   throw FlutterError(
     'AppLocalizations.delegate failed to load unsupported locale "$locale". This is likely '
     'an issue with the localizations generation tool. Please file an issue '
     'on GitHub with a reproducible sample app and the gen-l10n configuration '
-    'that was used.'
+    'that was used.',
   );
 }

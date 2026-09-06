@@ -76,14 +76,17 @@ class LiveInteractiveMapper {
       question: json['question']?.toString() ?? '',
       options: rawOptions is! List
           ? const <LivePollOption>[]
-          : rawOptions.whereType<Map>().map((raw) {
-              final option = asMap(raw);
-              return LivePollOption(
-                text: option['text']?.toString() ?? '',
-                votes: _asInt(option['votes']),
-                percentage: _asDouble(option['percentage']),
-              );
-            }).toList(growable: false),
+          : rawOptions
+                .whereType<Map>()
+                .map((raw) {
+                  final option = asMap(raw);
+                  return LivePollOption(
+                    text: option['text']?.toString() ?? '',
+                    votes: _asInt(option['votes']),
+                    percentage: _asDouble(option['percentage']),
+                  );
+                })
+                .toList(growable: false),
       totalVotes: _asInt(json['totalVotes']),
       status: json['status']?.toString() ?? 'ACTIVE',
     );
@@ -104,6 +107,41 @@ class LiveInteractiveMapper {
       isPinned: json['isPinned'] == true,
       isAnswered: json['isAnswered'] == true,
     );
+  }
+
+  static LiveQA qaPatch(dynamic payload, List<LiveQA> previous) {
+    final json = _unwrap(payload, 'qa');
+    final id = json['id'];
+    final matches = previous.where((item) => item.id == id);
+    if (matches.isEmpty) return qa(payload);
+    final old = matches.first;
+    return qa({
+      'id': old.id,
+      'liveId': old.liveId,
+      'username': old.username,
+      'question': old.question,
+      'isPinned': old.isPinned,
+      'isAnswered': old.isAnswered,
+      ...json,
+    });
+  }
+
+  static LiveAuction auctionPatch(dynamic payload, List<LiveAuction> previous) {
+    final json = _unwrap(payload, 'auction');
+    final matches = previous.where((item) => item.id == json['id']);
+    if (matches.isEmpty) return auction(payload);
+    final old = matches.first;
+    return auction({
+      'id': old.id,
+      'liveId': old.liveId,
+      'itemName': old.itemName,
+      'currentPrice': old.currentPrice,
+      'targetPrice': old.targetPrice,
+      'status': old.status,
+      'isPinned': old.isPinned,
+      'startingPrice': old.startingPrice,
+      ...json,
+    });
   }
 
   static LiveTreasureBox treasureBox(dynamic payload) {
@@ -129,8 +167,10 @@ class LiveInteractiveMapper {
     return LiveTreasureClaim(
       boxId: json['boxId']?.toString() ?? box['id']?.toString() ?? '',
       coinsWon: _asInt(json['coinsWon']),
-      claimedCount: _asInt(json['claimedCount'] ?? box['claimedCount']),
-      remainingCoins: _asInt(json['remainingCoins'] ?? box['remainingCoins']),
+      claimedCount: _optionalInt(json['claimedCount'] ?? box['claimedCount']),
+      remainingCoins: _optionalInt(
+        json['remainingCoins'] ?? box['remainingCoins'],
+      ),
     );
   }
 
@@ -153,9 +193,30 @@ class LiveInteractiveMapper {
   static LiveSummary summary(dynamic payload) {
     final json = _unwrap(payload, 'summary');
     final rawGifters = json['topGifters'];
+    final shop = asMap(json['shop']);
+    final traffic = json['trafficSourceBreakdown'];
     return LiveSummary(
       liveId: json['liveId']?.toString() ?? '',
       title: json['title']?.toString() ?? '',
+      uniqueViewers: _optionalInt(json['uniqueViewers']),
+      totalWatchSeconds: _optionalInt(json['totalWatchSeconds']),
+      avgWatchSeconds: json['avgWatchSeconds'] is num
+          ? json['avgWatchSeconds'] as num
+          : null,
+      newFollowers: _optionalInt(json['newFollowers']),
+      shareCount: _optionalInt(json['shareCount']),
+      shopOrders: _optionalInt(shop['orders']),
+      shopRevenueCoins: _optionalInt(shop['revenueCoins']),
+      trafficSourceBreakdown: traffic is Map
+          ? Map<String, int>.unmodifiable(
+              traffic.map((key, value) {
+                final count = _optionalInt(value);
+                if (key is! String || count == null)
+                  throw const FormatException('Invalid traffic count.');
+                return MapEntry(key, count);
+              }),
+            )
+          : null,
       durationSeconds: _asInt(json['durationSeconds']),
       peakViewers: _asInt(json['peakViewers']),
       totalViewerSessions: _asInt(json['totalViewerSessions']),
@@ -164,18 +225,27 @@ class LiveInteractiveMapper {
       totalEarnedCoins: _asInt(json['totalEarnedCoins']),
       topGifters: rawGifters is! List
           ? const <LiveSummaryTopGifter>[]
-          : rawGifters.whereType<Map>().map((raw) {
-              final gifter = asMap(raw);
-              final user = asMap(gifter['user']);
-              return LiveSummaryTopGifter(
-                displayName:
-                    user['fullName']?.toString() ??
-                    user['username']?.toString() ??
-                    'Viewer',
-                totalCoins: _asInt(gifter['totalCoins']),
-              );
-            }).toList(growable: false),
+          : rawGifters
+                .whereType<Map>()
+                .map((raw) {
+                  final gifter = asMap(raw);
+                  final user = asMap(gifter['user']);
+                  return LiveSummaryTopGifter(
+                    displayName:
+                        user['fullName']?.toString() ??
+                        user['username']?.toString() ??
+                        'Viewer',
+                    totalCoins: _asInt(gifter['totalCoins']),
+                  );
+                })
+                .toList(growable: false),
     );
+  }
+
+  static int? _optionalInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int && value >= 0) return value;
+    throw const FormatException('Expected a non-negative integer.');
   }
 
   static int _asInt(dynamic value, [int fallback = 0]) {

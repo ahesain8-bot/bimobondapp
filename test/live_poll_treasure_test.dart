@@ -1,3 +1,4 @@
+import 'package:bimobondapp/core/services/live_operation_guard.dart';
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -165,13 +166,14 @@ void main() {
       expect(bloc.state.poll!.id, 'poll-1');
     });
 
-    test('an empty payload clears the poll', () async {
+    test('an identity-less event cannot close the active poll', () async {
       socket.add(pollEvent(pollJson(id: 'poll-1')));
       await bloc.stream.firstWhere((s) => s.poll != null);
 
       socket.add(pollEvent({'liveId': 'live-1'}));
-      await bloc.stream.firstWhere((s) => s.poll == null);
-      expect(bloc.state.poll, isNull);
+      await Future<void>.delayed(Duration.zero);
+      // mobile-api.md: poll end emits the poll with status ENDED, not an empty object.
+      expect(bloc.state.poll?.id, 'poll-1');
     });
   });
 
@@ -213,20 +215,28 @@ void main() {
       await Future<void>.delayed(Duration.zero);
     });
 
-    test(
-      'a settled failure leaves a retry to the user, not to the code',
-      () async {
-        repo.claimError = Exception('network');
-        bloc.add(const LiveInteractiveTreasureBoxClaimed('box-1'));
-        await bloc.stream.firstWhere((s) => s.error != null);
-        expect(repo.claimCalls, 1);
+    test('a network failure stays unresolved on another tap', () async {
+      repo.claimError = Exception('network');
+      bloc.add(const LiveInteractiveTreasureBoxClaimed('box-1'));
+      await bloc.stream.firstWhere((s) => s.error != null);
+      repo.claimError = null;
+      bloc.add(const LiveInteractiveTreasureBoxClaimed('box-1'));
+      await Future<void>.delayed(Duration.zero);
+      expect(repo.claimCalls, 1);
+      expect(bloc.state.lastClaim, isNull);
+    });
 
-        // Nothing was retried automatically; a fresh user tap is accepted.
-        repo.claimError = null;
-        bloc.add(const LiveInteractiveTreasureBoxClaimed('box-1'));
-        await bloc.stream.firstWhere((s) => s.lastClaim != null);
-        expect(repo.claimCalls, 2);
-      },
-    );
+    test('a proven pre-dispatch rejection permits an explicit retry', () async {
+      repo.claimError = const LiveOperationNotSent('not dispatched');
+      bloc.add(const LiveInteractiveTreasureBoxClaimed('box-1'));
+      await bloc.stream.firstWhere((s) => s.error != null);
+      expect(repo.claimCalls, 1);
+
+      // Nothing was retried automatically; a fresh user tap is accepted.
+      repo.claimError = null;
+      bloc.add(const LiveInteractiveTreasureBoxClaimed('box-1'));
+      await bloc.stream.firstWhere((s) => s.lastClaim != null);
+      expect(repo.claimCalls, 2);
+    });
   });
 }

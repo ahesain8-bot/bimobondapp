@@ -1,3 +1,4 @@
+import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -17,11 +18,14 @@ class LiveSummaryPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context)!;
+    String value(num? number) => number?.toString() ?? l.liveMetricUnavailable;
     return BlocProvider(
-      create: (_) => LiveSummaryBloc(repository: repository)
-        ..add(LiveSummaryRequested(liveId)),
+      create: (_) =>
+          LiveSummaryBloc(repository: repository)
+            ..add(LiveSummaryRequested(liveId)),
       child: Scaffold(
-        appBar: AppBar(title: const Text('Live summary')),
+        appBar: AppBar(title: Text(l.liveSummaryTitle)),
         body: BlocBuilder<LiveSummaryBloc, LiveSummaryState>(
           builder: (context, state) {
             if (state.isLoading) {
@@ -37,7 +41,7 @@ class LiveSummaryPage extends StatelessWidget {
             }
             final summary = state.summary;
             if (summary == null) {
-              return const Center(child: Text('No summary available.'));
+              return Center(child: Text(l.liveSummaryEmpty));
             }
             return ListView(
               padding: const EdgeInsets.all(20),
@@ -48,23 +52,70 @@ class LiveSummaryPage extends StatelessWidget {
                 ),
                 const SizedBox(height: 18),
                 _Metric(
-                  label: 'Duration',
+                  label: l.liveSummaryDuration,
                   value: '${summary.durationSeconds}s',
                 ),
-                _Metric(label: 'Peak viewers', value: '${summary.peakViewers}'),
                 _Metric(
-                  label: 'Viewer sessions',
+                  label: l.liveSummaryPeak,
+                  value: '${summary.peakViewers}',
+                ),
+                _Metric(
+                  label: l.liveSummarySessions,
                   value: '${summary.totalViewerSessions}',
                 ),
-                _Metric(label: 'Likes', value: '${summary.totalLikes}'),
-                _Metric(label: 'Comments', value: '${summary.totalComments}'),
                 _Metric(
-                  label: 'Earned coins',
+                  label: l.liveSummaryLikes,
+                  value: '${summary.totalLikes}',
+                ),
+                _Metric(
+                  label: l.liveSummaryComments,
+                  value: '${summary.totalComments}',
+                ),
+                _Metric(
+                  label: l.liveSummaryCoins,
                   value: '${summary.totalEarnedCoins}',
+                ),
+                _Metric(
+                  label: l.liveSummaryUnique,
+                  value: value(summary.uniqueViewers),
+                ),
+                _Metric(
+                  label: l.liveSummaryWatch,
+                  value: value(summary.totalWatchSeconds),
+                ),
+                _Metric(
+                  label: l.liveSummaryAverage,
+                  value: value(summary.avgWatchSeconds),
+                ),
+                _Metric(
+                  label: l.liveSummaryFollowers,
+                  value: value(summary.newFollowers),
+                ),
+                _Metric(
+                  label: l.liveSummaryShares,
+                  value: value(summary.shareCount),
+                ),
+                _Metric(
+                  label: l.liveSummaryOrders,
+                  value: value(summary.shopOrders),
+                ),
+                _Metric(
+                  label: l.liveSummaryRevenue,
+                  value: value(summary.shopRevenueCoins),
                 ),
                 const SizedBox(height: 18),
                 Text(
-                  'Top gifters',
+                  l.liveSummaryTraffic,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                if (summary.trafficSourceBreakdown == null)
+                  Text(l.liveMetricUnavailable)
+                else
+                  for (final entry in summary.trafficSourceBreakdown!.entries)
+                    _Metric(label: entry.key, value: '${entry.value}'),
+                const SizedBox(height: 18),
+                Text(
+                  l.liveSummaryGifters,
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 for (final gifter in summary.topGifters)

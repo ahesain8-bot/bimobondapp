@@ -1,3 +1,5 @@
+import 'package:location/location.dart' as gps;
+import '../../../../core/constants/live_traffic_source.dart';
 import 'dart:async';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import '../../domain/entities/live_feed_activation.dart';
@@ -54,13 +56,141 @@ class _LiveFeedViewState extends State<LiveFeedScreen>
   var _isExiting = false;
   LiveFeedActivation? _activation;
   String? _entryKey;
+  String _surface = 'feed';
+  bool _following = false;
+  String? _topic;
+  int _filterGeneration = 0;
 
   void _activate(LiveEntity live) {
     if (_entryKey != live.feedEntryKey) {
       _entryKey = live.feedEntryKey;
       _activation = LiveFeedActivation.fromEntry(live);
     }
-    _viewerBloc.add(LiveViewerActivated(live, activation: _activation));
+    _viewerBloc.add(
+      LiveViewerActivated(
+        live,
+        activation: _activation,
+        trafficSource: _following
+            ? LiveTrafficSource.following
+            : (_surface == 'feed'
+                  ? LiveTrafficSource.forYou
+                  : LiveTrafficSource.other),
+      ),
+    );
+  }
+
+  Future<void> _showFilters() async {
+    final l = AppLocalizations.of(context)!;
+    final topic = TextEditingController(text: _topic);
+    var surface = _surface;
+    var following = _following;
+    final result = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => StatefulBuilder(
+        builder: (context, update) => SafeArea(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              20,
+              20,
+              20,
+              20 + MediaQuery.viewInsetsOf(context).bottom,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(l.liveDiscoveryFilter),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    for (final choice in [
+                      ('feed', false, l.liveDiscoveryForYou),
+                      ('feed', true, l.liveDiscoveryFollowing),
+                      ('nearby', false, l.liveDiscoveryNearby),
+                      ('audio', false, l.liveDiscoveryAudio),
+                    ])
+                      ChoiceChip(
+                        label: Text(choice.$3),
+                        selected:
+                            surface == choice.$1 && following == choice.$2,
+                        onSelected: (_) => update(() {
+                          surface = choice.$1;
+                          following = choice.$2;
+                        }),
+                      ),
+                  ],
+                ),
+                if (surface != 'nearby')
+                  TextField(
+                    controller: topic,
+                    maxLength: 80,
+                    decoration: InputDecoration(
+                      labelText: l.liveDiscoveryTopic,
+                    ),
+                  ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: Text(l.liveDiscoveryFilter),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    final selectedTopic = topic.text.trim();
+    topic.dispose();
+    if (result != true || !mounted) return;
+    final generation = ++_filterGeneration;
+    double? latitude, longitude;
+    if (surface == 'nearby') {
+      try {
+        final location = gps.Location();
+        if (!await location.serviceEnabled() &&
+            !await location.requestService()) {
+          throw StateError('location unavailable');
+        }
+        var permission = await location.hasPermission();
+        if (permission == gps.PermissionStatus.denied)
+          permission = await location.requestPermission();
+        if (permission != gps.PermissionStatus.granted &&
+            permission != gps.PermissionStatus.grantedLimited) {
+          throw StateError('location permission denied');
+        }
+        final point = await location.getLocation();
+        latitude = point.latitude;
+        longitude = point.longitude;
+        if (latitude == null || longitude == null)
+          throw StateError('location unavailable');
+      } catch (_) {
+        if (mounted)
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(l.liveLocationUnavailable)));
+        return;
+      }
+    }
+    if (!mounted || generation != _filterGeneration) return;
+    _viewerBloc.add(const LiveViewerDeactivated());
+    _surface = surface;
+    _following = following;
+    _topic = surface == 'nearby' || selectedTopic.isEmpty
+        ? null
+        : selectedTopic;
+    _entryKey = null;
+    _activation = null;
+    _currentIndex.value = 0;
+    if (_pageController.hasClients) _pageController.jumpToPage(0);
+    _feedBloc.add(
+      LiveFeedLoadRequested(
+        refresh: true,
+        surface: surface,
+        followingOnly: following,
+        topic: _topic,
+        latitude: latitude,
+        longitude: longitude,
+      ),
+    );
   }
 
   static const double _storiesStripH = 104;
@@ -437,7 +567,7 @@ class _LiveFeedViewState extends State<LiveFeedScreen>
     if (feed.error != null && feed.lives.isEmpty) {
       return Column(
         children: [
-          _DiscoverHeader(onClose: _exitLiveFeed),
+          _DiscoverHeader(onClose: _exitLiveFeed, onFilter: _showFilters),
           Expanded(
             child: _ErrorView(error: feed.error!, onRetry: _refresh),
           ),
@@ -448,7 +578,7 @@ class _LiveFeedViewState extends State<LiveFeedScreen>
     if (feed.lives.isEmpty) {
       return Column(
         children: [
-          _DiscoverHeader(onClose: _exitLiveFeed),
+          _DiscoverHeader(onClose: _exitLiveFeed, onFilter: _showFilters),
           Expanded(child: _EmptyView(onRefresh: _refresh)),
         ],
       );
@@ -530,7 +660,10 @@ class _LiveFeedViewState extends State<LiveFeedScreen>
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      _DiscoverHeader(onClose: _exitLiveFeed),
+                      _DiscoverHeader(
+                        onClose: _exitLiveFeed,
+                        onFilter: _showFilters,
+                      ),
                       LiveStoriesStrip(
                         lives: feed.lives,
                         selectedIndex: selected,
@@ -601,7 +734,9 @@ class _LiveFeedViewState extends State<LiveFeedScreen>
 }
 
 class _DiscoverHeader extends StatelessWidget {
-  const _DiscoverHeader({required this.onClose});
+  const _DiscoverHeader({required this.onClose, this.onFilter});
+
+  final VoidCallback? onFilter;
 
   final VoidCallback onClose;
 
@@ -615,12 +750,9 @@ class _DiscoverHeader extends StatelessWidget {
         child: Row(
           children: [
             IconButton(
-              onPressed: () {},
-              icon: const Icon(
-                Icons.calendar_month_outlined,
-                color: AppColors.textPrimary,
-              ),
-              tooltip: 'Events',
+              onPressed: onFilter,
+              icon: const Icon(Icons.filter_list, color: AppColors.textPrimary),
+              tooltip: AppLocalizations.of(context)!.liveDiscoveryFilter,
             ),
             const Expanded(
               child: Text(

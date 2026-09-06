@@ -1,3 +1,4 @@
+import '../../../live/domain/entities/live_host_league.dart';
 import 'dart:async';
 import 'dart:io';
 
@@ -24,6 +25,11 @@ class RealRankingRepository implements RankingRepository {
 
   final RankingRemoteDataSource _remote;
   final SocketService _socket;
+
+  @override
+  Future<List<LiveLeagueTier>> loadLeagueTiers() => _remote.loadLeagueTiers();
+  @override
+  Future<LiveHostLeague?> loadHostLeague(String userId) => _remote.loadHostLeague(userId);
 
   @override
   Future<Either<Failure, HourlyLeaderboard>> getHourlyLeaderboard({

@@ -140,7 +140,11 @@ class _ViewerEyePill extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.remove_red_eye_outlined, color: Colors.white, size: 15),
+            const Icon(
+              Icons.remove_red_eye_outlined,
+              color: Colors.white,
+              size: 15,
+            ),
             const SizedBox(width: 4),
             AnimatedCounter(
               value: viewerCount,
@@ -167,53 +171,102 @@ class _HostIdentity extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hostName = live.hostName.trim();
-    return GestureDetector(
-      onTap: onFollow,
-      behavior: HitTestBehavior.opaque,
-      child: Row(
-        children: [
-          ClipOval(
-            child: SizedBox(
-              width: TikTokLiveTokens.hostAvatar,
-              height: TikTokLiveTokens.hostAvatar,
-              child: CachedNetworkImage(
-                imageUrl: live.hostAvatar ?? '',
-                fit: BoxFit.cover,
-                placeholder: (_, _) => FallbackAvatar(
-                  seed: live.hostId,
-                  name: live.hostName,
-                  radius: TikTokLiveTokens.hostAvatar / 2,
-                ),
-                errorWidget: (_, _, _) => FallbackAvatar(
-                  seed: live.hostId,
-                  name: live.hostName,
-                  radius: TikTokLiveTokens.hostAvatar / 2,
-                ),
+    final nameStyle = TikTokLiveTokens.hostName.copyWith(
+      shadows: TikTokLiveTokens.glyphShadow,
+    );
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final textDirection = Directionality.of(context);
+        final nameWidth = (TextPainter(
+          text: TextSpan(text: hostName, style: nameStyle),
+          textDirection: textDirection,
+          maxLines: 1,
+        )..layout()).width;
+        final followWidth =
+            (TextPainter(
+              text: const TextSpan(
+                text: 'Follow',
+                style: TikTokLiveTokens.follow,
               ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: SizedBox(
-              height: 18,
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  hostName,
-                  maxLines: 1,
-                  softWrap: false,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    shadows: TikTokLiveTokens.glyphShadow,
+              textDirection: textDirection,
+              maxLines: 1,
+            )..layout()).width +
+            16;
+        final canShowFollow =
+            !live.isFollowing &&
+            TikTokLiveTokens.hostAvatar + 8 + nameWidth + 6 + followWidth <=
+                constraints.maxWidth;
+
+        return GestureDetector(
+          onTap: onFollow,
+          behavior: HitTestBehavior.opaque,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ClipOval(
+                child: SizedBox(
+                  width: TikTokLiveTokens.hostAvatar,
+                  height: TikTokLiveTokens.hostAvatar,
+                  child: CachedNetworkImage(
+                    imageUrl: live.hostAvatar ?? '',
+                    fit: BoxFit.cover,
+                    placeholder: (_, _) => FallbackAvatar(
+                      seed: live.hostId,
+                      name: live.hostName,
+                      radius: TikTokLiveTokens.hostAvatar / 2,
+                    ),
+                    errorWidget: (_, _, _) => FallbackAvatar(
+                      seed: live.hostId,
+                      name: live.hostName,
+                      radius: TikTokLiveTokens.hostAvatar / 2,
+                    ),
                   ),
                 ),
               ),
-            ),
+              const SizedBox(width: 8),
+              Flexible(
+                fit: FlexFit.loose,
+                child: SizedBox(
+                  height: 18,
+                  child: Text(
+                    hostName,
+                    maxLines: 1,
+                    softWrap: false,
+                    overflow: TextOverflow.ellipsis,
+                    style: nameStyle,
+                  ),
+                ),
+              ),
+              if (canShowFollow) ...[
+                const SizedBox(width: 6),
+                _FollowChip(onTap: onFollow),
+              ],
+            ],
           ),
-        ],
+        );
+      },
+    );
+  }
+}
+
+class _FollowChip extends StatelessWidget {
+  const _FollowChip({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 24,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: TikTokLiveTokens.liveRed,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Text('Follow', style: TikTokLiveTokens.follow),
       ),
     );
   }
@@ -582,23 +635,18 @@ class _PkBattleBarState extends State<PkBattleBar>
       return;
     }
     final nextRatio = PkBattleBar.ratioFor(widget.scoreLeft, widget.scoreRight);
-    _ratioAnim = Tween<double>(begin: _ratio, end: nextRatio).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
-    );
-    _leftScoreAnim =
-        Tween<double>(
-          begin: _displayLeft,
-          end: widget.scoreLeft.toDouble(),
-        ).animate(
-          CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
-        );
-    _rightScoreAnim =
-        Tween<double>(
-          begin: _displayRight,
-          end: widget.scoreRight.toDouble(),
-        ).animate(
-          CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
-        );
+    _ratioAnim = Tween<double>(
+      begin: _ratio,
+      end: nextRatio,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
+    _leftScoreAnim = Tween<double>(
+      begin: _displayLeft,
+      end: widget.scoreLeft.toDouble(),
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
+    _rightScoreAnim = Tween<double>(
+      begin: _displayRight,
+      end: widget.scoreRight.toDouble(),
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
     _controller
       ..stop()
       ..forward(from: 0);
@@ -632,10 +680,13 @@ class _PkBattleBarState extends State<PkBattleBar>
                   top: 0,
                   bottom: 0,
                   width: leftW,
-                  child: const DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Color(0xFFFF2D55), Color(0xFFFF5C8A)],
+                  child: const KeyedSubtree(
+                    key: ValueKey('pk-left-score-fill'),
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Color(0xFFFF2D55), Color(0xFFFF5C8A)],
+                        ),
                       ),
                     ),
                   ),
@@ -840,6 +891,23 @@ class TikTokLiveBottomBar extends StatelessWidget {
                         ),
                       ),
                     ],
+                    if (onRoseTap != null) ...[
+                      const SizedBox(width: 2),
+                      _BottomAction(
+                        onTap: onRoseTap!,
+                        child: const Text('🌹', style: TextStyle(fontSize: 22)),
+                      ),
+                    ],
+                    const SizedBox(width: 2),
+                    _BottomAction(
+                      onTap: onShareTap,
+                      child: const Icon(
+                        Icons.reply_rounded,
+                        color: Colors.white,
+                        size: 23,
+                        shadows: TikTokLiveTokens.glyphShadow,
+                      ),
+                    ),
                     const SizedBox(width: 4),
                     _BottomAction(
                       onTap: onGiftTap,

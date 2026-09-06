@@ -328,7 +328,20 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
     String? layout,
     bool? allowGuestCamera,
     bool? moderatorsCanManageGuests,
+    bool? ticketEnabled,
+    int? ticketPriceCoins,
   }) async {
+    if (ticketPriceCoins != null && ticketPriceCoins < 0) {
+      throw ArgumentError.value(
+        ticketPriceCoins,
+        'ticketPriceCoins',
+        'Ticket price cannot be negative.',
+      );
+    }
+    if (ticketEnabled == true &&
+        (ticketPriceCoins == null || ticketPriceCoins <= 0)) {
+      throw ArgumentError('A paid-entry LIVE needs a positive ticket price.');
+    }
     final live = await _remote.updateSettings(
       liveId,
       guestsEnabled: guestsEnabled,
@@ -337,6 +350,8 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
       layout: layout,
       allowGuestCamera: allowGuestCamera,
       moderatorsCanManageGuests: moderatorsCanManageGuests,
+      ticketEnabled: ticketEnabled,
+      ticketPriceCoins: ticketPriceCoins,
     );
     final map = (live['id'] != null)
         ? live
@@ -357,8 +372,10 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
   @override
   Future<List<LiveGalleryItem>> loadGalleryItems(String liveId) async {
     final json = await _remote.gallery(liveId);
-    final raw = json['data'] ?? json['items'] ?? json['gallery'];
-    if (raw is! List) return const [];
+    final raw = json['data'];
+    if (raw is! List || raw.any((item) => item is! Map)) {
+      throw const FormatException('Invalid gallery list.');
+    }
     return raw
         .whereType<Map>()
         .map(
@@ -837,6 +854,10 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
     final parsed = Uri.tryParse(url);
     if (liveId.isEmpty ||
         parsed == null ||
+        !parsed.isAbsolute ||
+        parsed.host.isEmpty ||
+        parsed.userInfo.isNotEmpty ||
+        parsed.host.contains(RegExp(r'\s')) ||
         !(parsed.isScheme('https') || parsed.isScheme('http'))) {
       throw ArgumentError('A replay URL must be an absolute http(s) address');
     }

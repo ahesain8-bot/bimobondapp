@@ -27,6 +27,8 @@ class LiveSession {
     this.layout,
     this.allowGuestCamera,
     this.moderatorsCanManageGuests,
+    this.ticketEnabled,
+    this.ticketPriceCoins,
     this.liveKitToken,
     this.liveKitUrl,
     this.liveKitRole,
@@ -66,6 +68,11 @@ class LiveSession {
   final String? layout;
   final bool? allowGuestCamera;
   final bool? moderatorsCanManageGuests;
+
+  /// Paid-entry policy returned by the LIVE API. Null means this response did
+  /// not include the P3 ticket fields; it must not be treated as free entry.
+  final bool? ticketEnabled;
+  final int? ticketPriceCoins;
 
   /// LiveKit JWT from start/join (never mint on device).
   final String? liveKitToken;
@@ -111,6 +118,8 @@ class LiveSession {
     String? layout,
     bool? allowGuestCamera,
     bool? moderatorsCanManageGuests,
+    bool? ticketEnabled,
+    int? ticketPriceCoins,
     String? liveKitToken,
     String? liveKitUrl,
     String? liveKitRole,
@@ -143,6 +152,8 @@ class LiveSession {
       allowGuestCamera: allowGuestCamera ?? this.allowGuestCamera,
       moderatorsCanManageGuests:
           moderatorsCanManageGuests ?? this.moderatorsCanManageGuests,
+      ticketEnabled: ticketEnabled ?? this.ticketEnabled,
+      ticketPriceCoins: ticketPriceCoins ?? this.ticketPriceCoins,
       liveKitToken: liveKitToken ?? this.liveKitToken,
       liveKitUrl: liveKitUrl ?? this.liveKitUrl,
       liveKitRole: liveKitRole ?? this.liveKitRole,

@@ -57,18 +57,18 @@ class LiveReplay {
   /// flag decide. A banned live has no public replay.
   bool get isPlayable =>
       status == LiveReplayStatus.ready &&
-      available != false &&
+      available == true &&
       (url != null && url!.trim().isNotEmpty);
 
   /// Recording exists but is not watchable yet.
-  bool get isPreparing =>
-      enabled == true && status == LiveReplayStatus.none;
+  bool get isPreparing => enabled == true && status == LiveReplayStatus.none;
 
   bool get isGone =>
       status == LiveReplayStatus.expired || status == LiveReplayStatus.removed;
 }
 
-/// Documented clip states. `POSTED` is set once the clip becomes a For You post.
+/// Only POSTED is established by P1. Other recognized legacy values below
+/// are compatibility values, not proof of preparation or publication success.
 enum LiveClipStatus {
   processing('PROCESSING'),
   ready('READY'),
@@ -117,5 +117,6 @@ class LiveClip {
   /// The server's idempotency signal on a repeated publish.
   final bool? alreadyPosted;
 
-  bool get isPosted => status == LiveClipStatus.posted || postId != null;
+  bool get isPosted =>
+      status == LiveClipStatus.posted && postId?.trim().isNotEmpty == true;
 }

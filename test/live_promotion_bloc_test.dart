@@ -36,6 +36,7 @@ class _Repo implements LiveRepository {
   Future<Either<Failure, JoinLiveResult>> joinLive(
     String liveId, {
     String? campaignId,
+    String? trafficSource,
   }) async {
     calls.add((liveId: liveId, campaignId: campaignId));
     if (gate != null) await gate!.future;

@@ -53,6 +53,8 @@ class _MultiGuestSettingsBodyState extends State<_MultiGuestSettingsBody>
   late String _layout;
   late bool _allowGuestCamera;
   late bool _moderatorsCanManageGuests;
+  late bool _ticketEnabled;
+  late final TextEditingController _ticketPriceController;
   var _saving = false;
 
   @override
@@ -68,6 +70,16 @@ class _MultiGuestSettingsBodyState extends State<_MultiGuestSettingsBody>
     _layout = _normalizeLayout(s.layout);
     _allowGuestCamera = s.allowGuestCamera ?? true;
     _moderatorsCanManageGuests = s.moderatorsCanManageGuests ?? true;
+    _ticketEnabled = s.ticketEnabled ?? false;
+    _ticketPriceController = TextEditingController(
+      text: s.ticketPriceCoins?.toString() ?? '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _ticketPriceController.dispose();
+    super.dispose();
   }
 
   /// Anything the server has not sent (or a value this build does not render)
@@ -79,6 +91,11 @@ class _MultiGuestSettingsBodyState extends State<_MultiGuestSettingsBody>
 
   Future<void> _save() async {
     if (_saving) return;
+    final ticketPrice = int.tryParse(_ticketPriceController.text.trim());
+    if (_ticketEnabled && (ticketPrice == null || ticketPrice <= 0)) {
+      snack('أدخل سعر تذكرة موجبًا قبل تفعيل الدخول المدفوع.');
+      return;
+    }
     setState(() => _saving = true);
     try {
       final updated = await repository.updateSettings(
@@ -89,6 +106,8 @@ class _MultiGuestSettingsBodyState extends State<_MultiGuestSettingsBody>
         layout: _layout,
         allowGuestCamera: _allowGuestCamera,
         moderatorsCanManageGuests: _moderatorsCanManageGuests,
+        ticketEnabled: _ticketEnabled,
+        ticketPriceCoins: ticketPrice,
       );
       if (!mounted) return;
       context.read<LiveRoomBloc>().add(LiveRoomSettingsApplied(updated));
@@ -165,6 +184,26 @@ class _MultiGuestSettingsBodyState extends State<_MultiGuestSettingsBody>
             onChanged: _saving
                 ? null
                 : (v) => setState(() => _moderatorsCanManageGuests = v),
+          ),
+          const SizedBox(height: 14),
+          const Divider(height: 28, color: Colors.white12),
+          _ToggleRow(
+            title: 'دخول بتذكرة',
+            subtitle: 'لا يدخل المشاهد قبل تأكيد الخادم لشراء التذكرة.',
+            value: _ticketEnabled,
+            onChanged: _saving
+                ? null
+                : (v) => setState(() => _ticketEnabled = v),
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: _ticketPriceController,
+            enabled: !_saving && _ticketEnabled,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'سعر التذكرة بالعملات',
+              hintText: 'مثال: 100',
+            ),
           ),
           const SizedBox(height: 24),
           FilledButton(

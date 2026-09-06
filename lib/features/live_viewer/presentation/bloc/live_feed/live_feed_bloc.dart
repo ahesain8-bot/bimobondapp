@@ -17,6 +17,9 @@ class LiveFeedBloc extends Bloc<LiveFeedEvent, LiveFeedState> {
   final GetLiveFeedUseCase getLiveFeedUseCase;
   String? _currentCategory;
   bool _followingOnly = false;
+  String _surface = 'feed';
+  String? _topic;
+  double? _latitude, _longitude;
   int _queryGeneration = 0;
   static const _pageSize = 10;
 
@@ -32,11 +35,23 @@ class LiveFeedBloc extends Bloc<LiveFeedEvent, LiveFeedState> {
   ) async {
     final queryChanged =
         _currentCategory != event.category ||
-        _followingOnly != event.followingOnly;
+        _followingOnly != event.followingOnly ||
+        _surface != event.surface ||
+        _topic != event.topic ||
+        _latitude != event.latitude ||
+        _longitude != event.longitude;
     if (state.isLoading && !queryChanged) return;
     final generation = ++_queryGeneration;
     _currentCategory = event.category;
     _followingOnly = event.followingOnly;
+    _surface = event.surface;
+    _topic = event.topic;
+    _latitude = event.latitude;
+    _longitude = event.longitude;
+    if (queryChanged) {
+      _lastSilentAt = null;
+      _silentCooldownUntil = null;
+    }
     emit(
       LiveFeedLoadInProgress(
         lives: (event.refresh || queryChanged) ? const [] : state.lives,
@@ -52,6 +67,10 @@ class LiveFeedBloc extends Bloc<LiveFeedEvent, LiveFeedState> {
       limit: _pageSize,
       category: event.category,
       followingOnly: _followingOnly,
+      surface: _surface,
+      topic: _topic,
+      latitude: _latitude,
+      longitude: _longitude,
       // Opening Lives uses cache; only pull-to-refresh clears the TTL.
       forceRefresh: false,
     );
@@ -97,6 +116,10 @@ class LiveFeedBloc extends Bloc<LiveFeedEvent, LiveFeedState> {
       limit: _pageSize,
       category: _currentCategory,
       followingOnly: _followingOnly,
+      surface: _surface,
+      topic: _topic,
+      latitude: _latitude,
+      longitude: _longitude,
     );
     if (generation != _queryGeneration || isClosed) return;
     await result.fold(
@@ -139,6 +162,10 @@ class LiveFeedBloc extends Bloc<LiveFeedEvent, LiveFeedState> {
       limit: _pageSize,
       category: _currentCategory,
       followingOnly: _followingOnly,
+      surface: _surface,
+      topic: _topic,
+      latitude: _latitude,
+      longitude: _longitude,
       forceRefresh: true,
     );
     if (generation != _queryGeneration || isClosed) return;
@@ -189,6 +216,10 @@ class LiveFeedBloc extends Bloc<LiveFeedEvent, LiveFeedState> {
         limit: _pageSize,
         category: _currentCategory,
         followingOnly: _followingOnly,
+        surface: _surface,
+        topic: _topic,
+        latitude: _latitude,
+        longitude: _longitude,
         forceRefresh: false,
       );
       if (generation != _queryGeneration || isClosed) return;

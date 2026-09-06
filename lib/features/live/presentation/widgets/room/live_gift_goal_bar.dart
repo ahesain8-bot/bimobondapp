@@ -1,3 +1,4 @@
+import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
 import '../../../domain/entities/live_interactive.dart';
@@ -18,6 +19,8 @@ class LiveGiftGoalBar extends StatelessWidget {
     // A non-positive target is not a goal; the caller filters it out, and this
     // guard keeps the division safe if it ever slips through.
     if (goal.target <= 0) return const SizedBox.shrink();
+    final l10n = AppLocalizations.of(context);
+    final goalLabel = l10n?.liveGiftGoalLabel ?? '';
     final reached = goal.current >= goal.target;
     // Clamped for painting only. The label keeps the server's real numbers.
     final progress = (goal.current / goal.target).clamp(0.0, 1.0);
@@ -25,8 +28,8 @@ class LiveGiftGoalBar extends StatelessWidget {
 
     return Semantics(
       container: true,
-      label: 'Gift goal',
-      value: '${goal.current} of ${goal.target} coins',
+      label: goalLabel,
+      value: '${goal.current}/${goal.target} ${l10n?.coinsUnit ?? ''}',
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -41,7 +44,7 @@ class LiveGiftGoalBar extends StatelessWidget {
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
-                  title == null || title.isEmpty ? 'Gift goal' : title,
+                  title == null || title.isEmpty ? goalLabel : title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(

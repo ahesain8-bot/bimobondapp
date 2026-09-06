@@ -54,7 +54,8 @@ import 'package:bimobondapp/app/wallets/presentation/pages/balance_transaction_d
 import 'package:bimobondapp/app/wallets/presentation/pages/add_payout_method_screen.dart';
 import 'package:bimobondapp/app/home/presentation/pages/live_details_screen.dart';
 import 'package:bimobondapp/features/live_viewer/presentation/live_viewer.dart';
-import 'package:bimobondapp/features/live/presentation/pages/live_room_page.dart' as host_live;
+import 'package:bimobondapp/features/live/presentation/pages/live_room_page.dart'
+    as host_live;
 import 'package:bimobondapp/app/shop/domain/entities/checkout_entity.dart';
 import 'package:bimobondapp/app/shop/presentation/pages/cart_screen.dart';
 import 'package:bimobondapp/app/shop/presentation/pages/checkout_screen.dart';
@@ -200,8 +201,7 @@ class AppRouter {
           path: '/personal-info',
           name: 'personal_info',
           builder: (context, state) {
-          final isOnboarding =
-              state.uri.queryParameters['onboarding'] == '1';
+            final isOnboarding = state.uri.queryParameters['onboarding'] == '1';
             return PersonalInfoScreen(isOnboarding: isOnboarding);
           },
         ),
@@ -224,7 +224,8 @@ class AppRouter {
           path: '/settings/wallet',
           name: 'wallet',
           builder: (context, state) {
-          final tab = int.tryParse(state.uri.queryParameters['tab'] ?? '') ?? 0;
+            final tab =
+                int.tryParse(state.uri.queryParameters['tab'] ?? '') ?? 0;
             return CoinsHubScreen(initialTab: tab);
           },
         ),
@@ -289,7 +290,9 @@ class AppRouter {
           builder: (context, state) {
             final args = postOpenArgsFromExtra(state.extra);
             if (args == null) {
-            return const Scaffold(body: Center(child: Text('Post not found')));
+              return const Scaffold(
+                body: Center(child: Text('Post not found')),
+              );
             }
             if (args.post.isAuctionable) {
               final auctionId = args.post.auction?.id?.trim();
@@ -389,7 +392,8 @@ class AppRouter {
             final productId = state.uri.queryParameters['productId'] ?? '';
             final title = state.uri.queryParameters['title'] ?? 'Product';
             final priceCoins =
-              int.tryParse(state.uri.queryParameters['priceCoins'] ?? '') ?? 0;
+                int.tryParse(state.uri.queryParameters['priceCoins'] ?? '') ??
+                0;
             final imageUrl = state.uri.queryParameters['imageUrl'];
             return CreateAuctionScreen(
               productId: productId,
@@ -422,6 +426,7 @@ class AppRouter {
           name: CheckoutScreen.routeName,
           builder: (context, state) {
             final liveId = state.uri.queryParameters['liveId'];
+            final couponCode = state.uri.queryParameters['couponCode'];
             final postId = state.uri.queryParameters['postId'];
             final extra = state.extra;
             List<CheckoutItemInput>? items;
@@ -434,11 +439,12 @@ class AppRouter {
               items = extra.whereType<CheckoutItemInput>().toList();
             }
             if (items != null && items.isEmpty) items = null;
-          return CheckoutScreen(
-            liveId: liveId,
-            postId: postId,
-            items: items,
-          );
+            return CheckoutScreen(
+              liveId: liveId,
+              couponCode: couponCode,
+              postId: postId,
+              items: items,
+            );
           },
         ),
         GoRoute(
@@ -736,7 +742,8 @@ class AppRouter {
                       milliseconds:
                           extra?['initialSoundWindowMs'] as int? ?? 15000,
                     ),
-            initialSoundDidTrim: extra?['initialSoundDidTrim'] as bool? ?? false,
+              initialSoundDidTrim:
+                  extra?['initialSoundDidTrim'] as bool? ?? false,
               initialSoundSegmentId: extra?['initialSoundSegmentId'] as String?,
               initialFilterName: extra?['filterName'] as String?,
               initialFilterCategory: extra?['filterCategory'] as String?,
@@ -749,8 +756,9 @@ class AppRouter {
               initialTemplateProjectId: extra?['templateProjectId'] as String?,
               initialTemplateRenderedVideo:
                   extra?['templateRenderedVideo'] as File?,
-            initialTemplateSlotFiles:
-                (extra?['templateSlotFiles'] as List?)?.whereType<File>().toList(),
+              initialTemplateSlotFiles: (extra?['templateSlotFiles'] as List?)
+                  ?.whereType<File>()
+                  .toList(),
               initialTemplateServerExportUrl:
                   extra?['templateServerExportUrl'] as String?,
               initialTemplateClientExportQuality:
@@ -842,9 +850,7 @@ class AppRouter {
         ),
       ],
     );
-    router.routerDelegate.addListener(
-      FeedPlaybackGate.instance.syncFromRouter,
-    );
+    router.routerDelegate.addListener(FeedPlaybackGate.instance.syncFromRouter);
     return router;
   }
 }

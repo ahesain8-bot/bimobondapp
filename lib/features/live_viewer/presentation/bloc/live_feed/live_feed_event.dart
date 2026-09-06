@@ -11,15 +11,30 @@ class LiveFeedLoadRequested extends LiveFeedEvent {
   final String? category;
   final bool refresh;
   final bool followingOnly;
+  final String surface;
+  final String? topic;
+  final double? latitude, longitude;
 
   const LiveFeedLoadRequested({
     this.category,
     this.refresh = false,
     this.followingOnly = false,
+    this.surface = 'feed',
+    this.topic,
+    this.latitude,
+    this.longitude,
   });
 
   @override
-  List<Object?> get props => [category, refresh, followingOnly];
+  List<Object?> get props => [
+    category,
+    refresh,
+    followingOnly,
+    surface,
+    topic,
+    latitude,
+    longitude,
+  ];
 }
 
 class LiveFeedLoadMoreRequested extends LiveFeedEvent {

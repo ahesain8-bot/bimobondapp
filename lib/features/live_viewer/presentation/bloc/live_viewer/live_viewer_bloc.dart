@@ -272,11 +272,18 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
         _currentUserId = await _loadCurrentUserId(allowFirebaseFallback: false);
         if (!_isCurrentSession(live.id, sessionGen)) return;
       }
+      final sourceConsumed = event.activation?.isConsumed == true;
       final campaignId = event.activation?.consume(
         joiningLiveId: live.id,
         viewerId: _currentUserId,
       );
-      final joinResult = await joinLiveUseCase(live.id, campaignId: campaignId);
+      final joinResult = await joinLiveUseCase(
+        live.id,
+        campaignId: campaignId,
+        trafficSource: campaignId != null || sourceConsumed
+            ? null
+            : event.trafficSource,
+      );
       if (!_isCurrentSession(live.id, sessionGen)) {
         await _abandonStaleSession();
         return;

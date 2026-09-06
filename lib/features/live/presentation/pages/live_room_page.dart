@@ -126,6 +126,7 @@ class _LiveRoomPageState extends State<LiveRoomPage>
       media: media,
     );
     _interactiveRepository = LiveInteractiveRepositoryImpl(
+      userIdProvider: () => fb.FirebaseAuth.instance.currentUser?.uid ?? '',
       remote: LiveInteractiveRemoteDataSource(apiClient: apiClient),
     );
     // The room's own HUD socket already carries the interactive pushes, so the

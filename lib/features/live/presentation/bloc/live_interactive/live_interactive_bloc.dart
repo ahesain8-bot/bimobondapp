@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../../core/services/live_operation_guard.dart';
 
 import '../../../../live_viewer/domain/entities/socket_event.dart';
 import '../../../data/mappers/live_interactive_mapper.dart';
@@ -22,6 +23,12 @@ class LiveInteractiveBloc
   }) : _repository = repository,
        super(LiveInteractiveState(liveId: liveId)) {
     on<LiveInteractiveStarted>(_onStarted);
+    on<LiveInteractiveGiftGoalSnapshotReceived>((event, emit) {
+      if (event.liveId != _liveId || (_revisions['goal'] ?? 0) != 0) return;
+      emit(
+        state.copyWith(giftGoal: event.goal, clearGiftGoal: event.goal == null),
+      );
+    });
     on<LiveInteractiveGiftGoalCreated>(_onGiftGoalCreated);
     on<LiveInteractivePollCreated>(_onPollCreated);
     on<LiveInteractivePollVoted>(_onPollVoted);
@@ -54,9 +61,12 @@ class LiveInteractiveBloc
   /// put one of them back on screen.
   final Set<String> _endedPolls = {};
 
-  /// Claims already sent, keyed by box id, so a double tap or a second screen
-  /// cannot send the same coin claim twice.
+  // Per-view debounce. The repository owns the shared durable money guard.
   final Set<String> _claimsInFlight = {};
+
+  int _generation = 0;
+  final Map<String, int> _revisions = {};
+  final Set<String> _votedPolls = {};
 
   String get _liveId => state.liveId ?? '';
 
@@ -65,33 +75,67 @@ class LiveInteractiveBloc
     Emitter<LiveInteractiveState> emit,
   ) async {
     if (event.liveId.isEmpty) return;
+    final sameLive = _liveId == event.liveId;
+    final generation = ++_generation;
+    if (!sameLive) {
+      _endedPolls.clear();
+      _votedPolls.clear();
+      _revisions.clear();
+    }
     emit(
-      LiveInteractiveState(
-        liveId: event.liveId,
-        isLoading: true,
-        giftGoal: event.giftGoal,
-      ),
+      sameLive
+          ? state.copyWith(
+              isLoading: true,
+              clearError: true,
+              giftGoal: (_revisions['goal'] ?? 0) == 0 ? event.giftGoal : null,
+            )
+          : LiveInteractiveState(
+              liveId: event.liveId,
+              isLoading: true,
+              giftGoal: event.giftGoal,
+            ),
     );
-    try {
-      final results = await Future.wait<Object?>([
-        _repository.getActivePoll(event.liveId),
-        _repository.listQuestions(event.liveId),
-        _repository.listTreasureBoxes(event.liveId),
-        _repository.listActiveAuctions(event.liveId),
-      ]);
-      if (isClosed) return;
-      emit(
-        state.copyWith(
-          isLoading: false,
-          poll: results[0] as LivePoll?,
-          questions: results[1] as List<LiveQA>,
-          treasureBoxes: results[2] as List<LiveTreasureBox>,
-          auctions: results[3] as List<LiveAuction>,
-        ),
-      );
-    } catch (e) {
-      if (isClosed) return;
-      emit(state.copyWith(isLoading: false, error: e.toString()));
+    Future<void> read<T>(
+      String section,
+      Future<T> Function() fetch,
+      LiveInteractiveState Function(T) apply,
+    ) async {
+      final revision = _revisions[section] ?? 0;
+      try {
+        final value = await fetch();
+        if (isClosed || generation != _generation || emit.isDone) return;
+        if (revision == (_revisions[section] ?? 0)) emit(apply(value));
+      } catch (e) {
+        if (!isClosed && generation == _generation && !emit.isDone) {
+          emit(state.copyWith(error: e.toString()));
+        }
+      }
+    }
+
+    await Future.wait([
+      read(
+        'poll',
+        () => _repository.getActivePoll(event.liveId),
+        (poll) => state.copyWith(poll: poll, clearPoll: poll == null),
+      ),
+      read(
+        'qa',
+        () => _repository.listQuestions(event.liveId),
+        (questions) => state.copyWith(questions: questions),
+      ),
+      read(
+        'treasure',
+        () => _repository.listTreasureBoxes(event.liveId),
+        (boxes) => state.copyWith(treasureBoxes: boxes),
+      ),
+      read(
+        'auction',
+        () => _repository.listActiveAuctions(event.liveId),
+        (auctions) => state.copyWith(auctions: auctions),
+      ),
+    ]);
+    if (!isClosed && generation == _generation && !emit.isDone) {
+      emit(state.copyWith(isLoading: false));
     }
   }
 
@@ -99,15 +143,39 @@ class LiveInteractiveBloc
   /// every surface can disable its controls while a request is in flight.
   Future<void> _run(
     Emitter<LiveInteractiveState> emit,
-    Future<void> Function() action,
+    Future<void> Function(void Function(LiveInteractiveState) publish) action,
   ) async {
     if (!state.hasLiveId) return;
+    final generation = _generation;
+    final revisions = Map<String, int>.from(_revisions);
+    bool unchanged(String key) =>
+        (revisions[key] ?? 0) == (_revisions[key] ?? 0);
+    bool current() => !isClosed && !emit.isDone && generation == _generation;
     emit(state.copyWith(isLoading: true, clearError: true));
     try {
-      await action();
-      if (!isClosed) emit(state.copyWith(isLoading: false));
+      await action((next) {
+        if (!current()) return;
+        emit(
+          next.copyWith(
+            poll: unchanged('poll') ? next.poll : state.poll,
+            clearPoll: unchanged('poll')
+                ? next.poll == null
+                : state.poll == null,
+            giftGoal: unchanged('goal') ? next.giftGoal : state.giftGoal,
+            clearGiftGoal: unchanged('goal')
+                ? next.giftGoal == null
+                : state.giftGoal == null,
+            questions: unchanged('qa') ? next.questions : state.questions,
+            auctions: unchanged('auction') ? next.auctions : state.auctions,
+            treasureBoxes: unchanged('treasure')
+                ? next.treasureBoxes
+                : state.treasureBoxes,
+          ),
+        );
+      });
+      if (current()) emit(state.copyWith(isLoading: false));
     } catch (e) {
-      if (!isClosed) {
+      if (current()) {
         emit(state.copyWith(isLoading: false, error: e.toString()));
       }
     }
@@ -121,7 +189,7 @@ class LiveInteractiveBloc
       emit(state.copyWith(error: 'Enter a target above zero.'));
       return Future.value();
     }
-    return _run(emit, () async {
+    return _run(emit, (publish) async {
       // The POST response is the authoritative goal; dropping it left the bar
       // empty until the next gift arrived.
       final goal = await _repository.createGiftGoal(
@@ -129,7 +197,7 @@ class LiveInteractiveBloc
         title: event.title,
         target: event.target,
       );
-      if (!isClosed) emit(state.copyWith(giftGoal: goal));
+      if (!isClosed) publish(state.copyWith(giftGoal: goal));
     });
   }
 
@@ -150,13 +218,13 @@ class LiveInteractiveBloc
       );
       return Future.value();
     }
-    return _run(emit, () async {
+    return _run(emit, (publish) async {
       final poll = await _repository.createPoll(
         liveId: _liveId,
         question: question,
         options: options,
       );
-      emit(state.copyWith(poll: poll));
+      publish(state.copyWith(poll: poll));
     });
   }
 
@@ -165,9 +233,15 @@ class LiveInteractiveBloc
     Emitter<LiveInteractiveState> emit,
   ) {
     final poll = state.activePoll;
-    if (poll == null) return Future.value();
-    return _run(emit, () async {
-      emit(
+    if (poll == null ||
+        event.optionIndex < 0 ||
+        event.optionIndex >= poll.options.length)
+      return Future.value();
+    final liveId = _liveId;
+    final pollKey = '$liveId|${poll.id}';
+    if (!_votedPolls.add(pollKey)) return Future.value();
+    return _run(emit, (publish) async {
+      publish(
         state.copyWith(
           poll: await _repository.votePoll(
             liveId: _liveId,
@@ -185,10 +259,10 @@ class LiveInteractiveBloc
   ) {
     final poll = state.poll;
     if (poll == null) return Future.value();
-    return _run(emit, () async {
+    return _run(emit, (publish) async {
       await _repository.endPoll(liveId: _liveId, pollId: poll.id);
       _endedPolls.add(poll.id);
-      emit(state.copyWith(clearPoll: true));
+      publish(state.copyWith(clearPoll: true));
     });
   }
 
@@ -198,12 +272,12 @@ class LiveInteractiveBloc
   ) {
     final question = event.question.trim();
     if (question.isEmpty) return Future.value();
-    return _run(emit, () async {
+    return _run(emit, (publish) async {
       final created = await _repository.createQuestion(
         liveId: _liveId,
         question: question,
       );
-      emit(state.copyWith(questions: [created, ...state.questions]));
+      publish(state.copyWith(questions: [created, ...state.questions]));
     });
   }
 
@@ -211,23 +285,14 @@ class LiveInteractiveBloc
     LiveInteractiveQuestionPinned event,
     Emitter<LiveInteractiveState> emit,
   ) {
-    return _run(emit, () async {
+    return _run(emit, (publish) async {
       final pinned = await _repository.pinQuestion(
         liveId: _liveId,
         questionId: event.questionId,
       );
-      // Only one question is pinned at a time, so the freshly pinned one moves
-      // to the front and any previous pin drops back into the plain list.
-      emit(
-        state.copyWith(
-          questions: [
-            pinned,
-            ...state.questions.where(
-              (item) => item.id != pinned.id && !item.isPinned,
-            ),
-          ],
-        ),
-      );
+      publish(state.copyWith(questions: _replaceQuestion(pinned)));
+      final questions = await _repository.listQuestions(pinned.liveId);
+      publish(state.copyWith(questions: questions));
     });
   }
 
@@ -235,12 +300,12 @@ class LiveInteractiveBloc
     LiveInteractiveQuestionAnswered event,
     Emitter<LiveInteractiveState> emit,
   ) {
-    return _run(emit, () async {
+    return _run(emit, (publish) async {
       final answered = await _repository.answerQuestion(
         liveId: _liveId,
         questionId: event.questionId,
       );
-      emit(state.copyWith(questions: _replaceQuestion(answered)));
+      publish(state.copyWith(questions: _replaceQuestion(answered)));
     });
   }
 
@@ -261,14 +326,14 @@ class LiveInteractiveBloc
       );
       return Future.value();
     }
-    return _run(emit, () async {
+    return _run(emit, (publish) async {
       final box = await _repository.createTreasureBox(
         liveId: _liveId,
         totalCoins: event.totalCoins,
         maxClaims: event.maxClaims,
         delaySeconds: event.delaySeconds,
       );
-      emit(state.copyWith(treasureBoxes: [box, ...state.treasureBoxes]));
+      publish(state.copyWith(treasureBoxes: [box, ...state.treasureBoxes]));
     });
   }
 
@@ -276,16 +341,18 @@ class LiveInteractiveBloc
     LiveInteractiveTreasureBoxClaimed event,
     Emitter<LiveInteractiveState> emit,
   ) {
-    // Guarded here, not on the button: two screens share this bloc, and bloc
-    // handlers run concurrently, so a second tap would send a second POST.
-    if (!_claimsInFlight.add(event.boxId)) return Future.value();
-    return _run(emit, () async {
+    final liveId = _liveId;
+    final claimKey = '$liveId|${event.boxId}';
+    if (!state.hasLiveId || !_claimsInFlight.add(claimKey)) {
+      return Future.value();
+    }
+    return _run(emit, (publish) async {
       try {
         final claim = await _repository.claimTreasureBox(
-          liveId: _liveId,
+          liveId: liveId,
           boxId: event.boxId,
         );
-        emit(
+        publish(
           state.copyWith(
             lastClaim: claim,
             treasureBoxes: _applyClaim(
@@ -295,11 +362,12 @@ class LiveInteractiveBloc
             ),
           ),
         );
-      } finally {
-        // Released only once the request has settled; a visible failure stays
-        // a user decision to retry, never an automatic resend.
-        _claimsInFlight.remove(event.boxId);
+      } on LiveOperationNotSent {
+        _claimsInFlight.remove(claimKey);
+        rethrow;
       }
+      // Confirmed and uncertain claims both stay reserved. General network
+      // exceptions do not prove that the server failed to credit the wallet.
     });
   }
 
@@ -314,14 +382,14 @@ class LiveInteractiveBloc
       );
       return Future.value();
     }
-    return _run(emit, () async {
+    return _run(emit, (publish) async {
       final auction = await _repository.createAuction(
         liveId: _liveId,
         itemName: itemName,
         targetPrice: event.targetPrice,
         startingPrice: event.startingPrice,
       );
-      emit(state.copyWith(auctions: [auction, ...state.auctions]));
+      publish(state.copyWith(auctions: [auction, ...state.auctions]));
     });
   }
 
@@ -329,13 +397,13 @@ class LiveInteractiveBloc
     LiveInteractiveAuctionPinToggled event,
     Emitter<LiveInteractiveState> emit,
   ) {
-    return _run(emit, () async {
+    return _run(emit, (publish) async {
       final auction = await _repository.pinAuction(
         liveId: _liveId,
         auctionId: event.auctionId,
         pinned: event.pinned,
       );
-      emit(state.copyWith(auctions: _replaceAuction(auction)));
+      publish(state.copyWith(auctions: _replaceAuction(auction)));
     });
   }
 
@@ -345,7 +413,17 @@ class LiveInteractiveBloc
   ) {
     final payload = event.payload;
     if (state.hasLiveId && payload.liveId != _liveId) return;
+    if (!state.hasLiveId) return;
     final data = payload.payload;
+    final section = switch (payload.event) {
+      'livePollUpdated' => 'poll',
+      'liveQAUpdated' => 'qa',
+      'liveTreasureBoxSpawned' || 'liveTreasureBoxClaimed' => 'treasure',
+      'liveAuction' => 'auction',
+      'liveGiftGoalUpdate' => 'goal',
+      _ => '',
+    };
+    _revisions[section] = (_revisions[section] ?? 0) + 1;
     switch (payload.event) {
       case 'liveGiftGoalUpdate':
         // Server-authoritative: the progress is never added up locally, so one
@@ -358,10 +436,8 @@ class LiveInteractiveBloc
         );
       case 'livePollUpdated':
         final poll = LiveInteractiveMapper.poll(data);
-        if (poll.id.isEmpty) {
-          emit(state.copyWith(clearPoll: true));
-          return;
-        }
+        if (poll.id.isEmpty) return;
+        if (poll.liveId.isNotEmpty && poll.liveId != _liveId) return;
         if (!poll.isActive) {
           _endedPolls.add(poll.id);
           // Only the poll on screen can close the poll on screen.
@@ -374,7 +450,7 @@ class LiveInteractiveBloc
         if (_endedPolls.contains(poll.id)) return;
         emit(state.copyWith(poll: poll));
       case 'liveQAUpdated':
-        final question = LiveInteractiveMapper.qa(data);
+        final question = LiveInteractiveMapper.qaPatch(data, state.questions);
         if (question.id.isEmpty) return;
         emit(
           state.copyWith(
@@ -410,7 +486,10 @@ class LiveInteractiveBloc
           ),
         );
       case 'liveAuction':
-        final auction = LiveInteractiveMapper.auction(data);
+        final auction = LiveInteractiveMapper.auctionPatch(
+          data,
+          state.auctions,
+        );
         if (auction.id.isEmpty) return;
         emit(
           state.copyWith(
@@ -453,15 +532,15 @@ class LiveInteractiveBloc
   /// progress fields move forward.
   List<LiveTreasureBox> _applyClaim({
     required String boxId,
-    required int claimedCount,
-    required int remainingCoins,
+    required int? claimedCount,
+    required int? remainingCoins,
   }) {
     return state.treasureBoxes
         .map(
           (box) => box.id == boxId
               ? box.copyWith(
-                  claimedCount: claimedCount > 0 ? claimedCount : null,
-                  remainingCoins: remainingCoins > 0 ? remainingCoins : null,
+                  claimedCount: claimedCount,
+                  remainingCoins: remainingCoins,
                 )
               : box,
         )
@@ -478,6 +557,7 @@ class LiveInteractiveBloc
 
   @override
   Future<void> close() async {
+    _generation++;
     await _socketSub?.cancel();
     return super.close();
   }

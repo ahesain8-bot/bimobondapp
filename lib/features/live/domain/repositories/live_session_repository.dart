@@ -308,6 +308,8 @@ abstract class LiveSessionRepository {
     String? layout,
     bool? allowGuestCamera,
     bool? moderatorsCanManageGuests,
+    bool? ticketEnabled,
+    int? ticketPriceCoins,
   });
 
   /// Refreshes gallery counts (`GET /lives/:id/gallery`).

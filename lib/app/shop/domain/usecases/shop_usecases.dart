@@ -32,8 +32,7 @@ class GetPlatformShopUseCase {
 
   Future<Either<Failure, PlatformShopPageEntity>> call(
     BrowseProductsParams params,
-  ) =>
-      _repository.getPlatformShop(params);
+  ) => _repository.getPlatformShop(params);
 }
 
 class GetProductCategoriesUseCase {
@@ -59,12 +58,11 @@ class AddCartItemUseCase {
     required String productId,
     String? variantId,
     int quantity = 1,
-  }) =>
-      _repository.addCartItem(
-        productId: productId,
-        variantId: variantId,
-        quantity: quantity,
-      );
+  }) => _repository.addCartItem(
+    productId: productId,
+    variantId: variantId,
+    quantity: quantity,
+  );
 }
 
 class UpdateCartItemUseCase {
@@ -74,11 +72,7 @@ class UpdateCartItemUseCase {
   Future<Either<Failure, CartEntity>> call({
     required String cartItemId,
     required int quantity,
-  }) =>
-      _repository.updateCartItem(
-        cartItemId: cartItemId,
-        quantity: quantity,
-      );
+  }) => _repository.updateCartItem(cartItemId: cartItemId, quantity: quantity);
 }
 
 class RemoveCartItemUseCase {
@@ -104,12 +98,15 @@ class PreviewCheckoutUseCase {
     required List<CheckoutItemInput> items,
     ProductPaymentMethod? paymentMethod,
     List<CheckoutGiftPaymentInput> giftPayments = const [],
-  }) =>
-      _repository.previewCheckout(
-        items: items,
-        paymentMethod: paymentMethod,
-        giftPayments: giftPayments,
-      );
+    String? couponCode,
+    String? liveId,
+  }) => _repository.previewCheckout(
+    items: items,
+    paymentMethod: paymentMethod,
+    giftPayments: giftPayments,
+    couponCode: couponCode,
+    liveId: liveId,
+  );
 }
 
 class CheckoutUseCase {
@@ -125,17 +122,16 @@ class CheckoutUseCase {
     String? liveId,
     String? postId,
     String? idempotencyKey,
-  }) =>
-      _repository.checkout(
-        items: items,
-        paymentMethod: paymentMethod,
-        giftPayments: giftPayments,
-        shippingAddress: shippingAddress,
-        couponCode: couponCode,
-        liveId: liveId,
-        postId: postId,
-        idempotencyKey: idempotencyKey,
-      );
+  }) => _repository.checkout(
+    items: items,
+    paymentMethod: paymentMethod,
+    giftPayments: giftPayments,
+    shippingAddress: shippingAddress,
+    couponCode: couponCode,
+    liveId: liveId,
+    postId: postId,
+    idempotencyKey: idempotencyKey,
+  );
 }
 
 class ShipOrderUseCase {
@@ -146,12 +142,11 @@ class ShipOrderUseCase {
     required String orderId,
     String? trackingNumber,
     String? shippingNote,
-  }) =>
-      _repository.shipOrder(
-        orderId: orderId,
-        trackingNumber: trackingNumber,
-        shippingNote: shippingNote,
-      );
+  }) => _repository.shipOrder(
+    orderId: orderId,
+    trackingNumber: trackingNumber,
+    shippingNote: shippingNote,
+  );
 }
 
 class ReceiveOrderUseCase {
@@ -177,8 +172,7 @@ class DisputeOrderUseCase {
   Future<Either<Failure, ProductOrderEntity>> call({
     required String orderId,
     String? note,
-  }) =>
-      _repository.disputeOrder(orderId: orderId, note: note);
+  }) => _repository.disputeOrder(orderId: orderId, note: note);
 }
 
 class AddLiveProductUseCase {
@@ -188,8 +182,7 @@ class AddLiveProductUseCase {
   Future<Either<Failure, LiveProductPinEntity>> call({
     required String liveId,
     required String productId,
-  }) =>
-      _repository.addLiveProduct(liveId: liveId, productId: productId);
+  }) => _repository.addLiveProduct(liveId: liveId, productId: productId);
 }
 
 class PinLiveProductUseCase {
@@ -200,12 +193,11 @@ class PinLiveProductUseCase {
     required String liveId,
     required String productId,
     required bool isPinned,
-  }) =>
-      _repository.pinLiveProduct(
-        liveId: liveId,
-        productId: productId,
-        isPinned: isPinned,
-      );
+  }) => _repository.pinLiveProduct(
+    liveId: liveId,
+    productId: productId,
+    isPinned: isPinned,
+  );
 }
 
 class RemoveLiveProductUseCase {
@@ -215,8 +207,7 @@ class RemoveLiveProductUseCase {
   Future<Either<Failure, Unit>> call({
     required String liveId,
     required String productId,
-  }) =>
-      _repository.removeLiveProduct(liveId: liveId, productId: productId);
+  }) => _repository.removeLiveProduct(liveId: liveId, productId: productId);
 }
 
 class GetMyOrdersUseCase {
@@ -226,8 +217,7 @@ class GetMyOrdersUseCase {
   Future<Either<Failure, OrdersPageEntity>> call({
     int page = 1,
     int limit = 20,
-  }) =>
-      _repository.getMyOrders(page: page, limit: limit);
+  }) => _repository.getMyOrders(page: page, limit: limit);
 }
 
 class GetPurchasedProductsUseCase {
@@ -236,8 +226,7 @@ class GetPurchasedProductsUseCase {
 
   Future<Either<Failure, PurchasedProductsPageEntity>> call(
     PurchasedProductsQueryParams params,
-  ) =>
-      _repository.getPurchasedProducts(params);
+  ) => _repository.getPurchasedProducts(params);
 }
 
 class GetSalesOrdersUseCase {
@@ -247,8 +236,7 @@ class GetSalesOrdersUseCase {
   Future<Either<Failure, OrdersPageEntity>> call({
     int page = 1,
     int limit = 20,
-  }) =>
-      _repository.getSalesOrders(page: page, limit: limit);
+  }) => _repository.getSalesOrders(page: page, limit: limit);
 }
 
 class GetOrderUseCase {
@@ -266,4 +254,3 @@ class GetLiveProductsUseCase {
   Future<Either<Failure, List<LiveProductPinEntity>>> call(String liveId) =>
       _repository.getLiveProducts(liveId);
 }
-

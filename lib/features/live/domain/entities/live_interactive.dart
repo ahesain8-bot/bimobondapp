@@ -95,7 +95,7 @@ class LiveTreasureBox {
   bool get isExhausted => claimedCount >= maxClaims || remainingCoins <= 0;
   bool get isOpen {
     final normalized = status.toUpperCase();
-    return normalized != 'ENDED' && normalized != 'EXPIRED';
+    return normalized == 'OPEN' || normalized == 'WAITING';
   }
 
   /// Seconds left before the box may be claimed, derived from [unlocksAt] when
@@ -133,8 +133,8 @@ class LiveTreasureClaim {
 
   final String boxId;
   final int coinsWon;
-  final int claimedCount;
-  final int remainingCoins;
+  final int? claimedCount;
+  final int? remainingCoins;
 }
 
 class LiveAuction {
@@ -182,6 +182,14 @@ class LiveSummary {
     required this.totalComments,
     required this.totalEarnedCoins,
     required this.topGifters,
+    this.uniqueViewers,
+    this.totalWatchSeconds,
+    this.avgWatchSeconds,
+    this.newFollowers,
+    this.shareCount,
+    this.trafficSourceBreakdown,
+    this.shopOrders,
+    this.shopRevenueCoins,
   });
 
   final String liveId;
@@ -193,6 +201,10 @@ class LiveSummary {
   final int totalComments;
   final int totalEarnedCoins;
   final List<LiveSummaryTopGifter> topGifters;
+  final int? uniqueViewers, totalWatchSeconds, newFollowers, shareCount;
+  final num? avgWatchSeconds;
+  final Map<String, int>? trafficSourceBreakdown;
+  final int? shopOrders, shopRevenueCoins;
 }
 
 /// A server push for one of the interactive room features, normalized so both

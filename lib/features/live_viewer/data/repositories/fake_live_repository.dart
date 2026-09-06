@@ -14,7 +14,9 @@ import '../datasources/live_remote_datasource.dart';
 class FakeLiveRepository implements LiveRepository {
   final LiveRemoteDataSource _remote;
 
-  FakeLiveRepository(this._remote);
+  FakeLiveRepository(this._remote, {String Function()? accountId})
+    : _accountId = accountId ?? (() => '');
+  final String Function() _accountId;
 
   /// Short TTL so reopening the Lives screen does not stampede `/lives/feed`.
   static const _feedCacheTtl = Duration(seconds: 25);
@@ -38,7 +40,7 @@ class FakeLiveRepository implements LiveRepository {
     double? longitude,
     int? radiusKm,
   }) =>
-      '$surface|$page|$limit|${category ?? ''}|$followingOnly|${topic ?? ''}'
+      '${_accountId()}|$surface|$page|$limit|${category ?? ''}|$followingOnly|${topic ?? ''}'
       '|${latitude ?? ''}|${longitude ?? ''}|${radiusKm ?? ''}';
 
   @override
@@ -212,12 +214,7 @@ class FakeLiveRepository implements LiveRepository {
     String? topic,
     bool forceRefresh = false,
   }) => _surfaceFeed(
-    key: _feedKey(
-      page: page,
-      limit: limit,
-      surface: 'audio',
-      topic: topic,
-    ),
+    key: _feedKey(page: page, limit: limit, surface: 'audio', topic: topic),
     page: page,
     limit: limit,
     forceRefresh: forceRefresh,
@@ -300,20 +297,24 @@ class FakeLiveRepository implements LiveRepository {
   final Map<String, Future<Either<Failure, JoinLiveResult>>> _joinInFlight = {};
 
   final Map<String, String?> _joinCampaigns = {};
+  final Map<String, String?> _joinSources = {};
 
   @override
   Future<Either<Failure, JoinLiveResult>> joinLive(
     String liveId, {
     String? campaignId,
+    String? trafficSource,
   }) async {
-    final existing = _joinInFlight[liveId];
+    final joinKey = '${_accountId()}|$liveId';
+    final existing = _joinInFlight[joinKey];
     final normalizedCampaignId = campaignId?.trim();
     final attribution =
         normalizedCampaignId == null || normalizedCampaignId.isEmpty
         ? null
         : normalizedCampaignId;
     if (existing != null) {
-      if (_joinCampaigns[liveId] != attribution) {
+      if (_joinCampaigns[joinKey] != attribution ||
+          _joinSources[joinKey] != trafficSource) {
         // One connection per room, with no silent attribution borrowing.
         // The caller can finish its current activation and explicitly retry.
         return const Left(
@@ -326,15 +327,21 @@ class FakeLiveRepository implements LiveRepository {
       return existing;
     }
 
-    _joinCampaigns[liveId] = attribution;
-    final future = _joinLiveOnce(liveId, campaignId: attribution);
-    _joinInFlight[liveId] = future;
+    _joinCampaigns[joinKey] = attribution;
+    _joinSources[joinKey] = trafficSource;
+    final future = _joinLiveOnce(
+      liveId,
+      campaignId: attribution,
+      trafficSource: trafficSource,
+    );
+    _joinInFlight[joinKey] = future;
     try {
       return await future;
     } finally {
-      if (identical(_joinInFlight[liveId], future)) {
-        _joinInFlight.remove(liveId);
-        _joinCampaigns.remove(liveId);
+      if (identical(_joinInFlight[joinKey], future)) {
+        _joinInFlight.remove(joinKey);
+        _joinCampaigns.remove(joinKey);
+        _joinSources.remove(joinKey);
       }
     }
   }
@@ -342,9 +349,14 @@ class FakeLiveRepository implements LiveRepository {
   Future<Either<Failure, JoinLiveResult>> _joinLiveOnce(
     String liveId, {
     String? campaignId,
+    String? trafficSource,
   }) async {
     try {
-      final result = await _remote.joinLive(liveId, campaignId: campaignId);
+      final result = await _remote.joinLive(
+        liveId,
+        campaignId: campaignId,
+        trafficSource: trafficSource,
+      );
       return Right(result);
     } on SocketException catch (e) {
       return Left(

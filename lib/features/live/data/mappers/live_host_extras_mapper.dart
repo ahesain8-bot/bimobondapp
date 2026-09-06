@@ -20,7 +20,8 @@ class LiveHostExtrasMapper {
       status: json['status']?.toString() ?? '',
       mutedByHost: json['mutedByHost'] == true,
       cameraOffByHost: json['cameraOffByHost'] == true,
-      displayName: user?['fullName']?.toString() ??
+      displayName:
+          user?['fullName']?.toString() ??
           user?['username']?.toString() ??
           'Guest',
       avatarUrl: user?['avatarUrl']?.toString(),
@@ -30,12 +31,17 @@ class LiveHostExtrasMapper {
 
   /// `GET /lives/leagues` → `{ "tiers": [ { tier, minCoins, minFollowers } ] }`.
   static List<LiveLeagueTier> leagueTiersFromJson(Map<String, dynamic> json) {
-    final raw = json['tiers'] ?? json['data'];
+    final raw = json['tiers'];
+    // This is a read-only list. A malformed record is not evidence of a
+    // zero-progress tier, so discard it while preserving valid server rows.
     if (raw is! List) return const [];
     return raw
         .whereType<Map>()
         .map((e) => Map<String, dynamic>.from(e))
-        .where((e) => (e['tier']?.toString() ?? '').isNotEmpty)
+        .where((e) {
+          final tier = e['tier'];
+          return tier is String && tier.isNotEmpty;
+        })
         .map(
           (e) => LiveLeagueTier(
             tier: e['tier'].toString(),
@@ -49,15 +55,13 @@ class LiveHostExtrasMapper {
 
   /// `GET /lives/host-league/:userId`. Returns null without a usable user id.
   static LiveHostLeague? hostLeagueFromJson(Map<String, dynamic> json) {
-    final source = json['hostLeague'] is Map
-        ? Map<String, dynamic>.from(json['hostLeague'] as Map)
-        : json;
+    final source = json;
     final userId = source['userId']?.toString() ?? '';
     if (userId.isEmpty) return null;
     return LiveHostLeague(
       userId: userId,
       username: source['username']?.toString(),
-      tier: source['hostLeagueTier']?.toString() ?? source['tier']?.toString(),
+      tier: source['hostLeagueTier']?.toString(),
       totalLiveEarnedCoins: _asInt(source['totalLiveEarnedCoins']),
       followerCount: _asInt(source['followerCount']),
       nextTier: source['nextTier']?.toString(),
@@ -70,9 +74,7 @@ class LiveHostExtrasMapper {
   static LiveReplay replayFromJson(Map<String, dynamic>? json) {
     if (json == null) return LiveReplay.none;
     final nested = json['replay'];
-    final source = nested is Map
-        ? Map<String, dynamic>.from(nested)
-        : json;
+    final source = nested is Map ? Map<String, dynamic>.from(nested) : json;
     return LiveReplay(
       status: LiveReplayStatus.parse(source['status']?.toString()),
       enabled: source['enabled'] as bool?,
@@ -97,13 +99,15 @@ class LiveHostExtrasMapper {
       endSeconds: _asNum(source['endSeconds']),
       clipUrl: source['clipUrl']?.toString(),
       postId: (source['postId'] ?? source['post']?['id'])?.toString(),
-      alreadyPosted: (json['alreadyPosted'] ?? source['alreadyPosted'])
-          as bool?,
+      alreadyPosted:
+          (json['alreadyPosted'] ?? source['alreadyPosted']) as bool?,
     );
   }
 
   static List<LiveClip> clipsFromJson(Map<String, dynamic> json) {
-    final raw = json['data'] ?? json['items'] ?? json['clips'];
+    final raw = json['data'];
+    // A list endpoint can legitimately be empty. Invalid elements carry no
+    // actionable clip identity and are therefore ignored, never invented.
     if (raw is! List) return const [];
     return raw
         .whereType<Map>()
@@ -129,7 +133,8 @@ class LiveHostExtrasMapper {
         ? null
         : LiveHost(
             id: user['id']?.toString() ?? '',
-            displayName: user['fullName']?.toString() ??
+            displayName:
+                user['fullName']?.toString() ??
                 user['username']?.toString() ??
                 'Host',
             avatarUrl: user['avatarUrl']?.toString(),
@@ -148,13 +153,14 @@ class LiveHostExtrasMapper {
       viewers: _asInt(json['viewers'] ?? live['viewers']),
       host: host,
       userId: json['userId']?.toString() ?? user?['id']?.toString(),
-      displayName: host?.displayName ??
+      displayName:
+          host?.displayName ??
           json['username']?.toString() ??
           json['fullName']?.toString(),
       avatarUrl: host?.avatarUrl ?? json['avatarUrl']?.toString(),
       isPopular: (json['isPopular'] ?? live['isPopular']) as bool?,
-      popularReason:
-          (json['popularReason'] ?? live['popularReason'])?.toString(),
+      popularReason: (json['popularReason'] ?? live['popularReason'])
+          ?.toString(),
       hostLeagueTier: user?['hostLeagueTier']?.toString(),
       gifterLevel: _asInt(user?['gifterLevel']),
     );
@@ -162,15 +168,12 @@ class LiveHostExtrasMapper {
 
   static LiveGalleryItem galleryItemFromJson(Map<String, dynamic> json) {
     return LiveGalleryItem(
-      id: json['id']?.toString() ??
-          json['auctionId']?.toString() ??
-          '',
-      itemName: json['itemName']?.toString() ??
-          json['title']?.toString() ??
-          'عنصر',
+      id: json['id']?.toString() ?? json['auctionId']?.toString() ?? '',
+      itemName:
+          json['itemName']?.toString() ?? json['title']?.toString() ?? 'عنصر',
       itemImageUrl:
           json['itemImageUrl']?.toString() ?? json['imageUrl']?.toString(),
-      pinned: json['pinned'] == true,
+      pinned: json['pinned'] == true || json['isPinned'] == true,
       pinOrder: _asInt(json['pinOrder']),
       status: json['status']?.toString(),
       targetPrice: _asNum(json['targetPrice']),
