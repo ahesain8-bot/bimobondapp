@@ -190,7 +190,8 @@ final class ArCameraController: NSObject {
     }
 
     /// Updates the maximum photo dimensions based on the currently active
-    /// camera. Called on initial setup and after every camera flip.
+    /// camera, and syncs the saved photo's mirroring to match the live
+    /// mirrored on front
     private func refreshMaxPhotoDimensions() {
         guard let device = currentInput?.device else {
             return
@@ -202,6 +203,11 @@ final class ArCameraController: NSObject {
                 ?? photoOutput.maxPhotoDimensions
         } else {
             photoOutput.isHighResolutionCaptureEnabled = true
+        }
+
+        if let connection = photoOutput.connection(with: .video) {
+            connection.automaticallyAdjustsVideoMirroring = false
+            connection.isVideoMirrored = isFrontCamera
         }
     }
 
