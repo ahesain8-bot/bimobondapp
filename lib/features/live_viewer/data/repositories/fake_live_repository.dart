@@ -6,6 +6,7 @@ import 'package:dartz/dartz.dart';
 import '../../../../core/network/api_exceptions.dart';
 import 'package:bimobondapp/features/live_viewer/core/errors/failures.dart';
 import '../../domain/entities/live_entity.dart';
+import '../../domain/entities/live_feed_page_result.dart';
 import '../../domain/entities/live_session_entity.dart';
 import '../../domain/repositories/live_repository.dart';
 import '../datasources/live_remote_datasource.dart';
@@ -15,22 +16,91 @@ class FakeLiveRepository implements LiveRepository {
 
   FakeLiveRepository(this._remote);
 
+  /// Short TTL so reopening the Lives screen does not stampede `/lives/feed`.
+  static const _feedCacheTtl = Duration(seconds: 25);
+
+  LiveFeedPageResult? _feedCache;
+  DateTime? _feedCacheAt;
+  String? _feedCacheKey;
+  Future<Either<Failure, LiveFeedPageResult>>? _feedInFlight;
+  String? _feedInFlightKey;
+
+  String _feedKey({
+    required int page,
+    required int limit,
+    String? category,
+  }) =>
+      '$page|$limit|${category ?? ''}';
+
   @override
-  Future<Either<Failure, List<LiveEntity>>> getLiveFeed({
+  Future<Either<Failure, LiveFeedPageResult>> getLiveFeed({
     int page = 1,
     int limit = 10,
     String? category,
+    bool forceRefresh = false,
+  }) async {
+    final key = _feedKey(page: page, limit: limit, category: category);
+
+    if (!forceRefresh &&
+        page == 1 &&
+        _feedCache != null &&
+        _feedCacheAt != null &&
+        _feedCacheKey == key &&
+        DateTime.now().difference(_feedCacheAt!) < _feedCacheTtl) {
+      return Right(_feedCache!);
+    }
+
+    final existing = _feedInFlight;
+    if (existing != null && _feedInFlightKey == key) {
+      return existing;
+    }
+
+    final future = _fetchLiveFeed(
+      page: page,
+      limit: limit,
+      category: category,
+      cacheKey: key,
+    );
+    _feedInFlight = future;
+    _feedInFlightKey = key;
+    try {
+      return await future;
+    } finally {
+      if (identical(_feedInFlight, future)) {
+        _feedInFlight = null;
+        _feedInFlightKey = null;
+      }
+    }
+  }
+
+  Future<Either<Failure, LiveFeedPageResult>> _fetchLiveFeed({
+    required int page,
+    required int limit,
+    String? category,
+    required String cacheKey,
   }) async {
     try {
-      final lives = await _remote.getLiveFeed(
+      final pageResult = await _remote.getLiveFeed(
         page: page,
         limit: limit,
         category: category,
       );
-      final activeLives = lives
+      final activeLives = pageResult.lives
           .where((l) => l.status == LiveStatus.live)
           .toList();
-      return Right(activeLives);
+      final result = LiveFeedPageResult(
+        lives: activeLives,
+        page: pageResult.page,
+        limit: pageResult.limit,
+        total: pageResult.total,
+        totalPages: pageResult.totalPages,
+      );
+      if (page == 1) {
+        _feedCache = result;
+        _feedCacheAt = DateTime.now();
+        _feedCacheKey = cacheKey;
+      }
+      return Right(result);
     } on SocketException catch (e) {
       return Left(
         NetworkFailure(
@@ -102,8 +172,13 @@ class FakeLiveRepository implements LiveRepository {
     String category, {
     int page = 1,
     int limit = 10,
-  }) {
-    return getLiveFeed(page: page, limit: limit, category: category);
+  }) async {
+    final result = await getLiveFeed(
+      page: page,
+      limit: limit,
+      category: category,
+    );
+    return result.map((pageResult) => pageResult.lives);
   }
 
   @override
@@ -113,8 +188,8 @@ class FakeLiveRepository implements LiveRepository {
     int limit = 10,
   }) async {
     try {
-      final lives = await _remote.getLiveFeed(page: page, limit: limit);
-      final filtered = lives.where((live) {
+      final pageResult = await _remote.getLiveFeed(page: page, limit: limit);
+      final filtered = pageResult.lives.where((live) {
         final q = query.toLowerCase();
         return live.title.toLowerCase().contains(q) ||
             live.hostName.toLowerCase().contains(q) ||
@@ -126,8 +201,26 @@ class FakeLiveRepository implements LiveRepository {
     }
   }
 
+  final Map<String, Future<Either<Failure, JoinLiveResult>>> _joinInFlight =
+      {};
+
   @override
   Future<Either<Failure, JoinLiveResult>> joinLive(String liveId) async {
+    final existing = _joinInFlight[liveId];
+    if (existing != null) return existing;
+
+    final future = _joinLiveOnce(liveId);
+    _joinInFlight[liveId] = future;
+    try {
+      return await future;
+    } finally {
+      if (identical(_joinInFlight[liveId], future)) {
+        _joinInFlight.remove(liveId);
+      }
+    }
+  }
+
+  Future<Either<Failure, JoinLiveResult>> _joinLiveOnce(String liveId) async {
     try {
       final result = await _remote.joinLive(liveId);
       return Right(result);
@@ -153,6 +246,14 @@ class FakeLiveRepository implements LiveRepository {
     } on NotFoundException catch (e) {
       return Left(
         NotFoundFailure(
+          e.message,
+          code: e.statusCode?.toString(),
+          details: e.details,
+        ),
+      );
+    } on ApiException catch (e) {
+      return Left(
+        ServerFailure(
           e.message,
           code: e.statusCode?.toString(),
           details: e.details,
@@ -261,8 +362,9 @@ class FakeLiveRepository implements LiveRepository {
   @override
   Future<Either<Failure, List<LiveEntity>>> getRecommendedLives({
     int limit = 10,
-  }) {
-    return getLiveFeed(limit: limit);
+  }) async {
+    final result = await getLiveFeed(limit: limit);
+    return result.map((pageResult) => pageResult.lives);
   }
 
   @override

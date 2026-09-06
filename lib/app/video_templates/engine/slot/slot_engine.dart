@@ -19,6 +19,14 @@ class SlotFillEntry extends Equatable {
     this.rotation = 0,
     this.scale = 1,
     this.volume = 1,
+    this.opacity = 1,
+    this.reversed = false,
+    this.freeze = false,
+    this.reduceNoise = false,
+    this.beautify = false,
+    this.cutout = false,
+    this.maskType,
+    this.voiceEffect,
   });
 
   final String slotId;
@@ -33,6 +41,16 @@ class SlotFillEntry extends Equatable {
   final double rotation;
   final double scale;
   final double volume;
+  final double opacity;
+  final bool reversed;
+  final bool freeze;
+  final bool reduceNoise;
+  final bool beautify;
+  final bool cutout;
+  /// CapCut-style mask id for encode (`circle`, `rect`, …).
+  final String? maskType;
+  /// CapCut-style voice effect id for encode.
+  final String? voiceEffect;
 
   bool get hasMedia =>
       (localFile != null && localFile!.path.isNotEmpty) ||
@@ -57,8 +75,18 @@ class SlotFillEntry extends Equatable {
     double? rotation,
     double? scale,
     double? volume,
+    double? opacity,
+    bool? reversed,
+    bool? freeze,
+    bool? reduceNoise,
+    bool? beautify,
+    bool? cutout,
+    String? maskType,
+    String? voiceEffect,
     bool clearFile = false,
     bool clearUrl = false,
+    bool clearMask = false,
+    bool clearVoiceEffect = false,
   }) {
     return SlotFillEntry(
       slotId: slotId,
@@ -72,6 +100,15 @@ class SlotFillEntry extends Equatable {
       rotation: rotation ?? this.rotation,
       scale: scale ?? this.scale,
       volume: volume ?? this.volume,
+      opacity: opacity ?? this.opacity,
+      reversed: reversed ?? this.reversed,
+      freeze: freeze ?? this.freeze,
+      reduceNoise: reduceNoise ?? this.reduceNoise,
+      beautify: beautify ?? this.beautify,
+      cutout: cutout ?? this.cutout,
+      maskType: clearMask ? null : (maskType ?? this.maskType),
+      voiceEffect:
+          clearVoiceEffect ? null : (voiceEffect ?? this.voiceEffect),
     );
   }
 
@@ -85,6 +122,14 @@ class SlotFillEntry extends Equatable {
       'rotation': rotation,
       'scale': scale,
       if (!isImageSlot) 'volume': volume,
+      'opacity': opacity,
+      if (!isImageSlot) 'reversed': reversed,
+      if (!isImageSlot) 'freeze': freeze,
+      if (!isImageSlot) 'reduceNoise': reduceNoise,
+      'beautify': beautify,
+      'cutout': cutout,
+      if (maskType != null) 'maskType': maskType,
+      if (voiceEffect != null) 'voiceEffect': voiceEffect,
     };
   }
 
@@ -115,6 +160,14 @@ class SlotFillEntry extends Equatable {
         rotation,
         scale,
         volume,
+        opacity,
+        reversed,
+        freeze,
+        reduceNoise,
+        beautify,
+        cutout,
+        maskType,
+        voiceEffect,
       ];
 }
 

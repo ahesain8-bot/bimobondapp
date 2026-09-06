@@ -163,7 +163,30 @@ class SocialRemoteDataSourceImpl implements SocialRemoteDataSource {
         options: Options(headers: await _authHeaders()),
       );
       if (response.statusCode == 200) {
-        final data = _extractObject(response.data);
+        final raw = response.data;
+        final data = _extractObject(raw);
+        // Merge root envelope flags — nested `data` may omit isFollowing
+        // while the outer payload has the real viewer relationship.
+        if (raw is Map) {
+          final root = Map<String, dynamic>.from(raw);
+          for (final key in [
+            'isFollowing',
+            'isFollowed',
+            'viewerIsFollowing',
+            'youFollow',
+            'followedByMe',
+            'amIFollowing',
+            'iFollow',
+            'isFriend',
+            'isMutual',
+            'status',
+            'following',
+          ]) {
+            if (root.containsKey(key)) {
+              data[key] = root[key];
+            }
+          }
+        }
         return FollowStatus.fromResponse(data) == FollowStatus.followed;
       }
       throw ServerException(

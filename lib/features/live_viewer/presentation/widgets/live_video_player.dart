@@ -126,6 +126,20 @@ class _LiveVideoPlayerState extends State<LiveVideoPlayer> {
           ? VideoDimensions(capWidth, capHeight)
           : const VideoDimensions(854, 480);
       final quality = isActive ? VideoQuality.HIGH : VideoQuality.LOW;
+      // Skip no-op renegotiation — re-applying the same floor mid-PK stalls
+      // decode and looks like a freeze/reload.
+      final currentDims = pub.dimensions;
+      final alreadyAtFloor =
+          pub.videoQuality == quality &&
+          currentDims != null &&
+          currentDims.width >= dims.width &&
+          currentDims.height >= dims.height;
+      if (alreadyAtFloor) {
+        debugPrint(
+          '[VIDEO-FIX] VIEWER-FLOOR: skip (already ${dims.width}x${dims.height} ${quality.name})',
+        );
+        return;
+      }
       debugPrint(
         '[VIDEO-FIX] VIEWER-FLOOR: liveId=${widget.live.id}'
         '  isActive=$isActive'

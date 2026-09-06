@@ -22,6 +22,9 @@ class SocialUserModel extends SocialUserEntity {
         case '1':
         case 'followed':
         case 'following':
+        case 'friends':
+        case 'friend':
+        case 'mutual':
           return true;
         case 'false':
         case '0':
@@ -32,12 +35,59 @@ class SocialUserModel extends SocialUserEntity {
     return false;
   }
 
+  static bool? _parseOptionalBool(dynamic value) {
+    if (value == null) return null;
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    if (value is String) {
+      switch (value.toLowerCase()) {
+        case 'true':
+        case '1':
+        case 'followed':
+        case 'following':
+        case 'friends':
+        case 'friend':
+        case 'mutual':
+          return true;
+        case 'false':
+        case '0':
+        case 'unfollowed':
+          return false;
+      }
+    }
+    return null;
+  }
+
+  static const _relationshipKeys = [
+    'isFollowing',
+    'isFollowed',
+    'viewerIsFollowing',
+    'youFollow',
+    'followedByMe',
+    'amIFollowing',
+    'isFollowedBy',
+    'followsYou',
+    'isFollower',
+    'followsViewer',
+    'isFriend',
+    'isMutual',
+    'friendshipStatus',
+  ];
+
   static Map<String, dynamic> unwrapForParsing(Map<String, dynamic> json) {
     for (final key in ['user', 'friend', 'followedUser', 'follower', 'profile']) {
       final nested = json[key];
       if (nested is Map) {
         final user = Map<String, dynamic>.from(nested);
         user.putIfAbsent('id', () => json['userId'] ?? json['friendId']);
+        // Viewer↔user flags live on the list item; nested profiles often omit
+        // them or default isFollowing to false and would incorrectly keep
+        // "Follow back" for people you already follow.
+        for (final relKey in _relationshipKeys) {
+          if (json.containsKey(relKey)) {
+            user[relKey] = json[relKey];
+          }
+        }
         return user;
       }
     }
@@ -52,15 +102,23 @@ class SocialUserModel extends SocialUserEntity {
         data['image'] ??
         data['profileImage'];
 
-    final isFollowing = _parseBool(
+    final isFriend = _parseBool(
+          data['isFriend'] ?? json['isFriend'],
+        ) ||
+        _parseBool(data['isMutual'] ?? json['isMutual']) ||
+        _parseBool(data['friendshipStatus'] ?? json['friendshipStatus']);
+
+    final parsedFollowing = _parseOptionalBool(
       data['isFollowing'] ??
           data['isFollowed'] ??
           data['viewerIsFollowing'] ??
           data['youFollow'] ??
+          data['followedByMe'] ??
+          data['amIFollowing'] ??
           json['isFollowing'],
     );
 
-    final isFollowedBy = _parseBool(
+    final parsedFollowedBy = _parseOptionalBool(
       data['isFollowedBy'] ??
           data['followsYou'] ??
           data['isFollower'] ??
@@ -76,8 +134,8 @@ class SocialUserModel extends SocialUserEntity {
           ? MediaUtils.resolveAbsoluteUrl(avatar.toString())
           : null,
       isActive: data['isActive'] as bool? ?? data['active'] as bool?,
-      isFollowing: isFollowing,
-      isFollowedBy: isFollowedBy,
+      isFollowing: isFriend || (parsedFollowing ?? false),
+      isFollowedBy: isFriend || (parsedFollowedBy ?? false),
     );
   }
 }

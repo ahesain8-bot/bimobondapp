@@ -1,0 +1,1105 @@
+﻿> Task :gradle:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :gradle:pluginDescriptors UP-TO-DATE
+> Task :gradle:processResources
+
+> Task :gradle:compileKotlin
+w: file:///C:/src/flutter/packages/flutter_tools/gradle/src/main/kotlin/FlutterPlugin.kt:11:37 'ApkVariant' is deprecated. Deprecated in Java
+w: file:///C:/src/flutter/packages/flutter_tools/gradle/src/main/kotlin/FlutterPlugin.kt:614:69 'ApkVariant' is deprecated. Deprecated in Java
+w: file:///C:/src/flutter/packages/flutter_tools/gradle/src/main/kotlin/plugins/PluginHandler.kt:186:64 Unchecked cast: NamedDomainObjectContainer<out BuildType> to NamedDomainObjectContainer<BuildType>
+w: file:///C:/src/flutter/packages/flutter_tools/gradle/src/main/kotlin/plugins/PluginHandler.kt:187:69 Unchecked cast: NamedDomainObjectContainer<out BuildType> to NamedDomainObjectContainer<BuildType>
+
+> Task :gradle:compileJava NO-SOURCE
+> Task :gradle:compileGroovy NO-SOURCE
+> Task :gradle:classes
+> Task :gradle:jar
+
+> Configure project :app
+w: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/build.gradle.kts:22:9: 'jvmTarget: String' is deprecated. Please migrate to the compilerOptions DSL. More details are here: https://kotl.in/u1r8ln
+WARNING: C/C++: The build staging directory you specified ('C:\Users\Flutter_2_2026\AndroidStudioProjects\MyApplication\bimobondapp\build\app\cxx')
+is a subdirectory of your project's temporary build directory (
+'C:\Users\Flutter_2_2026\AndroidStudioProjects\MyApplication\bimobondapp\build\app'). Files in this directory do not persist through clean
+builds. It is recommended to either use the default build staging directory
+('C:\Users\Flutter_2_2026\AndroidStudioProjects\MyApplication\bimobondapp\android\app\.cxx'), or specify a path outside the temporary build directory.
+C/C++: The build staging directory you specified ('C:\Users\Flutter_2_2026\AndroidStudioProjects\MyApplication\bimobondapp\build\app\cxx')
+is a subdirectory of your project's temporary build directory (
+'C:\Users\Flutter_2_2026\AndroidStudioProjects\MyApplication\bimobondapp\build\app'). Files in this directory do not persist through clean
+builds. It is recommended to either use the default build staging directory
+('C:\Users\Flutter_2_2026\AndroidStudioProjects\MyApplication\bimobondapp\android\app\.cxx'), or specify a path outside the temporary build directory.
+WARNING: C/C++: The build staging directory you specified ('C:\Users\Flutter_2_2026\AndroidStudioProjects\MyApplication\bimobondapp\build\app\cxx')
+is a subdirectory of your project's temporary build directory (
+'C:\Users\Flutter_2_2026\AndroidStudioProjects\MyApplication\bimobondapp\build\app'). Files in this directory do not persist through clean
+builds. It is recommended to either use the default build staging directory
+('C:\Users\Flutter_2_2026\AndroidStudioProjects\MyApplication\bimobondapp\android\app\.cxx'), or specify a path outside the temporary build directory.
+C/C++: The build staging directory you specified ('C:\Users\Flutter_2_2026\AndroidStudioProjects\MyApplication\bimobondapp\build\app\cxx')
+is a subdirectory of your project's temporary build directory (
+'C:\Users\Flutter_2_2026\AndroidStudioProjects\MyApplication\bimobondapp\build\app'). Files in this directory do not persist through clean
+builds. It is recommended to either use the default build staging directory
+('C:\Users\Flutter_2_2026\AndroidStudioProjects\MyApplication\bimobondapp\android\app\.cxx'), or specify a path outside the temporary build directory.
+WARNING: C/C++: The build staging directory you specified ('C:\Users\Flutter_2_2026\AndroidStudioProjects\MyApplication\bimobondapp\build\app\cxx')
+is a subdirectory of your project's temporary build directory (
+'C:\Users\Flutter_2_2026\AndroidStudioProjects\MyApplication\bimobondapp\build\app'). Files in this directory do not persist through clean
+builds. It is recommended to either use the default build staging directory
+('C:\Users\Flutter_2_2026\AndroidStudioProjects\MyApplication\bimobondapp\android\app\.cxx'), or specify a path outside the temporary build directory.
+C/C++: The build staging directory you specified ('C:\Users\Flutter_2_2026\AndroidStudioProjects\MyApplication\bimobondapp\build\app\cxx')
+is a subdirectory of your project's temporary build directory (
+'C:\Users\Flutter_2_2026\AndroidStudioProjects\MyApplication\bimobondapp\build\app'). Files in this directory do not persist through clean
+builds. It is recommended to either use the default build staging directory
+('C:\Users\Flutter_2_2026\AndroidStudioProjects\MyApplication\bimobondapp\android\app\.cxx'), or specify a path outside the temporary build directory.
+
+> Configure project :jni
+WARNING: C/C++: The build staging directory you specified ('C:\Users\Flutter_2_2026\AndroidStudioProjects\MyApplication\bimobondapp\build\jni\cxx')
+is a subdirectory of your project's temporary build directory (
+'C:\Users\Flutter_2_2026\AndroidStudioProjects\MyApplication\bimobondapp\build\jni'). Files in this directory do not persist through clean
+builds. It is recommended to either use the default build staging directory
+('C:\Users\Flutter_2_2026\AppData\Local\Pub\Cache\hosted\pub.dev\jni-1.0.0\android\.cxx'), or specify a path outside the temporary build directory.
+C/C++: The build staging directory you specified ('C:\Users\Flutter_2_2026\AndroidStudioProjects\MyApplication\bimobondapp\build\jni\cxx')
+is a subdirectory of your project's temporary build directory (
+'C:\Users\Flutter_2_2026\AndroidStudioProjects\MyApplication\bimobondapp\build\jni'). Files in this directory do not persist through clean
+builds. It is recommended to either use the default build staging directory
+('C:\Users\Flutter_2_2026\AppData\Local\Pub\Cache\hosted\pub.dev\jni-1.0.0\android\.cxx'), or specify a path outside the temporary build directory.
+WARNING: C/C++: The build staging directory you specified ('C:\Users\Flutter_2_2026\AndroidStudioProjects\MyApplication\bimobondapp\build\jni\cxx')
+is a subdirectory of your project's temporary build directory (
+'C:\Users\Flutter_2_2026\AndroidStudioProjects\MyApplication\bimobondapp\build\jni'). Files in this directory do not persist through clean
+builds. It is recommended to either use the default build staging directory
+('C:\Users\Flutter_2_2026\AppData\Local\Pub\Cache\hosted\pub.dev\jni-1.0.0\android\.cxx'), or specify a path outside the temporary build directory.
+C/C++: The build staging directory you specified ('C:\Users\Flutter_2_2026\AndroidStudioProjects\MyApplication\bimobondapp\build\jni\cxx')
+is a subdirectory of your project's temporary build directory (
+'C:\Users\Flutter_2_2026\AndroidStudioProjects\MyApplication\bimobondapp\build\jni'). Files in this directory do not persist through clean
+builds. It is recommended to either use the default build staging directory
+('C:\Users\Flutter_2_2026\AppData\Local\Pub\Cache\hosted\pub.dev\jni-1.0.0\android\.cxx'), or specify a path outside the temporary build directory.
+WARNING: C/C++: The build staging directory you specified ('C:\Users\Flutter_2_2026\AndroidStudioProjects\MyApplication\bimobondapp\build\jni\cxx')
+is a subdirectory of your project's temporary build directory (
+'C:\Users\Flutter_2_2026\AndroidStudioProjects\MyApplication\bimobondapp\build\jni'). Files in this directory do not persist through clean
+builds. It is recommended to either use the default build staging directory
+('C:\Users\Flutter_2_2026\AppData\Local\Pub\Cache\hosted\pub.dev\jni-1.0.0\android\.cxx'), or specify a path outside the temporary build directory.
+C/C++: The build staging directory you specified ('C:\Users\Flutter_2_2026\AndroidStudioProjects\MyApplication\bimobondapp\build\jni\cxx')
+is a subdirectory of your project's temporary build directory (
+'C:\Users\Flutter_2_2026\AndroidStudioProjects\MyApplication\bimobondapp\build\jni'). Files in this directory do not persist through clean
+builds. It is recommended to either use the default build staging directory
+('C:\Users\Flutter_2_2026\AppData\Local\Pub\Cache\hosted\pub.dev\jni-1.0.0\android\.cxx'), or specify a path outside the temporary build directory.
+
+> Configure project :tflite_flutter_custom
+WARNING: C/C++: The build staging directory you specified ('C:\Users\Flutter_2_2026\AndroidStudioProjects\MyApplication\bimobondapp\build\tflite_flutter_custom\cxx')
+is a subdirectory of your project's temporary build directory (
+'C:\Users\Flutter_2_2026\AndroidStudioProjects\MyApplication\bimobondapp\build\tflite_flutter_custom'). Files in this directory do not persist through clean
+builds. It is recommended to either use the default build staging directory
+('C:\Users\Flutter_2_2026\AppData\Local\Pub\Cache\hosted\pub.dev\tflite_flutter_custom-1.2.5\android\.cxx'), or specify a path outside the temporary build directory.
+C/C++: The build staging directory you specified ('C:\Users\Flutter_2_2026\AndroidStudioProjects\MyApplication\bimobondapp\build\tflite_flutter_custom\cxx')
+is a subdirectory of your project's temporary build directory (
+'C:\Users\Flutter_2_2026\AndroidStudioProjects\MyApplication\bimobondapp\build\tflite_flutter_custom'). Files in this directory do not persist through clean
+builds. It is recommended to either use the default build staging directory
+('C:\Users\Flutter_2_2026\AppData\Local\Pub\Cache\hosted\pub.dev\tflite_flutter_custom-1.2.5\android\.cxx'), or specify a path outside the temporary build directory.
+WARNING: C/C++: The build staging directory you specified ('C:\Users\Flutter_2_2026\AndroidStudioProjects\MyApplication\bimobondapp\build\tflite_flutter_custom\cxx')
+is a subdirectory of your project's temporary build directory (
+'C:\Users\Flutter_2_2026\AndroidStudioProjects\MyApplication\bimobondapp\build\tflite_flutter_custom'). Files in this directory do not persist through clean
+builds. It is recommended to either use the default build staging directory
+('C:\Users\Flutter_2_2026\AppData\Local\Pub\Cache\hosted\pub.dev\tflite_flutter_custom-1.2.5\android\.cxx'), or specify a path outside the temporary build directory.
+C/C++: The build staging directory you specified ('C:\Users\Flutter_2_2026\AndroidStudioProjects\MyApplication\bimobondapp\build\tflite_flutter_custom\cxx')
+is a subdirectory of your project's temporary build directory (
+'C:\Users\Flutter_2_2026\AndroidStudioProjects\MyApplication\bimobondapp\build\tflite_flutter_custom'). Files in this directory do not persist through clean
+builds. It is recommended to either use the default build staging directory
+('C:\Users\Flutter_2_2026\AppData\Local\Pub\Cache\hosted\pub.dev\tflite_flutter_custom-1.2.5\android\.cxx'), or specify a path outside the temporary build directory.
+WARNING: C/C++: The build staging directory you specified ('C:\Users\Flutter_2_2026\AndroidStudioProjects\MyApplication\bimobondapp\build\tflite_flutter_custom\cxx')
+is a subdirectory of your project's temporary build directory (
+'C:\Users\Flutter_2_2026\AndroidStudioProjects\MyApplication\bimobondapp\build\tflite_flutter_custom'). Files in this directory do not persist through clean
+builds. It is recommended to either use the default build staging directory
+('C:\Users\Flutter_2_2026\AppData\Local\Pub\Cache\hosted\pub.dev\tflite_flutter_custom-1.2.5\android\.cxx'), or specify a path outside the temporary build directory.
+C/C++: The build staging directory you specified ('C:\Users\Flutter_2_2026\AndroidStudioProjects\MyApplication\bimobondapp\build\tflite_flutter_custom\cxx')
+is a subdirectory of your project's temporary build directory (
+'C:\Users\Flutter_2_2026\AndroidStudioProjects\MyApplication\bimobondapp\build\tflite_flutter_custom'). Files in this directory do not persist through clean
+builds. It is recommended to either use the default build staging directory
+('C:\Users\Flutter_2_2026\AppData\Local\Pub\Cache\hosted\pub.dev\tflite_flutter_custom-1.2.5\android\.cxx'), or specify a path outside the temporary build directory.
+
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:compileFlutterBuildDebug
+> Task :app:packJniLibsflutterBuildDebug
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :audio_session:preBuild UP-TO-DATE
+> Task :audio_session:preDebugBuild UP-TO-DATE
+> Task :audio_session:writeDebugAarMetadata UP-TO-DATE
+> Task :camera_android_camerax:preBuild UP-TO-DATE
+> Task :camera_android_camerax:preDebugBuild UP-TO-DATE
+> Task :camera_android_camerax:writeDebugAarMetadata UP-TO-DATE
+> Task :camerawesome:preBuild UP-TO-DATE
+> Task :camerawesome:preDebugBuild UP-TO-DATE
+> Task :camerawesome:writeDebugAarMetadata UP-TO-DATE
+> Task :cloud_firestore:preBuild UP-TO-DATE
+> Task :cloud_firestore:preDebugBuild UP-TO-DATE
+> Task :cloud_firestore:writeDebugAarMetadata UP-TO-DATE
+> Task :cloud_functions:preBuild UP-TO-DATE
+> Task :cloud_functions:preDebugBuild UP-TO-DATE
+> Task :cloud_functions:writeDebugAarMetadata UP-TO-DATE
+> Task :connectivity_plus:preBuild UP-TO-DATE
+> Task :connectivity_plus:preDebugBuild UP-TO-DATE
+> Task :connectivity_plus:writeDebugAarMetadata UP-TO-DATE
+> Task :device_info_plus:preBuild UP-TO-DATE
+> Task :device_info_plus:preDebugBuild UP-TO-DATE
+> Task :device_info_plus:writeDebugAarMetadata UP-TO-DATE
+> Task :easy_video_editor:preBuild UP-TO-DATE
+> Task :easy_video_editor:preDebugBuild UP-TO-DATE
+> Task :easy_video_editor:writeDebugAarMetadata UP-TO-DATE
+> Task :file_selector_android:preBuild UP-TO-DATE
+> Task :file_selector_android:preDebugBuild UP-TO-DATE
+> Task :file_selector_android:writeDebugAarMetadata UP-TO-DATE
+> Task :firebase_auth:preBuild UP-TO-DATE
+> Task :firebase_auth:preDebugBuild UP-TO-DATE
+> Task :firebase_auth:writeDebugAarMetadata UP-TO-DATE
+> Task :firebase_core:preBuild UP-TO-DATE
+> Task :firebase_core:preDebugBuild UP-TO-DATE
+> Task :firebase_core:writeDebugAarMetadata UP-TO-DATE
+> Task :firebase_messaging:preBuild UP-TO-DATE
+> Task :firebase_messaging:preDebugBuild UP-TO-DATE
+> Task :firebase_messaging:writeDebugAarMetadata UP-TO-DATE
+> Task :flutter_callkit_incoming:preBuild UP-TO-DATE
+> Task :flutter_callkit_incoming:preDebugBuild UP-TO-DATE
+> Task :flutter_callkit_incoming:writeDebugAarMetadata UP-TO-DATE
+> Task :flutter_contacts:preBuild UP-TO-DATE
+> Task :flutter_contacts:preDebugBuild UP-TO-DATE
+> Task :flutter_contacts:writeDebugAarMetadata UP-TO-DATE
+> Task :flutter_image_compress_common:preBuild UP-TO-DATE
+> Task :flutter_image_compress_common:preDebugBuild UP-TO-DATE
+> Task :flutter_image_compress_common:writeDebugAarMetadata UP-TO-DATE
+> Task :flutter_local_notifications:preBuild UP-TO-DATE
+> Task :flutter_local_notifications:preDebugBuild UP-TO-DATE
+> Task :flutter_local_notifications:writeDebugAarMetadata UP-TO-DATE
+> Task :flutter_plugin_android_lifecycle:preBuild UP-TO-DATE
+> Task :flutter_plugin_android_lifecycle:preDebugBuild UP-TO-DATE
+> Task :flutter_plugin_android_lifecycle:writeDebugAarMetadata UP-TO-DATE
+> Task :flutter_webrtc:preBuild UP-TO-DATE
+> Task :flutter_webrtc:preDebugBuild UP-TO-DATE
+> Task :flutter_webrtc:writeDebugAarMetadata UP-TO-DATE
+> Task :google_maps_flutter_android:preBuild UP-TO-DATE
+> Task :google_maps_flutter_android:preDebugBuild UP-TO-DATE
+> Task :google_maps_flutter_android:writeDebugAarMetadata UP-TO-DATE
+> Task :google_mlkit_commons:preBuild UP-TO-DATE
+> Task :google_mlkit_commons:preDebugBuild UP-TO-DATE
+> Task :google_mlkit_commons:writeDebugAarMetadata UP-TO-DATE
+> Task :google_mlkit_face_detection:preBuild UP-TO-DATE
+> Task :google_mlkit_face_detection:preDebugBuild UP-TO-DATE
+> Task :google_mlkit_face_detection:writeDebugAarMetadata UP-TO-DATE
+> Task :google_sign_in_android:preBuild UP-TO-DATE
+> Task :google_sign_in_android:preDebugBuild UP-TO-DATE
+> Task :google_sign_in_android:writeDebugAarMetadata UP-TO-DATE
+> Task :image_picker_android:preBuild UP-TO-DATE
+> Task :image_picker_android:preDebugBuild UP-TO-DATE
+> Task :image_picker_android:writeDebugAarMetadata UP-TO-DATE
+> Task :jni:preBuild UP-TO-DATE
+> Task :jni:preDebugBuild UP-TO-DATE
+> Task :jni:writeDebugAarMetadata UP-TO-DATE
+> Task :jni_flutter:preBuild UP-TO-DATE
+> Task :jni_flutter:preDebugBuild UP-TO-DATE
+> Task :jni_flutter:writeDebugAarMetadata UP-TO-DATE
+> Task :just_audio:preBuild UP-TO-DATE
+> Task :just_audio:preDebugBuild UP-TO-DATE
+> Task :just_audio:writeDebugAarMetadata UP-TO-DATE
+> Task :livekit_client:preBuild UP-TO-DATE
+> Task :livekit_client:preDebugBuild UP-TO-DATE
+> Task :livekit_client:writeDebugAarMetadata UP-TO-DATE
+> Task :location:preBuild UP-TO-DATE
+> Task :location:preDebugBuild UP-TO-DATE
+> Task :location:writeDebugAarMetadata UP-TO-DATE
+> Task :package_info_plus:preBuild UP-TO-DATE
+> Task :package_info_plus:preDebugBuild UP-TO-DATE
+> Task :package_info_plus:writeDebugAarMetadata UP-TO-DATE
+> Task :permission_handler_android:preBuild UP-TO-DATE
+> Task :permission_handler_android:preDebugBuild UP-TO-DATE
+> Task :permission_handler_android:writeDebugAarMetadata UP-TO-DATE
+> Task :pro_video_editor:preBuild UP-TO-DATE
+> Task :pro_video_editor:preDebugBuild UP-TO-DATE
+> Task :pro_video_editor:writeDebugAarMetadata UP-TO-DATE
+> Task :record_android:preBuild UP-TO-DATE
+> Task :record_android:preDebugBuild UP-TO-DATE
+> Task :record_android:writeDebugAarMetadata UP-TO-DATE
+> Task :share_plus:preBuild UP-TO-DATE
+> Task :share_plus:preDebugBuild UP-TO-DATE
+> Task :share_plus:writeDebugAarMetadata UP-TO-DATE
+> Task :shared_preferences_android:preBuild UP-TO-DATE
+> Task :shared_preferences_android:preDebugBuild UP-TO-DATE
+> Task :shared_preferences_android:writeDebugAarMetadata UP-TO-DATE
+> Task :sqflite_android:preBuild UP-TO-DATE
+> Task :sqflite_android:preDebugBuild UP-TO-DATE
+> Task :sqflite_android:writeDebugAarMetadata UP-TO-DATE
+> Task :tflite_flutter_custom:preBuild UP-TO-DATE
+> Task :tflite_flutter_custom:preDebugBuild UP-TO-DATE
+> Task :tflite_flutter_custom:writeDebugAarMetadata UP-TO-DATE
+> Task :url_launcher_android:preBuild UP-TO-DATE
+> Task :url_launcher_android:preDebugBuild UP-TO-DATE
+> Task :url_launcher_android:writeDebugAarMetadata UP-TO-DATE
+> Task :video_player_android:preBuild UP-TO-DATE
+> Task :video_player_android:preDebugBuild UP-TO-DATE
+> Task :video_player_android:writeDebugAarMetadata UP-TO-DATE
+> Task :video_thumbnail:preBuild UP-TO-DATE
+> Task :video_thumbnail:preDebugBuild UP-TO-DATE
+> Task :video_thumbnail:writeDebugAarMetadata UP-TO-DATE
+> Task :wakelock_plus:preBuild UP-TO-DATE
+> Task :wakelock_plus:preDebugBuild UP-TO-DATE
+> Task :wakelock_plus:writeDebugAarMetadata UP-TO-DATE
+> Task :app:checkDebugAarMetadata UP-TO-DATE
+> Task :app:cleanMergeDebugAssets
+> Task :app:mergeDebugShaders UP-TO-DATE
+> Task :app:compileDebugShaders NO-SOURCE
+> Task :app:generateDebugAssets UP-TO-DATE
+> Task :audio_session:mergeDebugShaders UP-TO-DATE
+> Task :audio_session:compileDebugShaders NO-SOURCE
+> Task :audio_session:generateDebugAssets UP-TO-DATE
+> Task :audio_session:mergeDebugAssets UP-TO-DATE
+> Task :camera_android_camerax:mergeDebugShaders UP-TO-DATE
+> Task :camera_android_camerax:compileDebugShaders NO-SOURCE
+> Task :camera_android_camerax:generateDebugAssets UP-TO-DATE
+> Task :camera_android_camerax:mergeDebugAssets UP-TO-DATE
+> Task :camerawesome:mergeDebugShaders UP-TO-DATE
+> Task :camerawesome:compileDebugShaders NO-SOURCE
+> Task :camerawesome:generateDebugAssets UP-TO-DATE
+> Task :camerawesome:mergeDebugAssets UP-TO-DATE
+> Task :cloud_firestore:mergeDebugShaders UP-TO-DATE
+> Task :cloud_firestore:compileDebugShaders NO-SOURCE
+> Task :cloud_firestore:generateDebugAssets UP-TO-DATE
+> Task :cloud_firestore:mergeDebugAssets UP-TO-DATE
+> Task :cloud_functions:mergeDebugShaders UP-TO-DATE
+> Task :cloud_functions:compileDebugShaders NO-SOURCE
+> Task :cloud_functions:generateDebugAssets UP-TO-DATE
+> Task :cloud_functions:mergeDebugAssets UP-TO-DATE
+> Task :connectivity_plus:mergeDebugShaders UP-TO-DATE
+> Task :connectivity_plus:compileDebugShaders NO-SOURCE
+> Task :connectivity_plus:generateDebugAssets UP-TO-DATE
+> Task :connectivity_plus:mergeDebugAssets UP-TO-DATE
+> Task :device_info_plus:mergeDebugShaders UP-TO-DATE
+> Task :device_info_plus:compileDebugShaders NO-SOURCE
+> Task :device_info_plus:generateDebugAssets UP-TO-DATE
+> Task :device_info_plus:mergeDebugAssets UP-TO-DATE
+> Task :easy_video_editor:mergeDebugShaders UP-TO-DATE
+> Task :easy_video_editor:compileDebugShaders NO-SOURCE
+> Task :easy_video_editor:generateDebugAssets UP-TO-DATE
+> Task :easy_video_editor:mergeDebugAssets UP-TO-DATE
+> Task :file_selector_android:mergeDebugShaders UP-TO-DATE
+> Task :file_selector_android:compileDebugShaders NO-SOURCE
+> Task :file_selector_android:generateDebugAssets UP-TO-DATE
+> Task :file_selector_android:mergeDebugAssets UP-TO-DATE
+> Task :firebase_auth:mergeDebugShaders UP-TO-DATE
+> Task :firebase_auth:compileDebugShaders NO-SOURCE
+> Task :firebase_auth:generateDebugAssets UP-TO-DATE
+> Task :firebase_auth:mergeDebugAssets UP-TO-DATE
+> Task :firebase_core:mergeDebugShaders UP-TO-DATE
+> Task :firebase_core:compileDebugShaders NO-SOURCE
+> Task :firebase_core:generateDebugAssets UP-TO-DATE
+> Task :firebase_core:mergeDebugAssets UP-TO-DATE
+> Task :firebase_messaging:mergeDebugShaders UP-TO-DATE
+> Task :firebase_messaging:compileDebugShaders NO-SOURCE
+> Task :firebase_messaging:generateDebugAssets UP-TO-DATE
+> Task :firebase_messaging:mergeDebugAssets UP-TO-DATE
+> Task :flutter_callkit_incoming:mergeDebugShaders UP-TO-DATE
+> Task :flutter_callkit_incoming:compileDebugShaders NO-SOURCE
+> Task :flutter_callkit_incoming:generateDebugAssets UP-TO-DATE
+> Task :flutter_callkit_incoming:mergeDebugAssets UP-TO-DATE
+> Task :flutter_contacts:mergeDebugShaders UP-TO-DATE
+> Task :flutter_contacts:compileDebugShaders NO-SOURCE
+> Task :flutter_contacts:generateDebugAssets UP-TO-DATE
+> Task :flutter_contacts:mergeDebugAssets UP-TO-DATE
+> Task :flutter_image_compress_common:mergeDebugShaders UP-TO-DATE
+> Task :flutter_image_compress_common:compileDebugShaders NO-SOURCE
+> Task :flutter_image_compress_common:generateDebugAssets UP-TO-DATE
+> Task :flutter_image_compress_common:mergeDebugAssets UP-TO-DATE
+> Task :flutter_local_notifications:mergeDebugShaders UP-TO-DATE
+> Task :flutter_local_notifications:compileDebugShaders NO-SOURCE
+> Task :flutter_local_notifications:generateDebugAssets UP-TO-DATE
+> Task :flutter_local_notifications:mergeDebugAssets UP-TO-DATE
+> Task :flutter_plugin_android_lifecycle:mergeDebugShaders UP-TO-DATE
+> Task :flutter_plugin_android_lifecycle:compileDebugShaders NO-SOURCE
+> Task :flutter_plugin_android_lifecycle:generateDebugAssets UP-TO-DATE
+> Task :flutter_plugin_android_lifecycle:mergeDebugAssets UP-TO-DATE
+> Task :flutter_webrtc:mergeDebugShaders UP-TO-DATE
+> Task :flutter_webrtc:compileDebugShaders NO-SOURCE
+> Task :flutter_webrtc:generateDebugAssets UP-TO-DATE
+> Task :flutter_webrtc:mergeDebugAssets UP-TO-DATE
+> Task :google_maps_flutter_android:mergeDebugShaders UP-TO-DATE
+> Task :google_maps_flutter_android:compileDebugShaders NO-SOURCE
+> Task :google_maps_flutter_android:generateDebugAssets UP-TO-DATE
+> Task :google_maps_flutter_android:mergeDebugAssets UP-TO-DATE
+> Task :google_mlkit_commons:mergeDebugShaders UP-TO-DATE
+> Task :google_mlkit_commons:compileDebugShaders NO-SOURCE
+> Task :google_mlkit_commons:generateDebugAssets UP-TO-DATE
+> Task :google_mlkit_commons:mergeDebugAssets UP-TO-DATE
+> Task :google_mlkit_face_detection:mergeDebugShaders UP-TO-DATE
+> Task :google_mlkit_face_detection:compileDebugShaders NO-SOURCE
+> Task :google_mlkit_face_detection:generateDebugAssets UP-TO-DATE
+> Task :google_mlkit_face_detection:mergeDebugAssets UP-TO-DATE
+> Task :google_sign_in_android:mergeDebugShaders UP-TO-DATE
+> Task :google_sign_in_android:compileDebugShaders NO-SOURCE
+> Task :google_sign_in_android:generateDebugAssets UP-TO-DATE
+> Task :google_sign_in_android:mergeDebugAssets UP-TO-DATE
+> Task :image_picker_android:mergeDebugShaders UP-TO-DATE
+> Task :image_picker_android:compileDebugShaders NO-SOURCE
+> Task :image_picker_android:generateDebugAssets UP-TO-DATE
+> Task :image_picker_android:mergeDebugAssets UP-TO-DATE
+> Task :jni:mergeDebugShaders UP-TO-DATE
+> Task :jni:compileDebugShaders NO-SOURCE
+> Task :jni:generateDebugAssets UP-TO-DATE
+> Task :jni:mergeDebugAssets UP-TO-DATE
+> Task :jni_flutter:mergeDebugShaders UP-TO-DATE
+> Task :jni_flutter:compileDebugShaders NO-SOURCE
+> Task :jni_flutter:generateDebugAssets UP-TO-DATE
+> Task :jni_flutter:mergeDebugAssets UP-TO-DATE
+> Task :just_audio:mergeDebugShaders UP-TO-DATE
+> Task :just_audio:compileDebugShaders NO-SOURCE
+> Task :just_audio:generateDebugAssets UP-TO-DATE
+> Task :just_audio:mergeDebugAssets UP-TO-DATE
+> Task :livekit_client:mergeDebugShaders UP-TO-DATE
+> Task :livekit_client:compileDebugShaders NO-SOURCE
+> Task :livekit_client:generateDebugAssets UP-TO-DATE
+> Task :livekit_client:mergeDebugAssets UP-TO-DATE
+> Task :location:mergeDebugShaders UP-TO-DATE
+> Task :location:compileDebugShaders NO-SOURCE
+> Task :location:generateDebugAssets UP-TO-DATE
+> Task :location:mergeDebugAssets UP-TO-DATE
+> Task :package_info_plus:mergeDebugShaders UP-TO-DATE
+> Task :package_info_plus:compileDebugShaders NO-SOURCE
+> Task :package_info_plus:generateDebugAssets UP-TO-DATE
+> Task :package_info_plus:mergeDebugAssets UP-TO-DATE
+> Task :permission_handler_android:mergeDebugShaders UP-TO-DATE
+> Task :permission_handler_android:compileDebugShaders NO-SOURCE
+> Task :permission_handler_android:generateDebugAssets UP-TO-DATE
+> Task :permission_handler_android:mergeDebugAssets UP-TO-DATE
+> Task :pro_video_editor:mergeDebugShaders UP-TO-DATE
+> Task :pro_video_editor:compileDebugShaders NO-SOURCE
+> Task :pro_video_editor:generateDebugAssets UP-TO-DATE
+> Task :pro_video_editor:mergeDebugAssets UP-TO-DATE
+> Task :record_android:mergeDebugShaders UP-TO-DATE
+> Task :record_android:compileDebugShaders NO-SOURCE
+> Task :record_android:generateDebugAssets UP-TO-DATE
+> Task :record_android:mergeDebugAssets UP-TO-DATE
+> Task :share_plus:mergeDebugShaders UP-TO-DATE
+> Task :share_plus:compileDebugShaders NO-SOURCE
+> Task :share_plus:generateDebugAssets UP-TO-DATE
+> Task :share_plus:mergeDebugAssets UP-TO-DATE
+> Task :shared_preferences_android:mergeDebugShaders UP-TO-DATE
+> Task :shared_preferences_android:compileDebugShaders NO-SOURCE
+> Task :shared_preferences_android:generateDebugAssets UP-TO-DATE
+> Task :shared_preferences_android:mergeDebugAssets UP-TO-DATE
+> Task :sqflite_android:mergeDebugShaders UP-TO-DATE
+> Task :sqflite_android:compileDebugShaders NO-SOURCE
+> Task :sqflite_android:generateDebugAssets UP-TO-DATE
+> Task :sqflite_android:mergeDebugAssets UP-TO-DATE
+> Task :tflite_flutter_custom:mergeDebugShaders UP-TO-DATE
+> Task :tflite_flutter_custom:compileDebugShaders NO-SOURCE
+> Task :tflite_flutter_custom:generateDebugAssets UP-TO-DATE
+> Task :tflite_flutter_custom:mergeDebugAssets UP-TO-DATE
+> Task :url_launcher_android:mergeDebugShaders UP-TO-DATE
+> Task :url_launcher_android:compileDebugShaders NO-SOURCE
+> Task :url_launcher_android:generateDebugAssets UP-TO-DATE
+> Task :url_launcher_android:mergeDebugAssets UP-TO-DATE
+> Task :video_player_android:mergeDebugShaders UP-TO-DATE
+> Task :video_player_android:compileDebugShaders NO-SOURCE
+> Task :video_player_android:generateDebugAssets UP-TO-DATE
+> Task :video_player_android:mergeDebugAssets UP-TO-DATE
+> Task :video_thumbnail:mergeDebugShaders UP-TO-DATE
+> Task :video_thumbnail:compileDebugShaders NO-SOURCE
+> Task :video_thumbnail:generateDebugAssets UP-TO-DATE
+> Task :video_thumbnail:mergeDebugAssets UP-TO-DATE
+> Task :wakelock_plus:mergeDebugShaders UP-TO-DATE
+> Task :wakelock_plus:compileDebugShaders NO-SOURCE
+> Task :wakelock_plus:generateDebugAssets UP-TO-DATE
+> Task :wakelock_plus:mergeDebugAssets UP-TO-DATE
+> Task :app:mergeDebugAssets
+> Task :app:copyFlutterAssetsDebug
+> Task :app:generateDebugResValues UP-TO-DATE
+> Task :app:processDebugGoogleServices UP-TO-DATE
+> Task :audio_session:generateDebugResValues UP-TO-DATE
+> Task :audio_session:generateDebugResources UP-TO-DATE
+> Task :audio_session:packageDebugResources UP-TO-DATE
+> Task :camera_android_camerax:generateDebugResValues UP-TO-DATE
+> Task :camera_android_camerax:generateDebugResources UP-TO-DATE
+> Task :camera_android_camerax:packageDebugResources UP-TO-DATE
+> Task :camerawesome:generateDebugResValues UP-TO-DATE
+> Task :camerawesome:generateDebugResources UP-TO-DATE
+> Task :camerawesome:packageDebugResources UP-TO-DATE
+> Task :cloud_firestore:generateDebugResValues UP-TO-DATE
+> Task :cloud_firestore:generateDebugResources UP-TO-DATE
+> Task :cloud_firestore:packageDebugResources UP-TO-DATE
+> Task :cloud_functions:generateDebugResValues UP-TO-DATE
+> Task :cloud_functions:generateDebugResources UP-TO-DATE
+> Task :cloud_functions:packageDebugResources UP-TO-DATE
+> Task :connectivity_plus:generateDebugResValues UP-TO-DATE
+> Task :connectivity_plus:generateDebugResources UP-TO-DATE
+> Task :connectivity_plus:packageDebugResources UP-TO-DATE
+> Task :device_info_plus:generateDebugResValues UP-TO-DATE
+> Task :device_info_plus:generateDebugResources UP-TO-DATE
+> Task :device_info_plus:packageDebugResources UP-TO-DATE
+> Task :easy_video_editor:generateDebugResValues UP-TO-DATE
+> Task :easy_video_editor:generateDebugResources UP-TO-DATE
+> Task :easy_video_editor:packageDebugResources UP-TO-DATE
+> Task :file_selector_android:generateDebugResValues UP-TO-DATE
+> Task :file_selector_android:generateDebugResources UP-TO-DATE
+> Task :file_selector_android:packageDebugResources UP-TO-DATE
+> Task :firebase_auth:generateDebugResValues UP-TO-DATE
+> Task :firebase_auth:generateDebugResources UP-TO-DATE
+> Task :firebase_auth:packageDebugResources UP-TO-DATE
+> Task :firebase_core:generateDebugResValues UP-TO-DATE
+> Task :firebase_core:generateDebugResources UP-TO-DATE
+> Task :firebase_core:packageDebugResources UP-TO-DATE
+> Task :firebase_messaging:generateDebugResValues UP-TO-DATE
+> Task :firebase_messaging:generateDebugResources UP-TO-DATE
+> Task :firebase_messaging:packageDebugResources UP-TO-DATE
+> Task :flutter_callkit_incoming:generateDebugResValues UP-TO-DATE
+> Task :flutter_callkit_incoming:generateDebugResources UP-TO-DATE
+> Task :flutter_callkit_incoming:packageDebugResources UP-TO-DATE
+> Task :flutter_contacts:generateDebugResValues UP-TO-DATE
+> Task :flutter_contacts:generateDebugResources UP-TO-DATE
+> Task :flutter_contacts:packageDebugResources UP-TO-DATE
+> Task :flutter_image_compress_common:generateDebugResValues UP-TO-DATE
+> Task :flutter_image_compress_common:generateDebugResources UP-TO-DATE
+> Task :flutter_image_compress_common:packageDebugResources UP-TO-DATE
+> Task :flutter_local_notifications:generateDebugResValues UP-TO-DATE
+> Task :flutter_local_notifications:generateDebugResources UP-TO-DATE
+> Task :flutter_local_notifications:packageDebugResources UP-TO-DATE
+> Task :flutter_plugin_android_lifecycle:generateDebugResValues UP-TO-DATE
+> Task :flutter_plugin_android_lifecycle:generateDebugResources UP-TO-DATE
+> Task :flutter_plugin_android_lifecycle:packageDebugResources UP-TO-DATE
+> Task :flutter_webrtc:generateDebugResValues UP-TO-DATE
+> Task :flutter_webrtc:generateDebugResources UP-TO-DATE
+> Task :flutter_webrtc:packageDebugResources UP-TO-DATE
+> Task :google_maps_flutter_android:generateDebugResValues UP-TO-DATE
+> Task :google_maps_flutter_android:generateDebugResources UP-TO-DATE
+> Task :google_maps_flutter_android:packageDebugResources UP-TO-DATE
+> Task :google_mlkit_commons:generateDebugResValues UP-TO-DATE
+> Task :google_mlkit_commons:generateDebugResources UP-TO-DATE
+> Task :google_mlkit_commons:packageDebugResources UP-TO-DATE
+> Task :google_mlkit_face_detection:generateDebugResValues UP-TO-DATE
+> Task :google_mlkit_face_detection:generateDebugResources UP-TO-DATE
+> Task :google_mlkit_face_detection:packageDebugResources UP-TO-DATE
+> Task :google_sign_in_android:generateDebugResValues UP-TO-DATE
+> Task :google_sign_in_android:generateDebugResources UP-TO-DATE
+> Task :google_sign_in_android:packageDebugResources UP-TO-DATE
+> Task :image_picker_android:generateDebugResValues UP-TO-DATE
+> Task :image_picker_android:generateDebugResources UP-TO-DATE
+> Task :image_picker_android:packageDebugResources UP-TO-DATE
+> Task :jni:generateDebugResValues UP-TO-DATE
+> Task :jni:generateDebugResources UP-TO-DATE
+> Task :jni:packageDebugResources UP-TO-DATE
+> Task :jni_flutter:generateDebugResValues UP-TO-DATE
+> Task :jni_flutter:generateDebugResources UP-TO-DATE
+> Task :jni_flutter:packageDebugResources UP-TO-DATE
+> Task :just_audio:generateDebugResValues UP-TO-DATE
+> Task :just_audio:generateDebugResources UP-TO-DATE
+> Task :just_audio:packageDebugResources UP-TO-DATE
+> Task :livekit_client:generateDebugResValues UP-TO-DATE
+> Task :livekit_client:generateDebugResources UP-TO-DATE
+> Task :livekit_client:packageDebugResources UP-TO-DATE
+> Task :location:generateDebugResValues UP-TO-DATE
+> Task :location:generateDebugResources UP-TO-DATE
+> Task :location:packageDebugResources UP-TO-DATE
+> Task :package_info_plus:generateDebugResValues UP-TO-DATE
+> Task :package_info_plus:generateDebugResources UP-TO-DATE
+> Task :package_info_plus:packageDebugResources UP-TO-DATE
+> Task :permission_handler_android:generateDebugResValues UP-TO-DATE
+> Task :permission_handler_android:generateDebugResources UP-TO-DATE
+> Task :permission_handler_android:packageDebugResources UP-TO-DATE
+> Task :pro_video_editor:generateDebugResValues UP-TO-DATE
+> Task :pro_video_editor:generateDebugResources UP-TO-DATE
+> Task :pro_video_editor:packageDebugResources UP-TO-DATE
+> Task :record_android:generateDebugResValues UP-TO-DATE
+> Task :record_android:generateDebugResources UP-TO-DATE
+> Task :record_android:packageDebugResources UP-TO-DATE
+> Task :share_plus:generateDebugResValues UP-TO-DATE
+> Task :share_plus:generateDebugResources UP-TO-DATE
+> Task :share_plus:packageDebugResources UP-TO-DATE
+> Task :shared_preferences_android:generateDebugResValues UP-TO-DATE
+> Task :shared_preferences_android:generateDebugResources UP-TO-DATE
+> Task :shared_preferences_android:packageDebugResources UP-TO-DATE
+> Task :sqflite_android:generateDebugResValues UP-TO-DATE
+> Task :sqflite_android:generateDebugResources UP-TO-DATE
+> Task :sqflite_android:packageDebugResources UP-TO-DATE
+> Task :tflite_flutter_custom:generateDebugResValues UP-TO-DATE
+> Task :tflite_flutter_custom:generateDebugResources UP-TO-DATE
+> Task :tflite_flutter_custom:packageDebugResources UP-TO-DATE
+> Task :url_launcher_android:generateDebugResValues UP-TO-DATE
+> Task :url_launcher_android:generateDebugResources UP-TO-DATE
+> Task :url_launcher_android:packageDebugResources UP-TO-DATE
+> Task :video_player_android:generateDebugResValues UP-TO-DATE
+> Task :video_player_android:generateDebugResources UP-TO-DATE
+> Task :video_player_android:packageDebugResources UP-TO-DATE
+> Task :video_thumbnail:generateDebugResValues UP-TO-DATE
+> Task :video_thumbnail:generateDebugResources UP-TO-DATE
+> Task :video_thumbnail:packageDebugResources UP-TO-DATE
+> Task :wakelock_plus:generateDebugResValues UP-TO-DATE
+> Task :wakelock_plus:generateDebugResources UP-TO-DATE
+> Task :wakelock_plus:packageDebugResources UP-TO-DATE
+> Task :app:mapDebugSourceSetPaths UP-TO-DATE
+> Task :app:generateDebugResources UP-TO-DATE
+> Task :app:mergeDebugResources UP-TO-DATE
+> Task :app:packageDebugResources UP-TO-DATE
+> Task :app:parseDebugLocalResources UP-TO-DATE
+> Task :app:createDebugCompatibleScreenManifests UP-TO-DATE
+> Task :app:extractDeepLinksDebug UP-TO-DATE
+> Task :audio_session:extractDeepLinksDebug UP-TO-DATE
+> Task :audio_session:processDebugManifest UP-TO-DATE
+> Task :camera_android_camerax:extractDeepLinksDebug UP-TO-DATE
+> Task :camera_android_camerax:processDebugManifest UP-TO-DATE
+> Task :camerawesome:extractDeepLinksDebug UP-TO-DATE
+> Task :camerawesome:processDebugManifest UP-TO-DATE
+> Task :cloud_firestore:extractDeepLinksDebug UP-TO-DATE
+> Task :cloud_firestore:processDebugManifest UP-TO-DATE
+> Task :cloud_functions:extractDeepLinksDebug UP-TO-DATE
+> Task :cloud_functions:processDebugManifest UP-TO-DATE
+> Task :connectivity_plus:extractDeepLinksDebug UP-TO-DATE
+> Task :connectivity_plus:processDebugManifest UP-TO-DATE
+> Task :device_info_plus:extractDeepLinksDebug UP-TO-DATE
+> Task :device_info_plus:processDebugManifest UP-TO-DATE
+> Task :easy_video_editor:extractDeepLinksDebug UP-TO-DATE
+> Task :easy_video_editor:processDebugManifest UP-TO-DATE
+> Task :file_selector_android:extractDeepLinksDebug UP-TO-DATE
+> Task :file_selector_android:processDebugManifest UP-TO-DATE
+> Task :firebase_auth:extractDeepLinksDebug UP-TO-DATE
+> Task :firebase_auth:processDebugManifest UP-TO-DATE
+> Task :firebase_core:extractDeepLinksDebug UP-TO-DATE
+> Task :firebase_core:processDebugManifest UP-TO-DATE
+> Task :firebase_messaging:extractDeepLinksDebug UP-TO-DATE
+> Task :firebase_messaging:processDebugManifest UP-TO-DATE
+> Task :flutter_callkit_incoming:extractDeepLinksDebug UP-TO-DATE
+> Task :flutter_callkit_incoming:processDebugManifest UP-TO-DATE
+> Task :flutter_contacts:extractDeepLinksDebug UP-TO-DATE
+> Task :flutter_contacts:processDebugManifest UP-TO-DATE
+> Task :flutter_image_compress_common:extractDeepLinksDebug UP-TO-DATE
+> Task :flutter_image_compress_common:processDebugManifest UP-TO-DATE
+> Task :flutter_local_notifications:extractDeepLinksDebug UP-TO-DATE
+> Task :flutter_local_notifications:processDebugManifest UP-TO-DATE
+> Task :flutter_plugin_android_lifecycle:extractDeepLinksDebug UP-TO-DATE
+> Task :flutter_plugin_android_lifecycle:processDebugManifest UP-TO-DATE
+> Task :flutter_webrtc:extractDeepLinksDebug UP-TO-DATE
+> Task :flutter_webrtc:processDebugManifest UP-TO-DATE
+> Task :google_maps_flutter_android:extractDeepLinksDebug UP-TO-DATE
+> Task :google_maps_flutter_android:processDebugManifest UP-TO-DATE
+> Task :google_mlkit_commons:extractDeepLinksDebug UP-TO-DATE
+> Task :google_mlkit_commons:processDebugManifest UP-TO-DATE
+> Task :google_mlkit_face_detection:extractDeepLinksDebug UP-TO-DATE
+> Task :google_mlkit_face_detection:processDebugManifest UP-TO-DATE
+> Task :google_sign_in_android:extractDeepLinksDebug UP-TO-DATE
+> Task :google_sign_in_android:processDebugManifest UP-TO-DATE
+> Task :image_picker_android:extractDeepLinksDebug UP-TO-DATE
+> Task :image_picker_android:processDebugManifest UP-TO-DATE
+> Task :jni:extractDeepLinksDebug UP-TO-DATE
+> Task :jni:processDebugManifest UP-TO-DATE
+> Task :jni_flutter:extractDeepLinksDebug UP-TO-DATE
+> Task :jni_flutter:processDebugManifest UP-TO-DATE
+> Task :just_audio:extractDeepLinksDebug UP-TO-DATE
+> Task :just_audio:processDebugManifest UP-TO-DATE
+> Task :livekit_client:extractDeepLinksDebug UP-TO-DATE
+> Task :livekit_client:processDebugManifest UP-TO-DATE
+> Task :location:extractDeepLinksDebug UP-TO-DATE
+> Task :location:processDebugManifest UP-TO-DATE
+> Task :package_info_plus:extractDeepLinksDebug UP-TO-DATE
+> Task :package_info_plus:processDebugManifest UP-TO-DATE
+> Task :permission_handler_android:extractDeepLinksDebug UP-TO-DATE
+> Task :permission_handler_android:processDebugManifest UP-TO-DATE
+> Task :pro_video_editor:extractDeepLinksDebug UP-TO-DATE
+> Task :pro_video_editor:processDebugManifest UP-TO-DATE
+> Task :record_android:extractDeepLinksDebug UP-TO-DATE
+> Task :record_android:processDebugManifest UP-TO-DATE
+> Task :share_plus:extractDeepLinksDebug UP-TO-DATE
+> Task :share_plus:processDebugManifest UP-TO-DATE
+> Task :shared_preferences_android:extractDeepLinksDebug UP-TO-DATE
+> Task :shared_preferences_android:processDebugManifest UP-TO-DATE
+> Task :sqflite_android:extractDeepLinksDebug UP-TO-DATE
+> Task :sqflite_android:processDebugManifest UP-TO-DATE
+> Task :tflite_flutter_custom:extractDeepLinksDebug UP-TO-DATE
+> Task :tflite_flutter_custom:processDebugManifest UP-TO-DATE
+> Task :url_launcher_android:extractDeepLinksDebug UP-TO-DATE
+> Task :url_launcher_android:processDebugManifest UP-TO-DATE
+> Task :video_player_android:extractDeepLinksDebug UP-TO-DATE
+> Task :video_player_android:processDebugManifest UP-TO-DATE
+> Task :video_thumbnail:extractDeepLinksDebug UP-TO-DATE
+> Task :video_thumbnail:processDebugManifest UP-TO-DATE
+> Task :wakelock_plus:extractDeepLinksDebug UP-TO-DATE
+> Task :wakelock_plus:processDebugManifest UP-TO-DATE
+> Task :app:processDebugMainManifest UP-TO-DATE
+> Task :app:outputDebugAppLinkSettings UP-TO-DATE
+> Task :app:processDebugManifest UP-TO-DATE
+> Task :app:processDebugManifestForPackage UP-TO-DATE
+> Task :audio_session:compileDebugLibraryResources UP-TO-DATE
+> Task :audio_session:parseDebugLocalResources UP-TO-DATE
+> Task :audio_session:generateDebugRFile UP-TO-DATE
+> Task :camera_android_camerax:compileDebugLibraryResources UP-TO-DATE
+> Task :camera_android_camerax:parseDebugLocalResources UP-TO-DATE
+> Task :camera_android_camerax:generateDebugRFile UP-TO-DATE
+> Task :camerawesome:compileDebugLibraryResources UP-TO-DATE
+> Task :camerawesome:parseDebugLocalResources UP-TO-DATE
+> Task :camerawesome:generateDebugRFile UP-TO-DATE
+> Task :cloud_firestore:compileDebugLibraryResources UP-TO-DATE
+> Task :cloud_firestore:parseDebugLocalResources UP-TO-DATE
+> Task :cloud_firestore:generateDebugRFile UP-TO-DATE
+> Task :cloud_functions:compileDebugLibraryResources UP-TO-DATE
+> Task :cloud_functions:parseDebugLocalResources UP-TO-DATE
+> Task :cloud_functions:generateDebugRFile UP-TO-DATE
+> Task :connectivity_plus:compileDebugLibraryResources UP-TO-DATE
+> Task :connectivity_plus:parseDebugLocalResources UP-TO-DATE
+> Task :connectivity_plus:generateDebugRFile UP-TO-DATE
+> Task :device_info_plus:compileDebugLibraryResources UP-TO-DATE
+> Task :device_info_plus:parseDebugLocalResources UP-TO-DATE
+> Task :device_info_plus:generateDebugRFile UP-TO-DATE
+> Task :easy_video_editor:compileDebugLibraryResources UP-TO-DATE
+> Task :easy_video_editor:parseDebugLocalResources UP-TO-DATE
+> Task :easy_video_editor:generateDebugRFile UP-TO-DATE
+> Task :file_selector_android:compileDebugLibraryResources UP-TO-DATE
+> Task :file_selector_android:parseDebugLocalResources UP-TO-DATE
+> Task :file_selector_android:generateDebugRFile UP-TO-DATE
+> Task :firebase_auth:compileDebugLibraryResources UP-TO-DATE
+> Task :firebase_auth:parseDebugLocalResources UP-TO-DATE
+> Task :firebase_auth:generateDebugRFile UP-TO-DATE
+> Task :firebase_core:compileDebugLibraryResources UP-TO-DATE
+> Task :firebase_core:parseDebugLocalResources UP-TO-DATE
+> Task :firebase_core:generateDebugRFile UP-TO-DATE
+> Task :firebase_messaging:compileDebugLibraryResources UP-TO-DATE
+> Task :firebase_messaging:parseDebugLocalResources UP-TO-DATE
+> Task :firebase_messaging:generateDebugRFile UP-TO-DATE
+> Task :flutter_callkit_incoming:compileDebugLibraryResources UP-TO-DATE
+> Task :flutter_callkit_incoming:parseDebugLocalResources UP-TO-DATE
+> Task :flutter_callkit_incoming:generateDebugRFile UP-TO-DATE
+> Task :flutter_contacts:compileDebugLibraryResources UP-TO-DATE
+> Task :flutter_contacts:parseDebugLocalResources UP-TO-DATE
+> Task :flutter_contacts:generateDebugRFile UP-TO-DATE
+> Task :flutter_image_compress_common:compileDebugLibraryResources UP-TO-DATE
+> Task :flutter_image_compress_common:parseDebugLocalResources UP-TO-DATE
+> Task :flutter_image_compress_common:generateDebugRFile UP-TO-DATE
+> Task :flutter_local_notifications:compileDebugLibraryResources UP-TO-DATE
+> Task :flutter_local_notifications:parseDebugLocalResources UP-TO-DATE
+> Task :flutter_local_notifications:generateDebugRFile UP-TO-DATE
+> Task :flutter_plugin_android_lifecycle:compileDebugLibraryResources UP-TO-DATE
+> Task :flutter_plugin_android_lifecycle:parseDebugLocalResources UP-TO-DATE
+> Task :flutter_plugin_android_lifecycle:generateDebugRFile UP-TO-DATE
+> Task :flutter_webrtc:compileDebugLibraryResources UP-TO-DATE
+> Task :flutter_webrtc:parseDebugLocalResources UP-TO-DATE
+> Task :flutter_webrtc:generateDebugRFile UP-TO-DATE
+> Task :google_maps_flutter_android:compileDebugLibraryResources UP-TO-DATE
+> Task :google_maps_flutter_android:parseDebugLocalResources UP-TO-DATE
+> Task :google_maps_flutter_android:generateDebugRFile UP-TO-DATE
+> Task :google_mlkit_commons:compileDebugLibraryResources UP-TO-DATE
+> Task :google_mlkit_commons:parseDebugLocalResources UP-TO-DATE
+> Task :google_mlkit_commons:generateDebugRFile UP-TO-DATE
+> Task :google_mlkit_face_detection:compileDebugLibraryResources UP-TO-DATE
+> Task :google_mlkit_face_detection:parseDebugLocalResources UP-TO-DATE
+> Task :google_mlkit_face_detection:generateDebugRFile UP-TO-DATE
+> Task :google_sign_in_android:compileDebugLibraryResources UP-TO-DATE
+> Task :google_sign_in_android:parseDebugLocalResources UP-TO-DATE
+> Task :google_sign_in_android:generateDebugRFile UP-TO-DATE
+> Task :image_picker_android:compileDebugLibraryResources UP-TO-DATE
+> Task :image_picker_android:parseDebugLocalResources UP-TO-DATE
+> Task :image_picker_android:generateDebugRFile UP-TO-DATE
+> Task :jni:compileDebugLibraryResources UP-TO-DATE
+> Task :jni:parseDebugLocalResources UP-TO-DATE
+> Task :jni:generateDebugRFile UP-TO-DATE
+> Task :jni_flutter:compileDebugLibraryResources UP-TO-DATE
+> Task :jni_flutter:parseDebugLocalResources UP-TO-DATE
+> Task :jni_flutter:generateDebugRFile UP-TO-DATE
+> Task :just_audio:compileDebugLibraryResources UP-TO-DATE
+> Task :just_audio:parseDebugLocalResources UP-TO-DATE
+> Task :just_audio:generateDebugRFile UP-TO-DATE
+> Task :livekit_client:compileDebugLibraryResources UP-TO-DATE
+> Task :livekit_client:parseDebugLocalResources UP-TO-DATE
+> Task :livekit_client:generateDebugRFile UP-TO-DATE
+> Task :location:compileDebugLibraryResources UP-TO-DATE
+> Task :location:parseDebugLocalResources UP-TO-DATE
+> Task :location:generateDebugRFile UP-TO-DATE
+> Task :package_info_plus:compileDebugLibraryResources UP-TO-DATE
+> Task :package_info_plus:parseDebugLocalResources UP-TO-DATE
+> Task :package_info_plus:generateDebugRFile UP-TO-DATE
+> Task :permission_handler_android:compileDebugLibraryResources UP-TO-DATE
+> Task :permission_handler_android:parseDebugLocalResources UP-TO-DATE
+> Task :permission_handler_android:generateDebugRFile UP-TO-DATE
+> Task :pro_video_editor:compileDebugLibraryResources UP-TO-DATE
+> Task :pro_video_editor:parseDebugLocalResources UP-TO-DATE
+> Task :pro_video_editor:generateDebugRFile UP-TO-DATE
+> Task :record_android:compileDebugLibraryResources UP-TO-DATE
+> Task :record_android:parseDebugLocalResources UP-TO-DATE
+> Task :record_android:generateDebugRFile UP-TO-DATE
+> Task :share_plus:compileDebugLibraryResources UP-TO-DATE
+> Task :share_plus:parseDebugLocalResources UP-TO-DATE
+> Task :share_plus:generateDebugRFile UP-TO-DATE
+> Task :shared_preferences_android:compileDebugLibraryResources UP-TO-DATE
+> Task :shared_preferences_android:parseDebugLocalResources UP-TO-DATE
+> Task :shared_preferences_android:generateDebugRFile UP-TO-DATE
+> Task :sqflite_android:compileDebugLibraryResources UP-TO-DATE
+> Task :sqflite_android:parseDebugLocalResources UP-TO-DATE
+> Task :sqflite_android:generateDebugRFile UP-TO-DATE
+> Task :tflite_flutter_custom:compileDebugLibraryResources UP-TO-DATE
+> Task :tflite_flutter_custom:parseDebugLocalResources UP-TO-DATE
+> Task :tflite_flutter_custom:generateDebugRFile UP-TO-DATE
+> Task :url_launcher_android:compileDebugLibraryResources UP-TO-DATE
+> Task :url_launcher_android:parseDebugLocalResources UP-TO-DATE
+> Task :url_launcher_android:generateDebugRFile UP-TO-DATE
+> Task :video_player_android:compileDebugLibraryResources UP-TO-DATE
+> Task :video_player_android:parseDebugLocalResources UP-TO-DATE
+> Task :video_player_android:generateDebugRFile UP-TO-DATE
+> Task :video_thumbnail:compileDebugLibraryResources UP-TO-DATE
+> Task :video_thumbnail:parseDebugLocalResources UP-TO-DATE
+> Task :video_thumbnail:generateDebugRFile UP-TO-DATE
+> Task :wakelock_plus:compileDebugLibraryResources UP-TO-DATE
+> Task :wakelock_plus:parseDebugLocalResources UP-TO-DATE
+> Task :wakelock_plus:generateDebugRFile UP-TO-DATE
+> Task :app:processDebugResources UP-TO-DATE
+> Task :audio_session:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :audio_session:javaPreCompileDebug UP-TO-DATE
+> Task :camera_android_camerax:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :camera_android_camerax:javaPreCompileDebug UP-TO-DATE
+> Task :camerawesome:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :camerawesome:javaPreCompileDebug UP-TO-DATE
+> Task :cloud_firestore:generateDebugBuildConfig UP-TO-DATE
+> Task :cloud_firestore:javaPreCompileDebug UP-TO-DATE
+> Task :firebase_core:generateDebugBuildConfig UP-TO-DATE
+> Task :firebase_core:javaPreCompileDebug UP-TO-DATE
+> Task :firebase_core:compileDebugJavaWithJavac
+> Task :cloud_functions:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :cloud_functions:generateDebugBuildConfig UP-TO-DATE
+> Task :cloud_functions:javaPreCompileDebug UP-TO-DATE
+> Task :connectivity_plus:javaPreCompileDebug UP-TO-DATE
+> Task :firebase_core:bundleLibCompileToJarDebug
+> Task :connectivity_plus:compileDebugJavaWithJavac
+
+> Task :cloud_firestore:compileDebugJavaWithJavac
+.\gradlew.bat : Note: C:\Users\Flutter_2_2026\AppData\Local\Pub\Cache\hosted\pub.dev\cloud_firestore-6.3.0\android\src\
+main\java\io\flutter\plugins\firebase\firestore\utils\PipelineStageHandlers.java uses unchecked or unsafe operations.
+At C:\Users\Flutter_2_2026\AppData\Local\Temp\ps-script-4d3ac9c9-dc0f-49f3-a21a-097bbe2ccfd6.ps1:110 char:87
++ ... obondapp\android"; .\gradlew.bat :app:compileDebugKotlin 2>&1 | Out-F ...
++                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Note: C:\Users\...afe operations.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Note: Recompile with -Xlint:unchecked for details.
+
+> Task :cloud_firestore:bundleLibCompileToJarDebug
+> Task :device_info_plus:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :connectivity_plus:bundleLibCompileToJarDebug
+> Task :device_info_plus:javaPreCompileDebug UP-TO-DATE
+> Task :easy_video_editor:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :easy_video_editor:javaPreCompileDebug UP-TO-DATE
+> Task :file_selector_android:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :file_selector_android:javaPreCompileDebug UP-TO-DATE
+> Task :firebase_auth:generateDebugBuildConfig UP-TO-DATE
+> Task :firebase_auth:javaPreCompileDebug UP-TO-DATE
+
+> Task :firebase_auth:compileDebugJavaWithJavac
+Note: Some input files use or override a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+
+> Task :firebase_messaging:generateDebugBuildConfig UP-TO-DATE
+> Task :firebase_messaging:javaPreCompileDebug UP-TO-DATE
+> Task :firebase_auth:bundleLibCompileToJarDebug
+> Task :firebase_messaging:compileDebugJavaWithJavac
+> Task :flutter_callkit_incoming:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :firebase_messaging:bundleLibCompileToJarDebug
+> Task :flutter_callkit_incoming:compileDebugKotlin UP-TO-DATE
+> Task :flutter_callkit_incoming:javaPreCompileDebug UP-TO-DATE
+> Task :flutter_callkit_incoming:compileDebugJavaWithJavac NO-SOURCE
+> Task :flutter_callkit_incoming:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :flutter_contacts:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :flutter_contacts:javaPreCompileDebug UP-TO-DATE
+> Task :flutter_image_compress_common:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :flutter_image_compress_common:javaPreCompileDebug UP-TO-DATE
+> Task :flutter_local_notifications:javaPreCompileDebug UP-TO-DATE
+> Task :flutter_local_notifications:compileDebugJavaWithJavac
+> Task :flutter_plugin_android_lifecycle:javaPreCompileDebug UP-TO-DATE
+> Task :flutter_local_notifications:bundleLibCompileToJarDebug
+> Task :flutter_plugin_android_lifecycle:compileDebugJavaWithJavac
+> Task :flutter_plugin_android_lifecycle:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :flutter_webrtc:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :flutter_webrtc:javaPreCompileDebug UP-TO-DATE
+> Task :google_maps_flutter_android:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :google_maps_flutter_android:javaPreCompileDebug UP-TO-DATE
+> Task :google_mlkit_commons:javaPreCompileDebug UP-TO-DATE
+
+Note: C:\Users\Flutter_2_2026\AppData\Local\Pub\Cache\hosted\pub.dev\google_mlkit_commons-0.11.1\android\src\main\java\
+com\google_mlkit_commons\InputImageConverter.java uses unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+> Task :google_mlkit_commons:compileDebugJavaWithJavac
+
+> Task :google_mlkit_face_detection:javaPreCompileDebug UP-TO-DATE
+> Task :google_sign_in_android:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :google_mlkit_commons:bundleLibCompileToJarDebug
+
+Note: C:\Users\Flutter_2_2026\AppData\Local\Pub\Cache\hosted\pub.dev\google_mlkit_face_detection-0.13.2\android\src\mai
+n\java\com\google_mlkit_face_detection\FaceDetector.java uses unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+> Task :google_mlkit_face_detection:compileDebugJavaWithJavac
+
+> Task :google_sign_in_android:javaPreCompileDebug UP-TO-DATE
+> Task :image_picker_android:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :google_mlkit_face_detection:bundleLibCompileToJarDebug
+> Task :image_picker_android:javaPreCompileDebug UP-TO-DATE
+> Task :jni:javaPreCompileDebug UP-TO-DATE
+> Task :jni:compileDebugJavaWithJavac
+> Task :jni_flutter:javaPreCompileDebug UP-TO-DATE
+> Task :just_audio:javaPreCompileDebug UP-TO-DATE
+> Task :livekit_client:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :livekit_client:javaPreCompileDebug UP-TO-DATE
+> Task :location:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :jni:bundleLibCompileToJarDebug
+> Task :jni_flutter:compileDebugJavaWithJavac
+> Task :jni_flutter:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :location:javaPreCompileDebug UP-TO-DATE
+> Task :package_info_plus:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :package_info_plus:javaPreCompileDebug UP-TO-DATE
+> Task :permission_handler_android:javaPreCompileDebug UP-TO-DATE
+> Task :permission_handler_android:compileDebugJavaWithJavac
+> Task :pro_video_editor:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :permission_handler_android:bundleLibCompileToJarDebug
+> Task :pro_video_editor:javaPreCompileDebug UP-TO-DATE
+> Task :record_android:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :record_android:javaPreCompileDebug UP-TO-DATE
+> Task :share_plus:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :share_plus:javaPreCompileDebug UP-TO-DATE
+> Task :shared_preferences_android:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :shared_preferences_android:javaPreCompileDebug UP-TO-DATE
+> Task :sqflite_android:javaPreCompileDebug UP-TO-DATE
+> Task :sqflite_android:compileDebugJavaWithJavac
+> Task :sqflite_android:bundleLibCompileToJarDebug
+> Task :tflite_flutter_custom:javaPreCompileDebug UP-TO-DATE
+> Task :tflite_flutter_custom:compileDebugJavaWithJavac NO-SOURCE
+> Task :tflite_flutter_custom:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :url_launcher_android:generateDebugBuildConfig UP-TO-DATE
+> Task :url_launcher_android:javaPreCompileDebug UP-TO-DATE
+> Task :url_launcher_android:compileDebugJavaWithJavac
+> Task :url_launcher_android:bundleLibCompileToJarDebug
+> Task :video_player_android:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :audio_session:compileDebugKotlin
+> Task :camera_android_camerax:compileDebugKotlin
+> Task :camerawesome:compileDebugKotlin
+> Task :cloud_functions:compileDebugKotlin
+> Task :device_info_plus:compileDebugKotlin
+> Task :easy_video_editor:compileDebugKotlin
+> Task :file_selector_android:compileDebugKotlin
+> Task :flutter_contacts:compileDebugKotlin
+> Task :flutter_image_compress_common:compileDebugKotlin
+> Task :flutter_webrtc:compileDebugKotlin
+> Task :google_maps_flutter_android:compileDebugKotlin
+> Task :google_sign_in_android:compileDebugKotlin
+> Task :image_picker_android:compileDebugKotlin
+> Task :location:compileDebugKotlin
+> Task :package_info_plus:compileDebugKotlin
+> Task :pro_video_editor:compileDebugKotlin
+> Task :record_android:compileDebugKotlin
+> Task :share_plus:compileDebugKotlin
+> Task :shared_preferences_android:compileDebugKotlin
+> Task :video_player_android:compileDebugKotlin
+> Task :audio_session:compileDebugJavaWithJavac NO-SOURCE
+> Task :audio_session:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :just_audio:compileDebugJavaWithJavac
+> Task :just_audio:bundleLibCompileToJarDebug
+> Task :video_player_android:javaPreCompileDebug UP-TO-DATE
+> Task :video_thumbnail:javaPreCompileDebug UP-TO-DATE
+
+> Task :video_thumbnail:compileDebugJavaWithJavac
+Note: C:\Users\Flutter_2_2026\AppData\Local\Pub\Cache\hosted\pub.dev\video_thumbnail-0.5.6\android\src\main\java\xyz\ju
+stsoft\video_thumbnail\VideoThumbnailPlugin.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+Note: C:\Users\Flutter_2_2026\AppData\Local\Pub\Cache\hosted\pub.dev\video_thumbnail-0.5.6\android\src\main\java\xyz\ju
+stsoft\video_thumbnail\VideoThumbnailPlugin.java uses unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+
+> Task :video_thumbnail:bundleLibCompileToJarDebug
+> Task :wakelock_plus:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :wakelock_plus:javaPreCompileDebug UP-TO-DATE
+> Task :device_info_plus:compileDebugJavaWithJavac NO-SOURCE
+> Task :device_info_plus:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :file_selector_android:compileDebugJavaWithJavac
+> Task :file_selector_android:bundleLibCompileToJarDebug
+
+> Task :cloud_functions:compileDebugKotlin
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/cloud_functions-6.2.0/android/src/main/kotlin/io/flutter/plugins/firebase/functions/FirebaseFunctionsStreamHandler.kt:23:34 Unchecked cast of 'Any' to 'Map<String, Any>'.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/cloud_functions-6.2.0/android/src/main/kotlin/io/flutter/plugins/firebase/functions/FlutterFirebaseFunctionsPlugin.kt:175:33 Unchecked cast of 'Map<String, Any?>' to 'Map<String, Any>'.
+
+> Task :flutter_webrtc:compileDebugJavaWithJavac
+Note: Some input files use or override a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+Note: Some input files use unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+
+> Task :cloud_functions:compileDebugJavaWithJavac
+> Task :cloud_functions:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :flutter_webrtc:bundleLibCompileToJarDebug
+> Task :package_info_plus:compileDebugJavaWithJavac NO-SOURCE
+> Task :package_info_plus:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :flutter_image_compress_common:compileDebugJavaWithJavac
+> Task :flutter_image_compress_common:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :google_sign_in_android:compileDebugJavaWithJavac
+> Task :easy_video_editor:compileDebugJavaWithJavac NO-SOURCE
+> Task :easy_video_editor:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :google_sign_in_android:bundleLibCompileToJarDebug
+
+> Task :location:compileDebugJavaWithJavac
+Note: Some input files use or override a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+
+> Task :image_picker_android:compileDebugJavaWithJavac
+> Task :share_plus:compileDebugJavaWithJavac NO-SOURCE
+> Task :share_plus:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :location:bundleLibCompileToJarDebug
+> Task :image_picker_android:bundleLibCompileToJarDebug
+
+> Task :flutter_contacts:compileDebugKotlin
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/Contact.kt:41:40 Unchecked cast of 'Any?' to 'Map<String, Any>'.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/Contact.kt:42:30 Unchecked cast of 'Any?' to 'List<Map<String, Any>>'.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/Contact.kt:43:30 Unchecked cast of 'Any?' to 'List<Map<String, Any>>'.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/Contact.kt:44:33 Unchecked cast of 'Any?' to 'List<Map<String, Any>>'.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/Contact.kt:45:37 Unchecked cast of 'Any?' to 'List<Map<String, Any>>'.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/Contact.kt:46:32 Unchecked cast of 'Any?' to 'List<Map<String, Any>>'.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/Contact.kt:47:36 Unchecked cast of 'Any?' to 'List<Map<String, Any>>'.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/Contact.kt:48:30 Unchecked cast of 'Any?' to 'List<Map<String, Any?>>'.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/Contact.kt:49:29 Unchecked cast of 'Any?' to 'List<Map<String, Any>>'.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/Contact.kt:50:32 Unchecked cast of 'Any?' to 'List<Map<String, Any>>'.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/Contact.kt:51:30 Unchecked cast of 'Any?' to 'List<Map<String, Any>>'.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:150:25 'class Im : Any, ContactsContract.CommonDataKinds.CommonColumns, ContactsContract.DataColumnsWithJoins' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:151:25 'class Im : Any, ContactsContract.CommonDataKinds.CommonColumns, ContactsContract.DataColumnsWithJoins' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:151:28 'static field PROTOCOL: String' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:152:25 'class Im : Any, ContactsContract.CommonDataKinds.CommonColumns, ContactsContract.DataColumnsWithJoins' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:152:28 'static field CUSTOM_PROTOCOL: String' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:373:25 'class Im : Any, ContactsContract.CommonDataKinds.CommonColumns, ContactsContract.DataColumnsWithJoins' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:373:28 'static field CONTENT_ITEM_TYPE: String' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:378:43 'class Im : Any, ContactsContract.CommonDataKinds.CommonColumns, ContactsContract.DataColumnsWithJoins' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:543:29 'class Im : Any, ContactsContract.CommonDataKinds.CommonColumns, ContactsContract.DataColumnsWithJoins' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:543:32 'static field CONTENT_ITEM_TYPE: String' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:962:60 'class Im : Any, ContactsContract.CommonDataKinds.CommonColumns, ContactsContract.DataColumnsWithJoins' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:962:63 'static field PROTOCOL: String' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:964:17 'class Im : Any, ContactsContract.CommonDataKinds.CommonColumns, ContactsContract.DataColumnsWithJoins' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:964:20 'static field PROTOCOL_AIM: Int' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:965:17 'class Im : Any, ContactsContract.CommonDataKinds.CommonColumns, ContactsContract.DataColumnsWithJoins' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:965:20 'static field PROTOCOL_GOOGLE_TALK: Int' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:966:17 'class Im : Any, ContactsContract.CommonDataKinds.CommonColumns, ContactsContract.DataColumnsWithJoins' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:966:20 'static field PROTOCOL_ICQ: Int' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:967:17 'class Im : Any, ContactsContract.CommonDataKinds.CommonColumns, ContactsContract.DataColumnsWithJoins' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:967:20 'static field PROTOCOL_JABBER: Int' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:968:17 'class Im : Any, ContactsContract.CommonDataKinds.CommonColumns, ContactsContract.DataColumnsWithJoins' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:968:20 'static field PROTOCOL_MSN: Int' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:969:17 'class Im : Any, ContactsContract.CommonDataKinds.CommonColumns, ContactsContract.DataColumnsWithJoins' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:969:20 'static field PROTOCOL_NETMEETING: Int' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:970:17 'class Im : Any, ContactsContract.CommonDataKinds.CommonColumns, ContactsContract.DataColumnsWithJoins' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:970:20 'static field PROTOCOL_QQ: Int' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:971:17 'class Im : Any, ContactsContract.CommonDataKinds.CommonColumns, ContactsContract.DataColumnsWithJoins' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:971:20 'static field PROTOCOL_SKYPE: Int' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:972:17 'class Im : Any, ContactsContract.CommonDataKinds.CommonColumns, ContactsContract.DataColumnsWithJoins' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:972:20 'static field PROTOCOL_YAHOO: Int' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:973:17 'class Im : Any, ContactsContract.CommonDataKinds.CommonColumns, ContactsContract.DataColumnsWithJoins' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:973:20 'static field PROTOCOL_CUSTOM: Int' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:979:59 'class Im : Any, ContactsContract.CommonDataKinds.CommonColumns, ContactsContract.DataColumnsWithJoins' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:979:62 'static field CUSTOM_PROTOCOL: String' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:985:47 'class Im : Any, ContactsContract.CommonDataKinds.CommonColumns, ContactsContract.DataColumnsWithJoins' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:985:50 'static field PROTOCOL_AIM: Int' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:986:54 'class Im : Any, ContactsContract.CommonDataKinds.CommonColumns, ContactsContract.DataColumnsWithJoins' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:986:57 'static field PROTOCOL_GOOGLE_TALK: Int' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:987:47 'class Im : Any, ContactsContract.CommonDataKinds.CommonColumns, ContactsContract.DataColumnsWithJoins' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:987:50 'static field PROTOCOL_ICQ: Int' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:988:50 'class Im : Any, ContactsContract.CommonDataKinds.CommonColumns, ContactsContract.DataColumnsWithJoins' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:988:53 'static field PROTOCOL_JABBER: Int' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:989:47 'class Im : Any, ContactsContract.CommonDataKinds.CommonColumns, ContactsContract.DataColumnsWithJoins' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:989:50 'static field PROTOCOL_MSN: Int' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:990:54 'class Im : Any, ContactsContract.CommonDataKinds.CommonColumns, ContactsContract.DataColumnsWithJoins' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:990:57 'static field PROTOCOL_NETMEETING: Int' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:991:50 'class Im : Any, ContactsContract.CommonDataKinds.CommonColumns, ContactsContract.DataColumnsWithJoins' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:991:53 'static field PROTOCOL_QQ: Int' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:992:49 'class Im : Any, ContactsContract.CommonDataKinds.CommonColumns, ContactsContract.DataColumnsWithJoins' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:992:52 'static field PROTOCOL_SKYPE: Int' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:993:49 'class Im : Any, ContactsContract.CommonDataKinds.CommonColumns, ContactsContract.DataColumnsWithJoins' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:993:52 'static field PROTOCOL_YAHOO: Int' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:994:50 'class Im : Any, ContactsContract.CommonDataKinds.CommonColumns, ContactsContract.DataColumnsWithJoins' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:994:53 'static field PROTOCOL_CUSTOM: Int' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:995:46 'class Im : Any, ContactsContract.CommonDataKinds.CommonColumns, ContactsContract.DataColumnsWithJoins' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:995:49 'static field PROTOCOL_CUSTOM: Int' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:1141:51 'class Im : Any, ContactsContract.CommonDataKinds.CommonColumns, ContactsContract.DataColumnsWithJoins' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:1141:54 'static field CONTENT_ITEM_TYPE: String' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:1142:36 'class Im : Any, ContactsContract.CommonDataKinds.CommonColumns, ContactsContract.DataColumnsWithJoins' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:1143:36 'class Im : Any, ContactsContract.CommonDataKinds.CommonColumns, ContactsContract.DataColumnsWithJoins' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:1143:39 'static field PROTOCOL: String' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:1144:36 'class Im : Any, ContactsContract.CommonDataKinds.CommonColumns, ContactsContract.DataColumnsWithJoins' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContacts.kt:1144:39 'static field CUSTOM_PROTOCOL: String' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContactsPlugin.kt:47:58 'fun getFlutterEngine(): FlutterEngine' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContactsPlugin.kt:48:62 'fun getFlutterEngine(): FlutterEngine' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContactsPlugin.kt:178:47 Unchecked cast of 'Any!' to 'List<Any>'.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContactsPlugin.kt:207:47 Unchecked cast of 'Any!' to 'List<Any>'.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContactsPlugin.kt:208:43 Unchecked cast of 'Any' to 'Map<String, Any>'.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContactsPlugin.kt:222:47 Unchecked cast of 'Any!' to 'List<Any>'.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContactsPlugin.kt:223:43 Unchecked cast of 'Any' to 'Map<String, Any>'.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContactsPlugin.kt:238:71 Unchecked cast of 'Any!' to 'List<String>'.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContactsPlugin.kt:251:47 Unchecked cast of 'Any!' to 'List<Any>'.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContactsPlugin.kt:252:41 Unchecked cast of 'Any' to 'Map<String, Any>'.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContactsPlugin.kt:262:47 Unchecked cast of 'Any!' to 'List<Any>'.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContactsPlugin.kt:263:41 Unchecked cast of 'Any' to 'Map<String, Any>'.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContactsPlugin.kt:273:47 Unchecked cast of 'Any!' to 'List<Any>'.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContactsPlugin.kt:274:41 Unchecked cast of 'Any' to 'Map<String, Any>'.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContactsPlugin.kt:283:47 Unchecked cast of 'Any!' to 'List<Any>'.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContactsPlugin.kt:291:47 Unchecked cast of 'Any!' to 'List<Any>'.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContactsPlugin.kt:305:47 Unchecked cast of 'Any!' to 'List<Any>'.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContactsPlugin.kt:306:63 Unchecked cast of 'Any' to 'Map<String, Any?>'.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/FlutterContactsPlugin.kt:380:68 'constructor(): Handler' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_contacts-1.1.9+2/android/src/main/kotlin/co/quis/flutter_contacts/properties/Account.kt:15:28 Unchecked cast of 'Any?' to 'List<String>'.
+
+> Task :flutter_contacts:compileDebugJavaWithJavac NO-SOURCE
+> Task :flutter_contacts:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :camera_android_camerax:compileDebugJavaWithJavac
+> Task :camera_android_camerax:bundleLibCompileToJarDebug
+
+> Task :camerawesome:compileDebugKotlin
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/camerawesome-2.5.0/android/src/main/kotlin/com/apparence/camerawesome/buttons/PlayerService.kt:23:36 'fun <T : Parcelable!> getParcelable(p0: String?): T?' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/camerawesome-2.5.0/android/src/main/kotlin/com/apparence/camerawesome/cameraX/AnalysisImageConverter.kt:203:46 Java type mismatch: inferred type is 'ByteArray?', but 'ByteArray' was expected.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/camerawesome-2.5.0/android/src/main/kotlin/com/apparence/camerawesome/cameraX/CameraAwesomeX.kt:600:9 'fun focus(): Unit' is deprecated. Use focusOnPoint instead.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/camerawesome-2.5.0/android/src/main/kotlin/com/apparence/camerawesome/cameraX/CameraXState.kt:134:39 'fun setTargetAspectRatio(p0: Int): Preview.Builder' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/camerawesome-2.5.0/android/src/main/kotlin/com/apparence/camerawesome/cameraX/CameraXState.kt:388:50 'static fun getSupportedQualities(p0: CameraInfo): (Mutable)List<Quality!>' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/camerawesome-2.5.0/android/src/main/kotlin/com/apparence/camerawesome/cameraX/ImageAnalysisBuilder.kt:67:53 'fun setTargetResolution(p0: Size): ImageAnalysis.Builder' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/camerawesome-2.5.0/android/src/main/kotlin/com/apparence/camerawesome/cameraX/Pigeon.kt:747:10 Duplicate branch condition in 'when'.
+
+> Task :video_player_android:compileDebugJavaWithJavac
+> Task :camerawesome:compileDebugJavaWithJavac
+> Task :video_player_android:bundleLibCompileToJarDebug
+> Task :camerawesome:bundleLibCompileToJarDebug
+> Task :shared_preferences_android:compileDebugJavaWithJavac
+> Task :shared_preferences_android:bundleLibCompileToJarDebug
+> Task :record_android:compileDebugJavaWithJavac NO-SOURCE
+> Task :record_android:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :google_maps_flutter_android:compileDebugJavaWithJavac
+> Task :google_maps_flutter_android:bundleLibCompileToJarDebug
+> Task :wakelock_plus:compileDebugKotlin
+> Task :wakelock_plus:compileDebugJavaWithJavac NO-SOURCE
+> Task :wakelock_plus:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :livekit_client:compileDebugKotlin
+> Task :livekit_client:compileDebugJavaWithJavac NO-SOURCE
+> Task :livekit_client:bundleLibCompileToJarDebug UP-TO-DATE
+
+> Task :pro_video_editor:compileDebugKotlin
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/pro_video_editor-2.2.4/android/src/main/kotlin/ch/waio/pro_video_editor/src/features/render/helpers/ApplyBitrate.kt:48:24 Only safe (?.) or non-null asserted (!!.) calls are allowed on a nullable receiver of type 'MediaCodecInfo.VideoCapabilities?'.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/pro_video_editor-2.2.4/android/src/main/kotlin/ch/waio/pro_video_editor/src/features/render/helpers/ApplyBitrate.kt:49:23 Only safe (?.) or non-null asserted (!!.) calls are allowed on a nullable receiver of type 'MediaCodecInfo.EncoderCapabilities?'.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/pro_video_editor-2.2.4/android/src/main/kotlin/ch/waio/pro_video_editor/src/features/render/helpers/ApplyPlaybackSpeed.kt:5:8 'class SpeedChangeEffect : Any, GlEffect' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/pro_video_editor-2.2.4/android/src/main/kotlin/ch/waio/pro_video_editor/src/features/render/helpers/ApplyPlaybackSpeed.kt:27:21 'constructor(p0: Float): SpeedChangeEffect' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/pro_video_editor-2.2.4/android/src/main/kotlin/ch/waio/pro_video_editor/src/features/render/helpers/AudioSequenceBuilder.kt:140:48 'constructor(vararg p0: EditedMediaItem): EditedMediaItemSequence.Builder' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/pro_video_editor-2.2.4/android/src/main/kotlin/ch/waio/pro_video_editor/src/features/render/helpers/GifDecoder.kt:5:8 'class Movie : Any' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/pro_video_editor-2.2.4/android/src/main/kotlin/ch/waio/pro_video_editor/src/features/render/helpers/VideoSequenceBuilder.kt:17:8 'class SpeedChangeEffect : Any, GlEffect' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/pro_video_editor-2.2.4/android/src/main/kotlin/ch/waio/pro_video_editor/src/features/render/helpers/VideoSequenceBuilder.kt:684:33 'constructor(p0: Float): SpeedChangeEffect' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AppData/Local/Pub/Cache/hosted/pub.dev/pro_video_editor-2.2.4/android/src/main/kotlin/ch/waio/pro_video_editor/src/features/render/helpers/VideoTranscoder.kt:148:56 'constructor(vararg p0: EditedMediaItem): EditedMediaItemSequence.Builder' is deprecated. Deprecated in Java.
+
+> Task :pro_video_editor:compileDebugJavaWithJavac NO-SOURCE
+> Task :pro_video_editor:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :app:compileDebugKotlin
+w: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/dubai/bimobondapp/MainActivity.kt:75:77 'static field FLAG_SHOW_WHEN_LOCKED: Int' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/dubai/bimobondapp/MainActivity.kt:76:77 'static field FLAG_TURN_SCREEN_ON: Int' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/dubai/bimobondapp/MainActivity.kt:80:77 'static field FLAG_SHOW_WHEN_LOCKED: Int' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/dubai/bimobondapp/MainActivity.kt:81:77 'static field FLAG_TURN_SCREEN_ON: Int' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/dubai/bimobondapp/ar_camera/ArCameraBridge.kt:826:21 Condition is always 'true'.
+w: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/dubai/bimobondapp/ar_camera/ArCameraController.kt:3933:58 'val defaultDisplay: Display!' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/dubai/bimobondapp/ar_camera/ArCameraController.kt:4006:27 Condition is always 'true'.
+w: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/dubai/bimobondapp/ar_camera/ArCameraController.kt:4048:26 'fun setTargetResolution(p0: Size): ImageAnalysis.Builder' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/dubai/bimobondapp/ar_camera/ArCameraController.kt:4168:22 'fun setTargetResolution(p0: Size): ImageAnalysis.Builder' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/dubai/bimobondapp/camera_engine/NativeCameraEngine.kt:61:46 'static field TRIM_MEMORY_RUNNING_LOW: Int' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/dubai/bimobondapp/camera_engine/NativeCameraEngine.kt:67:46 'static field TRIM_MEMORY_COMPLETE: Int' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/dubai/bimobondapp/camera_engine/NativeCameraEngine.kt:68:46 'static field TRIM_MEMORY_MODERATE: Int' is deprecated. Deprecated in Java.
+w: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/dubai/bimobondapp/camera_engine/NativeCameraEngine.kt:76:22 This declaration overrides a deprecated member but is not marked as deprecated itself. Add the '@Deprecated' annotation or suppress the diagnostic.
+w: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/dubai/bimobondapp/camera_engine/TemplateCompositionEncoder.kt:31:8 Annotation 'androidx.media3.common.util.UnstableApi' is not annotated with '@RequiresOptIn'. '@OptIn' has no effect.
+w: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/dubai/bimobondapp/camera_engine/VideoExporter.kt:37:8 Annotation 'androidx.media3.common.util.UnstableApi' is not annotated with '@RequiresOptIn'. '@OptIn' has no effect.
+w: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/dubai/bimobondapp/effect360/Engine360EffectImpl.kt:147:9 The corresponding parameter in the supertype 'Engine360EffectInterface' is named 'projectionMatrix'. This may cause problems when calling this function with named arguments.
+w: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/dubai/bimobondapp/effect360/Engine360EffectImpl.kt:148:9 The corresponding parameter in the supertype 'Engine360EffectInterface' is named 'viewMatrix'. This may cause problems when calling this function with named arguments.
+
+[Incubating] Problems report is available at: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.14/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 3m 39s
+603 actionable tasks: 83 executed, 520 up-to-date

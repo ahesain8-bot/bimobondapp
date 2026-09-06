@@ -4,6 +4,7 @@ import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:livekit_client/livekit_client.dart';
+import 'package:bimobondapp/app/ar_camera/ar_camera_bridge.dart';
 import 'package:bimobondapp/app/auctions/data/datasources/auction_socket_service.dart';
 
 import '../../../../../core/network/api_exceptions.dart';
@@ -27,6 +28,8 @@ import '../../../domain/usecases/update_live_title.dart';
 import 'live_room_event.dart';
 import 'live_room_state.dart';
 import '../../../domain/entities/live_gift_banner.dart';
+import '../../utils/ar_live_beauty_defaults.dart';
+import '../../utils/live_room_perf.dart';
 
 /// Orchestrates the live-room host screen: backend session + HUD + camera.
 class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
@@ -54,6 +57,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
       if (!isClosed) add(LiveRoomGiftComboReceived(payload));
     });
     on<LiveRoomStarted>(_onStarted);
+    on<LiveRoomEnrichSessionRequested>(_onEnrichSessionRequested);
     on<LiveRoomRecoverEndAndRestart>(_onRecoverEndAndRestart);
     on<LiveRoomRecoverResumeActive>(_onRecoverResumeActive);
     on<LiveRoomEndRequested>(_onEndRequested);
@@ -65,7 +69,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     on<LiveRoomShareTapped>(_onUiAction);
     on<LiveRoomEffectsTapped>(_onEffectsTapped);
     on<LiveRoomMoreTapped>(_onUiAction);
-    on<LiveRoomCollabTapped>(_onUiAction);
+    on<LiveRoomCollabTapped>(_onCollabTapped);
     on<LiveRoomViewersTapped>(_onUiAction);
     on<LiveRoomInviteTapped>(_onUiAction);
     on<LiveRoomRankingTapped>(_onRankingTapped);
@@ -145,6 +149,9 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
   var _appPaused = false;
   var _closing = false;
 
+  /// Android: FaceWarp owns CameraX; LiveKit publishes beauty frames.
+  var _useArBeautyCamera = false;
+
   /// Invalidates an older battle connect when a new battle or battle end
   /// arrives while its join request is still in flight.
   var _battleOperationGeneration = 0;
@@ -163,18 +170,29 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     LiveRoomStarted event,
     Emitter<LiveRoomState> emit,
   ) async {
+    final perf = LiveRoomPerf.start();
+    LiveRoomPerf.mark(perf, 'create_or_join_start');
     emit(const LiveRoomLoading());
     _sessionTeardownDone = false;
     _cameraOpInFlight = false;
+    _useArBeautyCamera = event.useArBeautyCamera;
+    if (_useArBeautyCamera) {
+      // Same FaceWarp camera as Add Post — publish raw until Beautify is used.
+      ArLiveBeautyDefaults.clear();
+      unawaited(ArCameraBridge.setLivePublishingExclusive(true));
+    }
 
     final title = event.title?.trim().isNotEmpty == true
         ? event.title!.trim()
         : 'بث مباشر';
 
     // Critical path: open local camera immediately — never wait for Nest/LiveKit.
+    // AR beauty keeps Kotlin CameraX; do not open Flutter camera.
     // If the start screen handed us its RUNNING camera, reuse it (same lens,
     // no reopen, no black flicker); otherwise open a fresh one.
-    final cameraFuture = event.initialCamera != null
+    final cameraFuture = _useArBeautyCamera
+        ? Future<CameraController?>.value(null)
+        : event.initialCamera != null
         ? Future<CameraController?>.value(event.initialCamera)
         : _initializeCamera(useFront: true);
     final sessionFuture = _startLiveSession(title: title);
@@ -193,12 +211,21 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
           isFrontCamera: true,
         ),
       );
+    } else if (_useArBeautyCamera) {
+      emit(
+        const LiveRoomOpening(
+          controller: null,
+          isCameraInitialized: true,
+          isFrontCamera: true,
+        ),
+      );
     }
 
     late final LiveSession session;
     var startedOnServer = true;
     try {
       session = await sessionFuture;
+      LiveRoomPerf.mark(perf, 'rest_ok', detail: 'liveId=${session.id}');
     } catch (e) {
       if (isClosed) {
         if (controller != null) await _disposeCamera(controller);
@@ -410,7 +437,8 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
       LiveRoomReady(
         session: session,
         controller: controller,
-        isCameraInitialized: controller != null,
+        // AR beauty has no Flutter CameraController — still treat as ready.
+        isCameraInitialized: controller != null || _useArBeautyCamera,
         isFrontCamera: true,
         isMediaConnected: false,
       ),
@@ -419,11 +447,9 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     if (startedOnServer && session.id.isNotEmpty) {
       _giftJoinedLiveId = session.id;
       unawaited(
-        _giftSocketService
-            .ensureJoined(liveId: session.id)
-            .catchError((error) {
-              debugPrint('Canonical gift socket join failed: $error');
-            }),
+        _giftSocketService.ensureJoined(liveId: session.id).catchError((error) {
+          debugPrint('Canonical gift socket join failed: $error');
+        }),
       );
     }
 
@@ -455,9 +481,20 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
 
     // Publishing is the critical path. Waiting for four HUD HTTP requests here
     // delayed the first outgoing frame by several seconds.
+    final publishPerf = LiveRoomPerf.start();
+    LiveRoomPerf.mark(publishPerf, 'livekit_connect_start');
     await _publishLiveKitAfterPreview(emit);
+    LiveRoomPerf.mark(publishPerf, 'publish_ok');
+    LiveRoomPerf.mark(publishPerf, 'room_ready');
 
-    // Comments/gallery/guests/rank can arrive after video is already flowing.
+    // P2 enrich via its own event so emit stays valid after this handler ends.
+    add(const LiveRoomEnrichSessionRequested());
+  }
+
+  Future<void> _onEnrichSessionRequested(
+    LiveRoomEnrichSessionRequested event,
+    Emitter<LiveRoomState> emit,
+  ) async {
     await _enrichSession(emit);
   }
 
@@ -485,7 +522,11 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
       if (ready == null || ready.session.id != liveId) return;
 
       try {
+        LiveRoomPerf.log('socket_connect_start', detail: 'liveId=$liveId');
+        final sockPerf = LiveRoomPerf.start();
         await _sessionRepository.connectRealtime(liveId);
+        LiveRoomPerf.mark(sockPerf, 'socket_connected');
+        LiveRoomPerf.mark(sockPerf, 'joinLive_ok');
         return;
       } catch (e) {
         debugPrint('HUD socket connect failed for $liveId: $e');
@@ -624,14 +665,15 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         url: url,
         token: token,
         useFrontCamera: useFront,
-        beforeVideoCapture: releaseLocalCamera,
+        beforeVideoCapture: _useArBeautyCamera ? null : releaseLocalCamera,
         mediaHints: current.session.mediaHints,
+        useArBeautyCamera: _useArBeautyCamera,
       );
       debugPrint('🔍 [BLoC] connectMedia SUCCESS ✅');
-    } catch (e) {
+      } catch (e) {
       debugPrint('🔴 [BLoC] connectMedia failed: $e');
       CameraController? fallback = localReleased ? null : local;
-      if (localReleased) {
+      if (localReleased && !_useArBeautyCamera) {
         fallback = await _initializeCamera(useFront: useFront);
       }
       if (isClosed) {
@@ -646,10 +688,12 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
       emit(
         ready.copyWith(
           controller: fallback,
-          isCameraInitialized: fallback != null,
+          isCameraInitialized: fallback != null || _useArBeautyCamera,
           isMediaConnected: false,
           localVideoTrack: null,
-          actionMessage: 'تعذر نشر الفيديو عبر LiveKit: $e',
+          actionMessage: _useArBeautyCamera
+              ? 'البث يعمل بالمعاينة المحلية. تعذر إرسال الفيديو عبر الشبكة حالياً.'
+              : 'تعذر نشر الفيديو عبر LiveKit: $e',
         ),
       );
       return;
@@ -668,19 +712,28 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
       'localPreviewTrack=${_sessionRepository.localPreviewTrack != null ? "SET" : "NULL"}',
     );
 
-    // Only swap when there is genuinely something to swap TO.
+    // FaceWarp stays the full-screen host preview (camera layer ignores this
+    // track on AR). Still keep the LiveKit local track in state so PK battle
+    // can render a clipped VideoTrackRenderer in the left frame.
     final liveTrack = _sessionRepository.localPreviewTrack as VideoTrack?;
     final mediaUp = _sessionRepository.isMediaConnected;
-    final swapToLiveKit = liveTrack != null && mediaUp;
+    final swapToLiveKit = !_useArBeautyCamera && liveTrack != null && mediaUp;
     if (mediaUp) _mediaConnectedAt ??= DateTime.now();
+    final beautyVideoMissing =
+        _useArBeautyCamera && mediaUp && liveTrack == null;
     emit(
       ready.copyWith(
         controller: swapToLiveKit ? null : ready.controller,
-        isCameraInitialized: swapToLiveKit ? false : ready.isCameraInitialized,
+        isCameraInitialized: _useArBeautyCamera
+            ? true
+            : (swapToLiveKit ? false : ready.isCameraInitialized),
         isMediaConnected: mediaUp,
         localVideoTrack: liveTrack,
         isFrontCamera: useFront,
-        clearActionMessage: true,
+        actionMessage: beautyVideoMissing
+            ? 'البث متصل. جارٍ استخدام كاميرا التجميل محلياً.'
+            : null,
+        clearActionMessage: !beautyVideoMissing,
       ),
     );
     debugPrint(
@@ -830,6 +883,9 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     final current = _readyOrNull;
     if (current == null) return;
     if (current.isMediaConnected) return;
+    // Kotlin FaceWarp owns CameraX — never open Flutter Camera2 beside it
+    // (dual open crashes CameraMetadata / binder on many devices).
+    if (_useArBeautyCamera) return;
     if (current.session.isLive && !current.isEnding) {
       await _recoverHostMedia(current.session.id, emit);
       if (_readyOrNull?.isMediaConnected == true) return;
@@ -1116,22 +1172,26 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     emit(
       current.copyWith(
         battle: battle,
-        battleMediaRoom: roomNeedsReplacement ? null : currentBattleRoom,
+        // Keep Room across recovery/score ticks — nulling remounts PK tiles.
+        battleMediaRoom: battleIdentityChanged ? null : currentBattleRoom,
         pendingCompetitionRequest: battle?.isActive == true
             ? null
             : current.pendingCompetitionRequest,
         isCompetitionActionBusy: false,
+        // Surface the beauty/LiveKit local track for the clipped PK left tile
+        // (full-screen AR preview still uses FaceWarp via camera layer).
+        localVideoTrack:
+            current.localVideoTrack ??
+            _sessionRepository.localPreviewTrack as VideoTrack?,
       ),
     );
     _syncBattlePoll(_readyOrNull ?? current);
     if (battle?.isActive != true) {
       _battleRoomRecoveryInFlight = false;
       await _sessionRepository.disconnectBattleOpponentMedia();
-      if (
-        isClosed ||
-        _closing ||
-        operationGeneration != _battleOperationGeneration
-      ) {
+      if (isClosed ||
+          _closing ||
+          operationGeneration != _battleOperationGeneration) {
         return;
       }
       final ended = _readyOrNull;
@@ -1142,7 +1202,13 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     }
     if (opponentId.isEmpty || opponentId == current.session.id) return;
     if (connectionAlreadyInFlight) return;
-    if (_battleRoomRecoveryInFlight) return;
+    // Media-layer recovery owns soft/hard reconnect for an existing room.
+    // Never block the first PK connect when we still have no usable room —
+    // that left release builds stuck on "جاري توصيل بث الخصم…".
+    final hasUsableBattleRoom =
+        currentBattleRoom != null &&
+        currentBattleRoom.connectionState != ConnectionState.disconnected;
+    if (_battleRoomRecoveryInFlight && hasUsableBattleRoom) return;
     if (!roomNeedsReplacement) return;
     // Both rings are re-read now that the opponent is known.
     _scheduleSupportersRefresh();
@@ -1150,11 +1216,9 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     try {
       await _sessionRepository.connectBattleOpponentMedia(opponentId);
       _battleRoomRecoveryInFlight = false;
-      if (
-        isClosed ||
-        _closing ||
-        operationGeneration != _battleOperationGeneration
-      ) {
+      if (isClosed ||
+          _closing ||
+          operationGeneration != _battleOperationGeneration) {
         return;
       }
       final ready = _readyOrNull;
@@ -1170,11 +1234,9 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         emit(ready.copyWith(battleMediaRoom: room is Room ? room : null));
       }
     } catch (e) {
-      if (
-        isClosed ||
-        _closing ||
-        operationGeneration != _battleOperationGeneration
-      ) {
+      if (isClosed ||
+          _closing ||
+          operationGeneration != _battleOperationGeneration) {
         return;
       }
       final ready = _readyOrNull;
@@ -1203,7 +1265,12 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     final liveId = current.session.id;
     try {
       final battle = await _sessionRepository.loadBattle(liveId);
-      if (isClosed || _readyOrNull?.session.id != liveId || battle == null) {
+      if (isClosed || _readyOrNull?.session.id != liveId) {
+        return;
+      }
+      // Server returns null once the PK is gone — clear the local split UI.
+      if (battle == null || !battle.isActive) {
+        add(LiveRoomBattleChanged(battle));
         return;
       }
       add(LiveRoomBattleChanged(battle));
@@ -1213,12 +1280,14 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
   }
 
   void _syncBattlePoll(LiveRoomReady current) {
-    final shouldPoll = current.isBattleActive && !current.isRealtimeConnected;
+    // Always poll while PK is active. Socket `finished` events are sometimes
+    // missed on the opponent host, which left one side stuck in battle UI.
+    final shouldPoll = current.isBattleActive;
     if (!shouldPoll) {
       _stopBattlePoll();
       return;
     }
-    _battlePollTimer ??= Timer.periodic(const Duration(seconds: 5), (_) {
+    _battlePollTimer ??= Timer.periodic(const Duration(seconds: 3), (_) {
       if (!isClosed) add(const LiveRoomBattlePollRequested());
     });
   }
@@ -1635,8 +1704,12 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         if (note != null) {
           emit(current.copyWith(actionMessage: note));
         }
-      case LiveHudBattleEvent(:final battle):
-        add(LiveRoomBattleChanged(battle));
+      case LiveHudBattleEvent(:final type, :final battle):
+        add(
+          LiveRoomBattleChanged(
+            battle.normalizedForUpdate(updateType: type),
+          ),
+        );
       case LiveHudConnectionEvent(:final connected):
         // Comments, viewers and likes all ride this socket. The flag is kept in
         // state so the room can show a standing warning: a SnackBar alone
@@ -1912,12 +1985,13 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
       switch (event.event.state) {
         case LiveMediaConnectionState.disconnected:
           _battleRoomRecoveryInFlight = true;
-          emit(current.copyWith(battleMediaRoom: null));
+          // Do not null battleMediaRoom — remounting VideoTrackRenderer on
+          // every opponent ICE blip freezes both PK tiles.
           return;
         case LiveMediaConnectionState.reconnected:
           _battleRoomRecoveryInFlight = false;
           final room = _sessionRepository.battleMediaRoom;
-          if (room is Room) {
+          if (room is Room && !identical(current.battleMediaRoom, room)) {
             emit(current.copyWith(battleMediaRoom: room));
           }
           return;
@@ -2010,12 +2084,15 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
             token: token,
             useFrontCamera: before.isFrontCamera,
             mediaHints: refreshed.mediaHints,
+            useArBeautyCamera: _useArBeautyCamera,
           );
           if (isClosed || _sessionTeardownDone) return;
           final ready = _readyOrNull;
           if (ready == null || ready.session.id != liveId) return;
           final track = _sessionRepository.localPreviewTrack as VideoTrack?;
-          final mediaUp = _sessionRepository.isMediaConnected && track != null;
+          final mediaUp = _useArBeautyCamera
+              ? _sessionRepository.isMediaConnected
+              : (_sessionRepository.isMediaConnected && track != null);
           if (!mediaUp) {
             throw StateError('Host video track was not republished');
           }
@@ -2027,7 +2104,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
                 mediaHints: refreshed.mediaHints,
               ),
               controller: null,
-              isCameraInitialized: false,
+              isCameraInitialized: _useArBeautyCamera,
               isMediaConnected: true,
               localVideoTrack: track,
               clearActionMessage: true,
@@ -2122,22 +2199,74 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
 
     try {
       if (current.isMediaConnected) {
+        // Frame gap during flip must not trip outbound stall → full reconnect.
+        _sessionRepository.pauseOutboundMediaHealthCheck();
+        final framesBefore =
+            _useArBeautyCamera
+            ? await ArCameraBridge.beautyPushedFrameCount()
+            : 0;
         try {
-          await _sessionRepository.flipMediaCamera(useFront: nextIsFront);
-          if (isClosed) return;
-          emit(
-            current.copyWith(
-              isFrontCamera: nextIsFront,
-              localVideoTrack:
-                  _sessionRepository.localPreviewTrack as VideoTrack?,
-            ),
-          );
+          if (_useArBeautyCamera) {
+            // Do NOT mute LiveKit here — mute/unmute renegotiates and is what
+            // made flip feel slow and sent bad frames to viewers. Pausing the
+            // native capturer freezes the last good frame on the SFU instead.
+            await ArCameraBridge.flipCamera().timeout(
+              const Duration(seconds: 3),
+              onTimeout: () {
+                debugPrint('[Host] flipCamera timed out — continuing');
+                return nextIsFront;
+              },
+            );
+            // Host UI flips immediately after CameraX bind.
+            if (!isClosed) {
+              emit(
+                current.copyWith(
+                  isFrontCamera: nextIsFront,
+                  localVideoTrack:
+                      _sessionRepository.localPreviewTrack as VideoTrack?,
+                ),
+              );
+            }
+            // Wait until beauty pump has pushed at least one post-flip frame
+            // (or a short cap) so viewers never decode mid-rebind garbage.
+            final deadline = DateTime.now().add(
+              const Duration(milliseconds: 1600),
+            );
+            while (DateTime.now().isBefore(deadline)) {
+              final n = await ArCameraBridge.beautyPushedFrameCount();
+              if (n > framesBefore) break;
+              await Future<void>.delayed(const Duration(milliseconds: 50));
+            }
+          } else {
+            await _sessionRepository.muteOutboundVideoForCameraFlip();
+            await _sessionRepository.flipMediaCamera(useFront: nextIsFront);
+            if (isClosed) return;
+            emit(
+              current.copyWith(
+                isFrontCamera: nextIsFront,
+                localVideoTrack:
+                    _sessionRepository.localPreviewTrack as VideoTrack?,
+              ),
+            );
+          }
         } catch (e) {
           if (isClosed) return;
           emit(
             current.copyWith(actionMessage: 'تعذر تبديل كاميرا LiveKit: $e'),
           );
+        } finally {
+          if (!_useArBeautyCamera) {
+            await _sessionRepository.unmuteOutboundVideoAfterCameraFlip();
+          }
+          _sessionRepository.resumeOutboundMediaHealthCheck();
         }
+        return;
+      }
+
+      if (_useArBeautyCamera) {
+        await ArCameraBridge.flipCamera();
+        if (isClosed) return;
+        emit(current.copyWith(isFrontCamera: nextIsFront));
         return;
       }
 
@@ -2357,6 +2486,25 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     final current = _readyOrNull;
     if (current == null) return;
     emit(current.copyWith(clearActionMessage: true));
+  }
+
+  /// Opening استضافة غرفة is guest management only — dismiss any pending
+  /// "join as battle" prompt so it does not sit under the guests sheet.
+  void _onCollabTapped(
+    LiveRoomCollabTapped event,
+    Emitter<LiveRoomState> emit,
+  ) {
+    final current = _readyOrNull;
+    if (current == null || current.pendingCompetitionRequest == null) return;
+    final request = current.pendingCompetitionRequest!;
+    emit(current.copyWith(pendingCompetitionRequest: null));
+    // Best-effort: drop the chat marker so enrichment does not resurrect it.
+    unawaited(
+      _sessionRepository.deleteComment(
+        liveId: current.session.id,
+        commentId: request.commentId,
+      ),
+    );
   }
 
   void _onUiAction(LiveRoomEvent event, Emitter<LiveRoomState> emit) {}

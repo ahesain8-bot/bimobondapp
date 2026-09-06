@@ -28,7 +28,6 @@ class UserProfilePostsGrid extends StatelessWidget {
     this.pinnedPostIds = const [],
     this.pinnedPostsList = const [],
     this.onTogglePin,
-    this.onNavigationReturn,
     this.isSelf = false,
     this.tabIndex = ProfileLayoutConstants.postsTabIndex,
     super.key,
@@ -40,7 +39,6 @@ class UserProfilePostsGrid extends StatelessWidget {
   final List<String> pinnedPostIds;
   final List<PostEntity> pinnedPostsList;
   final Function(PostEntity)? onTogglePin;
-  final VoidCallback? onNavigationReturn;
   final bool isSelf;
   final int tabIndex;
 
@@ -138,18 +136,15 @@ class UserProfilePostsGrid extends StatelessWidget {
           post: post,
           tabIndex: ProfileLayoutConstants.postsTabIndex,
           theme: Theme.of(context),
-          onTap: () async {
-            await openProfilePosts(
-              context,
-              posts: displayPosts,
-              initialIndex: index,
-              source: ProfilePostsViewerSource.userPosts,
-              page: state.page,
-              hasReachedMax: state.hasReachedMax,
-              userId: userId,
-            );
-            onNavigationReturn?.call();
-          },
+          onTap: () => openProfilePosts(
+            context,
+            posts: displayPosts,
+            initialIndex: index,
+            source: ProfilePostsViewerSource.userPosts,
+            page: state.page,
+            hasReachedMax: state.hasReachedMax,
+            userId: userId,
+          ),
         );
 
         if (!isSelf || onTogglePin == null) return tile;

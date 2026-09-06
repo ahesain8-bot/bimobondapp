@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
 import 'package:bimobondapp/app/social/domain/entities/social_list_query.dart';
@@ -6,6 +8,7 @@ import 'package:bimobondapp/app/social/domain/entities/social_user_page_entity.d
 import 'package:bimobondapp/app/social/domain/usecases/social_user_list_usecases.dart';
 import 'package:bimobondapp/app/social/presentation/di/social_injector.dart'
     as social_di;
+import 'package:bimobondapp/app/social/presentation/utils/enrich_social_follow_state.dart';
 import 'package:bimobondapp/app/social/presentation/utils/social_follow_toggle.dart';
 import 'package:bimobondapp/app/social/presentation/widgets/social_user_list_tile.dart';
 import 'package:bimobondapp/core/constants/profile_layout_constants.dart';
@@ -279,30 +282,58 @@ class _UserConnectionsScreenState extends State<UserConnectionsScreen>
         });
       },
       (pageResult) {
-        final normalizedUsers = _mergeUsers(
-          pageResult.users.map(_normalizeUser).toList(growable: false),
-          tab,
-          refresh: tab.page == 1,
+        unawaited(
+          _applyUsersPage(
+            tab,
+            pageResult,
+            replace: tab.page == 1,
+          ),
         );
-
-        setState(() {
-          if (tab.page == 1) {
-            tab.users
-              ..clear()
-              ..addAll(normalizedUsers);
-          } else {
-            final existingIds = tab.users.map((user) => user.id).toSet();
-            tab.users.addAll(
-              normalizedUsers.where((user) => !existingIds.contains(user.id)),
-            );
-          }
-          tab.hasReachedMax = pageResult.hasReachedMax;
-          tab.isLoading = false;
-          tab.isLoadingMore = false;
-          tab.hasLoaded = true;
-        });
       },
     );
+  }
+
+  Future<void> _applyUsersPage(
+    _ConnectionsTabState tab,
+    SocialUserPageEntity pageResult, {
+    required bool replace,
+  }) async {
+    var normalizedUsers = _mergeUsers(
+      pageResult.users.map(_normalizeUser).toList(growable: false),
+      tab,
+      refresh: replace,
+    );
+
+    // Followers list often omits viewer isFollowing — resolve so Follow back
+    // becomes Following when you already follow them.
+    if (_selectedType == UserConnectionType.followers) {
+      final currentUserId = _currentUserId;
+      if (currentUserId != null && currentUserId.isNotEmpty) {
+        normalizedUsers = await enrichSocialFollowState(
+          normalizedUsers,
+          currentUserId: currentUserId,
+        );
+      }
+    }
+
+    if (!mounted) return;
+
+    setState(() {
+      if (replace) {
+        tab.users
+          ..clear()
+          ..addAll(normalizedUsers);
+      } else {
+        final existingIds = tab.users.map((user) => user.id).toSet();
+        tab.users.addAll(
+          normalizedUsers.where((user) => !existingIds.contains(user.id)),
+        );
+      }
+      tab.hasReachedMax = pageResult.hasReachedMax;
+      tab.isLoading = false;
+      tab.isLoadingMore = false;
+      tab.hasLoaded = true;
+    });
   }
 
   Future<Either<Failure, SocialUserPageEntity>> _fetchUsersForType(

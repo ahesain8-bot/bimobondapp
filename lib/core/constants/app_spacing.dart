@@ -75,7 +75,7 @@ class AppSpacing {
   static const double roomHorizontal = sm;
 
   /// Gap between the room header and the top of the shared multi-guest stage.
-  static const double roomStageTop = 96;
+  static const double roomStageTop = 112;
 
   /// Vertical gap between chat feed messages.
   static const double roomChatGap = xs;

@@ -47,6 +47,8 @@ class CameraStudioOverlay extends StatelessWidget {
     this.photoEditorColorFilterIntensity = 1.0,
     this.onPhotoEditorColorFilterSelected,
     this.onPhotoEditorColorFilterIntensityChanged,
+    this.photoEditorLipColor = '#DB4761',
+    this.onPhotoEditorLipColorSelected,
     required this.timerEnabled,
     this.flashEnabled = false,
     required this.isRecording,
@@ -134,6 +136,8 @@ class CameraStudioOverlay extends StatelessWidget {
   final double photoEditorColorFilterIntensity;
   final ValueChanged<String>? onPhotoEditorColorFilterSelected;
   final ValueChanged<double>? onPhotoEditorColorFilterIntensityChanged;
+  final String photoEditorLipColor;
+  final ValueChanged<String>? onPhotoEditorLipColorSelected;
   final bool timerEnabled;
   final bool flashEnabled;
   final bool isRecording;
@@ -229,10 +233,7 @@ class CameraStudioOverlay extends StatelessWidget {
 
     final topChromeHeight = ratioLetterboxed
         ? CameraRatioLetterbox.topHeight(topPadding)
-        : CameraRatioLetterbox.tikTokTopChromeHeight(
-            topPadding,
-            photoMode: isPhotoMode,
-          );
+        : CameraRatioLetterbox.tikTokTopChromeHeight(topPadding);
     final bottomChromeHeight = ratioLetterboxed
         ? CameraRatioLetterbox.bottomHeight(
             useNativeAr: useNativeArFilters,
@@ -240,7 +241,6 @@ class CameraStudioOverlay extends StatelessWidget {
           )
         : CameraRatioLetterbox.tikTokBottomChromeHeight(
             MediaQuery.paddingOf(context).bottom,
-            photoMode: isPhotoMode,
           );
     final controlsTop =
         CameraRatioLetterbox.tikTokTopChromeHeight(topPadding) + 16.0;
@@ -320,8 +320,8 @@ class CameraStudioOverlay extends StatelessWidget {
                           onDurationSelected(seconds);
                           onStudioModeSelected(CameraStudioMode.video);
                         },
-                        onLiveSelected: () =>
-                            onStudioModeSelected(CameraStudioMode.live),
+                        // Open live start (Kotlin beauty) — not empty live mode.
+                        onLiveSelected: onGoLiveTap,
                         onTextSelected: onTextModeTap,
                       ),
                     if (useNativeArFilters &&
@@ -604,6 +604,8 @@ class CameraStudioOverlay extends StatelessWidget {
                 onColorFilterSelected: onPhotoEditorColorFilterSelected,
                 onColorFilterIntensityChanged:
                     onPhotoEditorColorFilterIntensityChanged,
+                selectedLipColor: photoEditorLipColor,
+                onLipColorSelected: onPhotoEditorLipColorSelected,
               ),
             ),
           ),

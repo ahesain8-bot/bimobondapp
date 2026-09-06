@@ -4,6 +4,7 @@ import '../../../../core/network/api_endpoints.dart';
 import '../../../../core/network/live_api_client.dart';
 import '../../../../core/models/live_media_hints.dart';
 import '../../domain/entities/live_entity.dart';
+import '../../domain/entities/live_feed_page_result.dart';
 import '../../domain/entities/live_session_entity.dart';
 import '../mappers/live_mapper.dart';
 import 'live_remote_datasource.dart';
@@ -34,7 +35,7 @@ class HttpLiveRemoteDataSource implements LiveRemoteDataSource {
   }
 
   @override
-  Future<List<LiveEntity>> getLiveFeed({
+  Future<LiveFeedPageResult> getLiveFeed({
     int page = 1,
     int limit = 10,
     String? category,
@@ -48,7 +49,11 @@ class HttpLiveRemoteDataSource implements LiveRemoteDataSource {
         if (category != null && category.isNotEmpty) 'categoryId': category,
       },
     );
-    return LiveMapper.listFromPayload(payload);
+    return LiveMapper.pageFromPayload(
+      payload,
+      requestedPage: page,
+      requestedLimit: limit,
+    );
   }
 
   @override

@@ -1,7 +1,11 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import 'package:bimobondapp/app/ar_camera/ar_camera_bridge.dart';
+
 import '../../../domain/usecases/dispose_camera.dart';
 import '../../../domain/usecases/initialize_camera.dart';
+import '../../utils/ar_live_beauty_defaults.dart';
+import '../../widgets/start_live/ar_live_camera_preview.dart';
 import 'live_event.dart';
 import 'live_state.dart';
 
@@ -11,8 +15,9 @@ class LiveBloc extends Bloc<LiveEvent, LiveState> {
   LiveBloc({
     required InitializeCamera initializeCamera,
     required DisposeCamera disposeCamera,
-  })  : _initializeCamera = initializeCamera, // ignore: prefer_initializing_formals
-        _disposeCamera = disposeCamera, // ignore: prefer_initializing_formals
+    this.reuseHostArCamera = false,
+  })  : _initializeCamera = initializeCamera,
+        _disposeCamera = disposeCamera,
         super(const LiveInitial()) {
     on<LiveInitializeRequested>(_onInitialize);
     on<LiveCameraSwitchRequested>(_onSwitchCamera);
@@ -27,8 +32,30 @@ class LiveBloc extends Bloc<LiveEvent, LiveState> {
   final InitializeCamera _initializeCamera;
   final DisposeCamera _disposeCamera;
 
+  /// Host post-camera keeps the Kotlin PlatformView; we only drive beauty/UI.
+  final bool reuseHostArCamera;
+
+  bool get _useArBeauty =>
+      ArLiveCameraPreview.isSupported && !reuseHostArCamera;
+
+  /// Wait for AndroidView / PlatformView to attach after stopCamera handoff.
+  static const _arAttachDelay = Duration(milliseconds: 450);
+
   LiveReady _ready(LiveState state) {
     return state is LiveReady ? state : const LiveReady();
+  }
+
+  /// PlatformView.init already starts CameraX; we re-bind once the view is up
+  /// and keep beauty Off until the host opens Beautify.
+  Future<void> _bootArCamera() async {
+    await Future<void>.delayed(_arAttachDelay);
+    for (var i = 0; i < 6; i++) {
+      if (isClosed) return;
+      await ArCameraBridge.startCamera();
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    }
+    if (isClosed) return;
+    await ArLiveBeautyDefaults.clearWithRetry();
   }
 
   Future<void> _onInitialize(
@@ -36,6 +63,33 @@ class LiveBloc extends Bloc<LiveEvent, LiveState> {
     Emitter<LiveState> emit,
   ) async {
     emit(const LiveCameraInitializing());
+
+    if (reuseHostArCamera) {
+      // Same CameraX / FaceWarp as Add Post image/video — keep it raw.
+      emit(
+        const LiveReady(
+          controller: null,
+          isCameraInitialized: true,
+          isFrontCamera: true,
+        ),
+      );
+      ArLiveBeautyDefaults.clear();
+      return;
+    }
+
+    if (_useArBeauty) {
+      // Mount PlatformView FIRST — starting before attach is a no-op / black.
+      emit(
+        const LiveReady(
+          controller: null,
+          isCameraInitialized: true,
+          isFrontCamera: true,
+        ),
+      );
+      await _bootArCamera();
+      return;
+    }
+
     final controller = await _initializeCamera(useFront: true);
     if (isClosed) return;
     emit(
@@ -52,8 +106,18 @@ class LiveBloc extends Bloc<LiveEvent, LiveState> {
     Emitter<LiveState> emit,
   ) async {
     final current = _ready(state);
+    if (!current.isCameraInitialized) return;
+
+    if (_useArBeauty || reuseHostArCamera) {
+      final nextIsFront = !current.isFrontCamera;
+      emit(current.copyWith(isFrontCamera: nextIsFront));
+      await ArCameraBridge.flipCamera();
+      // Do not re-force beauty defaults on flip — leave Magic as the host set it.
+      return;
+    }
+
     final oldController = current.controller;
-    if (oldController == null || !current.isCameraInitialized) return;
+    if (oldController == null) return;
 
     await _disposeCamera(oldController);
     final nextIsFront = !current.isFrontCamera;
@@ -76,7 +140,6 @@ class LiveBloc extends Bloc<LiveEvent, LiveState> {
         ),
       );
     } else {
-      // The requested camera could not be opened: revert to the previous one.
       final fallback = await _initializeCamera(useFront: !nextIsFront);
       if (isClosed) return;
       emit(
@@ -89,10 +152,7 @@ class LiveBloc extends Bloc<LiveEvent, LiveState> {
     }
   }
 
-  void _onToggleTools(
-    LiveToolsToggleRequested event,
-    Emitter<LiveState> emit,
-  ) {
+  void _onToggleTools(LiveToolsToggleRequested event, Emitter<LiveState> emit) {
     final current = _ready(state);
     emit(current.copyWith(isToolsExpanded: !current.isToolsExpanded));
   }
@@ -112,8 +172,15 @@ class LiveBloc extends Bloc<LiveEvent, LiveState> {
     Emitter<LiveState> emit,
   ) async {
     final current = _ready(state);
+    if (!current.isCameraInitialized) return;
+
+    // AR / host FaceWarp must keep CameraX for LiveKit beauty publish.
+    if (_useArBeauty || reuseHostArCamera) {
+      return;
+    }
+
     final controller = current.controller;
-    if (controller == null || !current.isCameraInitialized) return;
+    if (controller == null) return;
     await _disposeCamera(controller);
     if (isClosed) return;
     emit(current.copyWith(controller: null, isCameraInitialized: false));
@@ -124,6 +191,20 @@ class LiveBloc extends Bloc<LiveEvent, LiveState> {
     Emitter<LiveState> emit,
   ) async {
     final current = _ready(state);
+
+    if (reuseHostArCamera) {
+      // Host post-camera owns CameraX restart after the live route pops.
+      return;
+    }
+
+    if (_useArBeauty) {
+      if (!current.isCameraInitialized) {
+        emit(current.copyWith(isCameraInitialized: true));
+      }
+      await _bootArCamera();
+      return;
+    }
+
     if (current.controller != null && current.isCameraInitialized) return;
     final controller = await _initializeCamera(useFront: current.isFrontCamera);
     if (isClosed) return;
@@ -135,19 +216,22 @@ class LiveBloc extends Bloc<LiveEvent, LiveState> {
     );
   }
 
-  /// The live room took ownership of the running camera.
-  /// Forget it here WITHOUT disposing — the room disposes it on handoff.
-  void _onCameraHandedOff(
+  /// Room takes over — for Flutter camera, hand off the controller. For AR,
+  /// keep CameraX / FaceWarp running so beauty frames can be published.
+  Future<void> _onCameraHandedOff(
     LiveCameraHandedOff event,
     Emitter<LiveState> emit,
-  ) {
+  ) async {
     final current = _ready(state);
-    if (current.controller == null && !current.isCameraInitialized) return;
-    emit(
-      current.copyWith(
-        controller: null,
-        isCameraInitialized: false,
-      ),
-    );
+    if (!current.isCameraInitialized && current.controller == null) return;
+
+    if (_useArBeauty || reuseHostArCamera) {
+      // Do NOT stopCamera — LiveKit beauty capturer reads FaceWarp frames.
+      return;
+    }
+
+    // Flutter path: forget controller WITHOUT disposing — room owns it.
+    if (isClosed) return;
+    emit(current.copyWith(controller: null, isCameraInitialized: false));
   }
 }

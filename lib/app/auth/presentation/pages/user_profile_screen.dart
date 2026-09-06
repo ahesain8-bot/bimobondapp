@@ -404,7 +404,10 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     _refreshProfile();
   }
 
-  Future<void> _loadUser({bool showLoadingShell = true}) async {
+  Future<void> _loadUser({
+    bool showLoadingShell = true,
+    bool preserveFollowState = false,
+  }) async {
     final isInitialLoad = _user == null;
     if (showLoadingShell && isInitialLoad) {
       setState(() {
@@ -472,15 +475,31 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         setState(() {
           _user = user;
           _isLoadingUser = false;
-          if (user.isFollowing != null) {
-            _isFollowing = user.isFollowing!;
-          }
-          if (user.isFollowedBy != null) {
-            _isFollowedBy = user.isFollowedBy!;
+          if (user.isFriend == true) {
+            _isFollowing = true;
+            _isFollowedBy = true;
+          } else if (!preserveFollowState) {
+            if (user.isFollowing != null) {
+              _isFollowing = user.isFollowing!;
+            }
+            if (user.isFollowedBy != null) {
+              _isFollowedBy = user.isFollowedBy!;
+            }
+          } else {
+            // Refresh counts/profile after toggle, but don't let a stale
+            // isFollowing:false flip Following back to Follow back.
+            if (user.isFollowing == true) {
+              _isFollowing = true;
+            }
+            if (user.isFollowedBy != null) {
+              _isFollowedBy = user.isFollowedBy!;
+            }
           }
         });
         _loadHighlights();
-        if (!_isSelf && user.isFollowing == null) {
+        // Always resolve from /follow-status — profile payloads often omit or
+        // wrongly set isFollowing while isFollowedBy is true (Follow back).
+        if (!_isSelf && !preserveFollowState) {
           unawaited(_resolveFollowStatus());
         }
       },
@@ -603,7 +622,11 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     if (!mounted) return;
 
     result.fold((_) {}, (isFollowing) {
-      setState(() => _isFollowing = isFollowing);
+      if (!mounted) return;
+      setState(() {
+        // Trust the dedicated endpoint over stale profile flags.
+        _isFollowing = isFollowing;
+      });
     });
   }
 
@@ -652,7 +675,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       _isFollowing = result.isFollowing!;
       _isFollowLoading = false;
     });
-    unawaited(_loadUser(showLoadingShell: false));
+    unawaited(_loadUser(showLoadingShell: false, preserveFollowState: true));
   }
 
   Future<void> _openMessage() async {
@@ -934,7 +957,6 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                         pinnedPostIds: _pinnedPostIds,
                         pinnedPostsList: _pinnedPostsList,
                         onTogglePin: _isSelf ? _togglePinPost : null,
-                        onNavigationReturn: _refreshProfile,
                         isSelf: _isSelf,
                         tabIndex: _selectedTabIndex,
                       ),

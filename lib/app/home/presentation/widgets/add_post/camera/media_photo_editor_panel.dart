@@ -21,6 +21,14 @@ enum MediaPhotoEditorTool {
   whiteBalance,
   highlights,
   shadows,
+  lipstick,
+  blush,
+  eyeliner,
+  eyeshadow,
+  foundation,
+  contour,
+  underEye,
+  brightenEye,
 }
 
 /// Bipolar adjustment tools (slider -1…1, 0 = original).
@@ -39,18 +47,50 @@ const Set<MediaPhotoEditorTool> _bipolarTools = {
   MediaPhotoEditorTool.shadows,
 };
 
-/// One-way 0…1 tools (Smooth).
-const Set<MediaPhotoEditorTool> _intensityTools = {MediaPhotoEditorTool.smooth};
+/// One-way 0…1 tools (Smooth + Makeup).
+const Set<MediaPhotoEditorTool> _intensityTools = {
+  MediaPhotoEditorTool.smooth,
+  MediaPhotoEditorTool.lipstick,
+  MediaPhotoEditorTool.blush,
+  MediaPhotoEditorTool.eyeliner,
+  MediaPhotoEditorTool.eyeshadow,
+  MediaPhotoEditorTool.foundation,
+  MediaPhotoEditorTool.contour,
+  MediaPhotoEditorTool.underEye,
+  MediaPhotoEditorTool.brightenEye,
+};
+
+const Set<MediaPhotoEditorTool> kMakeupTools = {
+  MediaPhotoEditorTool.lipstick,
+  MediaPhotoEditorTool.foundation,
+  MediaPhotoEditorTool.eyeshadow,
+  MediaPhotoEditorTool.contour,
+  MediaPhotoEditorTool.blush,
+  MediaPhotoEditorTool.underEye,
+  MediaPhotoEditorTool.brightenEye,
+};
+
+/// TikTok-style lipstick swatches.
+const List<String> kMakeupLipColors = [
+  '#DB4761',
+  '#C6284A',
+  '#E8527A',
+  '#B71C3C',
+  '#F48FB1',
+  '#8E2438',
+  '#FF6F91',
+  '#6D1B2B',
+];
 
 /// UI-only feature flag; the teeth filter implementation remains available.
 const bool _showTeethWhiteningTool = false;
 
 enum MediaPhotoEditorTab { face, makeup }
 
-/// Film color-grade category shown under Makeup.
+/// Film color-grade category shown under Makeup (legacy / optional).
 const String kMediaPhotoEditorFilmCategoryId = 'beauty';
 
-/// Bottom panel: Face / Makeup tabs + circular tools (Magic + adjustments / Film filters).
+/// Bottom panel: Face / Makeup tabs + circular tools (Magic + adjustments / Makeup).
 class MediaPhotoEditorPanel extends StatefulWidget {
   const MediaPhotoEditorPanel({
     super.key,
@@ -68,6 +108,8 @@ class MediaPhotoEditorPanel extends StatefulWidget {
     this.colorFilterIntensity = 1.0,
     this.onColorFilterSelected,
     this.onColorFilterIntensityChanged,
+    this.selectedLipColor = '#DB4761',
+    this.onLipColorSelected,
   });
 
   final AppLocalizations l10n;
@@ -90,6 +132,8 @@ class MediaPhotoEditorPanel extends StatefulWidget {
   final double colorFilterIntensity;
   final ValueChanged<String>? onColorFilterSelected;
   final ValueChanged<double>? onColorFilterIntensityChanged;
+  final String selectedLipColor;
+  final ValueChanged<String>? onLipColorSelected;
 
   @override
   State<MediaPhotoEditorPanel> createState() => _MediaPhotoEditorPanelState();
@@ -143,10 +187,11 @@ class _MediaPhotoEditorPanelState extends State<MediaPhotoEditorPanel> {
       widget.magicOn &&
       widget.selectedTool == MediaPhotoEditorTool.smooth;
 
-  bool get _showMakeupIntensity =>
-      widget.tab == MediaPhotoEditorTab.makeup &&
-      _isFilmFilterSelected &&
-      widget.onColorFilterIntensityChanged != null;
+  /// TikTok beauty makeup tools live on the Face/Beauty tab (not Makeup).
+  bool get _showBeautyMakeupSlider =>
+      widget.tab == MediaPhotoEditorTab.face &&
+      widget.magicOn &&
+      kMakeupTools.contains(widget.selectedTool);
 
   void _emit(double value) {
     widget.onAdjustmentChanged(widget.selectedTool, value);
@@ -187,10 +232,11 @@ class _MediaPhotoEditorPanelState extends State<MediaPhotoEditorPanel> {
             onChanged: _onSliderDrag,
             onChangeEnd: _onSliderDragEnd,
           )
-        else if (_showMakeupIntensity)
+        else if (_showBeautyMakeupSlider)
           _FloatingIntensitySlider(
-            value: widget.colorFilterIntensity,
-            onChanged: widget.onColorFilterIntensityChanged!,
+            value: _localValue,
+            onChanged: _onSliderDrag,
+            onChangeEnd: _onSliderDragEnd,
           ),
         Material(
           color: Colors.black.withValues(alpha: 0.92),
@@ -208,7 +254,7 @@ class _MediaPhotoEditorPanelState extends State<MediaPhotoEditorPanel> {
                     onReset: widget.onReset,
                   ),
                   const SizedBox(height: 14),
-                  if (widget.tab == MediaPhotoEditorTab.face)
+                  if (widget.tab == MediaPhotoEditorTab.face) ...[
                     _FaceToolsRow(
                       l10n: widget.l10n,
                       selectedTool: widget.selectedTool,
@@ -216,12 +262,21 @@ class _MediaPhotoEditorPanelState extends State<MediaPhotoEditorPanel> {
                       adjustmentValues: widget.adjustmentValues,
                       onToolSelected: widget.onToolSelected,
                       onMagicToggled: widget.onMagicToggled,
-                    )
-                  else
+                    ),
+                    if (widget.selectedTool == MediaPhotoEditorTool.lipstick &&
+                        widget.magicOn &&
+                        widget.onLipColorSelected != null) ...[
+                      const SizedBox(height: 10),
+                      _LipColorRow(
+                        selectedHex: widget.selectedLipColor,
+                        onSelected: widget.onLipColorSelected!,
+                      ),
+                    ],
+                  ] else if (widget.onColorFilterSelected != null)
                     _FilmFiltersRow(
                       l10n: widget.l10n,
                       selectedFilterId: widget.selectedColorFilterId,
-                      onFilterSelected: widget.onColorFilterSelected ?? (_) {},
+                      onFilterSelected: widget.onColorFilterSelected!,
                     ),
                   const SizedBox(height: 4),
                 ],
@@ -247,16 +302,24 @@ class _FloatingBipolarSlider extends StatelessWidget {
 
   static double _snapToZero(double value) => value.abs() <= 0.03 ? 0.0 : value;
 
+  /// TikTok-style beauty range (±150 on the label).
+  static const double kBeautySliderMin = -1.5;
+  static const double kBeautySliderMax = 1.5;
+
   @override
   Widget build(BuildContext context) {
-    final label = '${(value * 100).round()}';
+    final clamped = value.clamp(kBeautySliderMin, kBeautySliderMax);
+    final label = '${(clamped * 100).round()}';
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Align(
-            alignment: Alignment(value.clamp(-1.0, 1.0), 0),
+            alignment: Alignment(
+              (clamped / kBeautySliderMax).clamp(-1.0, 1.0),
+              0,
+            ),
             child: Text(
               label,
               style: TextStyle(
@@ -297,9 +360,9 @@ class _FloatingBipolarSlider extends StatelessWidget {
                   ),
                 ),
                 child: Slider(
-                  value: value.clamp(-1.0, 1.0),
-                  min: -1.0,
-                  max: 1.0,
+                  value: clamped.toDouble(),
+                  min: kBeautySliderMin,
+                  max: kBeautySliderMax,
                   onChanged: (next) => onChanged(_snapToZero(next)),
                   onChangeEnd: (next) => onChangeEnd(_snapToZero(next)),
                 ),
@@ -498,6 +561,44 @@ class _FaceToolsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final beautyMakeupTools = <_AdjustToolSpec>[
+      _AdjustToolSpec(
+        MediaPhotoEditorTool.lipstick,
+        LucideIcons.paintbrush,
+        l10n.mediaPhotoEditorLipstick,
+      ),
+      _AdjustToolSpec(
+        MediaPhotoEditorTool.foundation,
+        LucideIcons.droplet,
+        l10n.mediaPhotoEditorFoundation,
+      ),
+      _AdjustToolSpec(
+        MediaPhotoEditorTool.eyeshadow,
+        LucideIcons.blend,
+        l10n.mediaPhotoEditorEyeshadow,
+      ),
+      _AdjustToolSpec(
+        MediaPhotoEditorTool.contour,
+        LucideIcons.circle,
+        l10n.mediaPhotoEditorContour,
+      ),
+      _AdjustToolSpec(
+        MediaPhotoEditorTool.blush,
+        LucideIcons.heart,
+        l10n.mediaPhotoEditorBlush,
+      ),
+      _AdjustToolSpec(
+        MediaPhotoEditorTool.underEye,
+        LucideIcons.circleDot,
+        l10n.mediaPhotoEditorUnderEye,
+      ),
+      _AdjustToolSpec(
+        MediaPhotoEditorTool.brightenEye,
+        LucideIcons.sunMedium,
+        l10n.mediaPhotoEditorBrightenEye,
+      ),
+    ];
+
     final adjustTools = <_AdjustToolSpec>[
       _AdjustToolSpec(
         MediaPhotoEditorTool.contrast,
@@ -530,6 +631,7 @@ class _FaceToolsRow extends StatelessWidget {
         LucideIcons.laugh,
         l10n.mediaPhotoEditorMouth,
       ),
+      ...beautyMakeupTools,
       _AdjustToolSpec(
         MediaPhotoEditorTool.saturation,
         LucideIcons.palette,
@@ -607,6 +709,57 @@ class _FaceToolsRow extends StatelessWidget {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+class _LipColorRow extends StatelessWidget {
+  const _LipColorRow({
+    required this.selectedHex,
+    required this.onSelected,
+  });
+
+  final String selectedHex;
+  final ValueChanged<String> onSelected;
+
+  Color _parse(String hex) {
+    final cleaned = hex.replaceFirst('#', '');
+    final value = int.tryParse(cleaned, radix: 16) ?? 0xDB4761;
+    return Color(0xFF000000 | value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 36,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: kMakeupLipColors.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 10),
+        itemBuilder: (context, index) {
+          final hex = kMakeupLipColors[index];
+          final selected =
+              hex.toUpperCase() == selectedHex.toUpperCase();
+          return GestureDetector(
+            onTap: () {
+              HapticFeedback.selectionClick();
+              onSelected(hex);
+            },
+            child: Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: _parse(hex),
+                border: Border.all(
+                  color: selected ? Colors.white : Colors.white24,
+                  width: selected ? 2.5 : 1,
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }

@@ -1,156 +1,302 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../../../core/utils/app_assets.dart';
-import '../../../../../core/utils/app_sizes.dart';
-import '../../../../../core/constants/app_spacing.dart';
 import '../../bloc/start_live/live_bloc.dart';
 import '../../bloc/start_live/live_event.dart';
-import '../../bloc/start_live/live_state.dart';
-import 'tool_button.dart';
 
-/// Tools row: expand/collapse toggle, primary tools and optional share row.
+/// TikTok Go LIVE tool chrome.
+///
+/// Collapsed: Flip · Enhance · Effects · Settings · More
+/// Expanded (More): full 3×5 grid ending with Less.
 class ToolsRow extends StatelessWidget {
   const ToolsRow({
     super.key,
+    this.expanded = false,
+    this.onExpandedChanged,
     this.onBeautifyTap,
     this.onEffectsTap,
     this.onSettingsTap,
-    this.onServiceTap,
-    this.onFansTap,
     this.onShareTap,
-    this.onInteractionTap,
+    this.onLiveCenterTap,
+    this.onCampaignsTap,
+    this.onSubscriptionTap,
+    this.onServicePlusTap,
+    this.onShopTap,
+    this.onInteractTap,
+    this.onPromoteTap,
+    this.onBoardsTap,
+    this.onDualTap,
   });
 
+  final bool expanded;
+  final ValueChanged<bool>? onExpandedChanged;
   final VoidCallback? onBeautifyTap;
   final VoidCallback? onEffectsTap;
   final VoidCallback? onSettingsTap;
-  final VoidCallback? onServiceTap;
-  final VoidCallback? onFansTap;
   final VoidCallback? onShareTap;
-  final VoidCallback? onInteractionTap;
+  final VoidCallback? onLiveCenterTap;
+  final VoidCallback? onCampaignsTap;
+  final VoidCallback? onSubscriptionTap;
+  final VoidCallback? onServicePlusTap;
+  final VoidCallback? onShopTap;
+  final VoidCallback? onInteractTap;
+  final VoidCallback? onPromoteTap;
+  final VoidCallback? onBoardsTap;
+  final VoidCallback? onDualTap;
 
   @override
   Widget build(BuildContext context) {
     final liveBloc = context.read<LiveBloc>();
 
-    return Align(
-      alignment: Alignment.center,
-      child: Container(
-        padding: const EdgeInsets.only(
-          left: AppSpacing.xxxl,
-          right: AppSpacing.xxxl,
-          top: AppSpacing.toolsRowVertical,
-          bottom: AppSpacing.toolsRowVertical,
-        ),
+    void flip() => liveBloc.add(const LiveCameraSwitchRequested());
+
+    if (!expanded) {
+      return _ToolGrid(
+        rows: [
+          [
+            _ToolSpec(
+              icon: Icons.cameraswitch_outlined,
+              label: 'Flip',
+              onTap: flip,
+            ),
+            _ToolSpec(
+              icon: Icons.auto_awesome,
+              label: 'Enhance',
+              onTap: onBeautifyTap,
+            ),
+            _ToolSpec(
+              icon: Icons.face_retouching_natural,
+              label: 'Effects',
+              onTap: onEffectsTap,
+            ),
+            _ToolSpec(
+              icon: Icons.settings_outlined,
+              label: 'Settings',
+              onTap: onSettingsTap,
+              showDot: true,
+            ),
+            _ToolSpec(
+              icon: Icons.keyboard_arrow_down_rounded,
+              label: 'More',
+              onTap: () => onExpandedChanged?.call(true),
+            ),
+          ],
+        ],
+      );
+    }
+
+    return _ToolGrid(
+      rows: [
+        [
+          _ToolSpec(
+            icon: Icons.cameraswitch_outlined,
+            label: 'Flip',
+            onTap: flip,
+          ),
+          _ToolSpec(
+            icon: Icons.auto_awesome,
+            label: 'Enhance',
+            onTap: onBeautifyTap,
+          ),
+          _ToolSpec(
+            icon: Icons.face_retouching_natural,
+            label: 'Effects',
+            onTap: onEffectsTap,
+          ),
+          _ToolSpec(
+            icon: Icons.settings_outlined,
+            label: 'Settings',
+            onTap: onSettingsTap,
+            showDot: true,
+          ),
+          _ToolSpec(
+            icon: Icons.keyboard_arrow_up_rounded,
+            label: 'Less',
+            onTap: () => onExpandedChanged?.call(false),
+          ),
+        ],
+        [
+          _ToolSpec(
+            icon: Icons.dashboard_outlined,
+            label: 'Boards',
+            onTap: onBoardsTap,
+          ),
+          _ToolSpec(
+            icon: Icons.photo_camera_back_outlined,
+            label: 'Dual',
+            onTap: onDualTap,
+          ),
+          _ToolSpec(
+            icon: Icons.ios_share_rounded,
+            label: 'Share',
+            onTap: onShareTap,
+          ),
+          _ToolSpec(
+            icon: Icons.home_outlined,
+            label: 'LIVE Center',
+            onTap: onLiveCenterTap,
+          ),
+          _ToolSpec(
+            icon: Icons.verified_outlined,
+            label: 'Campaigns',
+            onTap: onCampaignsTap,
+            badge: '2',
+          ),
+        ],
+        [
+          _ToolSpec(
+            icon: Icons.star_border_rounded,
+            label: 'Subscription',
+            onTap: onSubscriptionTap,
+          ),
+          _ToolSpec(
+            icon: Icons.support_agent_outlined,
+            label: 'Service+',
+            onTap: onServicePlusTap,
+          ),
+          _ToolSpec(
+            icon: Icons.shopping_bag_outlined,
+            label: 'Shop',
+            onTap: onShopTap,
+          ),
+          _ToolSpec(
+            icon: Icons.chat_bubble_outline_rounded,
+            label: 'Interact',
+            onTap: onInteractTap,
+          ),
+          _ToolSpec(
+            icon: Icons.local_fire_department_outlined,
+            label: 'Promote',
+            onTap: onPromoteTap,
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _ToolGrid extends StatelessWidget {
+  const _ToolGrid({required this.rows});
+
+  final List<List<_ToolSpec>> rows;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (var i = 0; i < rows.length; i++) ...[
+            if (i > 0) const SizedBox(height: 10),
+            Row(
+              children: [
+                for (final tool in rows[i])
+                  Expanded(child: _ToolCell(tool: tool)),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ToolSpec {
+  const _ToolSpec({
+    required this.icon,
+    required this.label,
+    this.onTap,
+    this.showDot = false,
+    this.badge,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback? onTap;
+  final bool showDot;
+  final String? badge;
+}
+
+class _ToolCell extends StatelessWidget {
+  const _ToolCell({required this.tool});
+
+  final _ToolSpec tool;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: tool.onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Expand / collapse toggle.
-            BlocBuilder<LiveBloc, LiveState>(
-              buildWhen: (previous, current) =>
-                  _expandedOf(previous) != _expandedOf(current),
-              builder: (context, state) {
-                final isExpanded = _expandedOf(state);
-                return GestureDetector(
-                  onTap: () => liveBloc.add(const LiveToolsToggleRequested()),
-                  child: Padding(
-                    padding: const EdgeInsets.only(
-                      bottom: AppSpacing.toolsToggleGap,
-                    ),
-                    child: Image.asset(
-                      isExpanded
-                          ? AppAssets.toolsExpanded
-                          : AppAssets.toolsCollapsed,
-                      width: AppSizes.toggleArrow,
-                      height: AppSizes.toggleArrow,
-                      fit: BoxFit.contain,
-                    ),
-                  ),
-                );
-              },
-            ),
-            // Both rows scale as one unit. Five 48px buttons with 8px gaps
-            // need 320px, and a 360dp phone leaves only 300 after the 30px
-            // side padding — which is exactly the 20px this row used to
-            // overflow by. Scaling keeps the design and fits any width.
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
+            SizedBox(
+              width: 28,
+              height: 28,
+              child: Stack(
+                clipBehavior: Clip.none,
                 children: [
-                  // Primary tools.
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      ToolButton(
-                        asset: AppAssets.service,
-                        label: 'Services+',
-                        onTap: onServiceTap,
-                      ),
-                      ToolButton(
-                        asset: AppAssets.settings,
-                        label: 'الإعدادات',
-                        onTap: onSettingsTap,
-                      ),
-                      ToolButton(
-                        asset: AppAssets.guests,
-                        label: 'المؤثرات',
-                        onTap: onEffectsTap,
-                      ),
-                      ToolButton(
-                        asset: AppAssets.edit,
-                        label: 'تجميل',
-                        onTap: onBeautifyTap,
-                      ),
-                      ToolButton(
-                        asset: AppAssets.heart,
-                        label: 'قلب',
-                        onTap: () =>
-                            liveBloc.add(const LiveCameraSwitchRequested()),
-                      ),
-                    ],
+                  Center(
+                    child: Icon(tool.icon, color: Colors.white, size: 26),
                   ),
-                  // Secondary tools are visible only while the tools panel
-                  // is expanded.
-                  BlocBuilder<LiveBloc, LiveState>(
-                    buildWhen: (previous, current) =>
-                        _expandedOf(previous) != _expandedOf(current),
-                    builder: (_, state) {
-                      if (!_expandedOf(state)) return const SizedBox.shrink();
-
-                      return Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          ToolButton(
-                            asset: AppAssets.share,
-                            label: 'مشاركة',
-                            onTap: onShareTap,
+                  if (tool.showDot)
+                    Positioned(
+                      right: -2,
+                      top: -2,
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFFE2C55),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                  if (tool.badge != null)
+                    Positioned(
+                      right: -6,
+                      top: -4,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 4,
+                          vertical: 1,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFE2C55),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          tool.badge!,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            height: 1,
                           ),
-                          ToolButton(
-                            asset: AppAssets.interaction,
-                            label: 'تفاعل',
-                            onTap: onInteractionTap,
-                          ),
-                          ToolButton(
-                            asset: AppAssets.followHosts,
-                            label: 'مجتمع المعجبين',
-                            onTap: onFansTap,
-                          ),
-                        ],
-                      );
-                    },
-                  ),
+                        ),
+                      ),
+                    ),
                 ],
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              tool.label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.92),
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ],
         ),
       ),
     );
-  }
-
-  bool _expandedOf(LiveState state) {
-    return state is LiveReady ? state.isToolsExpanded : true;
   }
 }

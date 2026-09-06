@@ -40,7 +40,7 @@ abstract final class TikTokLiveTokens {
   static const double badgeH = 20; // matches _Pill height in chrome
   /// Top chrome body under status bar: pad + host row + gap + badges.
   static const double topChromeBodyH =
-      topInsetV + hostPillH + 6 + badgeH; // matches TikTokLiveTopBar
+      topInsetV + 32 + 6 + badgeH; // host identity row ~32
   static const double badgeR = 11;
   static const double badgeGap = 5;
   static const double badgePadH = 8;

@@ -674,6 +674,70 @@ abstract final class TemplateOneShotRenderBuilder {
 
       }
 
+      if (fill.opacity != 1) {
+
+        map['opacity'] = fill.opacity;
+
+        hasOverride = true;
+
+      }
+
+      if (!isImageSlot && fill.reversed) {
+
+        map['reversed'] = true;
+
+        hasOverride = true;
+
+      }
+
+      if (!isImageSlot && fill.freeze) {
+
+        map['freeze'] = true;
+
+        hasOverride = true;
+
+      }
+
+      if (!isImageSlot && fill.reduceNoise) {
+
+        map['reduceNoise'] = true;
+
+        hasOverride = true;
+
+      }
+
+      if (fill.beautify) {
+
+        map['beautify'] = true;
+
+        hasOverride = true;
+
+      }
+
+      if (fill.cutout) {
+
+        map['cutout'] = true;
+
+        hasOverride = true;
+
+      }
+
+      if (fill.maskType != null && fill.maskType!.isNotEmpty) {
+
+        map['maskType'] = fill.maskType;
+
+        hasOverride = true;
+
+      }
+
+      if (fill.voiceEffect != null && fill.voiceEffect!.isNotEmpty) {
+
+        map['voiceEffect'] = fill.voiceEffect;
+
+        hasOverride = true;
+
+      }
+
     }
 
 

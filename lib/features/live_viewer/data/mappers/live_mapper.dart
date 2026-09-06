@@ -1,4 +1,5 @@
 import '../../domain/entities/live_entity.dart';
+import '../../domain/entities/live_feed_page_result.dart';
 
 /// Maps Nest live JSON (lives/mobile-api.md §5) into [LiveEntity].
 ///
@@ -83,6 +84,27 @@ class LiveMapper {
       return live.id.isEmpty ? const [] : [live];
     }
     return const [];
+  }
+
+  /// Parses `{ data, meta }` into a page result for finite pagination.
+  static LiveFeedPageResult pageFromPayload(
+    Map<String, dynamic> payload, {
+    required int requestedPage,
+    required int requestedLimit,
+  }) {
+    final lives = listFromPayload(payload);
+    final meta = _asMap(payload['meta']);
+    final page = _asInt(meta?['page']) ?? requestedPage;
+    final limit = _asInt(meta?['limit']) ?? requestedLimit;
+    final total = _asInt(meta?['total']);
+    final totalPages = _asInt(meta?['totalPages']);
+    return LiveFeedPageResult(
+      lives: lives,
+      page: page,
+      limit: limit,
+      total: total,
+      totalPages: totalPages,
+    );
   }
 
   /// Extracts distinct categories from a feed payload (fallback for

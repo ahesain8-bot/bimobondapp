@@ -199,6 +199,11 @@ class _AnimatedTopNotificationState extends State<_AnimatedTopNotification>
   late Animation<double> _fadeAnimation;
   bool _isDismissing = false;
 
+  /// Extra upward drag while the user is swiping to cancel.
+  double _dragDy = 0;
+  static const double _dismissDistance = 56;
+  static const double _dismissVelocity = 700;
+
   @override
   void initState() {
     super.initState();
@@ -224,7 +229,7 @@ class _AnimatedTopNotificationState extends State<_AnimatedTopNotification>
     _controller.forward();
 
     Future.delayed(const Duration(seconds: 3), () {
-      if (mounted && !_isDismissing) _dismiss();
+      if (mounted && !_isDismissing && _dragDy == 0) _dismiss();
     });
   }
 
@@ -237,104 +242,158 @@ class _AnimatedTopNotificationState extends State<_AnimatedTopNotification>
   Future<void> _dismiss() async {
     if (_isDismissing) return;
     _isDismissing = true;
-    await _controller.reverse();
+    // Finish sliding off the top if the user already dragged.
+    if (_dragDy < 0) {
+      setState(() => _dragDy = -200);
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+    } else {
+      await _controller.reverse();
+    }
     if (mounted) widget.onDismiss();
+  }
+
+  void _onVerticalDragUpdate(DragUpdateDetails details) {
+    if (_isDismissing) return;
+    // Only allow dragging upward (negative dy) to cancel.
+    final next = (_dragDy + details.delta.dy).clamp(-240.0, 0.0);
+    if (next != _dragDy) {
+      setState(() => _dragDy = next);
+    }
+  }
+
+  void _onVerticalDragEnd(DragEndDetails details) {
+    if (_isDismissing) return;
+    final velocity = details.primaryVelocity ?? 0;
+    final shouldDismiss =
+        _dragDy <= -_dismissDistance || velocity < -_dismissVelocity;
+    if (shouldDismiss) {
+      _dismiss();
+    } else {
+      setState(() => _dragDy = 0);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final topPadding = MediaQuery.of(context).padding.top;
     final style = _NotificationGlassStyle.of(context, widget.isError);
+    final dragProgress = (_dragDy.abs() / _dismissDistance).clamp(0.0, 1.0);
+    final dragOpacity = (1.0 - dragProgress * 0.55).clamp(0.35, 1.0);
 
     return Positioned(
-      top: topPadding + 10,
+      top: topPadding + 10 + _dragDy,
       left: 16,
       right: 16,
       child: SlideTransition(
         position: _slideAnimation,
         child: FadeTransition(
           opacity: _fadeAnimation,
-          child: Material(
-            color: Colors.transparent,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1),
-                    blurRadius: 16,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
-              ),
-              child: LiquidGlassSurface(
-                borderRadius: BorderRadius.circular(16),
-                blurSigma: 24,
-                backgroundColor: style.glassFill,
-                borderColor: style.glassBorder,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 12,
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      LiquidGlassSurface(
-                        borderRadius: BorderRadius.circular(12),
-                        blurSigma: 12,
-                        backgroundColor: style.accentColor.withValues(
-                          alpha: 0.16,
-                        ),
-                        borderColor: style.accentColor.withValues(alpha: 0.35),
-                        child: SizedBox(
-                          width: 40,
-                          height: 40,
-                          child: Icon(
-                            widget.isError
-                                ? LucideIcons.circleX
-                                : LucideIcons.circleCheck,
-                            color: style.accentColor,
-                            size: 22,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              widget.title,
-                              style: TextStyle(
-                                color: style.titleColor,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              widget.message,
-                              style: TextStyle(
-                                color: style.messageColor,
-                                fontSize: 14,
-                                height: 1.35,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      GestureDetector(
-                        onTap: _dismiss,
-                        child: Icon(
-                          LucideIcons.x,
-                          color: style.closeColor,
-                          size: 18,
-                        ),
+          child: Opacity(
+            opacity: dragOpacity,
+            child: GestureDetector(
+              onVerticalDragUpdate: _onVerticalDragUpdate,
+              onVerticalDragEnd: _onVerticalDragEnd,
+              behavior: HitTestBehavior.opaque,
+              child: Material(
+                color: Colors.transparent,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.1),
+                        blurRadius: 16,
+                        offset: const Offset(0, 6),
                       ),
                     ],
+                  ),
+                  child: LiquidGlassSurface(
+                    borderRadius: BorderRadius.circular(16),
+                    blurSigma: 24,
+                    backgroundColor: style.glassFill,
+                    borderColor: style.glassBorder,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Drag handle hint — swipe up to cancel.
+                          Container(
+                            width: 36,
+                            height: 4,
+                            margin: const EdgeInsets.only(bottom: 10),
+                            decoration: BoxDecoration(
+                              color: style.closeColor.withValues(alpha: 0.45),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              LiquidGlassSurface(
+                                borderRadius: BorderRadius.circular(12),
+                                blurSigma: 12,
+                                backgroundColor: style.accentColor.withValues(
+                                  alpha: 0.16,
+                                ),
+                                borderColor: style.accentColor.withValues(
+                                  alpha: 0.35,
+                                ),
+                                child: SizedBox(
+                                  width: 40,
+                                  height: 40,
+                                  child: Icon(
+                                    widget.isError
+                                        ? LucideIcons.circleX
+                                        : LucideIcons.circleCheck,
+                                    color: style.accentColor,
+                                    size: 22,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      widget.title,
+                                      style: TextStyle(
+                                        color: style.titleColor,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      widget.message,
+                                      style: TextStyle(
+                                        color: style.messageColor,
+                                        fontSize: 14,
+                                        height: 1.35,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              GestureDetector(
+                                onTap: _dismiss,
+                                child: Icon(
+                                  LucideIcons.x,
+                                  color: style.closeColor,
+                                  size: 18,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ),

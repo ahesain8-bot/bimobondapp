@@ -1,0 +1,281 @@
+﻿Resolving dependencies...
+Downloading packages...
+  _flutterfire_internals 1.3.69 (1.3.77 available)
+  archive 4.0.9 (4.2.0 available)
+  bloc 9.2.0 (9.2.1 available)
+  cached_network_image 3.4.1 (4.0.0 available)
+  cached_network_image_platform_interface 4.1.1 (5.0.0 available)
+  cached_network_image_web 1.3.1 (2.0.0 available)
+  camera_android_camerax 0.7.2 (0.7.4+7 available)
+  camera_avfoundation 0.10.2 (0.10.3 available)
+  chewie 1.15.0 (1.16.1 available)
+  clock 1.1.2 (1.1.3 available)
+  cloud_firestore 6.3.0 (6.9.0 available)
+  cloud_firestore_platform_interface 7.2.0 (8.0.7 available)
+  cloud_firestore_web 5.3.0 (5.7.3 available)
+  cloud_functions 6.2.0 (6.4.0 available)
+  cloud_functions_platform_interface 5.8.12 (6.0.7 available)
+  cloud_functions_web 5.1.5 (5.1.13 available)
+  code_assets 1.0.0 (2.0.0 available)
+  cross_file 0.3.5+2 (0.3.5+5 available)
+  dbus 0.7.13 (0.7.15 available)
+  device_info_plus 13.1.0 (13.2.0 available)
+  dio 5.9.2 (5.11.0 available)
+  dio_web_adapter 2.1.2 (2.2.1 available)
+  equatable 2.0.8 (2.1.0 available)
+  file_selector_android 0.5.2+6 (0.5.2+10 available)
+  file_selector_ios 0.5.3+5 (0.5.3+6 available)
+  file_selector_linux 0.9.4 (0.9.4+1 available)
+  file_selector_macos 0.9.5 (0.9.5+1 available)
+  file_selector_web 0.9.4+2 (0.9.5 available)
+  file_selector_windows 0.9.3+5 (0.9.3+6 available)
+  firebase_auth 6.4.0 (6.6.1 available)
+  firebase_auth_platform_interface 8.1.9 (9.0.7 available)
+  firebase_auth_web 6.1.5 (6.2.7 available)
+  firebase_core 4.7.0 (4.14.0 available)
+  firebase_core_platform_interface 6.0.3 (8.1.1 available)
+  firebase_core_web 3.6.0 (3.11.0 available)
+  firebase_messaging 16.2.0 (16.6.0 available)
+  firebase_messaging_platform_interface 4.7.9 (4.10.0 available)
+  firebase_messaging_web 4.1.5 (4.2.5 available)
+  flutter_cache_manager 3.4.1 (3.4.2 available)
+  flutter_callkit_incoming 2.5.8 (3.1.5 available)
+  flutter_contacts 1.1.9+2 (2.3.1 available)
+  flutter_image_compress 2.4.0 (2.5.1 available)
+  flutter_image_compress_common 1.0.6 (1.1.1 available)
+  flutter_image_compress_macos 1.0.3 (1.1.0 available)
+  flutter_image_compress_ohos 0.0.3 (0.0.3+1 available)
+  flutter_image_compress_platform_interface 1.0.5 (1.1.0 available)
+  flutter_image_compress_web 0.1.5 (0.1.5+1 available)
+  flutter_local_notifications 22.0.0 (22.3.0 available)
+  flutter_local_notifications_platform_interface 12.0.0 (12.2.0 available)
+  flutter_local_notifications_windows 3.1.0 (3.1.1 available)
+  flutter_plugin_android_lifecycle 2.0.34 (2.0.35 available)
+  flutter_riverpod 2.6.1 (3.4.2 available)
+  flutter_svg 2.2.4 (2.3.0 available)
+  flutter_webrtc 1.6.0 (1.6.1 available)
+  font_awesome_flutter 10.12.0 (11.0.0 available)
+  glob 2.1.3 (2.2.0 available)
+  go_router 17.2.3 (18.0.0 available)
+  google_fonts 8.2.0 (8.2.1 available)
+  google_maps 8.2.0 (8.3.0 available)
+  google_maps_flutter 2.17.1 (2.18.0 available)
+  google_maps_flutter_android 2.19.10 (2.19.13 available)
+  google_maps_flutter_ios 2.18.4 (2.18.6 available)
+  google_maps_flutter_platform_interface 2.15.0 (2.16.1 available)
+  google_maps_flutter_web 0.6.2+3 (0.6.3 available)
+  google_mlkit_commons 0.11.1 (0.13.0 available)
+  google_mlkit_face_detection 0.13.2 (0.15.1 available)
+  google_sign_in_android 7.2.10 (7.2.17 available)
+  google_sign_in_ios 6.3.0 (6.3.2 available)
+  hooks 1.0.3 (2.2.0 available)
+  html 0.15.6 (0.15.7 available)
+  image 4.9.1 (4.9.2 available)
+  image_picker 1.2.2 (1.2.3 available)
+  image_picker_android 0.8.13+17 (0.8.13+21 available)
+  image_picker_ios 0.8.13+6 (0.8.13+7 available)
+  intl 0.20.2 (0.20.3 available)
+  jni 1.0.0 (1.0.3 available)
+  jni_flutter 1.0.1 (1.0.3 available)
+  location 8.0.1 (10.0.2 available)
+  location_platform_interface 6.0.1 (7.0.0 available)
+  location_web 6.0.1 (7.0.0 available)
+  lottie 3.3.3 (3.5.1 available)
+  lucide_icons_flutter 3.1.15 (3.1.17 available)
+  matcher 0.12.19 (0.12.20 available)
+  material_color_utilities 0.13.0 (0.13.1 available)
+  meta 1.17.0 (1.19.0 available)
+  mime 2.0.0 (2.1.0 available)
+  native_toolchain_c 0.17.6 (0.19.4 available)
+  objective_c 9.3.0 (9.6.0 available)
+  package_config 2.2.0 (3.0.0 available)
+  package_info_plus 10.1.0 (10.2.1 available)
+  path_provider 2.1.5 (2.1.6 available)
+  path_provider_linux 2.2.1 (2.2.2 available)
+  path_provider_platform_interface 2.1.2 (2.1.3 available)
+  permission_handler 12.0.3 (13.0.1 available)
+  permission_handler_android 13.0.1 (14.0.0 available)
+  permission_handler_apple 9.4.9 (9.6.1 available)
+  permission_handler_html 0.1.3+5 (0.1.4+1 available)
+  permission_handler_platform_interface 4.3.0 (4.4.0 available)
+  permission_handler_windows 0.2.1 (0.2.2 available)
+  posix 6.5.0 (6.5.2 available)
+  pro_video_editor 2.2.4 (2.11.3 available)
+  pub_semver 2.2.0 (2.2.1 available)
+  record 6.2.1 (7.1.1 available)
+  record_android 1.5.2 (2.1.2 available)
+  record_ios 1.2.1 (2.1.1 available)
+  record_linux 1.3.1 (2.1.1 available)
+  record_macos 1.2.2 (2.1.1 available)
+  record_platform_interface 1.6.0 (2.1.0 available)
+  record_use 0.6.0 (1.1.1 available)
+  record_web 1.3.0 (2.1.2 available)
+  record_windows 1.0.7 (2.2.3 available)
+  riverpod 2.6.1 (3.4.2 available)
+  riverpod_annotation 2.6.1 (4.0.6 available)
+  share_plus 13.1.0 (13.3.0 available)
+  share_plus_platform_interface 7.1.0 (7.2.0 available)
+  shared_preferences_android 2.4.23 (2.4.28 available)
+  shared_preferences_foundation 2.5.6 (2.5.7 available)
+  shimmer 3.0.0 (4.0.0 available)
+  socket_io_client 3.1.4 (3.1.6 available)
+  sqflite 2.4.2+1 (2.4.3 available)
+  sqflite_android 2.4.2+3 (2.4.3 available)
+  sqflite_common 2.5.8 (2.5.11 available)
+  sqflite_darwin 2.4.2 (2.4.3+1 available)
+  sqflite_platform_interface 2.4.0 (2.4.1 available)
+  stack_trace 1.12.1 (1.12.2 available)
+  stream_transform 2.1.1 (2.1.2 available)
+  synchronized 3.4.0+1 (3.4.1+2 available)
+  test_api 0.7.10 (0.7.13 available)
+  timezone 0.11.0 (0.11.1 available)
+  url_launcher_android 6.3.29 (6.3.33 available)
+  url_launcher_ios 6.4.1 (6.4.2 available)
+  url_launcher_linux 3.2.2 (3.2.3 available)
+  url_launcher_macos 3.2.5 (3.2.6 available)
+  url_launcher_windows 3.1.5 (3.1.6 available)
+  uuid 4.5.3 (4.6.0 available)
+  vector_graphics 1.2.0 (1.2.3 available)
+  vector_graphics_compiler 1.2.6 (1.3.0 available)
+  vector_math 2.2.0 (2.4.2 available)
+  video_player 2.11.1 (2.14.0 available)
+  video_player_android 2.9.5 (2.12.1 available)
+  video_player_avfoundation 2.9.7 (2.11.1 available)
+  video_player_platform_interface 6.7.0 (6.9.0 available)
+  vm_service 15.2.0 (15.3.0 available)
+  wakelock_plus 1.7.0 (1.8.0 available)
+  wakelock_plus_platform_interface 1.6.0 (1.7.0 available)
+  win32 6.1.0 (6.4.0 available)
+  yaml 3.1.3 (3.1.4 available)
+Got dependencies!
+147 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+Running Gradle task 'assembleDebug'...                          
+flutter : e: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotli
+n/com/dubai/bimobondapp/ar_camera/ArBeautyVideoCapturer.kt:8:19 Unresolved reference 'CapturerObserver'.
+At C:\Users\Flutter_2_2026\AppData\Local\Temp\ps-script-91827cae-61f4-473d-b64a-d471b4ac7684.ps1:113 char:1
++ flutter build apk --debug 2>&1 | Out-File -FilePath "flutter_build_er ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (e: file:///C:/U...turerObserver'.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+e: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/duba
+i/bimobondapp/ar_camera/ArBeautyVideoCapturer.kt:9:19 Unresolved reference 'SurfaceTextureHelper'.
+e: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/duba
+i/bimobondapp/ar_camera/ArBeautyVideoCapturer.kt:10:19 Unresolved reference 'VideoCapturer'.
+e: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/duba
+i/bimobondapp/ar_camera/ArBeautyVideoCapturer.kt:11:19 Unresolved reference 'VideoFrame'.
+e: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/duba
+i/bimobondapp/ar_camera/ArBeautyVideoCapturer.kt:20:31 Unresolved reference 'VideoCapturer'.
+e: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/duba
+i/bimobondapp/ar_camera/ArBeautyVideoCapturer.kt:21:39 Unresolved reference 'SurfaceTextureHelper'.
+e: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/duba
+i/bimobondapp/ar_camera/ArBeautyVideoCapturer.kt:22:35 Unresolved reference 'CapturerObserver'.
+e: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/duba
+i/bimobondapp/ar_camera/ArBeautyVideoCapturer.kt:29:5 'initialize' overrides nothing.
+e: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/duba
+i/bimobondapp/ar_camera/ArBeautyVideoCapturer.kt:30:17 Unresolved reference 'SurfaceTextureHelper'.
+e: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/duba
+i/bimobondapp/ar_camera/ArBeautyVideoCapturer.kt:32:19 Unresolved reference 'CapturerObserver'.
+e: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/duba
+i/bimobondapp/ar_camera/ArBeautyVideoCapturer.kt:38:5 'startCapture' overrides nothing.
+e: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/duba
+i/bimobondapp/ar_camera/ArBeautyVideoCapturer.kt:43:23 Unresolved reference 'onCapturerStarted'.
+e: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/duba
+i/bimobondapp/ar_camera/ArBeautyVideoCapturer.kt:50:16 Unresolved reference 'setTextureSize'.
+e: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/duba
+i/bimobondapp/ar_camera/ArBeautyVideoCapturer.kt:51:16 Unresolved reference 'startListening'.
+e: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/duba
+i/bimobondapp/ar_camera/ArBeautyVideoCapturer.kt:51:40 Unresolved reference 'VideoFrame'.
+e: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/duba
+i/bimobondapp/ar_camera/ArBeautyVideoCapturer.kt:53:23 Unresolved reference 'release'.
+e: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/duba
+i/bimobondapp/ar_camera/ArBeautyVideoCapturer.kt:56:22 Unresolved reference 'onFrameCaptured'.
+e: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/duba
+i/bimobondapp/ar_camera/ArBeautyVideoCapturer.kt:59:38 Unresolved reference 'surfaceTexture'.
+e: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/duba
+i/bimobondapp/ar_camera/ArBeautyVideoCapturer.kt:67:26 Unresolved reference 'onCapturerStarted'.
+e: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/duba
+i/bimobondapp/ar_camera/ArBeautyVideoCapturer.kt:71:22 Unresolved reference 'onCapturerStarted'.
+e: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/duba
+i/bimobondapp/ar_camera/ArBeautyVideoCapturer.kt:76:5 'stopCapture' overrides nothing.
+e: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/duba
+i/bimobondapp/ar_camera/ArBeautyVideoCapturer.kt:78:31 Unresolved reference 'stopListening'.
+e: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/duba
+i/bimobondapp/ar_camera/ArBeautyVideoCapturer.kt:88:27 Unresolved reference 'onCapturerStopped'.
+e: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/duba
+i/bimobondapp/ar_camera/ArBeautyVideoCapturer.kt:91:5 'changeCaptureFormat' overrides nothing.
+e: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/duba
+i/bimobondapp/ar_camera/ArBeautyVideoCapturer.kt:95:31 Unresolved reference 'setTextureSize'.
+e: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/duba
+i/bimobondapp/ar_camera/ArBeautyVideoCapturer.kt:102:5 'dispose' overrides nothing.
+e: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/duba
+i/bimobondapp/ar_camera/ArBeautyVideoCapturer.kt:108:5 'isScreencast' overrides nothing.
+e: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/duba
+i/bimobondapp/ar_camera/ArLiveBeautyPublisher.kt:9:19 Unresolved reference 'MediaStream'.
+e: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/duba
+i/bimobondapp/ar_camera/ArLiveBeautyPublisher.kt:10:19 Unresolved reference 'PeerConnectionFactory'.
+e: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/duba
+i/bimobondapp/ar_camera/ArLiveBeautyPublisher.kt:11:19 Unresolved reference 'SurfaceTextureHelper'.
+e: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/duba
+i/bimobondapp/ar_camera/ArLiveBeautyPublisher.kt:12:19 Unresolved reference 'VideoCapturer'.
+e: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/duba
+i/bimobondapp/ar_camera/ArLiveBeautyPublisher.kt:13:19 Unresolved reference 'VideoSource'.
+e: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/duba
+i/bimobondapp/ar_camera/ArLiveBeautyPublisher.kt:14:19 Unresolved reference 'VideoTrack'.
+e: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/duba
+i/bimobondapp/ar_camera/ArLiveBeautyPublisher.kt:24:27 Unresolved reference 'VideoCapturer'.
+e: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/duba
+i/bimobondapp/ar_camera/ArLiveBeautyPublisher.kt:25:30 Unresolved reference 'VideoSource'.
+e: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/duba
+i/bimobondapp/ar_camera/ArLiveBeautyPublisher.kt:26:32 Unresolved reference 'SurfaceTextureHelper'.
+e: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/duba
+i/bimobondapp/ar_camera/ArLiveBeautyPublisher.kt:27:29 Unresolved reference 'VideoTrack'.
+e: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/duba
+i/bimobondapp/ar_camera/ArLiveBeautyPublisher.kt:48:22 Unresolved reference 'PeerConnectionFactory'.
+e: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/duba
+i/bimobondapp/ar_camera/ArLiveBeautyPublisher.kt:48:53 Cannot access class 'PeerConnectionFactory'. Check your module 
+classpath for missing or conflicting dependencies.
+e: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/duba
+i/bimobondapp/ar_camera/ArLiveBeautyPublisher.kt:53:21 Unresolved reference 'MediaStream'.
+e: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/duba
+i/bimobondapp/ar_camera/ArLiveBeautyPublisher.kt:53:42 Cannot access class 'MediaStream'. Check your module classpath 
+for missing or conflicting dependencies.
+e: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/duba
+i/bimobondapp/ar_camera/ArLiveBeautyPublisher.kt:69:22 Unresolved reference 'SurfaceTextureHelper'.
+e: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/duba
+i/bimobondapp/ar_camera/ArLiveBeautyPublisher.kt:71:22 Cannot access class 'Context'. Check your module classpath for 
+missing or conflicting dependencies.
+e: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/duba
+i/bimobondapp/ar_camera/ArLiveBeautyPublisher.kt:78:30 Unresolved reference 'createVideoSource'.
+e: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/duba
+i/bimobondapp/ar_camera/ArLiveBeautyPublisher.kt:83:29 Unresolved reference 'createVideoTrack'.
+e: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/duba
+i/bimobondapp/ar_camera/ArLiveBeautyPublisher.kt:85:16 Unresolved reference 'addTrack'.
+e: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/duba
+i/bimobondapp/ar_camera/ArLiveBeautyPublisher.kt:89:26 Cannot access class 'VideoTrack'. Check your module classpath 
+for missing or conflicting dependencies.
+e: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/duba
+i/bimobondapp/ar_camera/ArLiveBeautyPublisher.kt:112:23 Unresolved reference 'stopCapture'.
+e: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/duba
+i/bimobondapp/ar_camera/ArLiveBeautyPublisher.kt:117:23 Unresolved reference 'dispose'.
+e: file:///C:/Users/Flutter_2_2026/AndroidStudioProjects/MyApplication/bimobondapp/android/app/src/main/kotlin/com/duba
+i/bimobondapp/ar_camera/ArLiveBeautyPublisher.kt:128:28 Unresolved reference 'dispose'.
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:compileDebugKotlin'.
+> A failure occurred while executing 
+org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction
+   > Compilation error. See log for more details
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 4m 17s
+Running Gradle task 'assembleDebug'...                            257.7s
+Gradle task assembleDebug failed with exit code 1

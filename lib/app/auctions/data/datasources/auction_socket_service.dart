@@ -138,9 +138,10 @@ class GiftComboPayload {
 
     final giftName = (map['giftName'] ?? map['gift_name'] ?? giftObj?['name'])
         ?.toString();
-    final senderName =
-        (map['senderName'] ?? senderObj?['fullName'] ?? senderObj?['username'])
-            ?.toString();
+    final fullName = senderObj?['fullName']?.toString().trim();
+    final senderName = (fullName != null && fullName.isNotEmpty)
+        ? fullName
+        : (map['senderName'] ?? senderObj?['username'])?.toString();
     final senderAvatarUrl = (map['senderAvatarUrl'] ?? senderObj?['avatarUrl'])
         ?.toString();
     final rawCoins = map['coins'];
@@ -253,6 +254,9 @@ class AuctionSocketService {
       StreamController<Map<String, dynamic>>.broadcast();
   final _liveProductController =
       StreamController<Map<String, dynamic>>.broadcast();
+
+  /// Dedupe across `gift_combo` + `auctionGiftCombo` for the same send.
+  final Map<String, DateTime> _recentGiftComboKeys = {};
 
   Stream<AuctionUpdatedPayload> get onAuctionUpdated =>
       _auctionUpdatedController.stream;
@@ -586,9 +590,20 @@ class AuctionSocketService {
     }
 
     final payload = GiftComboPayload.fromMap(map);
-    if (payload != null && !_giftComboController.isClosed) {
-      _giftComboController.add(payload);
-    }
+    if (payload == null || _giftComboController.isClosed) return;
+
+    // gift_combo + auctionGiftCombo often arrive for the same send — emit once.
+    final now = DateTime.now();
+    _recentGiftComboKeys.removeWhere(
+      (_, seenAt) => now.difference(seenAt) > const Duration(seconds: 2),
+    );
+    final dedupeKey = payload.transactionId.trim().isNotEmpty
+        ? 'tx:${payload.transactionId}'
+        : '${payload.overlayKey}:${payload.combo}';
+    if (_recentGiftComboKeys.containsKey(dedupeKey)) return;
+    _recentGiftComboKeys[dedupeKey] = now;
+
+    _giftComboController.add(payload);
   }
 
   void _handleLiveAuction(dynamic data) {

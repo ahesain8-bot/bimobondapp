@@ -42,7 +42,17 @@ class RealLiveKitService implements LiveKitService {
   // is rebuilt. At the previous 4 samples of 4s a viewer stared at a stopped
   // frame for a quarter of a minute before anything happened.
   final _primaryVideoProgress = MediaProgressWatchdog(stalledSampleLimit: 3);
-  final _battleVideoProgress = MediaProgressWatchdog(stalledSampleLimit: 5);
+  // PK opponent uplink is flaky; a low limit caused hard reconnect loops.
+  final _battleVideoProgress = MediaProgressWatchdog(stalledSampleLimit: 12);
+  /// Soft battle recover tried once before hard room reconnect.
+  var _battleSoftRecoverUsed = false;
+
+  void _pkDiag(String event, {String? roomId, String? detail}) {
+    final ts = DateTime.now().toIso8601String();
+    final id = roomId ?? _roomName ?? '-';
+    final extra = detail == null || detail.isEmpty ? '' : ' | $detail';
+    debugPrint('[PK-DIAG][$ts] $event room=$id$extra');
+  }
 
   /// Whether this service currently holds [LiveAudioSession]. The battle room
   /// coming and going must never touch it — only entering and leaving the live
@@ -199,6 +209,25 @@ class RealLiveKitService implements LiveKitService {
     ),
   );
 
+  /// Battle secondary room must keep remote video subscribed even before the
+  /// Flutter renderer mounts (adaptiveStream caused forever-empty PK tiles).
+  RoomOptions _battleRoomOptions(LiveMediaHints _) => const RoomOptions(
+    adaptiveStream: false,
+    dynacast: false,
+    defaultAudioCaptureOptions: AudioCaptureOptions(
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+      voiceIsolation: true,
+      stopAudioCaptureOnMute: false,
+    ),
+    defaultAudioPublishOptions: AudioPublishOptions(dtx: true, red: true),
+    defaultVideoPublishOptions: VideoPublishOptions(
+      simulcast: true,
+      backupVideoCodec: BackupVideoCodec(enabled: false),
+    ),
+  );
+
   Future<void> _retryRemoteSubscription(
     Room room,
     TrackSubscriptionExceptionEvent event, {
@@ -226,8 +255,14 @@ class RealLiveKitService implements LiveKitService {
   }
 
   Future<void> _ensureRemoteTracksSubscribed(Room room) async {
-    for (final participant in room.remoteParticipants.values) {
-      for (final publication in participant.trackPublications.values) {
+    final participants = List<RemoteParticipant>.of(
+      room.remoteParticipants.values,
+    );
+    for (final participant in participants) {
+      final publications = List<RemoteTrackPublication>.of(
+        participant.trackPublications.values,
+      );
+      for (final publication in publications) {
         if (publication.subscribed) continue;
         try {
           await publication.subscribe();
@@ -239,8 +274,14 @@ class RealLiveKitService implements LiveKitService {
   }
 
   RemoteVideoTrack? _firstRemoteVideoTrack(Room room) {
-    for (final participant in room.remoteParticipants.values) {
-      for (final publication in participant.videoTrackPublications) {
+    final participants = List<RemoteParticipant>.of(
+      room.remoteParticipants.values,
+    );
+    for (final participant in participants) {
+      final pubs = List<RemoteTrackPublication<RemoteVideoTrack>>.of(
+        participant.videoTrackPublications,
+      );
+      for (final publication in pubs) {
         final track = publication.track;
         if (publication.subscribed && !publication.muted && track != null) {
           return track;
@@ -297,9 +338,23 @@ class RealLiveKitService implements LiveKitService {
 
   void _reportPrimaryVideoStall(Room room, String reason) {
     if (_room != room) return;
+    // Mid-PK, replacing the primary room always tore down the battle room
+    // (connect() called disconnectBattle). That remounted BOTH tiles and
+    // looked like periodic freezes. Soft-resubscribe only while PK is up.
+    if (_battleRoom != null) {
+      _pkDiag(
+        'primary_stall_soft',
+        detail: 'reason=$reason battleRoom=${_battleRoom.hashCode}',
+      );
+      unawaited(_ensureRemoteTracksSubscribed(room));
+      _primaryVideoProgress.reset();
+      _primaryMissingTrackSamples = 0;
+      return;
+    }
     debugPrint(
       '🔴 Viewer video stopped advancing while room remained connected: $reason',
     );
+    _pkDiag('primary_stall_hard_disconnect', detail: 'reason=$reason');
     _stopPrimaryVideoWatchdog();
     // The BLoC responds by obtaining a fresh join token and replacing the
     // stale Room. Keeping that policy above the SDK avoids reusing dead ICE.
@@ -321,6 +376,7 @@ class RealLiveKitService implements LiveKitService {
   }) {
     _stopBattleVideoWatchdog();
     _battleVideoProgress.reset();
+    _battleSoftRecoverUsed = false;
     _battleVideoHealthTimer = Timer.periodic(_kMediaHealthTick, (_) {
       if (_battleHealthCheckInFlight || _battleRoom != room) return;
       _battleHealthCheckInFlight = true;
@@ -368,7 +424,7 @@ class RealLiveKitService implements LiveKitService {
       debugPrint('🔴 Battle opponent video stalled: $roomName');
       _stopBattleVideoWatchdog();
       await _serializeBattleOperation(
-        () => _restartStalledBattleRoom(
+        () => _recoverStalledBattleRoom(
           room: room,
           url: url,
           token: token,
@@ -379,6 +435,53 @@ class RealLiveKitService implements LiveKitService {
     } catch (error) {
       debugPrint('Battle inbound health sample unavailable: $error');
     }
+  }
+
+  Future<void> _recoverStalledBattleRoom({
+    required Room room,
+    required String url,
+    required String token,
+    required String roomName,
+    required int generation,
+  }) async {
+    if (
+      _battleRoom != room ||
+      _battleRecoveryRoom == room ||
+      generation != _battleConnectionGeneration
+    ) {
+      return;
+    }
+    // Prefer track restore over room.disconnect — disconnect nulls UI room
+    // state and remounts VideoTrackRenderer on both PK tiles.
+    if (!_battleSoftRecoverUsed) {
+      _battleSoftRecoverUsed = true;
+      _pkDiag(
+        'battle_stall_soft_resubscribe',
+        roomId: roomName,
+        detail: 'roomHash=${room.hashCode}',
+      );
+      await _ensureRemoteTracksSubscribed(room);
+      if (_battleRoom != room || generation != _battleConnectionGeneration) {
+        return;
+      }
+      _battleVideoProgress.reset();
+      _startBattleVideoWatchdog(
+        room: room,
+        url: url,
+        token: token,
+        roomName: roomName,
+      );
+      // Soft recover already marked used; restart resets that flag — keep it.
+      _battleSoftRecoverUsed = true;
+      return;
+    }
+    await _restartStalledBattleRoom(
+      room: room,
+      url: url,
+      token: token,
+      roomName: roomName,
+      generation: generation,
+    );
   }
 
   Future<void> _restartStalledBattleRoom({
@@ -395,6 +498,11 @@ class RealLiveKitService implements LiveKitService {
     ) {
       return;
     }
+    _pkDiag(
+      'battle_stall_hard_reconnect',
+      roomId: roomName,
+      detail: 'roomHash=${room.hashCode}',
+    );
     _battleRecoveryRoom = room;
     var failed = false;
     try {
@@ -548,7 +656,7 @@ class RealLiveKitService implements LiveKitService {
     }
     final room = await _runWithLiveKitErrorGuard(() async {
       final hints = mediaHints ?? LiveMediaHints.defaultsForRole('viewer');
-      final guardedRoom = Room(roomOptions: _roomOptions(hints));
+      final guardedRoom = Room(roomOptions: _battleRoomOptions(hints));
       guardedRoom.events
         ..on<RoomDisconnectedEvent>((_) {
           if (
@@ -603,6 +711,13 @@ class RealLiveKitService implements LiveKitService {
           ) {
             return;
           }
+          if (event.track is RemoteVideoTrack) {
+            _pkDiag(
+              'battle_track_subscribed',
+              roomId: roomName,
+              detail: 'sid=${event.publication.sid}',
+            );
+          }
           if (event.track is RemoteAudioTrack) {
             unawaited(_preferMediaSpeaker());
           }
@@ -645,6 +760,7 @@ class RealLiveKitService implements LiveKitService {
       await _disconnectBattle();
       return;
     }
+    unawaited(_ensureRemoteTracksSubscribed(room));
     _setBattleState(LiveKitConnectionState.connected);
     _startBattleVideoWatchdog(
       room: room,
@@ -664,6 +780,11 @@ class RealLiveKitService implements LiveKitService {
   Future<void> _disconnectBattle() async {
     _stopBattleVideoWatchdog();
     final room = _battleRoom;
+    _pkDiag(
+      'battle_room_dispose',
+      roomId: _roomName,
+      detail: 'roomHash=${room?.hashCode ?? "null"}',
+    );
     _battleRoom = null;
     if (room == null) return;
     try {
@@ -690,6 +811,7 @@ class RealLiveKitService implements LiveKitService {
     required String roomName,
     String? mockStreamUrl,
     LiveMediaHints? mediaHints,
+    bool keepBattleRoom = false,
   }) async {
     // Replacing the viewer JWT with the accepted guest JWT is an intentional
     // in-room upgrade. Emitting `disconnected` here lets the viewer BLoC start
@@ -700,7 +822,22 @@ class RealLiveKitService implements LiveKitService {
     // Taken before the old room is disposed: a guest upgrade replaces the
     // primary room mid-live, and that teardown must not drop the session.
     await _acquireAudioSession();
-    await disconnectBattle();
+    if (keepBattleRoom) {
+      _pkDiag(
+        'primary_connect_keep_battle',
+        roomId: roomName,
+        detail:
+            'battleRoom=${_battleRoom?.hashCode ?? "null"} '
+            'prevPrimary=${_room?.hashCode ?? "null"}',
+      );
+    } else {
+      _pkDiag(
+        'primary_connect_drop_battle',
+        roomId: roomName,
+        detail: 'battleRoom=${_battleRoom?.hashCode ?? "null"}',
+      );
+      await disconnectBattle();
+    }
     await _disposePrimaryRoom(notify: false);
 
     if (url.isEmpty || token.isEmpty) {
@@ -727,16 +864,23 @@ class RealLiveKitService implements LiveKitService {
           ..on<RoomDisconnectedEvent>((event) {
             if (_room != room) return;
             debugPrint('🔴 LiveKit room disconnected: $roomName');
+            _pkDiag(
+              'primary_room_disconnected',
+              roomId: roomName,
+              detail: 'roomHash=${room.hashCode}',
+            );
             _setState(LiveKitConnectionState.disconnected);
           })
           ..on<ReconnectingEvent>((event) {
             if (_room != room) return;
             debugPrint('🔄 LiveKit reconnecting: $roomName');
+            _pkDiag('primary_room_reconnecting', roomId: roomName);
             _setState(LiveKitConnectionState.reconnecting);
           })
           ..on<RoomReconnectedEvent>((event) {
             if (_room != room) return;
             debugPrint('🔗 LiveKit reconnected: $roomName');
+            _pkDiag('primary_room_reconnected', roomId: roomName);
             _setState(LiveKitConnectionState.connected);
             _startPrimaryVideoWatchdog(room);
             unawaited(_preferMediaSpeaker());
@@ -747,6 +891,11 @@ class RealLiveKitService implements LiveKitService {
           ..on<RoomConnectedEvent>((event) {
             if (_room != room) return;
             debugPrint('🔌 LiveKit connected: $roomName');
+            _pkDiag(
+              'primary_room_connected',
+              roomId: roomName,
+              detail: 'roomHash=${room.hashCode}',
+            );
             _setState(LiveKitConnectionState.connected);
           })
           // [DEBUG-QOS VIEWER 1/3] Remote track subscribed: print what
@@ -767,6 +916,12 @@ class RealLiveKitService implements LiveKitService {
               unawaited(_preferMediaSpeaker());
             }
             if (ev.track is! RemoteVideoTrack) return;
+            _pkDiag(
+              'primary_track_subscribed',
+              roomId: roomName,
+              detail:
+                  'sid=${ev.publication.sid} participant=${ev.participant.identity}',
+            );
             final p = ev.publication;
             final part = ev.participant;
             final vtrack = ev.track as RemoteVideoTrack;

@@ -1,32 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../../../core/constants/app_spacing.dart';
 import '../../bloc/start_live/live_bloc.dart';
 import '../../bloc/start_live/live_event.dart';
 import '../../bloc/start_live/live_state.dart';
 
-/// Broadcast source selector: device camera / mobile games.
+/// TikTok mode selector: Device camera (green dot) / Mobile gaming.
 class OptionsRow extends StatelessWidget {
   const OptionsRow({super.key});
 
   static const List<({String label, IconData icon, bool isDeviceCamera})>
   _options = [
     (
-      label: 'ألعاب الهاتف المحمول',
-      icon: Icons.smartphone_outlined,
-      isDeviceCamera: false,
-    ),
-    (
-      label: 'الكاميرا الخاصة بالجهاز',
+      label: 'Device camera',
       icon: Icons.videocam_outlined,
       isDeviceCamera: true,
     ),
+    (
+      label: 'Mobile gaming',
+      icon: Icons.smartphone_outlined,
+      isDeviceCamera: false,
+    ),
   ];
-  static const double _optionWidth = 148;
-  static const double _optionGap = AppSpacing.xxs;
-  static const double _optionHeight = 28;
-  static const Duration _animationDuration = Duration(milliseconds: 250);
 
   @override
   Widget build(BuildContext context) {
@@ -39,73 +34,71 @@ class OptionsRow extends StatelessWidget {
         final isDeviceCamera = _deviceOf(state);
 
         return Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.optionsHorizontal,
-          ),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final selectedPosition = _selectedPosition(isDeviceCamera);
-              final centerLeft = (constraints.maxWidth - _optionWidth) / 2;
-              final step = _optionWidth + _optionGap;
-
-              return SizedBox(
-                height: _optionHeight,
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: _options.asMap().entries.map((entry) {
-                    final option = entry.value;
-                    final isActive = option.isDeviceCamera == isDeviceCamera;
-                    final position = entry.key - selectedPosition;
-
-                    return AnimatedPositioned(
-                      key: ValueKey(option.isDeviceCamera),
-                      duration: _animationDuration,
-                      curve: Curves.easeInOutCubic,
-                      left: centerLeft + (position * step),
-                      top: 0,
-                      width: _optionWidth,
-                      height: _optionHeight,
-                      child: GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: () => liveBloc.add(
-                          LiveSourceChanged(option.isDeviceCamera),
-                        ),
-                        child: Center(
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  option.label,
-                                  style: TextStyle(
-                                    color: isActive
-                                        ? Colors.white
-                                        : Colors.white.withValues(alpha: 0.5),
-                                    fontSize: 12,
-                                    fontWeight: isActive
-                                        ? FontWeight.w600
-                                        : FontWeight.w400,
-                                  ),
-                                ),
-                                const SizedBox(width: AppSpacing.xs),
-                                Icon(
-                                  option.icon,
-                                  color: isActive
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          child: Directionality(
+            textDirection: TextDirection.ltr,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                for (final option in _options) ...[
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => liveBloc.add(
+                      LiveSourceChanged(option.isDeviceCamera),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                option.icon,
+                                size: 18,
+                                color: option.isDeviceCamera == isDeviceCamera
+                                    ? Colors.white
+                                    : Colors.white.withValues(alpha: 0.45),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                option.label,
+                                style: TextStyle(
+                                  color: option.isDeviceCamera == isDeviceCamera
                                       ? Colors.white
-                                      : Colors.white.withValues(alpha: 0.5),
-                                  size: 18,
+                                      : Colors.white.withValues(alpha: 0.45),
+                                  fontSize: 13,
+                                  fontWeight:
+                                      option.isDeviceCamera == isDeviceCamera
+                                      ? FontWeight.w700
+                                      : FontWeight.w400,
                                 ),
-                              ],
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 5),
+                          AnimatedOpacity(
+                            duration: const Duration(milliseconds: 180),
+                            opacity: option.isDeviceCamera == isDeviceCamera
+                                ? 1
+                                : 0,
+                            child: Container(
+                              width: 6,
+                              height: 6,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFF20D5EC),
+                                shape: BoxShape.circle,
+                              ),
                             ),
                           ),
-                        ),
+                        ],
                       ),
-                    );
-                  }).toList(),
-                ),
-              );
-            },
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
         );
       },
@@ -114,12 +107,5 @@ class OptionsRow extends StatelessWidget {
 
   bool _deviceOf(LiveState state) {
     return state is LiveReady ? state.isDeviceCamera : true;
-  }
-
-  int _selectedPosition(bool isDeviceCamera) {
-    final position = _options.indexWhere(
-      (option) => option.isDeviceCamera == isDeviceCamera,
-    );
-    return position == -1 ? 0 : position;
   }
 }

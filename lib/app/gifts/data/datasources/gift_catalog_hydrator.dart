@@ -1,4 +1,5 @@
 import 'package:bimobondapp/app/gifts/domain/entities/gift_entity.dart';
+import 'package:bimobondapp/app/gifts/presentation/utils/gift_media_cache.dart';
 
 /// Loads the gift catalog on demand so realtime payloads can be hydrated.
 typedef GiftCatalogLoader = Future<List<GiftEntity>> Function();
@@ -46,11 +47,17 @@ class GiftCatalogHydrator {
 
   /// Merges catalog media/size/type into [payload] when the event omits them.
   Future<void> hydrate(Map<String, dynamic> payload, String giftId) async {
-    if (!needsHydration(payload)) return;
+    if (!needsHydration(payload)) {
+      GiftMediaCache.instance.prefetchFromGiftMap(
+        _asMap(payload['gift']) ?? payload,
+      );
+      return;
+    }
     await _ensureLoaded();
     final gift = _byId[giftId] ?? _byName(payload);
     if (gift == null) return;
     enrich(payload, gift);
+    GiftMediaCache.instance.prefetchFromGiftMap(_asMap(payload['gift']));
   }
 
   /// The catalog entry for [giftId], or null when it has not been loaded yet.
@@ -155,6 +162,9 @@ class GiftCatalogHydrator {
         // Only latch on success, otherwise one failed refresh would leave the
         // session without gift metadata until the app restarts.
         _loaded = _byId.isNotEmpty;
+        if (_loaded) {
+          GiftMediaCache.instance.prefetchCatalog(_byId.values);
+        }
       } catch (_) {
         // Gift events must still be delivered when a catalog refresh fails.
       } finally {

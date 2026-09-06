@@ -8,6 +8,8 @@ import 'package:livekit_client/livekit_client.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/live_gift_sheet.dart';
 import '../../../../core/utils/build_safe_notifier.dart';
 
+import '../../../../core/models/live_battle.dart';
+import '../../../../core/widgets/pk_battle_start_overlay.dart';
 import '../../core/theme/app_colors.dart';
 import '../../domain/entities/live_entity.dart';
 import '../../domain/entities/live_session_entity.dart';
@@ -335,10 +337,16 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
             (prev.live?.id) != (curr.live?.id) ||
             prev.guests != curr.guests ||
             prev.isOnStage != curr.isOnStage ||
-            prev.battle != curr.battle ||
+            // Score ticks update via nested PkBattleBar — do not rebuild
+            // the whole stage (VideoTrackRenderer flash).
+            (prev.battle?.isActive == true) != (curr.battle?.isActive == true) ||
+            prev.battle?.id != curr.battle?.id ||
+            prev.battle?.live1Id != curr.battle?.live1Id ||
+            prev.battle?.live2Id != curr.battle?.live2Id ||
+            prev.battle?.status != curr.battle?.status ||
+            prev.battle?.phase != curr.battle?.phase ||
             prev.battleOpponentLive != curr.battleOpponentLive ||
             prev.battleRoom != curr.battleRoom ||
-            prev.topViewerAvatars != curr.topViewerAvatars ||
             prev.opponentTopGifterAvatars != curr.opponentTopGifterAvatars ||
             prevInfo != currInfo;
       },
@@ -402,9 +410,10 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
         final guests = _guestsFrom(live, stageGuests);
         // The visible bar can lose navigation padding while the keyboard is
         // open, but the canvas/stage reservation must remain constant.
-        final barTotalH = 42 + 8 + (bottomPad < 16 ? 16.0 : bottomPad);
+        // Reactions (~36) + gap + comment row (~44) + safe padding.
+        final barTotalH = 90 + 8 + (bottomPad < 16 ? 16.0 : bottomPad);
         final canvasBarTotalH =
-            42 + 8 + (viewBottomPad < 16 ? 16.0 : viewBottomPad);
+            90 + 8 + (viewBottomPad < 16 ? 16.0 : viewBottomPad);
         final giftGoalH = showGiftGoal ? (isMultiGrid ? 112.0 : 96.0) : 0.0;
         final screenW = MediaQuery.sizeOf(context).width;
         final screenH = MediaQuery.sizeOf(context).height;
@@ -519,6 +528,29 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                                         );
                                       },
                                     ),
+                              ),
+                            if (isThisRoom)
+                              Positioned.fill(
+                                child: BlocBuilder<LiveViewerBloc, LiveViewerState>(
+                                  buildWhen: (prev, curr) =>
+                                      prev.battle?.id != curr.battle?.id ||
+                                      prev.battle?.status !=
+                                          curr.battle?.status,
+                                  builder: (context, state) {
+                                    final battle = state.battle;
+                                    if (battle == null || !battle.isActive) {
+                                      return const SizedBox.shrink();
+                                    }
+                                    return _PkBattleStartGate(
+                                      battle: battle,
+                                      leftAvatarUrl: live.hostAvatar,
+                                      rightAvatarUrl:
+                                          state.battleOpponentLive?.hostAvatar ??
+                                          live.metadata?['guestAvatar']
+                                              as String?,
+                                    );
+                                  },
+                                ),
                               ),
                           ],
                         ),
@@ -685,6 +717,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                 )
               else
                 LiveVideoPlayer(
+                  key: ValueKey('viewer_primary_${live.id}'),
                   live: live,
                   isActive: widget.isActive && connected,
                 ),
@@ -798,7 +831,11 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                       onClose: () {
                         if (widget.onClose != null) {
                           widget.onClose!();
+                          return;
                         }
+                        context.read<LiveViewerBloc>().add(
+                          const LiveViewerDeactivated(leavingFeed: true),
+                        );
                         if (context.canPop()) {
                           context.pop();
                         } else {
@@ -1075,6 +1112,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                             curr.session?.coinBalance ||
                         prev.chatMuted != curr.chatMuted ||
                         prev.isCommentSending != curr.isCommentSending ||
+                        prev.isOnStage != curr.isOnStage ||
                         pShare != cShare;
                   },
                   builder: (context, state) {
@@ -1087,6 +1125,8 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                     final shareCount = isThisRoom
                         ? (state.live?.metadata?['shareCount'] as int?)
                         : (live.metadata?['shareCount'] as int?);
+                    final canRequestGuest =
+                        widget.isActive && isThisRoom && !state.isOnStage;
                     return TikTokLiveBottomBar(
                       onTypeTap: () {
                         if (chatMuted) {
@@ -1111,6 +1151,20 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                           ),
                         );
                       },
+                      onLikeTap: () {
+                        _spawnHearts(3);
+                        if (widget.isActive) {
+                          context.read<LiveViewerBloc>().add(
+                            const LiveViewerLiked(burst: 3),
+                          );
+                        }
+                      },
+                      onQuickReact: (text) {
+                        if (!widget.isActive || chatMuted) return;
+                        context.read<LiveViewerBloc>().add(
+                          LiveViewerCommentSent(text),
+                        );
+                      },
                       onTreasureTap: (isPk || isMultiGrid)
                           ? null
                           : () {
@@ -1123,7 +1177,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                               );
                             },
                       onRoseTap: widget.isActive ? _sendRose : null,
-                      onMultiGuestTap: widget.isActive
+                      onMultiGuestTap: canRequestGuest
                           ? () => _openGuestRequest(live)
                           : null,
                       shareCount: shareCount,
@@ -1131,7 +1185,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                           ? CommentInputBar(
                               enabled: connected && !chatMuted,
                               isSending: isCommentSending,
-                              hintText: chatMuted ? 'Chat muted' : 'Write...',
+                              hintText: chatMuted ? 'Chat muted' : 'Comment',
                               onSend: (text) {
                                 if (isCommentSending) return;
                                 context.read<LiveViewerBloc>().add(
@@ -1234,6 +1288,7 @@ class _PkVideoLayout extends StatelessWidget {
                 fit: StackFit.expand,
                 children: [
                   LiveVideoPlayer(
+                    key: ValueKey('viewer_pk_host_${live.id}'),
                     live: live,
                     isActive: isActive,
                     fit: BoxFit.fitWidth,
@@ -1315,15 +1370,16 @@ class _PkGuestFeed extends StatelessWidget {
   }
 
   VideoTrack? _remoteVideoTrack(Room room) {
+    VideoTrack? mutedFallback;
     for (final participant in room.remoteParticipants.values) {
       for (final publication in participant.videoTrackPublications) {
         final track = publication.track;
-        if (publication.subscribed && !publication.muted && track != null) {
-          return track;
-        }
+        if (!publication.subscribed || track == null) continue;
+        if (!publication.muted) return track;
+        mutedFallback ??= track;
       }
     }
-    return null;
+    return mutedFallback;
   }
 
   Widget _fallback() {
@@ -1351,6 +1407,68 @@ class _PkGuestFeed extends StatelessWidget {
           child: FallbackAvatar(seed: liveId, name: guestName, radius: 36),
         ),
       ),
+    );
+  }
+}
+
+/// Plays the TikTok Match clash once when a battle id first becomes ACTIVE.
+class _PkBattleStartGate extends StatefulWidget {
+  const _PkBattleStartGate({
+    required this.battle,
+    this.leftAvatarUrl,
+    this.rightAvatarUrl,
+  });
+
+  final LiveBattle battle;
+  final String? leftAvatarUrl;
+  final String? rightAvatarUrl;
+
+  @override
+  State<_PkBattleStartGate> createState() => _PkBattleStartGateState();
+}
+
+class _PkBattleStartGateState extends State<_PkBattleStartGate> {
+  String? _playedForId;
+  var _visible = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _arm(widget.battle, notify: false);
+  }
+
+  @override
+  void didUpdateWidget(covariant _PkBattleStartGate oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.battle.id != widget.battle.id) {
+      _arm(widget.battle, notify: true);
+    }
+  }
+
+  void _arm(LiveBattle battle, {required bool notify}) {
+    if (!battle.isActive) return;
+    if (_playedForId == battle.id) return;
+    final startedAt = battle.startTime;
+    if (startedAt != null &&
+        DateTime.now().difference(startedAt).inSeconds > 10) {
+      _playedForId = battle.id;
+      return;
+    }
+    _playedForId = battle.id;
+    _visible = true;
+    if (notify) setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_visible) return const SizedBox.shrink();
+    return PkBattleStartOverlay(
+      leftAvatarUrl: widget.leftAvatarUrl,
+      rightAvatarUrl: widget.rightAvatarUrl,
+      onFinished: () {
+        if (!mounted) return;
+        setState(() => _visible = false);
+      },
     );
   }
 }

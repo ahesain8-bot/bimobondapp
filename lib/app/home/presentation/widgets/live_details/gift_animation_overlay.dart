@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:bimobondapp/app/gifts/domain/entities/gift_entity.dart';
 import 'package:bimobondapp/app/gifts/presentation/utils/gift_lottie_cache.dart';
+import 'package:bimobondapp/app/gifts/presentation/utils/gift_media_cache.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
 import 'package:bimobondapp/core/widgets/safe_network_image.dart';
 import 'package:flutter/material.dart';
@@ -11,9 +12,9 @@ import 'package:video_player/video_player.dart';
 
 /// TikTok-style gift overlay — prefers preloaded Lottie for instant playback.
 ///
-/// Important: never wrap [VideoPlayer] in `saveLayer` / [BlendMode.screen].
-/// That combination hard-crashes many Android GPUs when a second texture
-/// (live feed + gift MP4) is blended.
+/// Never wrap [VideoPlayer] in [BlendMode.screen] / unrestricted `saveLayer`
+/// blends — that hard-crashes many Android GPUs over a live feed. LARGE gifts
+/// may use [BlendMode.dstIn] only for a top alpha dissolve into the room.
 class GiftAnimationOverlay extends StatefulWidget {
   const GiftAnimationOverlay({
     required this.animationUrl,
@@ -72,10 +73,11 @@ class GiftAnimationOverlay extends StatefulWidget {
     final resolved = MediaUtils.resolveAbsoluteUrl(animationUrl);
     if (resolved.trim().isEmpty) return Future.value();
 
-    // Kick off / reuse cached Lottie load before the first frame paints.
-    if (GiftLottieCache.looksLikeLottieUrl(resolved)) {
-      unawaited(GiftLottieCache.instance.load(resolved));
-    }
+    // Warm disk + memory before the first frame paints.
+    GiftMediaCache.instance.prefetchGiftUrls(
+      animationUrl: resolved,
+      thumbnailUrl: thumbnailUrl,
+    );
 
     // Prefer the root navigator overlay so gifts sit above sheets/dialogs.
     final overlay =
@@ -229,6 +231,8 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
   VideoPlayerController? _videoController;
   LottieComposition? _composition;
   bool _finished = false;
+  bool _videoDisposeInFlight = false;
+  int _videoGeneration = 0;
   bool _lottieFailed = false;
   bool _videoFailed = false;
   Timer? _finishTimer;
@@ -314,17 +318,31 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
   }
 
   Future<void> _initVideo() async {
+    final generation = ++_videoGeneration;
     VideoPlayerController? controller;
     try {
-      controller = VideoPlayerController.networkUrl(
-        Uri.parse(widget.animationUrl),
-        videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+      // Prefer a local file — streaming MP4 beside LiveKit/AR textures is a
+      // common Android OOM kill. Cache on first receive, play from disk after.
+      final local = await GiftMediaCache.instance.resolveVideoFile(
+        widget.animationUrl,
       );
+      if (!mounted || generation != _videoGeneration || _finished) {
+        return;
+      }
+      final options = VideoPlayerOptions(mixWithOthers: true);
+      controller = local != null
+          ? VideoPlayerController.file(local, videoPlayerOptions: options)
+          : VideoPlayerController.networkUrl(
+              Uri.parse(widget.animationUrl),
+              videoPlayerOptions: options,
+            );
       _videoController = controller;
       await controller.initialize().timeout(const Duration(seconds: 8));
-      if (!mounted) {
+      if (!mounted || generation != _videoGeneration || _finished) {
         await controller.dispose();
-        _videoController = null;
+        if (identical(_videoController, controller)) {
+          _videoController = null;
+        }
         return;
       }
       // Play once — no looping for LARGE/MEDIUM (lives + auction).
@@ -419,11 +437,13 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
     _finishTimer = null;
     _stallTimer?.cancel();
     _stallTimer = null;
+    _videoGeneration++;
 
     // Tear down video texture before removing the overlay entry.
     final video = _videoController;
     _videoController = null;
     if (video != null) {
+      _videoDisposeInFlight = true;
       unawaited(() async {
         try {
           await video.pause();
@@ -446,9 +466,15 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
     _stallTimer?.cancel();
     _stallTimer = null;
     _lottieController?.dispose();
+    _videoGeneration++;
     final video = _videoController;
     _videoController = null;
-    video?.dispose();
+    // Avoid double-dispose if [_finish] is already tearing the player down.
+    if (video != null && !_videoDisposeInFlight) {
+      try {
+        video.dispose();
+      } catch (_) {}
+    }
     _entranceController.dispose();
     super.dispose();
   }
@@ -466,9 +492,6 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
     if (s is String && s.trim().toUpperCase() == 'MEDIUM') return true;
     return false;
   }
-
-  /// LARGE gifts stay prominent without obscuring the host, battle, and chat.
-  bool get _isLargeStage => !_isSmall && !_isMedium;
 
   @override
   Widget build(BuildContext context) {
@@ -497,10 +520,9 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
       height: stageHeight,
       child: _buildMedia(),
     );
-    // This is the shared main-branch composition for every media kind. The
-    // stage stays square, while BoxFit.cover lets each asset fill that stage
-    // using its own aspect ratio without changing the overlay geometry.
-    final stage = _withEdgeFade(media);
+    // Only LARGE gets a top transparency fade into the live/auction feed.
+    // SMALL/MEDIUM stay fully opaque.
+    final stage = isLarge ? _withLargeTopFade(media) : media;
 
     Widget animatedStage;
     if (isLarge) {
@@ -595,49 +617,33 @@ class _GiftAnimationOverlayState extends State<GiftAnimationOverlay>
     );
   }
 
-  /// Dissolves the upper part of a LARGE gift into the live video behind it.
+  /// Dissolves the upper ~10% of a LARGE gift into the live/auction video.
   ///
-  /// [BlendMode.dstIn] multiplies the gift's own alpha by the gradient's, so an
-  /// asset that is already transparent keeps its transparency and the body of
-  /// the animation stays fully opaque — a mask, not an opacity change. Only the
-  /// gradient's alpha is read; its colour channels are irrelevant.
+  /// [BlendMode.dstIn] multiplies the gift's own alpha by the gradient's, so the
+  /// top edge is truly transparent over the room and the body stays opaque.
+  /// Applies to Lottie, image, **and** MP4 (occasion gifts like lions) — a dark
+  /// scrim overlay was used before and never looked like transparency.
+  Widget _withLargeTopFade(Widget child) => _withTopBlend(child);
+
+  /// Dissolves the upper ~10% of a LARGE gift into the feed behind it.
   Widget _withTopBlend(Widget child) {
     return ShaderMask(
       blendMode: BlendMode.dstIn,
       shaderCallback: (bounds) => const LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
-        // Eased ramp rather than one linear step: a straight ramp leaves a
-        // visible seam where the gradient meets the opaque body.
+        // Clear ramp across the top 10% of stage height.
         colors: [
           Color(0x00000000),
-          Color(0x26000000),
-          Color(0x8C000000),
+          Color(0x33000000),
+          Color(0x99000000),
           Color(0xFF000000),
           Color(0xFF000000),
         ],
-        stops: [0.0, 0.12, 0.22, 0.34, 1.0],
+        stops: [0.0, 0.03, 0.07, 0.10, 1.0],
       ).createShader(bounds),
-      child: RepaintBoundary(child: child),
-    );
-  }
-
-  /// Fades the top 20%; softens the bottom slightly while keeping it more opaque.
-  Widget _withEdgeFade(Widget child) {
-    return ShaderMask(
-      blendMode: BlendMode.dstIn,
-      shaderCallback: (bounds) => const LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [
-          Color(0x00000000),
-          Color(0xFF000000),
-          Color(0xFF000000),
-          // Bottom stays mostly visible (higher opacity than a full fade-out).
-          Color(0xE6FFFFFF),
-        ],
-        stops: [0.0, 0.20, 0.90, 1.0],
-      ).createShader(bounds),
+      // Isolate the media layer so dstIn masks a Flutter layer, not a raw
+      // platform texture blend (safer than BlendMode.screen over live).
       child: RepaintBoundary(child: child),
     );
   }

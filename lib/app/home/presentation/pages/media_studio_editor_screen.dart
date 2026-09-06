@@ -198,36 +198,44 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
   bool _preserveNeutralAdjustments = false;
 
   static const Map<MediaPhotoEditorTool, double> _magicBeautyDefaults = {
-    MediaPhotoEditorTool.smooth: 0.50,
-    MediaPhotoEditorTool.contrast: 0.04,
-    MediaPhotoEditorTool.shape: 0.0,
-    MediaPhotoEditorTool.nose: 0.0,
-    MediaPhotoEditorTool.eyes: 0.0,
-    MediaPhotoEditorTool.tooth: 0.0,
-    MediaPhotoEditorTool.mouth: 0.0,
-    MediaPhotoEditorTool.saturation: 0.05,
-    MediaPhotoEditorTool.brightness: 0.18,
-    MediaPhotoEditorTool.exposure: 0.06,
-    MediaPhotoEditorTool.whiteBalance: 0.02,
-    MediaPhotoEditorTool.highlights: -0.05,
-    MediaPhotoEditorTool.shadows: 0.10,
+    MediaPhotoEditorTool.smooth: 0.50, // 50
+    MediaPhotoEditorTool.contrast: 0.39, // 39
+    MediaPhotoEditorTool.shape: -0.83, // -83
+    MediaPhotoEditorTool.nose: 0.05, // 5
+    MediaPhotoEditorTool.eyes: 0.05, // 5
+    MediaPhotoEditorTool.tooth: 0.42, // cleaner
+    MediaPhotoEditorTool.mouth: 0.28, // fuller / more open
+    MediaPhotoEditorTool.saturation: -0.07, // -7
+    MediaPhotoEditorTool.brightness: -0.15, // -15
+    MediaPhotoEditorTool.exposure: -0.53, // -53
+    MediaPhotoEditorTool.whiteBalance: -0.04, // -4
+    MediaPhotoEditorTool.highlights: -0.22, // -22
+    MediaPhotoEditorTool.shadows: -0.50, // -50
   };
 
-  /// Bipolar tone/color adjustments (-1…1) keyed by tool.
+  /// Bipolar tone/color adjustments (−1.5…1.5) keyed by tool.
   final Map<MediaPhotoEditorTool, double> _adjustments = {
-    MediaPhotoEditorTool.smooth: 0.0,
-    MediaPhotoEditorTool.contrast: 0.0,
-    MediaPhotoEditorTool.shape: 0.0,
-    MediaPhotoEditorTool.nose: 0.0,
-    MediaPhotoEditorTool.eyes: 0.0,
-    MediaPhotoEditorTool.tooth: 0.0,
-    MediaPhotoEditorTool.mouth: 0.0,
-    MediaPhotoEditorTool.saturation: 0.0,
-    MediaPhotoEditorTool.brightness: 0.0,
-    MediaPhotoEditorTool.exposure: 0.0,
-    MediaPhotoEditorTool.whiteBalance: 0.0,
-    MediaPhotoEditorTool.highlights: 0.0,
-    MediaPhotoEditorTool.shadows: 0.0,
+    MediaPhotoEditorTool.smooth: 0.50,
+    MediaPhotoEditorTool.contrast: 0.39,
+    MediaPhotoEditorTool.shape: -0.83,
+    MediaPhotoEditorTool.nose: 0.05,
+    MediaPhotoEditorTool.eyes: 0.05,
+    MediaPhotoEditorTool.tooth: 0.42,
+    MediaPhotoEditorTool.mouth: 0.28,
+    MediaPhotoEditorTool.saturation: -0.07,
+    MediaPhotoEditorTool.brightness: -0.15,
+    MediaPhotoEditorTool.exposure: -0.53,
+    MediaPhotoEditorTool.whiteBalance: -0.04,
+    MediaPhotoEditorTool.highlights: -0.22,
+    MediaPhotoEditorTool.shadows: -0.50,
+    MediaPhotoEditorTool.lipstick: 0.0,
+    MediaPhotoEditorTool.foundation: 0.0,
+    MediaPhotoEditorTool.eyeshadow: 0.0,
+    MediaPhotoEditorTool.contour: 0.0,
+    MediaPhotoEditorTool.blush: 0.0,
+    MediaPhotoEditorTool.underEye: 0.0,
+    MediaPhotoEditorTool.brightenEye: 0.0,
+    MediaPhotoEditorTool.eyeliner: 0.0,
   };
   File? _smoothPreviewFile;
   Timer? _smoothDebounce;
@@ -3111,17 +3119,10 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
         : null;
     final selectedColorId = _hasActiveColorFilter ? _arFilterId : 'none';
     final screenSize = MediaQuery.of(context).size;
-    final isPhoto = !currentItem.isVideo;
-    // Full screen, no reserved top/bottom chrome band — matches the live
-    // camera's own default (non-ratio-toggled) viewport exactly, so photo/
-    // video capture shows here the same as it did while shooting. Was
-    // previously reduced by a fixed "TikTok chrome" amount (a much bigger cut
-    // for photos than video, unrelated to what the live camera actually
-    // showed), which made photos look squeezed/"square" and videos look
-    // over-cropped/"zoomed" relative to the live view. Toolbar controls now
-    // float over the media instead of sitting in a reserved band.
+    // Same full-screen height as video — no photo letterbox chrome that
+    // shrinks the frame after capture.
     const previewChrome = (top: 0.0, bottom: 0.0);
-    _previewSize = screenSize;
+    _previewSize = Size(screenSize.width, screenSize.height);
     final previewFile = (_smoothPreviewFile != null && _hasPreviewEdits)
         ? _smoothPreviewFile!
         : _currentState.sourceFile;
@@ -3255,6 +3256,8 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
               key: ValueKey('studio-preview-$_currentIndex-$_previewEpoch'),
               file: previewFile,
               isVideo: currentItem.isVideo,
+              // Fill full screen height + width like the live camera preview.
+              fit: BoxFit.cover,
               arFilterId: selectedColorId,
               arFilterIntensity: _arFilterIntensity,
               applyArColorPreview: currentItem.isVideo
@@ -3293,61 +3296,21 @@ class _MediaStudioEditorScreenState extends State<MediaStudioEditorScreen>
         body: Stack(
           fit: StackFit.expand,
           children: [
-            if (isPhoto)
-              Positioned(
-                top: previewChrome.top,
-                left: 0,
-                right: 0,
-                bottom: previewChrome.bottom,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(
-                    CameraRatioLetterbox.tikTokPreviewRadius,
-                  ),
-                  child: ColoredBox(color: Colors.black, child: previewWidget),
-                ),
-              )
-            else
-              TikTokPhotoPreviewClip(
-                topHeight: previewChrome.top,
-                bottomHeight: previewChrome.bottom,
-                child: previewWidget,
-              ),
-            if (!showTemplateLook && _currentState.textOverlays.isNotEmpty)
-              if (isPhoto)
-                Positioned(
-                  top: previewChrome.top,
-                  left: 0,
-                  right: 0,
-                  bottom: previewChrome.bottom,
-                  child: MediaTextOverlayLayer(
-                    key: ValueKey('text-overlays-$_currentIndex'),
-                    overlays: _currentState.textOverlays,
-                    onChanged: _moveOverlay,
-                    onEdit: _editText,
-                    mediaSize: _mediaPixelSize,
-                    fit: BoxFit.contain,
-                  ),
-                )
-              else
-                Positioned.fill(
-                  child: TikTokPhotoPreviewClip(
-                    topHeight: previewChrome.top,
-                    bottomHeight: previewChrome.bottom,
-                    child: MediaTextOverlayLayer(
-                      key: ValueKey('text-overlays-$_currentIndex'),
-                      overlays: _currentState.textOverlays,
-                      onChanged: _moveOverlay,
-                      onEdit: _editText,
-                      mediaSize: _mediaPixelSize,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                ),
-            TikTokChromeBarsOverlay(
-              topHeight: previewChrome.top,
-              bottomHeight: previewChrome.bottom,
-              animated: false,
+            // Full-bleed like live camera — fill height and width, no letterbox.
+            Positioned.fill(
+              child: ColoredBox(color: Colors.black, child: previewWidget),
             ),
+            if (!showTemplateLook && _currentState.textOverlays.isNotEmpty)
+              Positioned.fill(
+                child: MediaTextOverlayLayer(
+                  key: ValueKey('text-overlays-$_currentIndex'),
+                  overlays: _currentState.textOverlays,
+                  onChanged: _moveOverlay,
+                  onEdit: _editText,
+                  mediaSize: _mediaPixelSize,
+                  fit: BoxFit.cover,
+                ),
+              ),
             Positioned.fill(
               child: Stack(
                 clipBehavior: Clip.none,

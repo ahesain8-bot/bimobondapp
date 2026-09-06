@@ -33,8 +33,52 @@ class LiveBattle extends Equatable {
   final DateTime? endTime;
   final String? winnerLiveId;
 
-  bool get isActive => status.toUpperCase() == 'ACTIVE';
-  bool get isFinished => status.toUpperCase() == 'FINISHED';
+  bool get isActive {
+    final s = status.toUpperCase();
+    if (s == 'FINISHED' || s == 'ENDED' || s == 'CANCELLED') return false;
+    if (_isTerminalPhase(phase)) return false;
+    return s == 'ACTIVE';
+  }
+
+  bool get isFinished {
+    final s = status.toUpperCase();
+    return s == 'FINISHED' ||
+        s == 'ENDED' ||
+        s == 'CANCELLED' ||
+        _isTerminalPhase(phase);
+  }
+
+  static bool _isTerminalPhase(String phase) {
+    switch (phase.toUpperCase()) {
+      case 'RESULT':
+      case 'RESULTS':
+      case 'ENDED':
+      case 'FINISHED':
+      case 'VICTORY_LAP':
+      case 'VICTORY':
+      case 'DEFEAT':
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  /// Marks a snapshot as finished when the socket/API only signals end via
+  /// [type] or a terminal [phase] without a FINISHED status.
+  LiveBattle normalizedForUpdate({String? updateType}) {
+    final type = (updateType ?? '').toLowerCase();
+    final typeSaysEnded =
+        type.contains('finish') ||
+        type == 'ended' ||
+        type == 'end' ||
+        type == 'result' ||
+        type == 'results';
+    if (typeSaysEnded || _isTerminalPhase(phase)) {
+      if (status.toUpperCase() == 'FINISHED') return this;
+      return copyWith(status: 'FINISHED');
+    }
+    return this;
+  }
 
   String opponentLiveId(String currentLiveId) =>
       live1Id == currentLiveId ? live2Id : live1Id;
@@ -69,7 +113,7 @@ class LiveBattle extends Equatable {
       startTime: _date(source['startTime']),
       endTime: _date(source['endTime']),
       winnerLiveId: source['winnerLiveId']?.toString(),
-    );
+    ).normalizedForUpdate();
   }
 
   LiveBattle copyWith({
@@ -100,14 +144,28 @@ class LiveBattle extends Equatable {
   }
 
   /// Keeps timing fields that partial multiplier/end responses omit.
-  LiveBattle withTimingFrom(LiveBattle? previous) {
-    if (previous == null || previous.id != id) return this;
-    return copyWith(
-      status: status.isEmpty ? previous.status : status,
-      startTime: startTime ?? previous.startTime,
-      endTime: endTime ?? previous.endTime,
-      multiplierEndsAt: multiplierEndsAt ?? previous.multiplierEndsAt,
-    );
+  ///
+  /// Never resurrects a finished battle from a score tick that omitted
+  /// `status`, and never keeps ACTIVE when the new phase/type says ended.
+  LiveBattle withTimingFrom(LiveBattle? previous, {String? updateType}) {
+    final incoming = normalizedForUpdate(updateType: updateType);
+    if (previous == null || previous.id != incoming.id) return incoming;
+
+    // Finished snapshots win over partial ACTIVE leftovers.
+    if (incoming.isFinished) return incoming;
+    if (previous.isFinished && incoming.status.isEmpty) {
+      return previous.normalizedForUpdate();
+    }
+
+    return incoming
+        .copyWith(
+          status: incoming.status.isEmpty ? previous.status : incoming.status,
+          startTime: incoming.startTime ?? previous.startTime,
+          endTime: incoming.endTime ?? previous.endTime,
+          multiplierEndsAt:
+              incoming.multiplierEndsAt ?? previous.multiplierEndsAt,
+        )
+        .normalizedForUpdate(updateType: updateType);
   }
 
   @override
@@ -145,22 +203,49 @@ class LiveBattleOpponent extends Equatable {
   final int viewers;
 
   factory LiveBattleOpponent.fromJson(Map<String, dynamic> json) {
-    final live = _map(json['live']) ?? json;
-    final user = _map(live['user']) ?? _map(live['host']) ?? const {};
+    // Prefer a nested `live` only when it actually carries an id. An empty
+    // `{}` wrapper used to steal the flat payload and drop every opponent.
+    final nested = _map(json['live']);
+    final nestedId = nested == null
+        ? null
+        : (nested['id'] ?? nested['liveId'])?.toString();
+    final live = (nested != null && nestedId != null && nestedId.isNotEmpty)
+        ? nested
+        : json;
+    final user =
+        _map(live['user']) ??
+        _map(live['host']) ??
+        _map(json['user']) ??
+        _map(json['host']) ??
+        const {};
     final fullName = user['fullName']?.toString().trim();
     final username = user['username']?.toString().trim();
+    final liveId =
+        live['id']?.toString() ??
+        live['liveId']?.toString() ??
+        json['id']?.toString() ??
+        json['liveId']?.toString() ??
+        json['opponentLiveId']?.toString() ??
+        '';
     return LiveBattleOpponent(
-      liveId: live['id']?.toString() ?? '',
-      title: live['title']?.toString() ?? 'بث مباشر',
-      hostId: user['id']?.toString() ?? live['userId']?.toString() ?? '',
+      liveId: liveId,
+      title: live['title']?.toString() ?? json['title']?.toString() ?? 'بث مباشر',
+      hostId:
+          user['id']?.toString() ??
+          live['userId']?.toString() ??
+          json['userId']?.toString() ??
+          '',
       hostName: fullName?.isNotEmpty == true
           ? fullName!
           : (username?.isNotEmpty == true ? username! : 'مضيف'),
       hostAvatar:
           user['avatarUrl']?.toString() ??
           user['profilePicture']?.toString() ??
-          live['coverUrl']?.toString(),
-      viewers: _integer(live['viewers'] ?? live['viewerCount']),
+          live['coverUrl']?.toString() ??
+          json['coverUrl']?.toString(),
+      viewers: _integer(
+        live['viewers'] ?? live['viewerCount'] ?? json['viewers'],
+      ),
     );
   }
 

@@ -69,6 +69,7 @@ class ArCameraPlatformView(
     }
 
     init {
+        ArCameraDiagnostics.configure(context)
         ArCameraBridge.faceOverlay = faceOverlay
         ArCameraBridge.previewView = previewView
         ArCameraBridge.warpGlView = warpGlView
@@ -126,6 +127,13 @@ class ArCameraPlatformView(
         try {
             ArCameraBridge.ensureVideoHelper()?.release()
         } catch (_: Throwable) {
+        }
+        if (ArLiveBeautyPublisher.isLivePublishingExclusive()) {
+            android.util.Log.w(
+                "ArCameraLifecycle",
+                "PlatformView.dispose skipped stop/clear — live beauty publish owns CameraX",
+            )
+            return
         }
         ArCameraController.stop()
         ArCameraBridge.clear()

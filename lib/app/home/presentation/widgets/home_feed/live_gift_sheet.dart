@@ -16,7 +16,7 @@ import 'package:bimobondapp/app/auctions/presentation/di/auctions_injector.dart'
     as auctions_di;
 import 'package:bimobondapp/app/gifts/presentation/utils/gift_accent_color.dart';
 import 'package:bimobondapp/app/gifts/presentation/utils/gift_catalog_audio_preview.dart';
-import 'package:bimobondapp/app/gifts/presentation/utils/gift_lottie_cache.dart';
+import 'package:bimobondapp/app/gifts/presentation/utils/gift_media_cache.dart';
 import 'package:bimobondapp/app/gifts/presentation/widgets/gift_vinyl_record_icon.dart';
 import 'package:bimobondapp/core/constants/live_details_layout_constants.dart';
 import 'package:bimobondapp/core/usecases/usecase.dart';
@@ -224,9 +224,7 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
           _loading = false;
           _loadError = null;
         });
-        GiftLottieCache.instance.prefetch(
-          _catalog.map((gift) => gift.animationUrl),
-        );
+        GiftMediaCache.instance.prefetchCatalog(_catalog);
       },
     );
   }
@@ -266,9 +264,7 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
           _loading = false;
           _loadError = gifts.isEmpty ? groupsError : null;
         });
-        GiftLottieCache.instance.prefetch(
-          gifts.map((gift) => gift.animationUrl),
-        );
+        GiftMediaCache.instance.prefetchCatalog(gifts);
       },
     );
   }
@@ -282,9 +278,7 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
       _applyGroupCatalog(index);
       _selectedIndex = null;
     });
-    GiftLottieCache.instance.prefetch(
-      _catalog.map((gift) => gift.animationUrl),
-    );
+    GiftMediaCache.instance.prefetchCatalog(_catalog);
   }
 
   GiftEntity? get _selectedGift {
@@ -780,7 +774,10 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
               ? null
               : () {
                   setState(() => _selectedIndex = index);
-                  GiftLottieCache.instance.prefetch([gift.animationUrl]);
+                  GiftMediaCache.instance.prefetchGiftUrls(
+                    animationUrl: gift.animationUrl,
+                    thumbnailUrl: gift.thumbnailUrl ?? gift.imageUrl,
+                  );
                   if (gift.isAudioGift) {
                     if (_giftAudioPreview.isActiveGift(gift.id)) {
                       unawaited(_giftAudioPreview.toggleGift(gift));

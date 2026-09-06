@@ -35,6 +35,8 @@ abstract class LiveKitService {
     required String roomName,
     String? mockStreamUrl,
     LiveMediaHints? mediaHints,
+    /// When recovering the primary room mid-PK, keep the opponent room.
+    bool keepBattleRoom = false,
   });
 
   Future<void> disconnect();
@@ -187,6 +189,7 @@ class FakeLiveKitService implements LiveKitService {
     required String roomName,
     String? mockStreamUrl,
     LiveMediaHints? mediaHints,
+    bool keepBattleRoom = false,
   }) async {
     _url = url;
     _token = token;

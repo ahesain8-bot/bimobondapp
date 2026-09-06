@@ -119,7 +119,10 @@ class LiveHudHourlyRankEvent extends LiveHudEvent {
 /// avatar row in the header of a plain live. Carries the whole ordered list;
 /// the stage takes the first three (mobile-api.md §19).
 class LiveHudTopGiftersEvent extends LiveHudEvent {
-  const LiveHudTopGiftersEvent({required this.liveId, required this.avatarUrls});
+  const LiveHudTopGiftersEvent({
+    required this.liveId,
+    required this.avatarUrls,
+  });
   final String liveId;
   final List<String> avatarUrls;
 }
@@ -427,6 +430,7 @@ abstract class LiveSessionRepository {
     int maxAttempts = 3,
     Future<void> Function()? beforeVideoCapture,
     LiveMediaHints? mediaHints,
+    bool useArBeautyCamera = false,
   });
 
   /// Viewer subscribe-only LiveKit connect.
@@ -443,6 +447,17 @@ abstract class LiveSessionRepository {
   /// Flip LiveKit camera (front/back).
   Future<void> flipMediaCamera({required bool useFront});
 
+  /// Pause / resume outbound stall watchdog around camera flip.
+  void pauseOutboundMediaHealthCheck();
+
+  void resumeOutboundMediaHealthCheck();
+
+  /// Mute outbound camera to the SFU while the lens rebinds (viewer keeps
+  /// last good frame instead of decoding corrupt YUV).
+  Future<void> muteOutboundVideoForCameraFlip();
+
+  Future<void> unmuteOutboundVideoAfterCameraFlip();
+
   /// Opaque local LiveKit video track for UI preview (`LocalVideoTrack`).
   Object? get localPreviewTrack;
 
@@ -451,6 +466,9 @@ abstract class LiveSessionRepository {
   Object? get mediaRoom;
 
   Object? get battleMediaRoom;
+
+  /// True while the PK opponent LiveKit room is connected and usable.
+  bool get isBattleRoomUsable;
 
   /// Whether LiveKit host/guest publish is active (video published).
   bool get isMediaConnected;

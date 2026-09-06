@@ -1,80 +1,134 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
-import '../../../../../core/utils/app_assets.dart';
 import '../../../../../core/utils/app_colors.dart';
 import '../../../../../core/utils/app_sizes.dart';
 import '../../../../../core/utils/app_text_styles.dart';
 import '../../../domain/entities/live_host.dart';
-import 'live_room_pill.dart';
 
-/// Host profile: avatar + name + mini counter under the name.
+/// Host profile capsule — TikTok style:
+/// `[avatar · name · ♥ hearts]  [peach ♥ likes]`
 class LiveRoomProfilePill extends StatelessWidget {
   const LiveRoomProfilePill({
     super.key,
     required this.host,
     this.followerCount = 0,
+    this.likeCount = 0,
   });
 
   final LiveHost host;
+
+  /// Profile heart total (`hostHeartCount`) under the name.
   final int followerCount;
+
+  /// Live session like taps — shown in the nested light chip.
+  final int likeCount;
+
+  static const Color _outerFill = Color(0x99202028);
+  static const Color _likesChipFill = Color(0xE8F0E8F5);
+  static const Color _likesChipText = Color(0xFF5C2D6B);
+  static const Color _peachHeart = Color(0xFFFF8A65);
 
   @override
   Widget build(BuildContext context) {
     final hostName = host.displayName.trim();
-    final nameMaxWidth = (MediaQuery.sizeOf(context).width * 0.28)
-        .clamp(86.0, 132.0)
-        .toDouble();
-    return LiveRoomPill(
-      height: 42,
-      padding: const EdgeInsetsDirectional.only(start: 4, end: 10),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _HostAvatar(host: host),
-          const SizedBox(width: 7),
-          Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: nameMaxWidth),
-                child: Text(
-                  hostName,
-                  style: AppTextStyles.roomHostName.copyWith(
-                    fontSize: 12.5,
-                    height: 1.1,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.right,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Row(
-                mainAxisSize: MainAxisSize.min,
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        height: 40,
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.sizeOf(context).width * 0.58,
+        ),
+        padding: const EdgeInsets.fromLTRB(3, 3, 4, 3),
+        decoration: BoxDecoration(
+          color: _outerFill,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _HostAvatar(host: host),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  SvgPicture.asset(
-                    AppAssets.roomHeart,
-                    width: 10,
-                    height: 9,
-                    colorFilter: const ColorFilter.mode(
-                      Colors.white70,
-                      BlendMode.srcIn,
+                  Text(
+                    hostName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.roomHostName.copyWith(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      height: 1.1,
+                      color: Colors.white,
                     ),
                   ),
-                  const SizedBox(width: 3),
-                  Text(
-                    '$followerCount',
-                    style: AppTextStyles.roomCounter.copyWith(
-                      fontSize: 10,
-                      color: Colors.white70,
-                      fontWeight: FontWeight.w500,
-                    ),
+                  const SizedBox(height: 2),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.favorite,
+                        size: 9,
+                        color: Colors.white.withValues(alpha: 0.85),
+                      ),
+                      const SizedBox(width: 3),
+                      Text(
+                        '$followerCount',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: Colors.white.withValues(alpha: 0.85),
+                          fontWeight: FontWeight.w500,
+                          height: 1,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ],
+            ),
+            const SizedBox(width: 6),
+            _LikesChip(likeCount: likeCount),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LikesChip extends StatelessWidget {
+  const _LikesChip({required this.likeCount});
+
+  final int likeCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 28,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(
+        color: LiveRoomProfilePill._likesChipFill,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.favorite,
+            size: 14,
+            color: LiveRoomProfilePill._peachHeart,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            '$likeCount',
+            style: const TextStyle(
+              color: LiveRoomProfilePill._likesChipText,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              height: 1,
+            ),
           ),
         ],
       ),
@@ -90,13 +144,13 @@ class _HostAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: AppSizes.roomAvatar,
-      height: AppSizes.roomAvatar,
+      width: 34,
+      height: 34,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.9),
-          width: 1.2,
+          color: Colors.white.withValues(alpha: 0.85),
+          width: 1,
         ),
         gradient: const LinearGradient(
           begin: Alignment.topCenter,
@@ -114,7 +168,8 @@ class _HostAvatar extends StatelessWidget {
   }
 }
 
-/// Orange heart likes chip that sits beside the profile pill.
+/// Standalone likes chip (legacy); prefer the nested chip inside
+/// [LiveRoomProfilePill].
 class LiveRoomLikesPill extends StatelessWidget {
   const LiveRoomLikesPill({super.key, required this.likeCount});
 
@@ -126,21 +181,21 @@ class LiveRoomLikesPill extends StatelessWidget {
       height: 28,
       padding: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
-        color: const Color(0xA6000000),
+        color: const Color(0xE8F0E8F5),
         borderRadius: BorderRadius.circular(AppSizes.radiusPill),
-        border: Border.all(
-          color: const Color(0xFFFF2D55).withValues(alpha: 0.78),
-          width: 1.0,
-        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          SvgPicture.asset(AppAssets.roomHeart, width: 14, height: 13),
+          const Icon(Icons.favorite, size: 14, color: Color(0xFFFF8A65)),
           const SizedBox(width: 4),
           Text(
             '$likeCount',
-            style: AppTextStyles.roomCounter.copyWith(fontSize: 12),
+            style: AppTextStyles.roomCounter.copyWith(
+              fontSize: 12,
+              color: const Color(0xFF5C2D6B),
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ],
       ),

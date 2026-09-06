@@ -1,14 +1,19 @@
 import 'dart:async';
 
+import 'package:bimobondapp/core/utils/app_media_cache_manager.dart';
 import 'package:bimobondapp/core/utils/media_utils.dart';
 import 'package:lottie/lottie.dart';
 
 /// In-memory preload cache for gift Lottie animations (faster send/replay).
 ///
 /// Supports classic `.json` Lottie and `.lottie` (dotLottie zip) archives.
+/// Prefers disk bytes from [AppMediaCacheManager] so live gift spam does not
+/// re-download and re-decode the same composition until OOM.
 class GiftLottieCache {
   GiftLottieCache._() {
-    Lottie.cache.maximumSize = 40;
+    // Keep memory modest — compositions are large and live already holds
+    // LiveKit / AR textures. Disk cache covers cold reloads.
+    Lottie.cache.maximumSize = 24;
   }
 
   static final GiftLottieCache instance = GiftLottieCache._();
@@ -34,11 +39,11 @@ class GiftLottieCache {
         lower.endsWith('.gif')) {
       return false;
     }
+    // Only real Lottie payloads — `/gifts/` / `animation` alone pulled in MP4
+    // posters and burned memory during live gift spam.
     return lower.endsWith('.json') ||
         lower.endsWith('.lottie') ||
-        lower.contains('lottie') ||
-        lower.contains('/gifts/') ||
-        lower.contains('animation');
+        lower.contains('lottie');
   }
 
   static bool looksLikeVideoUrl(String url) {
@@ -91,13 +96,19 @@ class GiftLottieCache {
 
     return _loads.putIfAbsent(resolved, () async {
       try {
+        final fromDisk = await _loadFromDisk(resolved);
+        if (fromDisk != null) return fromDisk;
+
         // Always use giftDecoder so `.lottie` archives pick the real animation
         // JSON (not manifest.json). Plain `.json` still works via fallback.
-        return await NetworkLottie(
+        final composition = await NetworkLottie(
           resolved,
           backgroundLoading: true,
           decoder: giftDecoder,
         ).load();
+        // Pin bytes on disk for the next receive without another network hit.
+        unawaited(AppMediaCacheManager.instance.downloadFile(resolved));
+        return composition;
       } catch (_) {
         _loads.remove(resolved);
         return null;
@@ -105,13 +116,47 @@ class GiftLottieCache {
     });
   }
 
+  Future<LottieComposition?> _loadFromDisk(String resolved) async {
+    try {
+      final cached =
+          await AppMediaCacheManager.instance.getFileFromCache(resolved);
+      final file = cached?.file;
+      if (file == null || !await file.exists()) return null;
+      final bytes = await file.readAsBytes();
+      if (bytes.isEmpty) return null;
+      final decoded = await giftDecoder(bytes);
+      if (decoded != null) return decoded;
+      return await LottieComposition.fromBytes(bytes);
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Warm cache when the gift catalog / sheet opens.
-  void prefetch(Iterable<String?> urls) {
+  ///
+  /// Caps how many URLs are kicked off at once so opening the sheet mid-live
+  /// does not decode dozens of compositions on the UI isolate.
+  void prefetch(Iterable<String?> urls, {int limit = 8}) {
+    var started = 0;
     for (final url in urls) {
+      if (started >= limit) break;
       final value = url?.trim();
       if (value == null || value.isEmpty) continue;
       if (!looksLikeLottieUrl(value)) continue;
+      _evictIfNeeded();
       unawaited(load(value));
+      started++;
+    }
+  }
+
+  static const int _maxTrackedLoads = 24;
+
+  void _evictIfNeeded() {
+    if (_loads.length < _maxTrackedLoads) return;
+    final overflow = _loads.length - (_maxTrackedLoads ~/ 2);
+    final keys = _loads.keys.take(overflow).toList(growable: false);
+    for (final key in keys) {
+      _loads.remove(key);
     }
   }
 }

@@ -107,6 +107,9 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
   Object? get battleMediaRoom => _media.battleRoom;
 
   @override
+  bool get isBattleRoomUsable => _media.isBattleRoomUsable;
+
+  @override
   Future<LiveSession> startHostSession({required String title}) async {
     final trimmed = title.trim().isEmpty ? 'بث مباشر' : title.trim();
     try {
@@ -502,18 +505,78 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
     String liveId, {
     int limit = 20,
   }) async {
-    final json = await _remote.battleOpponents(liveId, limit: limit);
-    final raw = json['data'] ?? json['items'] ?? json['opponents'];
-    if (raw is! List) return const [];
-    return raw
-        .whereType<Map>()
-        .map(
-          (item) =>
-              LiveBattleOpponent.fromJson(Map<String, dynamic>.from(item)),
-        )
-        .where((item) => item.liveId.isNotEmpty && item.liveId != liveId)
-        .toList(growable: false);
+    // Primary: host-only suggest list. When it is empty or unusable, fall
+    // back to the public LIVE feed so other open broadcasts still show up
+    // in "بدء منافسة" (common while testing / if opponents ranking lags).
+    var opponents = await _opponentsFromPayload(
+      () => _remote.battleOpponents(liveId, limit: limit),
+      excludeLiveId: liveId,
+      liveOnly: false,
+    );
+    if (opponents.isEmpty) {
+      opponents = await _opponentsFromPayload(
+        () => _remote.feed(page: 1, limit: limit),
+        excludeLiveId: liveId,
+        liveOnly: true,
+      );
+    }
+    return opponents;
   }
+
+  Future<List<LiveBattleOpponent>> _opponentsFromPayload(
+    Future<Map<String, dynamic>> Function() load, {
+    required String excludeLiveId,
+    required bool liveOnly,
+  }) async {
+    try {
+      final json = await load();
+      final raw = _opponentListRaw(json);
+      if (raw == null) return const [];
+      final seen = <String>{};
+      final out = <LiveBattleOpponent>[];
+      for (final item in raw) {
+        if (item is! Map) continue;
+        final map = Map<String, dynamic>.from(item);
+        if (liveOnly) {
+          final status = (map['status'] ?? _mapValue(map['live'])?['status'])
+              ?.toString()
+              .toUpperCase();
+          if (status != null &&
+              status.isNotEmpty &&
+              status != 'LIVE' &&
+              status != 'LIVE_NOW') {
+            continue;
+          }
+        }
+        final opponent = LiveBattleOpponent.fromJson(map);
+        if (opponent.liveId.isEmpty || opponent.liveId == excludeLiveId) {
+          continue;
+        }
+        if (!seen.add(opponent.liveId)) continue;
+        out.add(opponent);
+      }
+      return out;
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  List<dynamic>? _opponentListRaw(Map<String, dynamic> json) {
+    final direct = json['data'] ?? json['items'] ?? json['opponents'] ?? json['lives'];
+    if (direct is List) return direct;
+    if (direct is Map) {
+      final nested =
+          direct['data'] ??
+          direct['items'] ??
+          direct['opponents'] ??
+          direct['lives'];
+      if (nested is List) return nested;
+    }
+    return null;
+  }
+
+  Map<String, dynamic>? _mapValue(Object? value) =>
+      value is Map ? Map<String, dynamic>.from(value) : null;
 
   LiveBattle _battleFrom(Map<String, dynamic> json) {
     final raw = json['battle'] ?? json['data'];
@@ -620,25 +683,65 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
     // already the head of.
     await _disconnectBattleOpponentMedia();
     if (generation != _battleMediaGeneration) return;
-    final json = await _remote.join(opponentLiveId);
-    if (generation != _battleMediaGeneration) return;
-    final data = json['data'];
-    final source = data is Map ? Map<String, dynamic>.from(data) : json;
-    final token = source['token']?.toString() ?? '';
-    final url =
-        source['url']?.toString() ?? source['livekitUrl']?.toString() ?? '';
-    if (generation != _battleMediaGeneration) return;
-    await _media.connectBattleAndSubscribe(
-      url: url,
-      token: token,
-      mediaHints: LiveMediaHints.fromPayload(source, fallbackRole: 'viewer'),
-    );
-    if (generation != _battleMediaGeneration) {
-      // A newer connect/disconnect is already queued behind this serialized
-      // operation and owns the next room teardown.
-      return;
+
+    Object? lastError;
+    for (var attempt = 1; attempt <= 2; attempt++) {
+      if (generation != _battleMediaGeneration) return;
+      try {
+        final json = await _remote.join(opponentLiveId);
+        if (generation != _battleMediaGeneration) return;
+        final creds = _liveKitJoinCredentials(json);
+        if (creds.url.isEmpty || creds.token.isEmpty) {
+          throw StateError(
+            'Opponent LiveKit url/token missing from join response',
+          );
+        }
+        await _media.connectBattleAndSubscribe(
+          url: creds.url,
+          token: creds.token,
+          mediaHints: LiveMediaHints.fromPayload(
+            creds.source,
+            fallbackRole: 'viewer',
+          ),
+        );
+        if (generation != _battleMediaGeneration) {
+          return;
+        }
+        if (!_media.isBattleRoomUsable) {
+          throw StateError('Battle opponent room not connected after join');
+        }
+        _battleOpponentLiveId = opponentLiveId;
+        return;
+      } catch (e, st) {
+        lastError = e;
+        debugPrint(
+          '[Host] battle opponent media connect attempt $attempt failed: $e\n$st',
+        );
+        if (attempt >= 2 || generation != _battleMediaGeneration) break;
+        await Future<void>.delayed(const Duration(milliseconds: 400));
+      }
     }
-    _battleOpponentLiveId = opponentLiveId;
+    throw lastError ?? StateError('Battle opponent media connect failed');
+  }
+
+  /// Join payloads vary: top-level, nested `data`, or camelCase LiveKit keys.
+  ({String url, String token, Map<String, dynamic> source})
+  _liveKitJoinCredentials(Map<String, dynamic> json) {
+    final nested = json['data'];
+    final source = nested is Map
+        ? Map<String, dynamic>.from(nested)
+        : Map<String, dynamic>.from(json);
+    final token =
+        source['token']?.toString() ??
+        source['liveKitToken']?.toString() ??
+        source['livekitToken']?.toString() ??
+        '';
+    final url =
+        source['url']?.toString() ??
+        source['liveKitUrl']?.toString() ??
+        source['livekitUrl']?.toString() ??
+        '';
+    return (url: url, token: token, source: source);
   }
 
   @override
@@ -756,6 +859,7 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
     int maxAttempts = 3,
     Future<void> Function()? beforeVideoCapture,
     LiveMediaHints? mediaHints,
+    bool useArBeautyCamera = false,
   }) => _media.connectAndPublish(
     url: url,
     token: token,
@@ -763,6 +867,7 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
     cameraPosition: useFrontCamera ? CameraPosition.front : CameraPosition.back,
     beforeVideoCapture: beforeVideoCapture,
     mediaHints: mediaHints,
+    useArBeautyCamera: useArBeautyCamera,
   );
 
   @override
@@ -790,6 +895,20 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
   Future<void> flipMediaCamera({required bool useFront}) async {
     await _media.flipCamera(useFront: useFront);
   }
+
+  @override
+  void pauseOutboundMediaHealthCheck() => _media.pauseOutboundHealthCheck();
+
+  @override
+  void resumeOutboundMediaHealthCheck() => _media.resumeOutboundHealthCheck();
+
+  @override
+  Future<void> muteOutboundVideoForCameraFlip() =>
+      _media.muteOutboundVideoForCameraFlip();
+
+  @override
+  Future<void> unmuteOutboundVideoAfterCameraFlip() =>
+      _media.unmuteOutboundVideoAfterCameraFlip();
 
   int? _asInt(dynamic value) {
     if (value == null) return null;
