@@ -42,8 +42,12 @@ import GoogleMaps
                       }
                   }
               case "flipCamera":
-                  ArCameraController.shared.flipCamera { isFront in
-                      result(isFront)
+                  ArCameraController.shared.flipCamera { ok in
+                      if ok {
+                          result(ArCameraController.shared.isFrontCamera)
+                      } else {
+                          result(FlutterError(code: "flip_failed", message: "cannot_flip", details: nil))
+                      }
                   }
               default:
                   result(FlutterMethodNotImplemented)
