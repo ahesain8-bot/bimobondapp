@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart' as fb;
 
+import '../../../../core/constants/live_traffic_source.dart';
 import '../../../../core/network/api_endpoints.dart';
 import '../../../../core/network/live_api_client.dart';
 import '../../../../core/models/live_media_hints.dart';
@@ -40,6 +41,7 @@ class HttpLiveRemoteDataSource implements LiveRemoteDataSource {
     int limit = 10,
     String? category,
     bool followingOnly = false,
+    String? topic,
   }) async {
     final payload = await _api.get(
       ApiEndpoints.livesFeed,
@@ -49,6 +51,62 @@ class HttpLiveRemoteDataSource implements LiveRemoteDataSource {
         'limit': '$limit',
         if (followingOnly) 'followingOnly': 'true',
         if (category != null && category.isNotEmpty) 'categoryId': category,
+        if (topic != null && topic.trim().isNotEmpty) 'topic': topic.trim(),
+      },
+    );
+    return LiveMapper.pageFromPayload(
+      payload,
+      requestedPage: page,
+      requestedLimit: limit,
+    );
+  }
+
+  @override
+  Future<LiveFeedPageResult> getNearbyFeed({
+    int page = 1,
+    int limit = 10,
+    required double latitude,
+    required double longitude,
+    int? radiusKm,
+  }) async {
+    if (!latitude.isFinite ||
+        !longitude.isFinite ||
+        latitude.abs() > 90 ||
+        longitude.abs() > 180) {
+      throw ArgumentError('Nearby needs valid coordinates');
+    }
+    final payload = await _api.get(
+      ApiEndpoints.livesNearby,
+      auth: true,
+      query: {
+        'page': '$page',
+        'limit': '$limit',
+        'latitude': '$latitude',
+        'longitude': '$longitude',
+        // Documented default 50, max 150. The server still decides.
+        if (radiusKm != null) 'radiusKm': '${radiusKm.clamp(1, 150)}',
+      },
+    );
+    return LiveMapper.pageFromPayload(
+      payload,
+      requestedPage: page,
+      requestedLimit: limit,
+    );
+  }
+
+  @override
+  Future<LiveFeedPageResult> getAudioFeed({
+    int page = 1,
+    int limit = 10,
+    String? topic,
+  }) async {
+    final payload = await _api.get(
+      ApiEndpoints.livesAudio,
+      auth: true,
+      query: {
+        'page': '$page',
+        'limit': '$limit',
+        if (topic != null && topic.trim().isNotEmpty) 'topic': topic.trim(),
       },
     );
     return LiveMapper.pageFromPayload(
@@ -73,14 +131,24 @@ class HttpLiveRemoteDataSource implements LiveRemoteDataSource {
   }
 
   @override
-  Future<JoinLiveResult> joinLive(String liveId, {String? campaignId}) async {
+  Future<JoinLiveResult> joinLive(
+    String liveId, {
+    String? campaignId,
+    String? trafficSource,
+  }) async {
     // POST /lives/:id/join → { live, token, url, role, guest }
     final attribution = campaignId?.trim();
+    final bucket = LiveTrafficSource.normalise(trafficSource);
+    final body = <String, dynamic>{
+      if (attribution != null && attribution.isNotEmpty)
+        'campaignId': attribution,
+      // Omitted with a campaignId means PROMOTE on the server, so a promoted
+      // open sends no bucket of its own unless the caller named one.
+      'trafficSource': ?bucket,
+    };
     final payload = await _api.post(
       ApiEndpoints.liveJoin(liveId),
-      body: attribution != null && attribution.isNotEmpty
-          ? <String, dynamic>{'campaignId': attribution}
-          : null,
+      body: body.isEmpty ? null : body,
     );
 
     final nestedLive = payload['live'];

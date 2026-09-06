@@ -13,6 +13,10 @@ class LiveLeaderboardEntry {
     this.userId,
     this.displayName,
     this.avatarUrl,
+    this.isPopular,
+    this.popularReason,
+    this.hostLeagueTier,
+    this.gifterLevel,
   });
 
   final int? rank;
@@ -25,4 +29,15 @@ class LiveLeaderboardEntry {
   final String? userId;
   final String? displayName;
   final String? avatarUrl;
+
+  /// Popular badge exactly as the server reported it. Never derived from
+  /// viewer counts on the client.
+  final bool? isPopular;
+  final String? popularReason;
+
+  /// Host league tier (`GET /lives/leaderboard/hourly` → `live.user`).
+  final String? hostLeagueTier;
+
+  /// Gifter level (`GET /lives/:id/leaderboard/gifters` → `user`).
+  final int? gifterLevel;
 }

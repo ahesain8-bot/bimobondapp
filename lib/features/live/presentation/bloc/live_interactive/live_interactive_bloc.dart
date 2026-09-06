@@ -50,6 +50,14 @@ class LiveInteractiveBloc
   final LiveInteractiveRepository _repository;
   StreamSubscription<Object>? _socketSub;
 
+  /// Polls this room has already seen end. A late `livePollUpdated` must not
+  /// put one of them back on screen.
+  final Set<String> _endedPolls = {};
+
+  /// Claims already sent, keyed by box id, so a double tap or a second screen
+  /// cannot send the same coin claim twice.
+  final Set<String> _claimsInFlight = {};
+
   String get _liveId => state.liveId ?? '';
 
   Future<void> _onStarted(
@@ -57,7 +65,13 @@ class LiveInteractiveBloc
     Emitter<LiveInteractiveState> emit,
   ) async {
     if (event.liveId.isEmpty) return;
-    emit(LiveInteractiveState(liveId: event.liveId, isLoading: true));
+    emit(
+      LiveInteractiveState(
+        liveId: event.liveId,
+        isLoading: true,
+        giftGoal: event.giftGoal,
+      ),
+    );
     try {
       final results = await Future.wait<Object?>([
         _repository.getActivePoll(event.liveId),
@@ -108,11 +122,14 @@ class LiveInteractiveBloc
       return Future.value();
     }
     return _run(emit, () async {
-      await _repository.createGiftGoal(
+      // The POST response is the authoritative goal; dropping it left the bar
+      // empty until the next gift arrived.
+      final goal = await _repository.createGiftGoal(
         liveId: _liveId,
         title: event.title,
         target: event.target,
       );
+      if (!isClosed) emit(state.copyWith(giftGoal: goal));
     });
   }
 
@@ -170,6 +187,7 @@ class LiveInteractiveBloc
     if (poll == null) return Future.value();
     return _run(emit, () async {
       await _repository.endPoll(liveId: _liveId, pollId: poll.id);
+      _endedPolls.add(poll.id);
       emit(state.copyWith(clearPoll: true));
     });
   }
@@ -258,21 +276,30 @@ class LiveInteractiveBloc
     LiveInteractiveTreasureBoxClaimed event,
     Emitter<LiveInteractiveState> emit,
   ) {
+    // Guarded here, not on the button: two screens share this bloc, and bloc
+    // handlers run concurrently, so a second tap would send a second POST.
+    if (!_claimsInFlight.add(event.boxId)) return Future.value();
     return _run(emit, () async {
-      final claim = await _repository.claimTreasureBox(
-        liveId: _liveId,
-        boxId: event.boxId,
-      );
-      emit(
-        state.copyWith(
-          lastClaim: claim,
-          treasureBoxes: _applyClaim(
-            boxId: claim.boxId,
-            claimedCount: claim.claimedCount,
-            remainingCoins: claim.remainingCoins,
+      try {
+        final claim = await _repository.claimTreasureBox(
+          liveId: _liveId,
+          boxId: event.boxId,
+        );
+        emit(
+          state.copyWith(
+            lastClaim: claim,
+            treasureBoxes: _applyClaim(
+              boxId: claim.boxId,
+              claimedCount: claim.claimedCount,
+              remainingCoins: claim.remainingCoins,
+            ),
           ),
-        ),
-      );
+        );
+      } finally {
+        // Released only once the request has settled; a visible failure stays
+        // a user decision to retry, never an automatic resend.
+        _claimsInFlight.remove(event.boxId);
+      }
     });
   }
 
@@ -320,11 +347,32 @@ class LiveInteractiveBloc
     if (state.hasLiveId && payload.liveId != _liveId) return;
     final data = payload.payload;
     switch (payload.event) {
+      case 'liveGiftGoalUpdate':
+        // Server-authoritative: the progress is never added up locally, so one
+        // gift cannot be counted twice by the response and the event together.
+        final goal = LiveInteractiveMapper.giftGoalPatch(data, state.giftGoal);
+        emit(
+          goal == null
+              ? state.copyWith(clearGiftGoal: true)
+              : state.copyWith(giftGoal: goal),
+        );
       case 'livePollUpdated':
         final poll = LiveInteractiveMapper.poll(data);
-        emit(poll.id.isEmpty
-            ? state.copyWith(clearPoll: true)
-            : state.copyWith(poll: poll));
+        if (poll.id.isEmpty) {
+          emit(state.copyWith(clearPoll: true));
+          return;
+        }
+        if (!poll.isActive) {
+          _endedPolls.add(poll.id);
+          // Only the poll on screen can close the poll on screen.
+          if (state.poll?.id != poll.id) return;
+          emit(state.copyWith(poll: poll));
+          return;
+        }
+        // Filtered by poll id: a late event must never revive a poll this
+        // room already saw end.
+        if (_endedPolls.contains(poll.id)) return;
+        emit(state.copyWith(poll: poll));
       case 'liveQAUpdated':
         final question = LiveInteractiveMapper.qa(data);
         if (question.id.isEmpty) return;

@@ -1,5 +1,6 @@
 import 'live_chat_message.dart';
 import 'live_host.dart';
+import 'live_interactive.dart';
 import '../../../../core/models/live_media_hints.dart';
 
 /// Snapshot of an active live broadcasting session (fields from mobile-api.md §5).
@@ -32,6 +33,7 @@ class LiveSession {
     this.mediaHints,
     this.hourlyRank,
     this.totalEarnedCoins = 0,
+    this.giftGoal,
     this.isPopular,
     this.popularReason,
   });
@@ -79,6 +81,9 @@ class LiveSession {
 
   final int? hourlyRank;
   final int totalEarnedCoins;
+
+  /// Gift goal carried by `GET /lives/:id`. Null when the stream has none.
+  final LiveGiftGoal? giftGoal;
   final bool? isPopular;
   final String? popularReason;
 

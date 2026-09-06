@@ -1,5 +1,6 @@
 import '../../domain/entities/live_chat_message.dart';
 import '../../domain/entities/live_host.dart';
+import '../../domain/entities/live_interactive.dart';
 import '../../domain/entities/live_session.dart';
 import '../../../../core/models/live_media_hints.dart';
 
@@ -82,8 +83,21 @@ class LiveSessionMapper {
       mediaHints: mediaHints,
       hourlyRank: hourlyRank,
       totalEarnedCoins: _asInt(live['totalEarnedCoins']) ?? 0,
+      giftGoal: _giftGoalFrom(live),
       isPopular: live['isPopular'] as bool?,
       popularReason: live['popularReason']?.toString(),
+    );
+  }
+
+  /// `giftGoalTarget` is nullable in the schema: no target means no goal.
+  static LiveGiftGoal? _giftGoalFrom(Map<String, dynamic> live) {
+    final target = _asInt(live['giftGoalTarget']);
+    if (target == null || target <= 0) return null;
+    return LiveGiftGoal(
+      id: live['id']?.toString() ?? '',
+      title: live['giftGoalTitle']?.toString(),
+      target: target,
+      current: _asInt(live['giftGoalCurrent']) ?? 0,
     );
   }
 

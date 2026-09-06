@@ -354,6 +354,7 @@ class LivesSocketDataSource {
       'liveTreasureBoxSpawned',
       'liveTreasureBoxClaimed',
       'liveAuction',
+      'liveGiftGoalUpdate',
     ]) {
       _on(socket, eventName, (data) {
         final map = _asMap(data);

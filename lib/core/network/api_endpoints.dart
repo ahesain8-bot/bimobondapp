@@ -105,6 +105,14 @@ class ApiEndpoints {
   static String liveGiftersLeaderboard(String id) =>
       '/lives/$id/leaderboard/gifters';
   static const String livesHourlyLeaderboard = '/lives/leaderboard/hourly';
+  static String liveReplay(String id) => '/lives/$id/replay';
+  static String liveClips(String id) => '/lives/$id/clips';
+  static String liveClipPost(String id, String clipId) =>
+      '/lives/$id/clips/$clipId/post';
+  static const String livesNearby = '/lives/nearby';
+  static const String livesAudio = '/lives/audio';
+  static const String livesLeagues = '/lives/leagues';
+  static String liveHostLeague(String userId) => '/lives/host-league/$userId';
   static String liveViewerMuteChat(String liveId, String userId) =>
       '/lives/$liveId/viewers/$userId/mute-chat';
   static String liveViewerUnmuteChat(String liveId, String userId) =>

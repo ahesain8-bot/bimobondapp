@@ -155,7 +155,9 @@ class LiveMapper {
       case 'BANNED':
         return LiveStatus.banned;
       default:
-        return LiveStatus.live;
+        // An unrecognised status is not proof the room is watchable. Treating
+        // it as LIVE put dead rooms in the active feed and let join run.
+        return LiveStatus.ended;
     }
   }
 

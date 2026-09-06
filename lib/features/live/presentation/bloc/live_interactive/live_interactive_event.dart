@@ -12,12 +12,16 @@ sealed class LiveInteractiveEvent extends Equatable {
 /// Binds the BLoC to [liveId] and loads the current poll, questions, boxes
 /// and auctions.
 class LiveInteractiveStarted extends LiveInteractiveEvent {
-  const LiveInteractiveStarted(this.liveId);
+  const LiveInteractiveStarted(this.liveId, {this.giftGoal});
 
   final String liveId;
 
+  /// Goal already known from the live snapshot, so the bar is correct before
+  /// the first `liveGiftGoalUpdate` arrives.
+  final LiveGiftGoal? giftGoal;
+
   @override
-  List<Object?> get props => [liveId];
+  List<Object?> get props => [liveId, giftGoal];
 }
 
 class LiveInteractiveGiftGoalCreated extends LiveInteractiveEvent {

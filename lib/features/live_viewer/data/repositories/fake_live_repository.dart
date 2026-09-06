@@ -25,12 +25,21 @@ class FakeLiveRepository implements LiveRepository {
   Future<Either<Failure, LiveFeedPageResult>>? _feedInFlight;
   String? _feedInFlightKey;
 
+  /// The surface is part of the key: For You, Following, a category, Nearby
+  /// and Audio are different lists and must never share a cached page.
   String _feedKey({
     required int page,
     required int limit,
     String? category,
     bool followingOnly = false,
-  }) => '$page|$limit|${category ?? ''}|$followingOnly';
+    String surface = 'feed',
+    String? topic,
+    double? latitude,
+    double? longitude,
+    int? radiusKm,
+  }) =>
+      '$surface|$page|$limit|${category ?? ''}|$followingOnly|${topic ?? ''}'
+      '|${latitude ?? ''}|${longitude ?? ''}|${radiusKm ?? ''}';
 
   @override
   Future<Either<Failure, LiveFeedPageResult>> getLiveFeed({
@@ -38,6 +47,7 @@ class FakeLiveRepository implements LiveRepository {
     int limit = 10,
     String? category,
     bool followingOnly = false,
+    String? topic,
     bool forceRefresh = false,
   }) async {
     final key = _feedKey(
@@ -45,6 +55,7 @@ class FakeLiveRepository implements LiveRepository {
       limit: limit,
       category: category,
       followingOnly: followingOnly,
+      topic: topic,
     );
 
     if (!forceRefresh &&
@@ -64,9 +75,14 @@ class FakeLiveRepository implements LiveRepository {
     final future = _fetchLiveFeed(
       page: page,
       limit: limit,
-      category: category,
-      followingOnly: followingOnly,
       cacheKey: key,
+      request: () => _remote.getLiveFeed(
+        page: page,
+        limit: limit,
+        category: category,
+        followingOnly: followingOnly,
+        topic: topic,
+      ),
     );
     _feedInFlight = future;
     _feedInFlightKey = key;
@@ -83,17 +99,11 @@ class FakeLiveRepository implements LiveRepository {
   Future<Either<Failure, LiveFeedPageResult>> _fetchLiveFeed({
     required int page,
     required int limit,
-    String? category,
-    bool followingOnly = false,
     required String cacheKey,
+    required Future<LiveFeedPageResult> Function() request,
   }) async {
     try {
-      final pageResult = await _remote.getLiveFeed(
-        page: page,
-        limit: limit,
-        category: category,
-        followingOnly: followingOnly,
-      );
+      final pageResult = await request();
       final activeLives = pageResult.lives
           .where((l) => l.status == LiveStatus.live)
           .toList();
@@ -163,6 +173,83 @@ class FakeLiveRepository implements LiveRepository {
       );
     } catch (e) {
       return Left(ServerFailure('Failed to fetch live feed: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, LiveFeedPageResult>> getNearbyFeed({
+    int page = 1,
+    int limit = 10,
+    required double latitude,
+    required double longitude,
+    int? radiusKm,
+    bool forceRefresh = false,
+  }) => _surfaceFeed(
+    key: _feedKey(
+      page: page,
+      limit: limit,
+      surface: 'nearby',
+      latitude: latitude,
+      longitude: longitude,
+      radiusKm: radiusKm,
+    ),
+    page: page,
+    limit: limit,
+    forceRefresh: forceRefresh,
+    request: () => _remote.getNearbyFeed(
+      page: page,
+      limit: limit,
+      latitude: latitude,
+      longitude: longitude,
+      radiusKm: radiusKm,
+    ),
+  );
+
+  @override
+  Future<Either<Failure, LiveFeedPageResult>> getAudioFeed({
+    int page = 1,
+    int limit = 10,
+    String? topic,
+    bool forceRefresh = false,
+  }) => _surfaceFeed(
+    key: _feedKey(
+      page: page,
+      limit: limit,
+      surface: 'audio',
+      topic: topic,
+    ),
+    page: page,
+    limit: limit,
+    forceRefresh: forceRefresh,
+    request: () => _remote.getAudioFeed(page: page, limit: limit, topic: topic),
+  );
+
+  /// Shares the in-flight guard with the main feed but never its cached page,
+  /// because the key carries the surface.
+  Future<Either<Failure, LiveFeedPageResult>> _surfaceFeed({
+    required String key,
+    required int page,
+    required int limit,
+    required bool forceRefresh,
+    required Future<LiveFeedPageResult> Function() request,
+  }) async {
+    final existing = _feedInFlight;
+    if (existing != null && _feedInFlightKey == key) return existing;
+    final future = _fetchLiveFeed(
+      page: page,
+      limit: limit,
+      cacheKey: key,
+      request: request,
+    );
+    _feedInFlight = future;
+    _feedInFlightKey = key;
+    try {
+      return await future;
+    } finally {
+      if (identical(_feedInFlight, future)) {
+        _feedInFlight = null;
+        _feedInFlightKey = null;
+      }
     }
   }
 

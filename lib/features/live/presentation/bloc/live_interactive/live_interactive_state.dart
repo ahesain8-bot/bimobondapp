@@ -11,6 +11,7 @@ class LiveInteractiveState extends Equatable {
     this.questions = const [],
     this.treasureBoxes = const [],
     this.auctions = const [],
+    this.giftGoal,
     this.lastClaim,
   });
 
@@ -21,6 +22,9 @@ class LiveInteractiveState extends Equatable {
   final List<LiveQA> questions;
   final List<LiveTreasureBox> treasureBoxes;
   final List<LiveAuction> auctions;
+
+  /// The stream gift goal as the server last reported it. Never computed here.
+  final LiveGiftGoal? giftGoal;
 
   /// Set once after a successful claim so the viewer panel can announce the
   /// reward, then cleared by [LiveInteractiveClaimShown].
@@ -54,6 +58,8 @@ class LiveInteractiveState extends Equatable {
     List<LiveQA>? questions,
     List<LiveTreasureBox>? treasureBoxes,
     List<LiveAuction>? auctions,
+    LiveGiftGoal? giftGoal,
+    bool clearGiftGoal = false,
     LiveTreasureClaim? lastClaim,
     bool clearLastClaim = false,
   }) {
@@ -65,6 +71,7 @@ class LiveInteractiveState extends Equatable {
       questions: questions ?? this.questions,
       treasureBoxes: treasureBoxes ?? this.treasureBoxes,
       auctions: auctions ?? this.auctions,
+      giftGoal: clearGiftGoal ? null : (giftGoal ?? this.giftGoal),
       lastClaim: clearLastClaim ? null : (lastClaim ?? this.lastClaim),
     );
   }
@@ -78,6 +85,7 @@ class LiveInteractiveState extends Equatable {
     questions,
     treasureBoxes,
     auctions,
+    giftGoal,
     lastClaim,
   ];
 }

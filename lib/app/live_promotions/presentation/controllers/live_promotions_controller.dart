@@ -62,6 +62,7 @@ class LivePromotionsState {
     bool clearPreview = false,
     bool clearWallet = false,
     bool clearStats = false,
+    bool clearEligibility = false,
   }) => LivePromotionsState(
     loading: loading ?? this.loading,
     loadingMore: loadingMore ?? this.loadingMore,
@@ -77,7 +78,7 @@ class LivePromotionsState {
     preview: clearPreview ? null : preview ?? this.preview,
     stats: clearStats ? null : stats ?? this.stats,
     balanceCoins: clearWallet ? null : balanceCoins ?? this.balanceCoins,
-    eligibility: eligibility ?? this.eligibility,
+    eligibility: clearEligibility ? null : eligibility ?? this.eligibility,
     error: clearError ? null : error ?? this.error,
     previewError: clearPreview ? null : previewError,
   );
@@ -93,7 +94,7 @@ class LivePromotionsController extends Cubit<LivePromotionsState> {
   final Future<int> Function() refreshWallet;
   final Future<LivePromotionEligibility> Function(String)? refreshEligibility;
   String? _liveId;
-  int _page = 1, _previewVersion = 0;
+  int _page = 1, _previewVersion = 0, _listGeneration = 0;
   Timer? _previewTimer, _cleanupTimer;
   bool _background = false;
   bool get responseContractVerified => repository.responseContractVerified;
@@ -112,6 +113,9 @@ class LivePromotionsController extends Cubit<LivePromotionsState> {
 
   Future<void> _eligibility() async {
     if (_liveId != null && refreshEligibility != null) {
+      // Mirrors _wallet: a failed re-check must not leave the previous verdict
+      // on screen, because it describes a context we can no longer confirm.
+      _set(state.copyWith(clearEligibility: true));
       setEligibility(await refreshEligibility!(_liveId!));
     }
   }
@@ -123,6 +127,8 @@ class LivePromotionsController extends Cubit<LivePromotionsState> {
 
   Future<void> refresh() async {
     if (state.loading || state.mutating || isClosed) return;
+    // Reloading the list retires any page request still in flight.
+    _listGeneration++;
     _set(state.copyWith(loading: true, clearError: true));
     // Independent reads: failure of options never prevents wallet refresh.
     await Future.wait([
@@ -166,8 +172,12 @@ class LivePromotionsController extends Cubit<LivePromotionsState> {
   Future<void> loadMore() async {
     if (state.loading || state.loadingMore || !state.hasMore) return;
     _set(state.copyWith(loadingMore: true, clearError: true));
+    final generation = _listGeneration;
     await _capture(() async {
       final page = await repository.mine(page: _page + 1);
+      // The list was reloaded while this page was in flight. Appending it now
+      // would skip pages and desynchronise the cursor from the visible list.
+      if (generation != _listGeneration || isClosed) return;
       _page++;
       final ids = state.items.map((e) => e.id).toSet();
       _set(
@@ -216,6 +226,9 @@ class LivePromotionsController extends Cubit<LivePromotionsState> {
     );
     await _capture(() async {
       final stats = await repository.stats(id);
+      // A background reconcile can resolve after the user opened another
+      // campaign; one campaign's numbers must never be shown under another.
+      if (state.campaign?.id != id) return;
       _set(state.copyWith(stats: stats));
     });
   }
@@ -290,6 +303,9 @@ class LivePromotionsController extends Cubit<LivePromotionsState> {
         if (state.balanceCoins! < campaign.budgetCoins!) {
           throw const LivePromotionInsufficientBalance();
         }
+        // The screen may have been disposed while reading campaign and wallet.
+        // Nothing has been sent yet, so stopping here leaves no uncertainty.
+        if (isClosed) return;
         try {
           await repository.pay(campaign.id);
         } finally {
@@ -310,7 +326,7 @@ class LivePromotionsController extends Cubit<LivePromotionsState> {
     c.durationDays,
     c.objective?.wireValue,
     c.automaticAudience,
-    c.draft?.toJson(),
+    c.draft?.toComparableJson(),
   ]);
 
   Future<void> _reconcile() async {

@@ -9,6 +9,7 @@ import '../../../live/domain/entities/live_interactive.dart';
 import '../../../live/presentation/bloc/live_interactive/live_interactive_bloc.dart';
 import '../../../live/presentation/bloc/live_interactive/live_interactive_event.dart';
 import '../../../live/presentation/bloc/live_interactive/live_interactive_state.dart';
+import '../../../live/presentation/widgets/room/live_gift_goal_bar.dart';
 import '../../../live/presentation/widgets/room/live_interactive_tools.dart';
 
 /// Viewer entry point to the room's interactions, opened from the bottom bar.
@@ -132,12 +133,14 @@ class LiveInteractiveViewerPanel extends StatelessWidget {
           previous.poll != current.poll ||
           previous.questions != current.questions ||
           previous.treasureBoxes != current.treasureBoxes ||
-          previous.auctions != current.auctions,
+          previous.auctions != current.auctions ||
+          previous.giftGoal != current.giftGoal,
       builder: (context, state) {
         final poll = state.activePoll;
         final boxes = state.openTreasureBoxes;
         final auctions = state.activeAuctions;
         final pinned = state.pinnedQuestion;
+        final giftGoal = state.giftGoal;
         final questions = state.questions.take(2).toList(growable: false);
 
         return Material(
@@ -150,6 +153,10 @@ class LiveInteractiveViewerPanel extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 if (onClose != null) _PanelHeader(onClose: onClose!),
+                if (giftGoal != null) ...[
+                  LiveGiftGoalBar(goal: giftGoal),
+                  const SizedBox(height: 6),
+                ],
                 if (poll != null) _PollCard(poll: poll),
                 if (pinned != null) ...[
                   const SizedBox(height: 6),

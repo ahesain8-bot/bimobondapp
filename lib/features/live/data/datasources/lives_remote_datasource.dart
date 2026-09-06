@@ -373,6 +373,80 @@ class LivesRemoteDataSource {
     );
   }
 
+  /// `GET /lives/leagues` → `{ tiers: [...] }`.
+  /// `GET /lives/:id/replay` — plays the replay and counts one replay view.
+  /// The count is the server's; the app never increments it.
+  Future<Map<String, dynamic>> replay(String liveId) {
+    return _api.get(ApiEndpoints.liveReplay(_seg(liveId)));
+  }
+
+  /// `POST /lives/:id/replay` — host fallback when auto-record failed.
+  Future<Map<String, dynamic>> publishReplay({
+    required String liveId,
+    required String replayUrl,
+  }) {
+    return _api.post(
+      ApiEndpoints.liveReplay(_seg(liveId)),
+      body: {'replayUrl': replayUrl},
+    );
+  }
+
+  /// `DELETE /lives/:id/replay` — host takedown.
+  Future<Map<String, dynamic>> deleteReplay(String liveId) {
+    return _api.delete(ApiEndpoints.liveReplay(_seg(liveId)));
+  }
+
+  /// `GET /lives/:id/clips`.
+  Future<Map<String, dynamic>> clips(String liveId) {
+    return _api.get(ApiEndpoints.liveClips(_seg(liveId)));
+  }
+
+  /// `POST /lives/:id/clips` — needs a READY replay (the server enforces it).
+  Future<Map<String, dynamic>> createClip({
+    required String liveId,
+    required num startSeconds,
+    required num endSeconds,
+    String? title,
+    String? clipUrl,
+  }) {
+    return _api.post(
+      ApiEndpoints.liveClips(_seg(liveId)),
+      body: {
+        'startSeconds': startSeconds,
+        'endSeconds': endSeconds,
+        if (title != null && title.trim().isNotEmpty) 'title': title.trim(),
+        if (clipUrl != null && clipUrl.trim().isNotEmpty)
+          'clipUrl': clipUrl.trim(),
+      },
+    );
+  }
+
+  /// `POST /lives/:id/clips/:clipId/post` — idempotent per the contract.
+  Future<Map<String, dynamic>> postClip({
+    required String liveId,
+    required String clipId,
+    String? description,
+  }) {
+    return _api.post(
+      ApiEndpoints.liveClipPost(_seg(liveId), _seg(clipId)),
+      body: {
+        if (description != null && description.trim().isNotEmpty)
+          'description': description.trim(),
+      },
+    );
+  }
+
+  static String _seg(String value) => Uri.encodeComponent(value);
+
+  Future<Map<String, dynamic>> leagues() {
+    return _api.get(ApiEndpoints.livesLeagues);
+  }
+
+  /// `GET /lives/host-league/:userId` → tier + progress for one creator.
+  Future<Map<String, dynamic>> hostLeague(String userId) {
+    return _api.get(ApiEndpoints.liveHostLeague(Uri.encodeComponent(userId)));
+  }
+
   Future<Map<String, dynamic>> giftersLeaderboard(
     String liveId, {
     String window = 'hour',

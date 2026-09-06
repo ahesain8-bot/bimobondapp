@@ -37,6 +37,36 @@ class LiveInteractiveMapper {
     );
   }
 
+  /// Applies a `liveGiftGoalUpdate` payload onto the last known goal.
+  ///
+  /// The documented update carries the whole goal, but a partial payload must
+  /// not blank what is already known: a missing number is unknown, not zero.
+  /// `giftGoalTarget` is nullable in the schema, so an explicit null - or a
+  /// target that is not positive - is the documented "no goal" state.
+  static LiveGiftGoal? giftGoalPatch(dynamic payload, LiveGiftGoal? previous) {
+    final json = _unwrap(payload, 'giftGoal');
+    final hasTarget =
+        json.containsKey('giftGoalTarget') || json.containsKey('target');
+    final rawTarget = json['giftGoalTarget'] ?? json['target'];
+    if (hasTarget && rawTarget == null) return null;
+    final target = hasTarget ? _asInt(rawTarget) : (previous?.target ?? 0);
+    if (target <= 0) return null;
+    final hasTitle =
+        json.containsKey('giftGoalTitle') || json.containsKey('title');
+    final hasCurrent =
+        json.containsKey('giftGoalCurrent') || json.containsKey('current');
+    return LiveGiftGoal(
+      id: json['id']?.toString() ?? previous?.id ?? '',
+      title: hasTitle
+          ? (json['giftGoalTitle'] ?? json['title'])?.toString()
+          : previous?.title,
+      target: target,
+      current: hasCurrent
+          ? _asInt(json['giftGoalCurrent'] ?? json['current'])
+          : (previous?.current ?? 0),
+    );
+  }
+
   static LivePoll poll(dynamic payload) {
     final json = _unwrap(payload, 'poll');
     final rawOptions = json['options'];

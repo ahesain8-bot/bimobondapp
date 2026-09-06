@@ -196,12 +196,14 @@ class _PkFirstDataSource implements LiveRemoteDataSource {
     int limit = 10,
     String? category,
     bool followingOnly = false,
+    String? topic,
   }) async {
     final pageResult = await _inner.getLiveFeed(
       page: page,
       limit: limit,
       category: category,
       followingOnly: followingOnly,
+      topic: topic,
     );
     if (pageResult.lives.isEmpty) return pageResult;
     final lives = pageResult.lives;
@@ -215,12 +217,41 @@ class _PkFirstDataSource implements LiveRemoteDataSource {
   }
 
   @override
+  Future<LiveFeedPageResult> getNearbyFeed({
+    int page = 1,
+    int limit = 10,
+    required double latitude,
+    required double longitude,
+    int? radiusKm,
+  }) => _inner.getNearbyFeed(
+    page: page,
+    limit: limit,
+    latitude: latitude,
+    longitude: longitude,
+    radiusKm: radiusKm,
+  );
+
+  @override
+  Future<LiveFeedPageResult> getAudioFeed({
+    int page = 1,
+    int limit = 10,
+    String? topic,
+  }) => _inner.getAudioFeed(page: page, limit: limit, topic: topic);
+
+  @override
   Future<LiveEntity> getLiveById(String liveId) async =>
       _asBattle(await _inner.getLiveById(liveId));
 
   @override
-  Future<JoinLiveResult> joinLive(String liveId, {String? campaignId}) =>
-      _inner.joinLive(liveId, campaignId: campaignId);
+  Future<JoinLiveResult> joinLive(
+    String liveId, {
+    String? campaignId,
+    String? trafficSource,
+  }) => _inner.joinLive(
+    liveId,
+    campaignId: campaignId,
+    trafficSource: trafficSource,
+  );
 
   @override
   Future<void> leaveLive(String liveId) => _inner.leaveLive(liveId);

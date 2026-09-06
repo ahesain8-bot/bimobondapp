@@ -14,11 +14,33 @@ abstract class LiveRemoteDataSource {
     int limit = 10,
     String? category,
     bool followingOnly = false,
+    String? topic,
+  });
+
+  /// `GET /lives/nearby` — distance-sorted, organic only (no promoted inject).
+  /// Coordinates belong to this endpoint, never to `/lives/feed`.
+  Future<LiveFeedPageResult> getNearbyFeed({
+    int page = 1,
+    int limit = 10,
+    required double latitude,
+    required double longitude,
+    int? radiusKm,
+  });
+
+  /// `GET /lives/audio` — Voice Chat listing. Read-only surface here.
+  Future<LiveFeedPageResult> getAudioFeed({
+    int page = 1,
+    int limit = 10,
+    String? topic,
   });
 
   Future<LiveEntity> getLiveById(String liveId);
 
-  Future<JoinLiveResult> joinLive(String liveId, {String? campaignId});
+  Future<JoinLiveResult> joinLive(
+    String liveId, {
+    String? campaignId,
+    String? trafficSource,
+  });
 
   Future<void> leaveLive(String liveId);
 
@@ -99,6 +121,7 @@ class FakeLiveRemoteDataSource implements LiveRemoteDataSource {
     int limit = 10,
     String? category,
     bool followingOnly = false,
+    String? topic,
   }) async {
     await Future.delayed(const Duration(milliseconds: 700));
 
@@ -131,6 +154,22 @@ class FakeLiveRemoteDataSource implements LiveRemoteDataSource {
   }
 
   @override
+  Future<LiveFeedPageResult> getNearbyFeed({
+    int page = 1,
+    int limit = 10,
+    required double latitude,
+    required double longitude,
+    int? radiusKm,
+  }) => getLiveFeed(page: page, limit: limit);
+
+  @override
+  Future<LiveFeedPageResult> getAudioFeed({
+    int page = 1,
+    int limit = 10,
+    String? topic,
+  }) => getLiveFeed(page: page, limit: limit);
+
+  @override
   Future<LiveEntity> getLiveById(String liveId) async {
     await Future.delayed(const Duration(milliseconds: 450));
     if (_cache.containsKey(liveId)) return _cache[liveId]!;
@@ -140,7 +179,11 @@ class FakeLiveRemoteDataSource implements LiveRemoteDataSource {
   }
 
   @override
-  Future<JoinLiveResult> joinLive(String liveId, {String? campaignId}) async {
+  Future<JoinLiveResult> joinLive(
+    String liveId, {
+    String? campaignId,
+    String? trafficSource,
+  }) async {
     // POST /lives/:id/join
     await Future.delayed(const Duration(milliseconds: 550));
     final live = await getLiveById(liveId);

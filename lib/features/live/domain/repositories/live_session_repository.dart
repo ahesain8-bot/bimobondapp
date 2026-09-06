@@ -2,7 +2,9 @@ import '../entities/live_chat_message.dart';
 import '../entities/live_gallery_item.dart';
 import '../entities/live_guest.dart';
 import '../entities/live_interactive.dart';
+import '../entities/live_host_league.dart';
 import '../entities/live_leaderboard_entry.dart';
+import '../entities/live_replay.dart';
 import '../entities/live_session.dart';
 import '../../../../core/models/live_media_hints.dart';
 import '../entities/live_viewer.dart';
@@ -315,6 +317,12 @@ abstract class LiveSessionRepository {
   Future<List<LiveGalleryItem>> loadGalleryItems(String liveId);
 
   /// Pin/unpin auction in gallery (`PATCH …/auctions/:id/pin`).
+  /// Host reorder (`PATCH /lives/:id/auctions/reorder` with `auctionIds`).
+  Future<void> reorderGalleryItems({
+    required String liveId,
+    required List<String> auctionIds,
+  });
+
   Future<void> pinGalleryItem({
     required String liveId,
     required String auctionId,
@@ -407,6 +415,44 @@ abstract class LiveSessionRepository {
   Future<List<LiveLeaderboardEntry>> loadGlobalHourlyLeaderboard({
     int limit = 20,
   });
+
+  /// `GET /lives/:id/replay` — plays the replay and counts one replay view
+  /// on the server. Never called for a live that is still running.
+  Future<LiveReplay> loadReplay(String liveId);
+
+  /// `POST /lives/:id/replay` — host publishes a URL when Egress failed.
+  Future<LiveReplay> publishReplay({
+    required String liveId,
+    required String replayUrl,
+  });
+
+  /// `DELETE /lives/:id/replay` — host takedown.
+  Future<void> removeReplay(String liveId);
+
+  /// `GET /lives/:id/clips`.
+  Future<List<LiveClip>> loadClips(String liveId);
+
+  /// `POST /lives/:id/clips` — requires a READY replay.
+  Future<LiveClip> createClip({
+    required String liveId,
+    required num startSeconds,
+    required num endSeconds,
+    String? title,
+    String? clipUrl,
+  });
+
+  /// `POST /lives/:id/clips/:clipId/post` — idempotent on the server.
+  Future<LiveClip> postClip({
+    required String liveId,
+    required String clipId,
+    String? description,
+  });
+
+  /// League tier table (`GET /lives/leagues`).
+  Future<List<LiveLeagueTier>> loadLeagueTiers();
+
+  /// One creator's league tier and progress (`GET /lives/host-league/:userId`).
+  Future<LiveHostLeague?> loadHostLeague(String userId);
 
   /// Top gifters for this live (`GET /lives/:id/leaderboard/gifters`).
   Future<List<LiveLeaderboardEntry>> loadGiftersLeaderboard(

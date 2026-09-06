@@ -91,9 +91,20 @@ class LivePromotionDraft {
     return errors;
   }
 
+  /// Create/edit request body. Throws when this draft is not a legal request.
   Map<String, dynamic> toJson({String? liveId}) {
     final errors = validate();
     if (errors.isNotEmpty) throw LivePromotionValidationException(errors);
+    return _payload(liveId: liveId);
+  }
+
+  /// The same shape without request validation, for comparing what the server
+  /// stored against what the user approved. A stored package campaign also
+  /// carries a duration, which is not a legal create body, so validating it
+  /// here would make a legitimate campaign impossible to quote.
+  Map<String, dynamic> toComparableJson() => _payload();
+
+  Map<String, dynamic> _payload({String? liveId}) {
     return {
       'liveId': ?liveId,
       'objective': objective.wireValue,
