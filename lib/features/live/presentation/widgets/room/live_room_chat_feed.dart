@@ -107,6 +107,12 @@ class _ChatMessageTile extends StatelessWidget {
   final LiveChatMessage message;
 
   Future<void> _showModeration(BuildContext context) async {
+    final ready = context.read<LiveRoomBloc>().state;
+    final moderatorIds = ready is LiveRoomReady
+        ? ready.session.moderatorIds
+        : const <String>[];
+    final isModerator =
+        message.userId != null && moderatorIds.contains(message.userId);
     final action = await showModalBottomSheet<LiveRoomModerationAction>(
       context: context,
       backgroundColor: const Color(0xFF1A1A1C),
@@ -185,6 +191,22 @@ class _ChatMessageTile extends StatelessWidget {
                     onTap: () => Navigator.pop(
                       sheetContext,
                       LiveRoomModerationAction.banViewer,
+                    ),
+                  ),
+                  ListTile(
+                    leading: const Icon(
+                      Icons.shield_outlined,
+                      color: Colors.white70,
+                    ),
+                    title: Text(
+                      isModerator ? 'إزالة المشرف' : 'تعيين مشرف',
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                    onTap: () => Navigator.pop(
+                      sheetContext,
+                      isModerator
+                          ? LiveRoomModerationAction.removeModerator
+                          : LiveRoomModerationAction.assignModerator,
                     ),
                   ),
                 ],

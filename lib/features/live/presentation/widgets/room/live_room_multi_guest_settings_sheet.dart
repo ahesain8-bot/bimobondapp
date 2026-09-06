@@ -104,11 +104,13 @@ class _MultiGuestSettingsBodyState extends State<_MultiGuestSettingsBody>
 
   @override
   Widget build(BuildContext context) {
+    final audioOnly = widget.session.isAudioOnly;
     return LiveRoomHostSheetChrome(
       title: 'إعدادات وضع تعدد الضيوف',
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
         children: [
+          if (!audioOnly) ...[
           const _SectionLabel('التخطيط'),
           const SizedBox(height: 12),
           _LayoutPicker(
@@ -118,6 +120,7 @@ class _MultiGuestSettingsBodyState extends State<_MultiGuestSettingsBody>
           ),
           const SizedBox(height: 4),
           const Divider(height: 28, color: Colors.white12),
+          ],
           _ToggleRow(
             title: 'تفعيل الضيوف',
             subtitle: 'السماح للمشاهدين بالانضمام إلى المسرح.',
@@ -149,6 +152,7 @@ class _MultiGuestSettingsBodyState extends State<_MultiGuestSettingsBody>
                 : (v) => setState(() => _maxGuests = v.round()),
           ),
           const SizedBox(height: 4),
+          if (!audioOnly) ...[
           _ToggleRow(
             title: 'السماح بكاميرا الضيف',
             subtitle: 'السماح للضيوف بتشغيل الكاميرا على المسرح.',
@@ -158,6 +162,7 @@ class _MultiGuestSettingsBodyState extends State<_MultiGuestSettingsBody>
                 : (v) => setState(() => _allowGuestCamera = v),
           ),
           const SizedBox(height: 14),
+          ],
           _ToggleRow(
             title: 'المشرفون يديرون الضيوف',
             subtitle: 'السماح للمشرفين بدعوة الضيوف وإدارتهم.',

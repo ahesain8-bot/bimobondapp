@@ -1,7 +1,11 @@
 import '../../domain/entities/live_chat_message.dart';
 import '../../domain/entities/live_host.dart';
+import '../../domain/entities/live_scene.dart';
 import '../../domain/entities/live_session.dart';
+import '../../domain/entities/live_studio.dart';
 import '../../../../core/models/live_media_hints.dart';
+import '../../../../core/models/live_media_mode.dart';
+import '../../../../core/models/live_topic.dart';
 
 /// Maps Nest live / comment JSON (lives/mobile-api.md) into domain entities.
 class LiveSessionMapper {
@@ -33,6 +37,7 @@ class LiveSessionMapper {
     String? liveKitUrl,
     String? liveKitRole,
     LiveMediaHints? mediaHints,
+    LiveStudio? studio,
     List<LiveChatMessage> messages = const [],
     int? galleryCurrent,
     int? galleryTotal,
@@ -84,6 +89,22 @@ class LiveSessionMapper {
       totalEarnedCoins: _asInt(live['totalEarnedCoins']) ?? 0,
       isPopular: live['isPopular'] as bool?,
       popularReason: live['popularReason']?.toString(),
+      paused: live['paused'] == true,
+      mediaMode: LiveMediaMode.normalize(live['mediaMode']?.toString()),
+      audioOnly:
+          live['audioOnly'] == true ||
+          LiveMediaMode.normalize(live['mediaMode']?.toString()) ==
+              LiveMediaMode.audio,
+      scene: LiveScene.fromLiveJson(live),
+      studio: studio ?? LiveStudio.fromJson(live['studio']),
+      topic: LiveTopic.normalize(live['topic']?.toString()),
+      scheduledAt: LiveSchedule.parse(live['scheduledAt']),
+      shareCount: _asInt(live['shareCount']) ?? 0,
+      chatMode: (live['chatMode']?.toString() ?? 'EVERYONE').toUpperCase(),
+      slowModeSeconds: _asInt(live['slowModeSeconds']) ?? 0,
+      blockedKeywords: _stringList(live['blockedKeywords']),
+      houseId: live['houseId']?.toString(),
+      ageRestricted: live['ageRestricted'] == true,
     );
   }
 
@@ -139,5 +160,13 @@ class LiveSessionMapper {
     if (value is int) return value;
     if (value is num) return value.toInt();
     return int.tryParse(value.toString());
+  }
+
+  static List<String> _stringList(dynamic value) {
+    if (value is! List) return const [];
+    return value
+        .map((e) => e.toString().trim())
+        .where((s) => s.isNotEmpty)
+        .toList(growable: false);
   }
 }

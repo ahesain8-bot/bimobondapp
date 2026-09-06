@@ -1,6 +1,9 @@
 import '../../domain/entities/live_entity.dart';
 import '../../domain/entities/live_feed_promotion.dart';
 import '../../domain/entities/live_feed_page_result.dart';
+import '../../../../core/models/live_media_mode.dart';
+import '../../../../core/models/live_topic.dart';
+import '../../../live/domain/entities/live_scene.dart';
 
 /// Maps Nest live JSON (lives/mobile-api.md §5) into [LiveEntity].
 ///
@@ -44,6 +47,16 @@ class LiveMapper {
     final status = _parseStatus(json['status']?.toString());
     final hourlyRank = _asInt(json['hourlyRank']);
 
+    final scene = LiveScene.fromLiveJson(json);
+    final mediaMode = LiveMediaMode.normalize(json['mediaMode']?.toString());
+    final audioOnly =
+        json['audioOnly'] == true || mediaMode == LiveMediaMode.audio;
+    final topic = LiveTopic.normalize(json['topic']?.toString());
+    final scheduledAt = LiveSchedule.parse(json['scheduledAt']);
+    final shareCount = _asInt(json['shareCount']) ?? 0;
+    final houseId = json['houseId']?.toString();
+    final ageRestricted = json['ageRestricted'] == true;
+
     return LiveEntity(
       id: id,
       hostId: user?['id']?.toString() ?? json['userId']?.toString() ?? '',
@@ -61,15 +74,36 @@ class LiveMapper {
       likeCount: likeCount,
       startTime:
           _parseDate(json['startedAt']) ??
+          scheduledAt ??
           _parseDate(json['createdAt']) ??
           DateTime.now(),
       endTime: _parseDate(json['endedAt']),
       status: status,
       isLive: status == LiveStatus.live,
       isFollowing: json['isFollowing'] == true,
+      paused: json['paused'] == true,
+      mediaMode: mediaMode,
+      audioOnly: audioOnly,
+      scene: scene.scene,
+      cameraFacing: scene.cameraFacing,
+      dualCameraEnabled: scene.dualCameraEnabled,
+      topic: topic,
+      scheduledAt: scheduledAt,
+      shareCount: shareCount,
+      houseId: houseId == null || houseId.isEmpty ? null : houseId,
+      ageRestricted: ageRestricted,
       isPromoted: json['isPromoted'] == true,
       promotion: LiveFeedPromotion.fromJson(json['promotion']),
-      metadata: _buildMetadata(json, user, hourlyRank),
+      metadata: _buildMetadata(
+        json,
+        user,
+        hourlyRank,
+        topic: topic,
+        scheduledAt: scheduledAt,
+        shareCount: shareCount,
+        houseId: houseId,
+        ageRestricted: ageRestricted,
+      ),
     );
   }
 
@@ -175,8 +209,13 @@ class LiveMapper {
   static Map<String, dynamic>? _buildMetadata(
     Map<String, dynamic> json,
     Map<String, dynamic>? user,
-    int? hourlyRank,
-  ) {
+    int? hourlyRank, {
+    String? topic,
+    DateTime? scheduledAt,
+    int shareCount = 0,
+    String? houseId,
+    bool ageRestricted = false,
+  }) {
     final meta = <String, dynamic>{};
 
     final battleSnapshot = _asMap(json['battle']);
@@ -191,10 +230,39 @@ class LiveMapper {
     meta['layout'] = json['layout']?.toString().toUpperCase() ?? 'PANEL';
     meta['guestsEnabled'] = json['guestsEnabled'] != false;
     meta['allowGuestCamera'] = json['allowGuestCamera'] != false;
-    meta['maxGuests'] = _asInt(json['maxGuests']) ?? 3;
+    meta['mediaMode'] = LiveMediaMode.normalize(json['mediaMode']?.toString());
+    meta['audioOnly'] =
+        json['audioOnly'] == true ||
+        LiveMediaMode.normalize(json['mediaMode']?.toString()) ==
+            LiveMediaMode.audio;
+    final scene = LiveScene.fromLiveJson(json);
+    meta['scene'] = scene.scene;
+    meta['cameraFacing'] = scene.cameraFacing;
+    meta['dualCameraEnabled'] = scene.dualCameraEnabled;
+    meta['maxGuests'] = _asInt(json['maxGuests']) ?? 8;
     meta['location'] = json['location']?.toString() ?? 'Live';
     meta['hourlyRank'] = hourlyRank ?? _asInt(json['hourlyRank']);
-    meta['shareCount'] = _asInt(json['shareCount']) ?? 0;
+    meta['shareCount'] = shareCount;
+    meta['moderatorsCanManageGuests'] =
+        json['moderatorsCanManageGuests'] != false;
+    meta['chatMode'] = (json['chatMode']?.toString() ?? 'EVERYONE')
+        .toUpperCase();
+    meta['slowModeSeconds'] = _asInt(json['slowModeSeconds']) ?? 0;
+    final keywords = json['blockedKeywords'];
+    if (keywords is List) {
+      meta['blockedKeywords'] = keywords
+          .map((e) => e.toString())
+          .where((s) => s.isNotEmpty)
+          .toList(growable: false);
+    }
+    if (houseId != null && houseId.isNotEmpty) {
+      meta['houseId'] = houseId;
+    }
+    meta['ageRestricted'] = ageRestricted;
+    if (topic != null) meta['topic'] = topic;
+    if (scheduledAt != null) {
+      meta['scheduledAt'] = scheduledAt.toUtc().toIso8601String();
+    }
     meta['showFanClub'] =
         json['fanClub'] != null || json['showFanClub'] == true;
 
@@ -271,5 +339,30 @@ class LiveMapper {
       if (url != null && url.trim().isNotEmpty) urls.add(url.trim());
     }
     return urls.take(3).toList();
+  }
+
+  /// Profile `currentLive` from `GET /users/:id` and `GET /auth/me`.
+  ///
+  /// Documented fields: `id`, `title`, `coverUrl`, `viewers`, `mediaMode`,
+  /// `audioOnly`. Host identity comes from the profile user.
+  static LiveEntity? fromProfileCurrentLive({
+    required bool isLive,
+    Map<String, dynamic>? currentLive,
+    required String hostId,
+    String? hostName,
+    String? hostAvatar,
+  }) {
+    if (!isLive) return null;
+    final raw = currentLive;
+    if (raw == null) return null;
+    final id = raw['id']?.toString();
+    if (id == null || id.isEmpty) return null;
+    return fromJson({
+      ...raw,
+      'status': raw['status'] ?? 'LIVE',
+      'coverUrl': raw['coverUrl'] ?? raw['cover'],
+      'viewers': raw['viewers'] ?? raw['viewerCount'],
+      'user': {'id': hostId, 'fullName': hostName, 'avatarUrl': hostAvatar},
+    });
   }
 }

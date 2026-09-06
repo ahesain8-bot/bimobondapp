@@ -6,15 +6,21 @@ class LiveStartInfoCard extends StatelessWidget {
     super.key,
     required this.titleController,
     this.coverUrl,
+    this.topic,
+    this.scheduledAt,
     this.onChangeCover,
     this.onAddTopic,
+    this.onSchedule,
     this.onAddGoal,
   });
 
   final TextEditingController titleController;
   final String? coverUrl;
+  final String? topic;
+  final DateTime? scheduledAt;
   final VoidCallback? onChangeCover;
   final VoidCallback? onAddTopic;
+  final VoidCallback? onSchedule;
   final VoidCallback? onAddGoal;
 
   static const Color _cardFill = Color(0x99000000);
@@ -76,15 +82,26 @@ class LiveStartInfoCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          Row(
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
             children: [
               _ChipButton(
-                icon: Icons.monetization_on,
+                icon: Icons.topic_outlined,
                 iconColor: const Color(0xFFFFC107),
-                label: 'Add topic',
+                label: (topic != null && topic!.isNotEmpty)
+                    ? topic!
+                    : 'Add topic',
                 onTap: onAddTopic,
               ),
-              const SizedBox(width: 8),
+              _ChipButton(
+                icon: Icons.schedule,
+                iconColor: const Color(0xFF80DEEA),
+                label: scheduledAt != null
+                    ? _formatSchedule(scheduledAt!)
+                    : 'Schedule',
+                onTap: onSchedule,
+              ),
               _ChipButton(
                 icon: Icons.emoji_events_outlined,
                 iconColor: const Color(0xFFB388FF),
@@ -176,6 +193,8 @@ class _ChipButton extends StatelessWidget {
             const SizedBox(width: 5),
             Text(
               label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 12,
@@ -187,4 +206,13 @@ class _ChipButton extends StatelessWidget {
       ),
     );
   }
+}
+
+String _formatSchedule(DateTime value) {
+  final local = value.toLocal();
+  final mm = local.month.toString().padLeft(2, '0');
+  final dd = local.day.toString().padLeft(2, '0');
+  final hh = local.hour.toString().padLeft(2, '0');
+  final min = local.minute.toString().padLeft(2, '0');
+  return '$mm/$dd $hh:$min';
 }

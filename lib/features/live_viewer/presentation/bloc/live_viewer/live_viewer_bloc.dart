@@ -71,6 +71,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     );
     on<LiveViewerSocketEventReceived>(_onSocketEventReceived);
     on<LiveViewerCommentDeletedRequested>(_onCommentDeletedRequested);
+    on<LiveViewerCommentPinRequested>(_onCommentPinRequested);
     on<LiveViewerViewerChatMuteRequested>(_onViewerChatMuteRequested);
     on<LiveViewerViewerChatUnmuteRequested>(_onViewerChatUnmuteRequested);
     on<LiveViewerViewerBannedRequested>(_onViewerBannedRequested);
@@ -84,6 +85,10 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     on<LiveViewerGuestApprovalChecked>(_onGuestApprovalChecked);
     on<LiveViewerLiveKitStateChanged>(_onLiveKitStateChanged);
     on<LiveViewerBattleRoomStateChanged>(_onBattleRoomStateChanged);
+    on<LiveViewerShareRequested>(_onShareRequested);
+    on<LiveViewerShareFeedbackConsumed>(_onShareFeedbackConsumed);
+    on<LiveViewerReportRequested>(_onReportRequested);
+    on<LiveViewerReportFeedbackConsumed>(_onReportFeedbackConsumed);
 
     _liveKitSub = liveKitService.stateStream.listen((mediaState) {
       if (!isClosed) add(LiveViewerLiveKitStateChanged(mediaState));
@@ -264,6 +269,27 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
           ),
         );
         return;
+      }
+
+      if (live.ageRestricted) {
+        final me = await _loadViewerProfile();
+        if (!_isCurrentSession(live.id, sessionGen)) {
+          await _abandonStaleSession();
+          return;
+        }
+        final myId = me?['id']?.toString();
+        if (myId != null && myId.isNotEmpty) _currentUserId = myId;
+        final isHost = myId != null && myId == live.hostId;
+        final dob = me?['dateOfBirth']?.toString().trim();
+        if (!isHost && (dob == null || dob.isEmpty)) {
+          emit(
+            state.copyWith(
+              currentUserId: _currentUserId,
+              needsDateOfBirth: true,
+            ),
+          );
+          return;
+        }
       }
 
       // Resolve the account ID before attributing a promoted activation; host
@@ -462,6 +488,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
         _loadCurrentUserId(),
         guestRepository.listGuests(liveId),
         _loadTopGifterAvatars(liveId),
+        liveRepository.listModerators(liveId),
       ]);
       if (!_isCurrentSession(liveId, sessionGen)) return;
 
@@ -470,6 +497,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
       _currentUserId = results[2] as String? ?? _currentUserId;
       final guestsResult = results[3];
       final topGifters = results[4] as List<String>?;
+      final modsResult = results[5];
       final comments = commentsResult
           .fold(
             (_) => <CommentEntity>[],
@@ -501,6 +529,10 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
           currentUserId: _currentUserId,
           guests: guestsResult.fold((_) => state.guests, (items) => items),
           topViewerAvatars: topGifters ?? state.topViewerAvatars,
+          moderatorIds: modsResult.fold(
+            (_) => state.moderatorIds,
+            (mods) => mods.map((m) => m.userId).toList(growable: false),
+          ),
         ),
       );
     } catch (_) {}
@@ -621,6 +653,89 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
       ),
     );
     await likeLiveUseCase(id, burst: event.burst);
+  }
+
+  Future<void> _onShareRequested(
+    LiveViewerShareRequested event,
+    Emitter<LiveViewerState> emit,
+  ) async {
+    final session = state.session;
+    final id = _activeLiveId;
+    if (session == null || id == null) return;
+    final result = await liveRepository.shareLive(id, channel: event.channel);
+    if (_activeLiveId != id || isClosed) return;
+    result.fold(
+      (failure) {
+        emit(state.copyWith(shareError: failure.message, lastShareUrl: null));
+      },
+      (share) {
+        final meta = Map<String, dynamic>.from(session.live.metadata ?? {});
+        meta['shareCount'] = share.shareCount;
+        emit(
+          state.copyWith(
+            session: session.copyWith(
+              live: session.live.copyWith(
+                shareCount: share.shareCount,
+                metadata: meta,
+              ),
+            ),
+            lastShareUrl: share.shareUrl,
+            shareError: null,
+          ),
+        );
+      },
+    );
+  }
+
+  void _onShareFeedbackConsumed(
+    LiveViewerShareFeedbackConsumed event,
+    Emitter<LiveViewerState> emit,
+  ) {
+    emit(state.copyWith(lastShareUrl: null, shareError: null));
+  }
+
+  Future<void> _onReportRequested(
+    LiveViewerReportRequested event,
+    Emitter<LiveViewerState> emit,
+  ) async {
+    if (state.isReporting) return;
+    final session = state.session;
+    final id = _activeLiveId;
+    if (session == null || id == null) return;
+    final me = state.currentUserId ?? _currentUserId;
+    if (me != null && me == session.live.hostId) {
+      emit(state.copyWith(reportFeedback: 'لا يمكنك الإبلاغ عن بثك'));
+      return;
+    }
+    emit(state.copyWith(isReporting: true, reportFeedback: null));
+    final result = await liveRepository.reportLive(
+      id,
+      reason: event.reason,
+      details: event.details,
+    );
+    if (_activeLiveId != id || isClosed) return;
+    result.fold(
+      (failure) {
+        emit(
+          state.copyWith(isReporting: false, reportFeedback: failure.message),
+        );
+      },
+      (_) {
+        emit(
+          state.copyWith(
+            isReporting: false,
+            reportFeedback: 'تم إرسال البلاغ. سنراجعه.',
+          ),
+        );
+      },
+    );
+  }
+
+  void _onReportFeedbackConsumed(
+    LiveViewerReportFeedbackConsumed event,
+    Emitter<LiveViewerState> emit,
+  ) {
+    emit(state.copyWith(isReporting: false, reportFeedback: null));
   }
 
   Future<void> _onGiftBalanceRefreshRequested(
@@ -764,6 +879,33 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     );
     await result.fold((failure) async {
       emit(state.copyWith(moderationBanner: 'Failed to delete comment'));
+      _scheduleBannerClear();
+    }, (_) async {});
+  }
+
+  Future<void> _onCommentPinRequested(
+    LiveViewerCommentPinRequested event,
+    Emitter<LiveViewerState> emit,
+  ) async {
+    final liveId = _activeLiveId;
+    if (liveId == null) return;
+    final result = event.unpin
+        ? await commentRepository.unpinComment(
+            liveId: liveId,
+            commentId: event.commentId,
+          )
+        : await commentRepository.pinComment(
+            liveId: liveId,
+            commentId: event.commentId,
+          );
+    await result.fold((failure) async {
+      emit(
+        state.copyWith(
+          moderationBanner: event.unpin
+              ? 'Failed to unpin comment'
+              : 'Failed to pin comment',
+        ),
+      );
       _scheduleBannerClear();
     }, (_) async {});
   }
@@ -934,6 +1076,14 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
   ) async {
     final liveId = state.live?.id;
     if (liveId == null || liveId.isEmpty || state.isGuestActionBusy) return;
+    if (state.live?.paused == true) {
+      emit(
+        state.copyWith(
+          moderationBanner: 'لا يمكن طلب الانضمام أثناء إيقاف البث مؤقتاً',
+        ),
+      );
+      return;
+    }
 
     emit(state.copyWith(isGuestActionBusy: true));
     try {
@@ -1401,6 +1551,25 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
       return;
     }
 
+    if (event is LiveHouseSocketEvent) {
+      final currentLive = session.live;
+      final nextHouseId = event.isClosed
+          ? null
+          : (event.houseId ?? currentLive.houseId);
+      emit(
+        state.copyWith(
+          session: session.copyWith(
+            live: currentLive.copyWith(houseId: nextHouseId),
+          ),
+          moderationBanner: event.isClosed
+              ? 'Live house closed'
+              : 'Live house updated',
+        ),
+      );
+      _scheduleBannerClear();
+      return;
+    }
+
     if (event is LiveBattleEvent) {
       await _applyBattle(
         event.battle.normalizedForUpdate(updateType: event.updateType),
@@ -1531,6 +1700,38 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
           opponentTopGifterAvatars: const [],
         ),
       );
+    } else if (event is LivePausedEvent) {
+      emit(
+        state.copyWith(
+          session: session.copyWith(
+            live: session.live.copyWith(paused: event.paused),
+          ),
+        ),
+      );
+    } else if (event is LiveSceneChangedEvent) {
+      emit(
+        state.copyWith(
+          session: session.copyWith(
+            live: session.live.copyWith(
+              scene: event.scene,
+              cameraFacing: event.cameraFacing,
+              dualCameraEnabled: event.dualCameraEnabled,
+            ),
+          ),
+        ),
+      );
+    } else if (event is LiveCameraChangedEvent) {
+      final live = session.live;
+      final isHost = event.userId == live.hostId;
+      emit(
+        state.copyWith(
+          session: session.copyWith(
+            live: live.copyWith(
+              cameraFacing: isHost ? event.facing : live.cameraFacing,
+            ),
+          ),
+        ),
+      );
     } else if (event is NetworkLostEvent) {
       emit(
         state.copyWith(
@@ -1654,12 +1855,8 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
         emit(state.copyWith(bannedUserIds: nextBanned));
         return;
       case 'chat_rules_updated':
-        // Chat mode / slow mode / blocked keywords changed — no state to
-        // mutate server-side; simply show a brief banner when relevant.
-        if (isMe) {
-          emit(state.copyWith(moderationBanner: 'Chat rules updated'));
-          _scheduleBannerClear();
-        }
+        emit(state.copyWith(moderationBanner: 'Chat rules updated'));
+        _scheduleBannerClear();
         return;
       default:
         if (isMe) {
@@ -1847,19 +2044,31 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
   Future<String?> _loadCurrentUserId({
     bool allowFirebaseFallback = true,
   }) async {
-    try {
-      final payload = await apiClient.get(ApiEndpoints.authMe);
-      final id = payload['id']?.toString();
-      if (id != null && id.isNotEmpty) return id;
-      final user = payload['user'];
-      if (user is Map) {
-        final nested = user['id']?.toString();
-        if (nested != null && nested.isNotEmpty) return nested;
-      }
-    } catch (_) {}
+    final me = await _loadViewerProfile();
+    final id = me?['id']?.toString();
+    if (id != null && id.isNotEmpty) return id;
     return allowFirebaseFallback
         ? fb.FirebaseAuth.instance.currentUser?.uid
         : null;
+  }
+
+  Future<Map<String, dynamic>?> _loadViewerProfile() async {
+    try {
+      final payload = await apiClient.get(ApiEndpoints.authMe);
+      final nested = payload['user'];
+      if (nested is Map) {
+        final map = nested.map((k, v) => MapEntry(k.toString(), v));
+        final topId = payload['id']?.toString();
+        if ((map['id'] == null || map['id'].toString().isEmpty) &&
+            topId != null &&
+            topId.isNotEmpty) {
+          map['id'] = topId;
+        }
+        return map;
+      }
+      return payload;
+    } catch (_) {}
+    return null;
   }
 
   Future<void> _refreshBattle(

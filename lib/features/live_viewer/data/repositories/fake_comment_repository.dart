@@ -92,6 +92,24 @@ class FakeCommentRepository implements CommentRepository {
   }
 
   @override
+  Future<Either<Failure, void>> pinComment({
+    required String liveId,
+    required String commentId,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 150));
+    return const Right(null);
+  }
+
+  @override
+  Future<Either<Failure, void>> unpinComment({
+    required String liveId,
+    required String commentId,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 150));
+    return const Right(null);
+  }
+
+  @override
   Future<Either<Failure, void>> reportComment({
     required String commentId,
     required String reason,

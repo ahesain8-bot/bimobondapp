@@ -49,7 +49,30 @@ class LiveCard extends StatelessWidget {
                   ),
                   _buildGradientOverlay(),
                   _buildContent(),
-                  const Positioned(top: 12, left: 12, child: LiveBadge()),
+                  Positioned(
+                    top: 12,
+                    left: 12,
+                    child: Row(
+                      children: [
+                        LiveBadge(
+                          paused: live.paused,
+                          planned: live.status == LiveStatus.scheduled,
+                        ),
+                        if (live.isAudioOnly) ...[
+                          const SizedBox(width: 6),
+                          const _AudioBadge(),
+                        ],
+                        if (live.houseId != null && live.houseId!.isNotEmpty) ...[
+                          const SizedBox(width: 6),
+                          const _HouseBadge(),
+                        ],
+                        if (live.ageRestricted) ...[
+                          const SizedBox(width: 6),
+                          const _AgeBadge(),
+                        ],
+                      ],
+                    ),
+                  ),
                   _buildViewerCount(),
                 ],
               ),
@@ -161,6 +184,17 @@ class LiveCard extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
+                    if (live.topic != null && live.topic!.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        live.topic!,
+                        style: AppTextStyles.labelSmall.copyWith(
+                          color: Colors.white70,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -220,6 +254,76 @@ class LiveCard extends StatelessWidget {
               style: AppTextStyles.viewerCount,
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AudioBadge extends StatelessWidget {
+  const _AudioBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFF2EE6A6),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: const Text(
+        'صوتي',
+        style: TextStyle(
+          color: Colors.black,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+class _HouseBadge extends StatelessWidget {
+  const _HouseBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFB020),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: const Text(
+        'بيت',
+        style: TextStyle(
+          color: Colors.black,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+class _AgeBadge extends StatelessWidget {
+  const _AgeBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.7),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.white24),
+      ),
+      child: const Text(
+        '18+',
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
         ),
       ),
     );

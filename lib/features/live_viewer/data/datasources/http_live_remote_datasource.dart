@@ -6,6 +6,8 @@ import '../../../../core/models/live_media_hints.dart';
 import '../../domain/entities/live_entity.dart';
 import '../../domain/entities/live_feed_page_result.dart';
 import '../../domain/entities/live_session_entity.dart';
+import '../../../live/domain/entities/live_moderator.dart';
+import '../../../live/domain/entities/live_share_result.dart';
 import '../mappers/live_mapper.dart';
 import 'live_remote_datasource.dart';
 
@@ -42,6 +44,7 @@ class HttpLiveRemoteDataSource implements LiveRemoteDataSource {
     bool followingOnly = false,
     double? latitude,
     double? longitude,
+    bool audioOnly = false,
   }) async {
     final hasCoordinates =
         latitude != null &&
@@ -53,7 +56,7 @@ class HttpLiveRemoteDataSource implements LiveRemoteDataSource {
         longitude >= -180 &&
         longitude <= 180;
     final payload = await _api.get(
-      ApiEndpoints.livesFeed,
+      audioOnly ? ApiEndpoints.livesAudio : ApiEndpoints.livesFeed,
       auth: true,
       query: {
         'page': '$page',
@@ -62,6 +65,7 @@ class HttpLiveRemoteDataSource implements LiveRemoteDataSource {
         if (hasCoordinates) 'latitude': '$latitude',
         if (hasCoordinates) 'longitude': '$longitude',
         if (category != null && category.isNotEmpty) 'categoryId': category,
+        if (audioOnly) 'audioOnly': 'true',
       },
     );
     return LiveMapper.pageFromPayload(
@@ -211,5 +215,25 @@ class HttpLiveRemoteDataSource implements LiveRemoteDataSource {
     required String userId,
   }) async {
     await _api.post(ApiEndpoints.liveViewerUnmuteChat(liveId, userId));
+  }
+
+  @override
+  Future<LiveShareResult> shareLive(String liveId, {String? channel}) async {
+    final payload = await _api.post(
+      ApiEndpoints.liveShare(liveId),
+      body: {if (channel != null && channel.isNotEmpty) 'channel': channel},
+    );
+    return LiveShareResult.fromJson(payload, liveId: liveId);
+  }
+
+  @override
+  Future<void> reportLive(String liveId, {required String reason}) async {
+    await _api.post(ApiEndpoints.liveReport(liveId), body: {'reason': reason});
+  }
+
+  @override
+  Future<List<LiveModerator>> listModerators(String liveId) async {
+    final payload = await _api.get(ApiEndpoints.liveModerators(liveId));
+    return LiveModerator.listFromPayload(payload);
   }
 }

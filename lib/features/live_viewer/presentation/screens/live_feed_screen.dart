@@ -355,6 +355,24 @@ class _LiveFeedViewState extends State<LiveFeedScreen>
     }
   }
 
+  void _selectAudioOnlyTab(bool audioOnly) {
+    if (_feedBloc.audioOnly == audioOnly && !_feedBloc.state.isLoading) {
+      return;
+    }
+    _feedBloc.add(LiveFeedLoadRequested(refresh: true, audioOnly: audioOnly));
+    if (_pageController.hasClients) {
+      _pageController.jumpToPage(0);
+    }
+    _currentIndex.value = 0;
+    _discoverFactor.value = 1;
+  }
+
+  Widget _discoverHeader() => _DiscoverHeader(
+    onClose: _exitLiveFeed,
+    audioOnly: _feedBloc.audioOnly,
+    onAudioOnlyChanged: _selectAudioOnlyTab,
+  );
+
   void _exitLiveFeed() => unawaited(_closeDiscover());
 
   @override
@@ -441,13 +459,18 @@ class _LiveFeedViewState extends State<LiveFeedScreen>
     double discoverFactor,
   ) {
     if (feed.isLoading && feed.lives.isEmpty) {
-      return _LoadingSkeleton();
+      return Column(
+        children: [
+          _discoverHeader(),
+          Expanded(child: _LoadingSkeleton()),
+        ],
+      );
     }
 
     if (feed.error != null && feed.lives.isEmpty) {
       return Column(
         children: [
-          _DiscoverHeader(onClose: _exitLiveFeed),
+          _discoverHeader(),
           Expanded(
             child: _ErrorView(error: feed.error!, onRetry: _refresh),
           ),
@@ -458,7 +481,7 @@ class _LiveFeedViewState extends State<LiveFeedScreen>
     if (feed.lives.isEmpty) {
       return Column(
         children: [
-          _DiscoverHeader(onClose: _exitLiveFeed),
+          _discoverHeader(),
           Expanded(child: _EmptyView(onRefresh: _refresh)),
         ],
       );
@@ -540,7 +563,7 @@ class _LiveFeedViewState extends State<LiveFeedScreen>
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      _DiscoverHeader(onClose: _exitLiveFeed),
+                      _discoverHeader(),
                       LiveStoriesStrip(
                         lives: feed.lives,
                         selectedIndex: selected,
@@ -611,9 +634,15 @@ class _LiveFeedViewState extends State<LiveFeedScreen>
 }
 
 class _DiscoverHeader extends StatelessWidget {
-  const _DiscoverHeader({required this.onClose});
+  const _DiscoverHeader({
+    required this.onClose,
+    required this.audioOnly,
+    required this.onAudioOnlyChanged,
+  });
 
   final VoidCallback onClose;
+  final bool audioOnly;
+  final ValueChanged<bool> onAudioOnlyChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -632,21 +661,79 @@ class _DiscoverHeader extends StatelessWidget {
               ),
               tooltip: 'Events',
             ),
-            const Expanded(
-              child: Text(
-                'Discover',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                ),
+            Expanded(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _DiscoverTab(
+                    label: 'For You',
+                    selected: !audioOnly,
+                    onTap: () => onAudioOnlyChanged(false),
+                  ),
+                  const SizedBox(width: 18),
+                  _DiscoverTab(
+                    label: 'Voice',
+                    icon: Icons.graphic_eq,
+                    selected: audioOnly,
+                    onTap: () => onAudioOnlyChanged(true),
+                  ),
+                ],
               ),
             ),
             IconButton(
               onPressed: onClose,
               icon: const Icon(Icons.close, color: AppColors.textPrimary),
               tooltip: 'Close',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DiscoverTab extends StatelessWidget {
+  const _DiscoverTab({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.icon,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final IconData? icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(
+                icon,
+                size: 16,
+                color: selected
+                    ? AppColors.textPrimary
+                    : AppColors.textPrimary.withValues(alpha: 0.55),
+              ),
+              const SizedBox(width: 4),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                color: selected
+                    ? AppColors.textPrimary
+                    : AppColors.textPrimary.withValues(alpha: 0.55),
+                fontSize: 16,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              ),
             ),
           ],
         ),

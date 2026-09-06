@@ -12,6 +12,7 @@ class LiveFeedLoadRequested extends LiveFeedEvent {
   final bool refresh;
   final bool followingOnly;
   final double? latitude, longitude;
+  final bool audioOnly;
 
   const LiveFeedLoadRequested({
     this.category,
@@ -19,6 +20,7 @@ class LiveFeedLoadRequested extends LiveFeedEvent {
     this.followingOnly = false,
     this.latitude,
     this.longitude,
+    this.audioOnly = false,
   });
 
   @override
@@ -28,6 +30,7 @@ class LiveFeedLoadRequested extends LiveFeedEvent {
     followingOnly,
     latitude,
     longitude,
+    audioOnly,
   ];
 }
 

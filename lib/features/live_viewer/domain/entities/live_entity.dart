@@ -20,6 +20,25 @@ class LiveEntity extends Equatable {
   final LiveStatus status;
   final bool isLive;
   final bool isFollowing;
+  /// Server pause flag (`paused`). Status stays `LIVE` while this is true.
+  final bool paused;
+  /// Stored `VIDEO` | `AUDIO`.
+  final String mediaMode;
+  /// Voice Chat rooms: avatars / waveform, never a video renderer.
+  final bool audioOnly;
+  /// `CAMERA` | `SCREEN` | `DUAL`.
+  final String scene;
+  /// `front` | `back`.
+  final String cameraFacing;
+  final bool dualCameraEnabled;
+  /// Radio / room topic (max 80). Feature #3 may filter feed on this value.
+  final String? topic;
+  /// Present on `PLANNED` lives. ISO-8601 UTC from the backend.
+  final DateTime? scheduledAt;
+  final int shareCount;
+  final String? houseId;
+  /// 18+ join/detail gate. Backend is authoritative.
+  final bool ageRestricted;
   final Map<String, dynamic>? metadata;
   final bool isPromoted;
   final LiveFeedPromotion? promotion;
@@ -44,11 +63,25 @@ class LiveEntity extends Equatable {
     this.endTime,
     this.status = LiveStatus.live,
     this.isLive = true,
+    this.paused = false,
+    this.mediaMode = 'VIDEO',
+    this.audioOnly = false,
+    this.scene = 'CAMERA',
+    this.cameraFacing = 'front',
+    this.dualCameraEnabled = false,
+    this.topic,
+    this.scheduledAt,
+    this.shareCount = 0,
+    this.houseId,
+    this.ageRestricted = false,
     this.metadata,
     this.isFollowing = false,
     this.isPromoted = false,
     this.promotion,
   });
+
+  bool get isAudioOnly => audioOnly || mediaMode.toUpperCase() == 'AUDIO';
+  bool get isFrontCamera => cameraFacing.toLowerCase() != 'back';
 
   LiveEntity copyWith({
     String? id,
@@ -67,6 +100,17 @@ class LiveEntity extends Equatable {
     LiveStatus? status,
     bool? isLive,
     bool? isFollowing,
+    bool? paused,
+    String? mediaMode,
+    bool? audioOnly,
+    String? scene,
+    String? cameraFacing,
+    bool? dualCameraEnabled,
+    String? topic,
+    DateTime? scheduledAt,
+    int? shareCount,
+    Object? houseId = _liveEntityUnset,
+    bool? ageRestricted,
     Map<String, dynamic>? metadata,
     bool? isPromoted,
     LiveFeedPromotion? promotion,
@@ -89,6 +133,19 @@ class LiveEntity extends Equatable {
       status: status ?? this.status,
       isLive: isLive ?? this.isLive,
       isFollowing: isFollowing ?? this.isFollowing,
+      paused: paused ?? this.paused,
+      mediaMode: mediaMode ?? this.mediaMode,
+      audioOnly: audioOnly ?? this.audioOnly,
+      scene: scene ?? this.scene,
+      cameraFacing: cameraFacing ?? this.cameraFacing,
+      dualCameraEnabled: dualCameraEnabled ?? this.dualCameraEnabled,
+      topic: topic ?? this.topic,
+      scheduledAt: scheduledAt ?? this.scheduledAt,
+      shareCount: shareCount ?? this.shareCount,
+      houseId: identical(houseId, _liveEntityUnset)
+          ? this.houseId
+          : houseId as String?,
+      ageRestricted: ageRestricted ?? this.ageRestricted,
       metadata: metadata ?? this.metadata,
       isPromoted: isPromoted ?? this.isPromoted,
       promotion: clearPromotion ? null : (promotion ?? this.promotion),
@@ -113,6 +170,17 @@ class LiveEntity extends Equatable {
     status,
     isLive,
     isFollowing,
+    paused,
+    mediaMode,
+    audioOnly,
+    scene,
+    cameraFacing,
+    dualCameraEnabled,
+    topic,
+    scheduledAt,
+    shareCount,
+    houseId,
+    ageRestricted,
     metadata,
     isPromoted,
     promotion,
@@ -154,3 +222,5 @@ extension LiveStatusExtension on LiveStatus {
 
   Color get color => Color(colorValue);
 }
+
+const Object _liveEntityUnset = Object();

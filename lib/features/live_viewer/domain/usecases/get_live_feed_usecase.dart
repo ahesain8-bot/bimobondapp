@@ -16,6 +16,7 @@ class GetLiveFeedUseCase {
     double? latitude,
     double? longitude,
     bool forceRefresh = false,
+    bool audioOnly = false,
   }) {
     return repository.getLiveFeed(
       page: page,
@@ -25,6 +26,7 @@ class GetLiveFeedUseCase {
       latitude: latitude,
       longitude: longitude,
       forceRefresh: forceRefresh,
+      audioOnly: audioOnly,
     );
   }
 }

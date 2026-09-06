@@ -11,6 +11,7 @@ class LiveGuest {
     this.username,
     this.mutedByHost = false,
     this.cameraOffByHost = false,
+    this.seat,
   });
 
   final String id;
@@ -24,7 +25,12 @@ class LiveGuest {
   final bool mutedByHost;
   final bool cameraOffByHost;
 
+  /// AUDIO rooms only: `HAND` (raised) | `SPEAKER` (on mic).
+  final String? seat;
+
   bool get isPending => status == 'REQUESTED' || status == 'INVITED';
+  bool get isRaisedHand => seat == 'HAND' || isRequesting;
+  bool get isSpeaker => seat == 'SPEAKER' || isActive;
 
   /// A viewer asking to come on stage, as opposed to someone the host already
   /// invited. Only these need the host to decide something.

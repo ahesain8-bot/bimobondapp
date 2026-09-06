@@ -9,8 +9,14 @@ import '../../../../core/models/live_media_hints.dart';
 import '../../domain/entities/live_chat_message.dart';
 import '../../domain/entities/live_gallery_item.dart';
 import '../../domain/entities/live_guest.dart';
+import '../../domain/entities/live_house.dart';
 import '../../domain/entities/live_leaderboard_entry.dart';
+import '../../domain/entities/live_moderator.dart';
+import '../../domain/entities/live_scene.dart';
 import '../../domain/entities/live_session.dart';
+import '../../domain/entities/live_share_result.dart';
+import '../../domain/entities/live_studio.dart';
+import '../../../../core/models/live_topic.dart';
 import '../../domain/repositories/live_session_repository.dart';
 import '../datasources/lives_media_datasource.dart';
 import '../datasources/lives_remote_datasource.dart';
@@ -110,10 +116,14 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
   bool get isBattleRoomUsable => _media.isBattleRoomUsable;
 
   @override
-  Future<LiveSession> startHostSession({required String title}) async {
+  Future<LiveSession> startHostSession({
+    required String title,
+    String mediaMode = 'VIDEO',
+    String? topic,
+  }) async {
     final trimmed = title.trim().isEmpty ? 'بث مباشر' : title.trim();
     try {
-      return await _createLive(trimmed);
+      return await _createLive(trimmed, mediaMode: mediaMode, topic: topic);
     } on BadRequestException catch (e) {
       // Server refuses: "You already have an active live." (stale live left
       // from a previous session). End it automatically, then retry ONCE so
@@ -124,12 +134,39 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
       if (stale != null) {
         await endSession(stale.id);
       }
-      return _createLive(trimmed);
+      return _createLive(trimmed, mediaMode: mediaMode, topic: topic);
     }
   }
 
-  Future<LiveSession> _createLive(String title) async {
-    final response = await _remote.createAndStart(title: title);
+  @override
+  Future<LiveSession> createPlannedSession({
+    required String title,
+    required DateTime scheduledAt,
+    String mediaMode = 'VIDEO',
+    String? topic,
+  }) async {
+    final trimmed = title.trim().isEmpty ? 'بث مباشر' : title.trim();
+    final normalized = LiveTopic.normalize(topic);
+    final response = await _remote.createPlanned(
+      title: trimmed,
+      scheduledAt: LiveSchedule.toUtcIso(scheduledAt),
+      mediaMode: mediaMode,
+      topic: normalized,
+    );
+    final liveMap = (response['live'] as Map<String, dynamic>?) ?? response;
+    return LiveSessionMapper.fromLiveJson(liveMap);
+  }
+
+  Future<LiveSession> _createLive(
+    String title, {
+    String mediaMode = 'VIDEO',
+    String? topic,
+  }) async {
+    final response = await _remote.createAndStart(
+      title: title,
+      mediaMode: mediaMode,
+      topic: LiveTopic.normalize(topic),
+    );
 
     final liveMap = (response['live'] as Map<String, dynamic>?) ?? response;
     final token = response['token']?.toString();
@@ -145,6 +182,7 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
       liveKitUrl: url,
       liveKitRole: role,
       mediaHints: LiveMediaHints.fromPayload(response, fallbackRole: role),
+      studio: LiveStudio.fromJson(response['studio']),
     );
   }
 
@@ -166,6 +204,7 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
         liveKitUrl: response['url']?.toString(),
         liveKitRole: response['role']?.toString() ?? 'host',
         mediaHints: LiveMediaHints.fromPayload(response, fallbackRole: 'host'),
+        studio: LiveStudio.fromJson(response['studio']),
       );
     } on ApiException catch (e) {
       if (isEndedLiveStartError(e)) {
@@ -201,6 +240,57 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
       await disconnectRealtime();
       await disconnectMedia();
     }
+  }
+
+  @override
+  Future<bool> pauseLive(String liveId) async {
+    final json = await _remote.pause(liveId);
+    return _pausedFromResponse(json);
+  }
+
+  @override
+  Future<bool> resumeLive(String liveId) async {
+    final json = await _remote.resume(liveId);
+    return _pausedFromResponse(json);
+  }
+
+  @override
+  Future<LiveStudio?> loadStudio(String liveId) async {
+    try {
+      final json = await _remote.studio(liveId);
+      return LiveStudio.fromJson(json) ?? LiveStudio.fromJson(json['studio']);
+    } catch (e) {
+      debugPrint('GET /lives/$liveId/studio failed (non-fatal): $e');
+      return null;
+    }
+  }
+
+  @override
+  Future<LiveScene> updateScene({
+    required String liveId,
+    required LiveScene scene,
+  }) async {
+    final json = await _remote.updateScene(
+      liveId,
+      scene: scene.scene,
+      cameraFacing: scene.cameraFacing,
+      dualCameraEnabled: scene.dualCameraEnabled,
+    );
+    final live = json['live'];
+    if (live is Map) {
+      return LiveScene.fromLiveJson(Map<String, dynamic>.from(live));
+    }
+    return LiveScene.fromSocket(
+      json.map((key, value) => MapEntry(key.toString(), value)),
+    );
+  }
+
+  @override
+  void emitSwitchLiveCamera({
+    required String liveId,
+    required String facing,
+  }) {
+    _socket.emitSwitchLiveCamera(liveId: liveId, facing: facing);
   }
 
   @override
@@ -300,12 +390,100 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
   }
 
   @override
+  Future<LiveSession> updateChatRules({
+    required String liveId,
+    String? chatMode,
+    int? slowModeSeconds,
+    List<String>? blockedKeywords,
+  }) async {
+    final json = await _remote.updateChatRules(
+      liveId: liveId,
+      chatMode: chatMode,
+      slowModeSeconds: slowModeSeconds,
+      blockedKeywords: blockedKeywords,
+    );
+    final live = json['live'];
+    if (live is Map) {
+      return LiveSessionMapper.fromLiveJson(Map<String, dynamic>.from(live));
+    }
+    return LiveSessionMapper.fromLiveJson(json);
+  }
+
+  @override
+  Future<List<LiveModerator>> loadModerators(String liveId) async {
+    final json = await _remote.listModerators(liveId);
+    return LiveModerator.listFromPayload(json);
+  }
+
+  @override
+  Future<LiveModerator> addModerator({
+    required String liveId,
+    required String userId,
+  }) async {
+    final json = await _remote.addModerator(liveId: liveId, userId: userId);
+    final nested = json['data'];
+    if (nested is Map) {
+      return LiveModerator.fromJson(Map<String, dynamic>.from(nested));
+    }
+    return LiveModerator.fromJson(json);
+  }
+
+  @override
+  Future<void> removeModerator({
+    required String liveId,
+    required String userId,
+  }) {
+    return _remote.removeModerator(liveId: liveId, userId: userId);
+  }
+
+  @override
+  Future<LiveHouse> createHouse({required String title}) async {
+    final json = await _remote.createHouse(title: title);
+    final house = LiveHouse.fromPayload(json);
+    if (house == null) {
+      throw ApiException('استجابة البيت بلا معرف');
+    }
+    return house;
+  }
+
+  @override
+  Future<List<LiveHouse>> loadHouses() async {
+    final json = await _remote.listHouses();
+    return LiveHouse.listFromPayload(json);
+  }
+
+  @override
+  Future<LiveHouse?> loadHouse(String houseId) async {
+    final json = await _remote.getHouse(houseId);
+    return LiveHouse.fromPayload(json);
+  }
+
+  @override
+  Future<void> attachLiveToHouse({
+    required String houseId,
+    required String liveId,
+  }) {
+    return _remote.attachLiveToHouse(houseId: houseId, liveId: liveId);
+  }
+
+  @override
+  Future<void> closeHouse(String houseId) {
+    return _remote.closeHouse(houseId);
+  }
+
+  @override
   Future<int> like(String liveId) async {
     final json = await _remote.like(liveId);
     final count = json['likeCount'];
     if (count is int) return count;
     if (count is num) return count.toInt();
     return int.tryParse(count?.toString() ?? '') ?? 0;
+  }
+
+  @override
+  Future<LiveShareResult> shareLive(String liveId, {String? channel}) async {
+    final json = await _remote.share(liveId, channel: channel);
+    return LiveShareResult.fromJson(json, liveId: liveId);
   }
 
   @override
@@ -326,6 +504,8 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
     String? layout,
     bool? allowGuestCamera,
     bool? moderatorsCanManageGuests,
+    String? topic,
+    bool? ageRestricted,
   }) async {
     final live = await _remote.updateSettings(
       liveId,
@@ -335,6 +515,8 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
       layout: layout,
       allowGuestCamera: allowGuestCamera,
       moderatorsCanManageGuests: moderatorsCanManageGuests,
+      topic: topic,
+      ageRestricted: ageRestricted,
     );
     final map = (live['id'] != null)
         ? live
@@ -870,6 +1052,13 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
   );
 
   @override
+  Future<void> setScreenShareEnabled(bool enabled) =>
+      _media.setScreenShareEnabled(enabled);
+
+  @override
+  Object? get localScreenShareTrack => _media.localScreenShareTrack;
+
+  @override
   Future<void> connectMediaSubscribe({
     required String url,
     required String token,
@@ -889,6 +1078,10 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
   @override
   Future<void> setMicrophoneEnabled(bool enabled) =>
       _media.setMicrophoneEnabled(enabled);
+
+  @override
+  Future<void> setCameraEnabled(bool enabled) =>
+      _media.setCameraEnabled(enabled);
 
   @override
   Future<void> flipMediaCamera({required bool useFront}) async {
@@ -914,5 +1107,14 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
     if (value is int) return value;
     if (value is num) return value.toInt();
     return int.tryParse(value.toString());
+  }
+
+  /// `{ paused, pausedAt }` from pause/resume, or wrapped in `{ data }`.
+  bool _pausedFromResponse(Map<String, dynamic> json) {
+    final data = json['data'];
+    if (data is Map) {
+      return data['paused'] == true;
+    }
+    return json['paused'] == true;
   }
 }

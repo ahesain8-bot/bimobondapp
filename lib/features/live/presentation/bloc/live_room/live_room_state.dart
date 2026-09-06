@@ -33,12 +33,14 @@ class LiveRoomOpening extends LiveRoomState {
     this.nativeController,
     this.isCameraInitialized = false,
     this.isFrontCamera = true,
+    this.isAudioOnly = false,
   });
 
   final CameraController? controller;
   final NativeCameraController? nativeController;
   final bool isCameraInitialized;
   final bool isFrontCamera;
+  final bool isAudioOnly;
 }
 
 class LiveRoomFailure extends LiveRoomState {
@@ -46,6 +48,8 @@ class LiveRoomFailure extends LiveRoomState {
     required this.message,
     this.isActiveLiveConflict = false,
     this.pendingTitle,
+    this.pendingTopic,
+    this.pendingMediaMode,
     this.isRecovering = false,
   });
 
@@ -56,6 +60,9 @@ class LiveRoomFailure extends LiveRoomState {
 
   /// Title to reuse after ending the stuck live and restarting.
   final String? pendingTitle;
+
+  final String? pendingTopic;
+  final String? pendingMediaMode;
 
   /// True while end/resume recovery is in flight.
   final bool isRecovering;
@@ -68,6 +75,7 @@ class LiveRoomReady extends LiveRoomState {
     this.controller,
     this.nativeController,
     this.localVideoTrack,
+    this.localScreenShareTrack,
     this.isCameraInitialized = false,
     this.isFrontCamera = true,
     this.selectedEffectId = 'none',
@@ -78,13 +86,13 @@ class LiveRoomReady extends LiveRoomState {
     this.isStabilizationEnabled = true,
     this.isNoiseReductionEnabled = false,
     this.isAiContentTagged = false,
-    this.isLivePaused = false,
     this.showLiveGiftsBadge = true,
     this.showLiveTitleBadge = true,
     this.isMediaConnected = false,
     this.isChatComposerVisible = false,
     this.isSendingChat = false,
     this.isEnding = false,
+    this.isPauseActionBusy = false,
     this.actionMessage,
     this.floatingHeartBurst = 0,
     this.giftBanner,
@@ -111,6 +119,9 @@ class LiveRoomReady extends LiveRoomState {
   /// LiveKit local camera track for [VideoTrackRenderer] host preview.
   final VideoTrack? localVideoTrack;
 
+  /// LiveKit local screen-share track for SCREEN / DUAL composition.
+  final VideoTrack? localScreenShareTrack;
+
   final bool isCameraInitialized;
   final bool isFrontCamera;
   final String selectedEffectId;
@@ -121,7 +132,6 @@ class LiveRoomReady extends LiveRoomState {
   final bool isStabilizationEnabled;
   final bool isNoiseReductionEnabled;
   final bool isAiContentTagged;
-  final bool isLivePaused;
   final bool showLiveGiftsBadge;
   final bool showLiveTitleBadge;
 
@@ -131,6 +141,9 @@ class LiveRoomReady extends LiveRoomState {
   final bool isChatComposerVisible;
   final bool isSendingChat;
   final bool isEnding;
+
+  /// True while `POST /pause` or `/resume` is in flight.
+  final bool isPauseActionBusy;
 
   /// Transient user-facing message (missing API / errors).
   final String? actionMessage;
@@ -184,6 +197,9 @@ class LiveRoomReady extends LiveRoomState {
 
   bool get isBattleActive => battle?.isActive == true;
 
+  /// Server pause flag. Status stays `LIVE`; LiveKit is not torn down.
+  bool get isLivePaused => session.paused;
+
   /// Guests actually publishing right now — what the stage renders.
   List<LiveGuest> get activeGuests =>
       guests.where((g) => g.isActive).toList(growable: false);
@@ -197,6 +213,7 @@ class LiveRoomReady extends LiveRoomState {
     Object? controller = _unset,
     Object? nativeController = _unset,
     Object? localVideoTrack = _unset,
+    Object? localScreenShareTrack = _unset,
     bool? isCameraInitialized,
     bool? isFrontCamera,
     String? selectedEffectId,
@@ -207,13 +224,13 @@ class LiveRoomReady extends LiveRoomState {
     bool? isStabilizationEnabled,
     bool? isNoiseReductionEnabled,
     bool? isAiContentTagged,
-    bool? isLivePaused,
     bool? showLiveGiftsBadge,
     bool? showLiveTitleBadge,
     bool? isMediaConnected,
     bool? isChatComposerVisible,
     bool? isSendingChat,
     bool? isEnding,
+    bool? isPauseActionBusy,
     String? actionMessage,
     bool clearActionMessage = false,
     int? floatingHeartBurst,
@@ -240,6 +257,9 @@ class LiveRoomReady extends LiveRoomState {
       localVideoTrack: identical(localVideoTrack, _unset)
           ? this.localVideoTrack
           : localVideoTrack as VideoTrack?,
+      localScreenShareTrack: identical(localScreenShareTrack, _unset)
+          ? this.localScreenShareTrack
+          : localScreenShareTrack as VideoTrack?,
       isCameraInitialized: isCameraInitialized ?? this.isCameraInitialized,
       isFrontCamera: isFrontCamera ?? this.isFrontCamera,
       selectedEffectId: selectedEffectId ?? this.selectedEffectId,
@@ -252,7 +272,6 @@ class LiveRoomReady extends LiveRoomState {
       isNoiseReductionEnabled:
           isNoiseReductionEnabled ?? this.isNoiseReductionEnabled,
       isAiContentTagged: isAiContentTagged ?? this.isAiContentTagged,
-      isLivePaused: isLivePaused ?? this.isLivePaused,
       showLiveGiftsBadge: showLiveGiftsBadge ?? this.showLiveGiftsBadge,
       showLiveTitleBadge: showLiveTitleBadge ?? this.showLiveTitleBadge,
       isMediaConnected: isMediaConnected ?? this.isMediaConnected,
@@ -260,6 +279,7 @@ class LiveRoomReady extends LiveRoomState {
           isChatComposerVisible ?? this.isChatComposerVisible,
       isSendingChat: isSendingChat ?? this.isSendingChat,
       isEnding: isEnding ?? this.isEnding,
+      isPauseActionBusy: isPauseActionBusy ?? this.isPauseActionBusy,
       actionMessage: clearActionMessage
           ? null
           : (actionMessage ?? this.actionMessage),

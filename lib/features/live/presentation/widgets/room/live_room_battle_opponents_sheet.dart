@@ -40,6 +40,7 @@ class LiveRoomBattleOpponentsSheet {
   }) {
     final state = bloc.state;
     if (state is! LiveRoomReady) return Future.value();
+    if (state.isLivePaused) return Future.value();
 
     return LiveRoomHostSheetChrome.show(
       context: context,
@@ -111,6 +112,10 @@ class _BattleOpponentsBodyState extends State<_BattleOpponentsBody>
     final ready = context.read<LiveRoomBloc>().state;
     if (ready is LiveRoomReady && ready.isBattleActive) {
       snack('هناك جولة منافسة نشطة بالفعل');
+      return;
+    }
+    if (ready is LiveRoomReady && ready.isLivePaused) {
+      snack('لا يمكن بدء منافسة أثناء الإيقاف المؤقت');
       return;
     }
     setState(() => _busy = true);

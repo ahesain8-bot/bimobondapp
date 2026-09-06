@@ -8,6 +8,7 @@ import 'package:socket_io_client/socket_io_client.dart' as io;
 import '../../../../core/network/api_endpoints.dart';
 import '../../../../core/models/live_battle.dart';
 import '../../domain/entities/live_interactive.dart';
+import '../../domain/entities/live_scene.dart';
 import '../../domain/repositories/live_session_repository.dart';
 import '../mappers/live_session_mapper.dart';
 
@@ -190,6 +191,7 @@ class LivesSocketDataSource {
           liveId: map['liveId']?.toString() ?? liveId,
           userId: map['userId']?.toString(),
           reason: map['reason']?.toString(),
+          chatRules: _asMap(map['chatRules']),
         ),
       );
     });
@@ -254,6 +256,45 @@ class LivesSocketDataSource {
           liveId: map?['liveId']?.toString() ?? liveId,
           status: map?['status']?.toString(),
           reason: map?['reason']?.toString(),
+        ),
+      );
+    });
+
+    _on(socket, 'livePaused', (data) {
+      final map = _asMap(data);
+      if (map == null) return;
+      _controller.add(
+        LiveHudPausedEvent(
+          paused: map['paused'] == true,
+          liveId: map['liveId']?.toString() ?? liveId,
+          pausedAt: DateTime.tryParse(map['pausedAt']?.toString() ?? ''),
+        ),
+      );
+    });
+
+    _on(socket, 'liveScene', (data) {
+      final map = _asMap(data);
+      if (map == null) return;
+      _controller.add(
+        LiveHudSceneEvent(
+          liveId: map['liveId']?.toString() ?? liveId,
+          scene: LiveScene.fromSocket(map),
+        ),
+      );
+    });
+
+    _on(socket, 'liveCameraChanged', (data) {
+      final map = _asMap(data);
+      if (map == null) return;
+      final userId = map['userId']?.toString() ?? '';
+      final facing = LiveScene.normalizeFacing(map['facing']);
+      if (userId.isEmpty) return;
+      _controller.add(
+        LiveHudCameraChangedEvent(
+          liveId: map['liveId']?.toString() ?? liveId,
+          userId: userId,
+          facing: facing,
+          role: map['role']?.toString(),
         ),
       );
     });
@@ -345,6 +386,20 @@ class LivesSocketDataSource {
       );
     });
 
+    _on(socket, 'liveHouse', (data) {
+      final map = _asMap(data);
+      if (map == null) return;
+      _controller.add(
+        LiveHudHouseEvent(
+          liveId: map['liveId']?.toString() ?? liveId,
+          houseId: map['houseId']?.toString() ?? map['id']?.toString(),
+          action: map['action']?.toString() ?? map['type']?.toString(),
+          status: map['status']?.toString(),
+          payload: map,
+        ),
+      );
+    });
+
     // Interactive room features. The documented payload is forwarded intact so
     // the interactive BLoC applies the server-authoritative update without
     // opening a second socket.
@@ -421,6 +476,16 @@ class LivesSocketDataSource {
   void _joinRooms(io.Socket socket, String liveId) {
     socket.emit('joinLive', {'liveId': liveId});
     socket.emit('joinUser', {});
+  }
+
+  void emitSwitchLiveCamera({
+    required String liveId,
+    required String facing,
+  }) {
+    _socket?.emit('switchLiveCamera', {
+      'liveId': liveId,
+      'facing': facing,
+    });
   }
 
   void _handleGiftPayload(

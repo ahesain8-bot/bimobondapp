@@ -27,6 +27,7 @@ class CommentsSection extends StatefulWidget {
   final Set<String> bannedUserIds;
 
   final void Function(String commentId, String? targetUserId)? onDeleteComment;
+  final void Function(String commentId, {required bool unpin})? onPinComment;
   final void Function(String userId, String? username, String? reason)?
   onMuteUser;
   final void Function(String userId, String? username)? onUnmuteUser;
@@ -46,6 +47,7 @@ class CommentsSection extends StatefulWidget {
     this.mutedUserIds = const {},
     this.bannedUserIds = const {},
     this.onDeleteComment,
+    this.onPinComment,
     this.onMuteUser,
     this.onUnmuteUser,
     this.onBanUser,
@@ -140,11 +142,18 @@ class _CommentsSectionState extends State<CommentsSection> {
                           isHostOrMod && !isSelf && !cIsJoin && !cIsGift,
                       isMuted: isMuted,
                       isBanned: isBanned,
+                      isPinned: comment.isPinned,
                       onDelete: widget.onDeleteComment == null
                           ? null
                           : () => widget.onDeleteComment!(
                               comment.id,
                               comment.userId,
+                            ),
+                      onPin: widget.onPinComment == null
+                          ? null
+                          : () => widget.onPinComment!(
+                              comment.id,
+                              unpin: comment.isPinned,
                             ),
                       onMute: widget.onMuteUser == null
                           ? null
@@ -198,7 +207,9 @@ class TikTokCommentBubble extends StatelessWidget {
   final bool showModerationMenu;
   final bool isMuted;
   final bool isBanned;
+  final bool isPinned;
   final VoidCallback? onDelete;
+  final VoidCallback? onPin;
   final VoidCallback? onMute;
   final VoidCallback? onUnmute;
   final VoidCallback? onBan;
@@ -213,7 +224,9 @@ class TikTokCommentBubble extends StatelessWidget {
     this.showModerationMenu = false,
     this.isMuted = false,
     this.isBanned = false,
+    this.isPinned = false,
     this.onDelete,
+    this.onPin,
     this.onMute,
     this.onUnmute,
     this.onBan,
@@ -428,7 +441,9 @@ class TikTokCommentBubble extends StatelessWidget {
               _CommentModerationMenu(
                 isMuted: isMuted,
                 isBanned: isBanned,
+                isPinned: isPinned,
                 onDelete: onDelete,
+                onPin: onPin,
                 onMute: onMute,
                 onUnmute: onUnmute,
                 onBan: onBan,
@@ -465,7 +480,9 @@ class _CommentRoleTag extends StatelessWidget {
 class _CommentModerationMenu extends StatelessWidget {
   final bool isMuted;
   final bool isBanned;
+  final bool isPinned;
   final VoidCallback? onDelete;
+  final VoidCallback? onPin;
   final VoidCallback? onMute;
   final VoidCallback? onUnmute;
   final VoidCallback? onBan;
@@ -474,7 +491,9 @@ class _CommentModerationMenu extends StatelessWidget {
   const _CommentModerationMenu({
     required this.isMuted,
     required this.isBanned,
+    this.isPinned = false,
     this.onDelete,
+    this.onPin,
     this.onMute,
     this.onUnmute,
     this.onBan,
@@ -509,6 +528,13 @@ class _CommentModerationMenu extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 16),
+                if (onPin != null)
+                  _MenuTile(
+                    icon: Icons.push_pin_outlined,
+                    label: isPinned ? 'Unpin comment' : 'Pin comment',
+                    color: Colors.white,
+                    onTap: () => Navigator.pop(ctx, 'pin'),
+                  ),
                 _MenuTile(
                   icon: Icons.delete_outline,
                   label: 'Delete comment',
@@ -544,6 +570,9 @@ class _CommentModerationMenu extends StatelessWidget {
     );
     if (result == null) return;
     switch (result) {
+      case 'pin':
+        onPin?.call();
+        break;
       case 'delete':
         onDelete?.call();
         break;

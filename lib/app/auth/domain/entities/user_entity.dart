@@ -76,6 +76,11 @@ class UserEntity extends Equatable {
   final bool? needsInterests;
   final String? authToken;
   final String? deviceToken;
+  /// From `GET /users/:id` and `GET /auth/me`. True while the user is LIVE.
+  final bool isLive;
+  /// Documented profile payload: id, title, coverUrl, viewers, mediaMode, audioOnly.
+  /// Null when the user is not LIVE.
+  final Map<String, dynamic>? currentLive;
 
   const UserEntity({
     required this.id,
@@ -150,6 +155,8 @@ class UserEntity extends Equatable {
     this.needsInterests,
     this.authToken,
     this.deviceToken,
+    this.isLive = false,
+    this.currentLive,
   });
 
   /// Resolved DM policy for UI (syncs legacy [allowDirectMsgs]).
@@ -232,6 +239,8 @@ class UserEntity extends Equatable {
     needsInterests,
     authToken,
     deviceToken,
+    isLive,
+    currentLive,
   ];
 }
 

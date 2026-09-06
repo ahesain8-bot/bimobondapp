@@ -9,6 +9,8 @@ import '../../domain/entities/live_entity.dart';
 import '../../domain/entities/live_feed_page_result.dart';
 import '../../domain/entities/live_session_entity.dart';
 import '../../domain/repositories/live_repository.dart';
+import '../../../live/domain/entities/live_moderator.dart';
+import '../../../live/domain/entities/live_share_result.dart';
 import '../datasources/live_remote_datasource.dart';
 
 class FakeLiveRepository implements LiveRepository {
@@ -32,7 +34,9 @@ class FakeLiveRepository implements LiveRepository {
     bool followingOnly = false,
     double? latitude,
     double? longitude,
-  }) => '$page|$limit|${category ?? ''}|$followingOnly|$latitude|$longitude';
+    bool audioOnly = false,
+  }) =>
+      '$page|$limit|${category ?? ''}|$followingOnly|$latitude|$longitude|audio=$audioOnly';
 
   @override
   Future<Either<Failure, LiveFeedPageResult>> getLiveFeed({
@@ -43,6 +47,7 @@ class FakeLiveRepository implements LiveRepository {
     double? latitude,
     double? longitude,
     bool forceRefresh = false,
+    bool audioOnly = false,
   }) async {
     final key = _feedKey(
       page: page,
@@ -51,6 +56,7 @@ class FakeLiveRepository implements LiveRepository {
       followingOnly: followingOnly,
       latitude: latitude,
       longitude: longitude,
+      audioOnly: audioOnly,
     );
 
     if (!forceRefresh &&
@@ -74,6 +80,7 @@ class FakeLiveRepository implements LiveRepository {
       followingOnly: followingOnly,
       latitude: latitude,
       longitude: longitude,
+      audioOnly: audioOnly,
       cacheKey: key,
     );
     _feedInFlight = future;
@@ -95,6 +102,7 @@ class FakeLiveRepository implements LiveRepository {
     bool followingOnly = false,
     double? latitude,
     double? longitude,
+    required bool audioOnly,
     required String cacheKey,
   }) async {
     try {
@@ -105,6 +113,7 @@ class FakeLiveRepository implements LiveRepository {
         followingOnly: followingOnly,
         latitude: latitude,
         longitude: longitude,
+        audioOnly: audioOnly,
       );
       final activeLives = pageResult.lives
           .where((l) => l.status == LiveStatus.live)
@@ -361,8 +370,39 @@ class FakeLiveRepository implements LiveRepository {
     required String reason,
     String? details,
   }) async {
-    await Future.delayed(const Duration(milliseconds: 400));
-    return const Right(null);
+    try {
+      final trimmed = reason.trim();
+      if (trimmed.isEmpty) {
+        return const Left(ServerFailure('Reason is required'));
+      }
+      final payload = details != null && details.trim().isNotEmpty
+          ? '$trimmed: ${details.trim()}'
+          : trimmed;
+      await _remote.reportLive(liveId, reason: payload);
+      return const Right(null);
+    } on SocketException catch (e) {
+      return Left(
+        NetworkFailure('No internet connection.', details: e.message),
+      );
+    } on UnauthorizedException catch (e) {
+      return Left(
+        AuthorizationFailure(
+          e.message,
+          code: e.statusCode?.toString(),
+          details: e.details,
+        ),
+      );
+    } on ApiException catch (e) {
+      return Left(
+        ServerFailure(
+          e.message,
+          code: e.statusCode?.toString(),
+          details: e.details,
+        ),
+      );
+    } catch (e) {
+      return Left(ServerFailure('Failed to report live: $e'));
+    }
   }
 
   @override
@@ -517,6 +557,43 @@ class FakeLiveRepository implements LiveRepository {
       );
     } catch (e) {
       return Left(ServerFailure('Failed to unmute viewer chat: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, LiveShareResult>> shareLive(
+    String liveId, {
+    String? channel,
+  }) async {
+    try {
+      final result = await _remote.shareLive(liveId, channel: channel);
+      return Right(result);
+    } on SocketException catch (e) {
+      return Left(
+        NetworkFailure('No internet connection.', details: e.message),
+      );
+    } on UnauthorizedException catch (e) {
+      return Left(
+        AuthorizationFailure(
+          e.message,
+          code: e.statusCode?.toString(),
+          details: e.details,
+        ),
+      );
+    } catch (e) {
+      return Left(ServerFailure('Failed to share live: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<LiveModerator>>> listModerators(
+    String liveId,
+  ) async {
+    try {
+      final mods = await _remote.listModerators(liveId);
+      return Right(mods);
+    } catch (e) {
+      return Left(ServerFailure('Failed to load moderators: $e'));
     }
   }
 }

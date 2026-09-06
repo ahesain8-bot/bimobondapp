@@ -16,6 +16,9 @@ enum SocketEventType {
   liveLike,
   liveViewers,
   liveEnded,
+  livePaused,
+  liveScene,
+  liveCameraChanged,
   userJoined,
   liveGuestInvite,
   liveGuestUpdate,
@@ -23,6 +26,7 @@ enum SocketEventType {
   liveHourlyRank,
   liveTopGifters,
   liveInteractive,
+  liveHouse,
   reconnecting,
   reconnected,
   networkLost,
@@ -100,17 +104,25 @@ class LiveModerationEvent extends SocketEvent {
   final String moderationType;
   final String? userId;
   final String? reason;
+  final Map<String, dynamic>? chatRules;
 
   const LiveModerationEvent({
     required super.liveId,
     required this.moderationType,
     this.userId,
     this.reason,
+    this.chatRules,
     required super.timestamp,
   }) : super(type: SocketEventType.liveModeration);
 
   @override
-  List<Object?> get props => [...super.props, moderationType, userId, reason];
+  List<Object?> get props => [
+    ...super.props,
+    moderationType,
+    userId,
+    reason,
+    chatRules,
+  ];
 }
 
 class LiveGiftEvent extends SocketEvent {
@@ -169,6 +181,57 @@ class LiveEndedEvent extends SocketEvent {
 
   @override
   List<Object?> get props => [...super.props, reason];
+}
+
+/// Socket `livePaused` `{ paused, pausedAt }`. Status stays `LIVE`.
+class LivePausedEvent extends SocketEvent {
+  final bool paused;
+  final DateTime? pausedAt;
+
+  const LivePausedEvent({
+    required super.liveId,
+    required this.paused,
+    this.pausedAt,
+    required super.timestamp,
+  }) : super(type: SocketEventType.livePaused);
+
+  @override
+  List<Object?> get props => [...super.props, paused, pausedAt];
+}
+
+class LiveSceneChangedEvent extends SocketEvent {
+  final String scene;
+  final String cameraFacing;
+  final bool dualCameraEnabled;
+
+  const LiveSceneChangedEvent({
+    required super.liveId,
+    required this.scene,
+    required this.cameraFacing,
+    required this.dualCameraEnabled,
+    required super.timestamp,
+  }) : super(type: SocketEventType.liveScene);
+
+  @override
+  List<Object?> get props =>
+      [...super.props, scene, cameraFacing, dualCameraEnabled];
+}
+
+class LiveCameraChangedEvent extends SocketEvent {
+  final String userId;
+  final String facing;
+  final String? role;
+
+  const LiveCameraChangedEvent({
+    required super.liveId,
+    required this.userId,
+    required this.facing,
+    this.role,
+    required super.timestamp,
+  }) : super(type: SocketEventType.liveCameraChanged);
+
+  @override
+  List<Object?> get props => [...super.props, userId, facing, role];
 }
 
 class UserJoinedEvent extends SocketEvent {
@@ -297,6 +360,29 @@ class LiveInteractiveSocketEvent extends SocketEvent {
 
   @override
   List<Object?> get props => [...super.props, payload.event, payload.payload];
+}
+
+/// Socket `liveHouse`. Payload is thin (room attached or house closed).
+class LiveHouseSocketEvent extends SocketEvent {
+  const LiveHouseSocketEvent({
+    required super.liveId,
+    this.houseId,
+    this.action,
+    this.status,
+    required super.timestamp,
+  }) : super(type: SocketEventType.liveHouse);
+
+  final String? houseId;
+  final String? action;
+  final String? status;
+
+  bool get isClosed {
+    final value = (status ?? action ?? '').toUpperCase();
+    return value == 'CLOSED' || value == 'CLOSE' || value == 'HOUSE_CLOSED';
+  }
+
+  @override
+  List<Object?> get props => [...super.props, houseId, action, status];
 }
 
 class NetworkLostEvent extends SocketEvent {

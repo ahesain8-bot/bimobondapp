@@ -136,6 +136,16 @@ class LiveViewerCommentDeletedRequested extends LiveViewerEvent {
   List<Object?> get props => [commentId, targetUserId];
 }
 
+class LiveViewerCommentPinRequested extends LiveViewerEvent {
+  const LiveViewerCommentPinRequested(this.commentId, {this.unpin = false});
+
+  final String commentId;
+  final bool unpin;
+
+  @override
+  List<Object?> get props => [commentId, unpin];
+}
+
 class LiveViewerViewerChatMuteRequested extends LiveViewerEvent {
   final String userId;
   final String? username;
@@ -266,4 +276,31 @@ class LiveViewerBattleRoomStateChanged extends LiveViewerEvent {
 
   @override
   List<Object?> get props => [state];
+}
+
+class LiveViewerShareRequested extends LiveViewerEvent {
+  const LiveViewerShareRequested({this.channel = 'COPY_LINK'});
+
+  final String channel;
+
+  @override
+  List<Object?> get props => [channel];
+}
+
+class LiveViewerShareFeedbackConsumed extends LiveViewerEvent {
+  const LiveViewerShareFeedbackConsumed();
+}
+
+class LiveViewerReportRequested extends LiveViewerEvent {
+  const LiveViewerReportRequested({required this.reason, this.details});
+
+  final String reason;
+  final String? details;
+
+  @override
+  List<Object?> get props => [reason, details];
+}
+
+class LiveViewerReportFeedbackConsumed extends LiveViewerEvent {
+  const LiveViewerReportFeedbackConsumed();
 }

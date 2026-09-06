@@ -25,6 +25,24 @@ class LiveSourceChanged extends LiveEvent {
   final bool isDeviceCamera;
 }
 
+class LiveMediaModeChanged extends LiveEvent {
+  const LiveMediaModeChanged(this.isAudioMode);
+
+  final bool isAudioMode;
+}
+
+class LiveTopicChanged extends LiveEvent {
+  const LiveTopicChanged(this.topic);
+
+  final String? topic;
+}
+
+class LiveScheduleChanged extends LiveEvent {
+  const LiveScheduleChanged(this.scheduledAt);
+
+  final DateTime? scheduledAt;
+}
+
 /// Changes the selected bottom tab.
 class LiveTabChanged extends LiveEvent {
   const LiveTabChanged(this.index);

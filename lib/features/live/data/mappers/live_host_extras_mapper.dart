@@ -18,6 +18,7 @@ class LiveHostExtrasMapper {
       status: json['status']?.toString() ?? '',
       mutedByHost: json['mutedByHost'] == true,
       cameraOffByHost: json['cameraOffByHost'] == true,
+      seat: json['seat']?.toString(),
       displayName: user?['fullName']?.toString() ??
           user?['username']?.toString() ??
           'Guest',

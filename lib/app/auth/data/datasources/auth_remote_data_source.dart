@@ -258,14 +258,30 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   Map<String, dynamic> _parseUserPayload(dynamic data) {
     if (data is Map<String, dynamic>) {
       if (data['data'] is Map) {
-        return Map<String, dynamic>.from(data['data'] as Map);
+        final inner = Map<String, dynamic>.from(data['data'] as Map);
+        _copyProfileLiveFields(data, inner);
+        return inner;
       }
       if (data['user'] is Map) {
-        return Map<String, dynamic>.from(data['user'] as Map);
+        final inner = Map<String, dynamic>.from(data['user'] as Map);
+        _copyProfileLiveFields(data, inner);
+        return inner;
       }
       return data;
     }
     throw ServerException(message: 'Invalid profile response');
+  }
+
+  void _copyProfileLiveFields(
+    Map<String, dynamic> parent,
+    Map<String, dynamic> inner,
+  ) {
+    if (!inner.containsKey('isLive') && parent.containsKey('isLive')) {
+      inner['isLive'] = parent['isLive'];
+    }
+    if (!inner.containsKey('currentLive') && parent.containsKey('currentLive')) {
+      inner['currentLive'] = parent['currentLive'];
+    }
   }
 
   Future<Map<String, dynamic>> _profileAuthHeaders() async {

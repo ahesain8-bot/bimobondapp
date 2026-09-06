@@ -14,6 +14,7 @@ class LiveMediaHints {
     required this.maxBitrateKbps,
     required this.maxSubscribeResolution,
     required this.codecPreference,
+    this.audioOnly = false,
   });
 
   final String role;
@@ -26,7 +27,25 @@ class LiveMediaHints {
   final String maxSubscribeResolution;
   final List<String> codecPreference;
 
+  /// Voice Chat: publish microphone only; do not attach a video renderer.
+  final bool audioOnly;
+
   bool get isPublisher => canPublish;
+
+  LiveMediaHints copyWith({bool? audioOnly}) {
+    return LiveMediaHints(
+      role: role,
+      canPublish: canPublish,
+      adaptiveStream: adaptiveStream,
+      dynacast: dynacast,
+      simulcast: simulcast,
+      maxVideoResolution: maxVideoResolution,
+      maxBitrateKbps: maxBitrateKbps,
+      maxSubscribeResolution: maxSubscribeResolution,
+      codecPreference: codecPreference,
+      audioOnly: audioOnly ?? this.audioOnly,
+    );
+  }
 
   String get preferredCodec {
     for (final codec in codecPreference) {
@@ -69,24 +88,26 @@ class LiveMediaHints {
     if (raw == null) return defaults;
 
     final codecs = raw['codecPreference'];
+    final audioOnly = _bool(raw['audioOnly']) ?? defaults.audioOnly;
     return LiveMediaHints(
       role: role,
       canPublish: _bool(raw['canPublish']) ?? publishingRole,
-      adaptiveStream: _bool(raw['adaptiveStream']) ?? true,
-      dynacast: _bool(raw['dynacast']) ?? defaults.dynacast,
-      simulcast: _bool(raw['simulcast']) ?? true,
-      maxVideoResolution:
-          raw['maxVideoResolution']?.toString() ?? defaults.maxVideoResolution,
-      maxBitrateKbps: _int(raw['maxBitrateKbps']) ?? defaults.maxBitrateKbps,
-      maxSubscribeResolution:
-          raw['maxSubscribeResolution']?.toString() ??
-          defaults.maxSubscribeResolution,
+      adaptiveStream: _bool(raw['adaptiveStream']) ?? (audioOnly ? false : true),
+      dynacast: _bool(raw['dynacast']) ?? (audioOnly ? false : defaults.dynacast),
+      simulcast: _bool(raw['simulcast']) ?? (audioOnly ? false : true),
+      maxVideoResolution: raw['maxVideoResolution']?.toString() ??
+          (audioOnly ? '0p' : defaults.maxVideoResolution),
+      maxBitrateKbps: _int(raw['maxBitrateKbps']) ??
+          (audioOnly ? 0 : defaults.maxBitrateKbps),
+      maxSubscribeResolution: raw['maxSubscribeResolution']?.toString() ??
+          (audioOnly ? '0p' : defaults.maxSubscribeResolution),
       codecPreference: codecs is List
           ? codecs
                 .map((value) => value.toString().toLowerCase())
                 .where((value) => value.isNotEmpty)
                 .toList(growable: false)
           : defaults.codecPreference,
+      audioOnly: audioOnly,
     );
   }
 

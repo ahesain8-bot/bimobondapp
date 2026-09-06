@@ -206,12 +206,14 @@ class _LiveStoryItem extends StatelessWidget {
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color: AppColors.secondary,
+                        color: live.paused
+                            ? const Color(0xFFFFAB00)
+                            : AppColors.secondary,
                         borderRadius: BorderRadius.circular(6),
                         border: Border.all(color: Colors.black, width: 1),
                       ),
-                      child: const Icon(
-                        Icons.equalizer,
+                      child: Icon(
+                        live.paused ? Icons.pause : Icons.equalizer,
                         color: Colors.white,
                         size: 10,
                       ),

@@ -6,6 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../bloc/start_live/live_bloc.dart';
 import '../../bloc/start_live/live_state.dart';
+import '../room/live_audio_room_stage.dart';
 import 'ar_live_camera_preview.dart';
 import 'aspect_preserving_camera_preview.dart';
 
@@ -26,11 +27,20 @@ class CameraPreviewLayer extends StatelessWidget {
           final b = current is LiveReady && current.isCameraInitialized;
           final initA = previous is LiveCameraInitializing;
           final initB = current is LiveCameraInitializing;
-          return a != b || initA != initB || previous.runtimeType != current.runtimeType;
+          return a != b ||
+              initA != initB ||
+              previous.runtimeType != current.runtimeType ||
+              (previous is LiveReady &&
+                  current is LiveReady &&
+                  previous.isAudioMode != current.isAudioMode);
         },
         builder: (context, state) {
           // Mount as soon as we leave Initial — PlatformView.init starts CameraX.
           if (state is LiveReady || state is LiveCameraInitializing) {
+            final audio = state is LiveReady && state.isAudioMode;
+            if (audio) {
+              return const LiveAudioRoomStage(hostName: 'Voice Chat');
+            }
             return const ArLiveCameraPreview();
           }
           return const ColoredBox(color: Colors.black);
@@ -44,9 +54,13 @@ class CameraPreviewLayer extends StatelessWidget {
           current is! LiveReady ||
           previous.controller != current.controller ||
           previous.nativeController != current.nativeController ||
-          previous.isCameraInitialized != current.isCameraInitialized,
+          previous.isCameraInitialized != current.isCameraInitialized ||
+          previous.isAudioMode != current.isAudioMode,
       builder: (context, state) {
         final ready = state is LiveReady ? state : null;
+        if (ready != null && ready.isAudioMode) {
+          return const LiveAudioRoomStage(hostName: 'Voice Chat');
+        }
         if (!kIsWeb &&
             defaultTargetPlatform == TargetPlatform.android &&
             ready?.isCameraInitialized == true) {
@@ -67,4 +81,3 @@ class CameraPreviewLayer extends StatelessWidget {
     );
   }
 }
-

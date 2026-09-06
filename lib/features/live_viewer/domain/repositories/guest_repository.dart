@@ -32,6 +32,7 @@ class GuestSummary {
     this.avatarUrl,
     this.mutedByHost = false,
     this.cameraOffByHost = false,
+    this.seat,
   });
 
   final String userId;
@@ -42,8 +43,12 @@ class GuestSummary {
   final bool mutedByHost;
   final bool cameraOffByHost;
 
+  /// AUDIO rooms only: `HAND` | `SPEAKER`.
+  final String? seat;
+
   bool get isActive => status == 'ACTIVE';
   bool get isPending => status == 'REQUESTED' || status == 'INVITED';
+  bool get isSpeaker => seat == 'SPEAKER' || isActive;
 }
 
 /// Viewer-side multi-guest participation (lives/mobile-api.md §10).
@@ -67,4 +72,46 @@ abstract class GuestRepository {
 
   /// Current roster (`GET /lives/:id/guests`).
   Future<Either<Failure, List<GuestSummary>>> listGuests(String liveId);
+
+  /// Moderator-allowed guest actions when `moderatorsCanManageGuests`.
+  /// Same-room cohost promote/demote stays host-only and is not here.
+  Future<Either<Failure, void>> acceptGuest({
+    required String liveId,
+    required String userId,
+  });
+
+  Future<Either<Failure, void>> rejectGuest({
+    required String liveId,
+    required String userId,
+  });
+
+  Future<Either<Failure, void>> kickGuest({
+    required String liveId,
+    required String userId,
+  });
+
+  Future<Either<Failure, void>> muteGuest({
+    required String liveId,
+    required String userId,
+  });
+
+  Future<Either<Failure, void>> unmuteGuest({
+    required String liveId,
+    required String userId,
+  });
+
+  Future<Either<Failure, void>> setGuestCameraOff({
+    required String liveId,
+    required String userId,
+  });
+
+  Future<Either<Failure, void>> setGuestCameraOn({
+    required String liveId,
+    required String userId,
+  });
+
+  Future<Either<Failure, void>> inviteGuest({
+    required String liveId,
+    required String userId,
+  });
 }

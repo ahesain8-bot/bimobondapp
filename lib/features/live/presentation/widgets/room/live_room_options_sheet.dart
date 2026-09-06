@@ -13,6 +13,7 @@ import '../../bloc/live_room/live_room_state.dart';
 import 'live_room_battle_opponents_sheet.dart';
 import 'live_room_option_tile.dart';
 import 'live_room_settings_sheet.dart';
+import 'live_room_studio_sheet.dart';
 
 /// Presents the TikTok-style live stream options menu as a modal bottom sheet.
 class LiveRoomOptionsSheet {
@@ -48,7 +49,14 @@ class LiveRoomOptionsSheet {
       await LiveRoomSettingsSheet.show(context);
     }
     if (destination == LiveRoomMenuDestination.startBattle && context.mounted) {
+      final ready = bloc.state;
+      if (ready is LiveRoomReady && ready.isLivePaused) {
+        return;
+      }
       await LiveRoomBattleOpponentsSheet.show(context);
+    }
+    if (destination == LiveRoomMenuDestination.studio && context.mounted) {
+      await LiveRoomStudioSheet.show(context);
     }
   }
 }
@@ -101,10 +109,18 @@ class _LiveRoomOptionsSheetBody extends StatelessWidget {
                             previous.isAiContentTagged !=
                                 current.isAiContentTagged ||
                             previous.isLivePaused != current.isLivePaused ||
+                            previous.isPauseActionBusy !=
+                                current.isPauseActionBusy ||
+                            previous.session.paused !=
+                                current.session.paused ||
                             previous.showLiveGiftsBadge !=
                                 current.showLiveGiftsBadge ||
                             previous.showLiveTitleBadge !=
-                                current.showLiveTitleBadge;
+                                current.showLiveTitleBadge ||
+                            previous.session.isAudioOnly !=
+                                current.session.isAudioOnly ||
+                            previous.session.scene.scene !=
+                                current.session.scene.scene;
                       },
                       builder: (context, state) {
                         final ready =
@@ -142,7 +158,8 @@ class _OptionsContent extends StatelessWidget {
         .add(LiveRoomMenuDestinationRequested(destination));
     if (!closeSheet) return;
     if (destination == LiveRoomMenuDestination.settings ||
-        destination == LiveRoomMenuDestination.startBattle) {
+        destination == LiveRoomMenuDestination.startBattle ||
+        destination == LiveRoomMenuDestination.studio) {
       // Hand the destination back to `show`, which reopens from the page's
       // own context once this sheet is really gone. Popping here and pushing
       // in the same frame left the options sheet stacked underneath.
@@ -161,8 +178,11 @@ class _OptionsContent extends StatelessWidget {
     final isNoiseReduction = ready?.isNoiseReductionEnabled ?? false;
     final isAiTagged = ready?.isAiContentTagged ?? false;
     final isPaused = ready?.isLivePaused ?? false;
+    final pauseBusy = ready?.isPauseActionBusy ?? false;
     final giftsBadge = ready?.showLiveGiftsBadge ?? true;
     final titleBadge = ready?.showLiveTitleBadge ?? true;
+    final audioOnly = ready?.session.isAudioOnly ?? false;
+    final scene = ready?.session.scene.scene ?? 'CAMERA';
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -185,12 +205,16 @@ class _OptionsContent extends StatelessWidget {
             LiveRoomOptionTile(
               icon: Icons.sports_mma_outlined,
               title: 'بدء منافسة',
-              subtitle: 'اختر بثاً مباشراً آخر لتتنافس معه.',
+              subtitle: isPaused
+                  ? 'غير متاح أثناء الإيقاف المؤقت'
+                  : 'اختر بثاً مباشراً آخر لتتنافس معه.',
               trailing: LiveRoomOptionTrailing.chevron,
-              onTap: () => _navigate(
-                context,
-                LiveRoomMenuDestination.startBattle,
-              ),
+              onTap: isPaused
+                  ? null
+                  : () => _navigate(
+                      context,
+                      LiveRoomMenuDestination.startBattle,
+                    ),
             ),
             LiveRoomOptionTile(
               icon: Icons.movie_filter_outlined,
@@ -201,6 +225,7 @@ class _OptionsContent extends StatelessWidget {
                 LiveRoomMenuDestination.liveHighlights,
               ),
             ),
+            if (!audioOnly) ...[
             LiveRoomOptionTile(
               icon: Icons.cameraswitch_outlined,
               title: 'قلب الكاميرا',
@@ -215,6 +240,46 @@ class _OptionsContent extends StatelessWidget {
               trailing: LiveRoomOptionTrailing.toggle,
               toggleValue: isMirror,
               onToggle: (_) => bloc.add(const LiveRoomMirrorToggled()),
+            ),
+            LiveRoomOptionTile(
+              icon: Icons.videocam_outlined,
+              title: 'كاميرا',
+              subtitle: scene == 'CAMERA' ? 'المشهد الحالي' : null,
+              onTap: () {
+                bloc.add(const LiveRoomSceneRequested('CAMERA'));
+                _close(context);
+              },
+            ),
+            LiveRoomOptionTile(
+              icon: Icons.screen_share_outlined,
+              title: 'مشاركة الشاشة',
+              subtitle: scene == 'SCREEN' ? 'المشهد الحالي' : null,
+              onTap: () {
+                bloc.add(const LiveRoomSceneRequested('SCREEN'));
+                _close(context);
+              },
+            ),
+            LiveRoomOptionTile(
+              icon: Icons.filter_none_outlined,
+              title: 'كاميرا مزدوجة',
+              subtitle: scene == 'DUAL'
+                  ? 'كاميرا + شاشة'
+                  : 'كاميرا + مشاركة الشاشة',
+              onTap: () {
+                bloc.add(const LiveRoomSceneRequested('DUAL'));
+                _close(context);
+              },
+            ),
+            ],
+            LiveRoomOptionTile(
+              icon: Icons.cast_connected_outlined,
+              title: 'البث من OBS',
+              subtitle: 'رابط RTMP ومفتاح البث',
+              trailing: LiveRoomOptionTrailing.chevron,
+              onTap: () => _navigate(
+                context,
+                LiveRoomMenuDestination.studio,
+              ),
             ),
             LiveRoomOptionTile(
               icon: Icons.mic_off_outlined,
@@ -253,10 +318,12 @@ class _OptionsContent extends StatelessWidget {
                   ? Icons.play_circle_outline
                   : Icons.pause_circle_outline,
               title: isPaused ? 'استئناف LIVE' : 'إيقاف LIVE مؤقتًا',
-              onTap: () {
-                bloc.add(const LiveRoomPauseLiveTapped());
-                _close(context);
-              },
+              onTap: pauseBusy
+                  ? null
+                  : () {
+                      bloc.add(const LiveRoomPauseLiveTapped());
+                      _close(context);
+                    },
             ),
             LiveRoomOptionTile(
               icon: Icons.settings_outlined,

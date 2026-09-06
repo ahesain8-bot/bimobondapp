@@ -104,6 +104,7 @@ class LiveDto {
       startTime: startTime,
       status: _mapStatus(status),
       isLive: status.toLowerCase() == 'live',
+      paused: status.toLowerCase() == 'paused',
       isPromoted: isPromoted,
       promotion: promotion,
     );

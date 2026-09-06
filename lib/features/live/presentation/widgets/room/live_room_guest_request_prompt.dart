@@ -51,6 +51,8 @@ class _RequestBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final bloc = context.read<LiveRoomBloc>();
     final scale = MediaQuery.textScalerOf(context);
+    final audio = bloc.state is LiveRoomReady &&
+        (bloc.state as LiveRoomReady).session.isAudioOnly;
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -82,8 +84,12 @@ class _RequestBar extends StatelessWidget {
                     ),
                     Text(
                       queued > 0
-                          ? 'يطلب الانضمام إلى المسرح · و$queued بالانتظار'
-                          : 'يطلب الانضمام إلى المسرح',
+                          ? (audio
+                                ? 'رفع يداً للحديث · و$queued بالانتظار'
+                                : 'يطلب الانضمام إلى المسرح · و$queued بالانتظار')
+                          : (audio
+                                ? 'رفع يداً للحديث'
+                                : 'يطلب الانضمام إلى المسرح'),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(

@@ -8,9 +8,20 @@ class ReportPostResult {
 }
 
 class ReportPostBottomSheet extends StatefulWidget {
-  const ReportPostBottomSheet({super.key});
+  const ReportPostBottomSheet({
+    super.key,
+    this.title,
+    this.message,
+  });
 
-  static Future<ReportPostResult?> show(BuildContext context) {
+  final String? title;
+  final String? message;
+
+  static Future<ReportPostResult?> show(
+    BuildContext context, {
+    String? title,
+    String? message,
+  }) {
     final theme = Theme.of(context);
     return showModalBottomSheet<ReportPostResult>(
       context: context,
@@ -21,7 +32,10 @@ class ReportPostBottomSheet extends StatefulWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) => const ReportPostBottomSheet(),
+      builder: (context) => ReportPostBottomSheet(
+        title: title,
+        message: message,
+      ),
     );
   }
 
@@ -109,7 +123,7 @@ class _ReportPostBottomSheetState extends State<ReportPostBottomSheet> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 4, 20, 4),
                 child: Text(
-                  l10n.postReportTitle,
+                  widget.title ?? l10n.postReportTitle,
                   style: theme.textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: theme.colorScheme.onSurface,
@@ -119,7 +133,7 @@ class _ReportPostBottomSheetState extends State<ReportPostBottomSheet> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
                 child: Text(
-                  l10n.postReportMessage,
+                  widget.message ?? l10n.postReportMessage,
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),

@@ -78,6 +78,8 @@ class UserModel extends UserEntity {
     super.needsInterests,
     super.authToken,
     super.deviceToken,
+    super.isLive,
+    super.currentLive,
   });
 
   static String? _normalizeUrl(String? url) {
@@ -272,6 +274,8 @@ class UserModel extends UserEntity {
       needsInterests: _parseOptionalBool(json['needsInterests']) ?? false,
       authToken: json['token'] ?? json['authToken'],
       deviceToken: json['deviceToken'],
+      isLive: _parseOptionalBool(json['isLive']) == true,
+      currentLive: _asStringMap(json['currentLive']),
     );
   }
 
@@ -358,7 +362,17 @@ class UserModel extends UserEntity {
       'needsInterests': needsInterests,
       'authToken': authToken,
       'deviceToken': deviceToken,
+      'isLive': isLive,
+      'currentLive': currentLive,
     };
+  }
+
+  static Map<String, dynamic>? _asStringMap(dynamic value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) {
+      return value.map((k, v) => MapEntry(k.toString(), v));
+    }
+    return null;
   }
 }
 

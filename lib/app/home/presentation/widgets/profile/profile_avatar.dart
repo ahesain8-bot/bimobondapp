@@ -1,6 +1,7 @@
 import 'package:bimobondapp/app/auth/domain/entities/user_entity.dart';
 import 'package:bimobondapp/app/home/presentation/utils/story_flow.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_avatar_tap_handler.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_live_now_badge.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/stories/story_profile_avatar.dart';
 import 'package:bimobondapp/core/constants/profile_layout_constants.dart';
 import 'package:flutter/material.dart';
@@ -25,7 +26,9 @@ class ProfileAvatar extends StatelessWidget {
         ? Colors.white
         : theme.scaffoldBackgroundColor;
 
-    return Stack(
+    return ProfileLiveNowBadge(
+      user: user,
+      child: Stack(
       clipBehavior: Clip.none,
       children: [
         Container(
@@ -80,6 +83,7 @@ class ProfileAvatar extends StatelessWidget {
           ),
         ),
       ],
+      ),
     );
   }
 }

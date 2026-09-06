@@ -16,6 +16,8 @@ class LiveRoomStarted extends LiveRoomEvent {
     this.title,
     this.initialCamera,
     this.useArBeautyCamera = false,
+    this.mediaMode = 'VIDEO',
+    this.topic,
   });
 
   final String? title;
@@ -25,6 +27,12 @@ class LiveRoomStarted extends LiveRoomEvent {
 
   /// Android: publish FaceWarp beauty frames instead of raw LiveKit camera.
   final bool useArBeautyCamera;
+
+  /// `VIDEO` (default) or `AUDIO` (Voice Chat). Cannot switch after start.
+  final String mediaMode;
+
+  /// Optional `topic` (max 80) sent on `POST /lives`.
+  final String? topic;
 }
 
 /// Ends the stuck active live (`GET /lives/mine` → `POST …/end`) then retries start.
@@ -191,6 +199,17 @@ class LiveRoomFlipCameraRequested extends LiveRoomEvent {
   const LiveRoomFlipCameraRequested();
 }
 
+class LiveRoomSceneRequested extends LiveRoomEvent {
+  const LiveRoomSceneRequested(this.scene);
+
+  /// `CAMERA` | `SCREEN` | `DUAL`
+  final String scene;
+}
+
+class LiveRoomStudioRequested extends LiveRoomEvent {
+  const LiveRoomStudioRequested();
+}
+
 /// Toggles host-preview mirroring.
 class LiveRoomMirrorToggled extends LiveRoomEvent {
   const LiveRoomMirrorToggled();
@@ -216,7 +235,7 @@ class LiveRoomAiContentToggled extends LiveRoomEvent {
   const LiveRoomAiContentToggled();
 }
 
-/// Pauses or resumes the live broadcast (client-only; no backend pause API).
+/// Pauses or resumes the live via `POST /lives/:id/pause` or `/resume`.
 class LiveRoomPauseLiveTapped extends LiveRoomEvent {
   const LiveRoomPauseLiveTapped();
 }
@@ -236,6 +255,10 @@ enum LiveRoomMenuDestination {
   reportProblem,
   learnMoreStabilization,
   learnMoreAiContent,
+  studio,
+  sceneCamera,
+  sceneScreen,
+  sceneDual,
 }
 
 /// A menu row that navigates or opens a future sub-flow.
@@ -275,6 +298,13 @@ class LiveRoomShareChannelRequested extends LiveRoomEvent {
   const LiveRoomShareChannelRequested(this.channel);
 
   final LiveRoomShareChannel channel;
+}
+
+/// Authoritative `shareCount` from `POST /lives/:id/share`.
+class LiveRoomShareCountUpdated extends LiveRoomEvent {
+  const LiveRoomShareCountUpdated(this.shareCount);
+
+  final int shareCount;
 }
 
 /// Re-pulls the comment history after the HUD socket comes back, so anything
@@ -347,6 +377,31 @@ class LiveRoomSettingsApplied extends LiveRoomEvent {
   final LiveSession session;
 }
 
+/// Host saved `PATCH /lives/:id/chat-rules`.
+class LiveRoomChatRulesApplied extends LiveRoomEvent {
+  const LiveRoomChatRulesApplied(this.session);
+
+  final LiveSession session;
+}
+
+/// Moderator roster from `GET /lives/:id/moderators`.
+class LiveRoomModeratorsChanged extends LiveRoomEvent {
+  const LiveRoomModeratorsChanged(this.moderatorIds);
+
+  final List<String> moderatorIds;
+}
+
+class LiveRoomModeratorsRefreshRequested extends LiveRoomEvent {
+  const LiveRoomModeratorsRefreshRequested();
+}
+
+/// This live's `houseId` after create/attach/close or `liveHouse`.
+class LiveRoomHouseChanged extends LiveRoomEvent {
+  const LiveRoomHouseChanged({this.houseId});
+
+  final String? houseId;
+}
+
 /// Host moderation actions on a chat message / viewer.
 enum LiveRoomModerationAction {
   pin,
@@ -355,6 +410,8 @@ enum LiveRoomModerationAction {
   muteChat,
   unmuteChat,
   banViewer,
+  assignModerator,
+  removeModerator,
 }
 
 class LiveRoomModerationRequested extends LiveRoomEvent {

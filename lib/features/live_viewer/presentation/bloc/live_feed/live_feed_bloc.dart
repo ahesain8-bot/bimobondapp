@@ -19,7 +19,11 @@ class LiveFeedBloc extends Bloc<LiveFeedEvent, LiveFeedState> {
   bool _followingOnly = false;
   double? _latitude, _longitude;
   int _queryGeneration = 0;
+  bool _audioOnly = false;
   static const _pageSize = 10;
+
+  /// Voice Chat tab (`GET /lives/audio`) vs mixed For You.
+  bool get audioOnly => _audioOnly;
 
   /// Prevents stacked silent polls while a previous one is still in flight.
   var _silentBusy = false;
@@ -35,13 +39,15 @@ class LiveFeedBloc extends Bloc<LiveFeedEvent, LiveFeedState> {
         _currentCategory != event.category ||
         _followingOnly != event.followingOnly ||
         _latitude != event.latitude ||
-        _longitude != event.longitude;
+        _longitude != event.longitude ||
+        _audioOnly != event.audioOnly;
     if (state.isLoading && !queryChanged) return;
     final generation = ++_queryGeneration;
     _currentCategory = event.category;
     _followingOnly = event.followingOnly;
     _latitude = event.latitude;
     _longitude = event.longitude;
+    _audioOnly = event.audioOnly;
     emit(
       LiveFeedLoadInProgress(
         lives: (event.refresh || queryChanged) ? const [] : state.lives,
@@ -59,6 +65,7 @@ class LiveFeedBloc extends Bloc<LiveFeedEvent, LiveFeedState> {
       followingOnly: _followingOnly,
       latitude: _latitude,
       longitude: _longitude,
+      audioOnly: _audioOnly,
       // Opening Lives uses cache; only pull-to-refresh clears the TTL.
       forceRefresh: false,
     );
@@ -106,6 +113,7 @@ class LiveFeedBloc extends Bloc<LiveFeedEvent, LiveFeedState> {
       followingOnly: _followingOnly,
       latitude: _latitude,
       longitude: _longitude,
+      audioOnly: _audioOnly,
     );
     if (generation != _queryGeneration || isClosed) return;
     await result.fold(
@@ -150,6 +158,7 @@ class LiveFeedBloc extends Bloc<LiveFeedEvent, LiveFeedState> {
       followingOnly: _followingOnly,
       latitude: _latitude,
       longitude: _longitude,
+      audioOnly: _audioOnly,
       forceRefresh: true,
     );
     if (generation != _queryGeneration || isClosed) return;
@@ -202,6 +211,7 @@ class LiveFeedBloc extends Bloc<LiveFeedEvent, LiveFeedState> {
         followingOnly: _followingOnly,
         latitude: _latitude,
         longitude: _longitude,
+        audioOnly: _audioOnly,
         forceRefresh: false,
       );
       if (generation != _queryGeneration || isClosed) return;

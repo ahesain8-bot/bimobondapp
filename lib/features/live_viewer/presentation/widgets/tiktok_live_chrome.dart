@@ -17,6 +17,7 @@ class TikTokLiveTopBar extends StatelessWidget {
   final VoidCallback? onViewersTap;
   final VoidCallback? onHourlyRankTap;
   final VoidCallback? onLeagueTap;
+  final VoidCallback? onMoreTap;
 
   const TikTokLiveTopBar({
     super.key,
@@ -27,6 +28,7 @@ class TikTokLiveTopBar extends StatelessWidget {
     this.onViewersTap,
     this.onHourlyRankTap,
     this.onLeagueTap,
+    this.onMoreTap,
   });
 
   @override
@@ -53,12 +55,34 @@ class TikTokLiveTopBar extends StatelessWidget {
                       child: _HostIdentity(live: live, onFollow: onFollow),
                     ),
                   ),
-                  const _LiveBadge(),
+                  _LiveBadge(
+                    paused: live.paused,
+                    ageRestricted: live.ageRestricted,
+                  ),
                   const SizedBox(width: 6),
                   _ViewerEyePill(
                     viewerCount: live.viewerCount,
                     onTap: onViewersTap,
                   ),
+                  if (onMoreTap != null) ...[
+                    const SizedBox(width: 4),
+                    GestureDetector(
+                      onTap: onMoreTap,
+                      behavior: HitTestBehavior.opaque,
+                      child: const SizedBox(
+                        width: TikTokLiveTokens.closeIcon,
+                        height: TikTokLiveTokens.closeIcon,
+                        child: Center(
+                          child: Icon(
+                            Icons.more_horiz_rounded,
+                            color: Colors.white,
+                            size: 24,
+                            shadows: TikTokLiveTokens.glyphShadow,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                   const SizedBox(width: 4),
                   GestureDetector(
                     onTap: onClose,
@@ -94,27 +118,56 @@ class TikTokLiveTopBar extends StatelessWidget {
 }
 
 class _LiveBadge extends StatelessWidget {
-  const _LiveBadge();
+  const _LiveBadge({this.paused = false, this.ageRestricted = false});
+
+  final bool paused;
+  final bool ageRestricted;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 26,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: TikTokLiveTokens.liveRed,
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: const Text(
-        'LIVE',
-        style: TextStyle(
-          color: Colors.white,
-          fontSize: 11,
-          fontWeight: FontWeight.w800,
-          letterSpacing: 0.6,
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          height: 26,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: paused ? const Color(0xFFFFAB00) : TikTokLiveTokens.liveRed,
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Text(
+            paused ? 'PAUSED' : 'LIVE',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.6,
+            ),
+          ),
         ),
-      ),
+        if (ageRestricted) ...[
+          const SizedBox(width: 6),
+          Container(
+            height: 26,
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.55),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: Colors.white24),
+            ),
+            child: const Text(
+              '18+',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

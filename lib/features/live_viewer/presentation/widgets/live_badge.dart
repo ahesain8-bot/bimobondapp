@@ -6,8 +6,16 @@ import '../../core/theme/app_text_styles.dart';
 class LiveBadge extends StatelessWidget {
   final bool compact;
   final bool pulse;
+  final bool paused;
+  final bool planned;
 
-  const LiveBadge({super.key, this.compact = false, this.pulse = true});
+  const LiveBadge({
+    super.key,
+    this.compact = false,
+    this.pulse = true,
+    this.paused = false,
+    this.planned = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -17,9 +25,16 @@ class LiveBadge extends StatelessWidget {
         vertical: compact ? 2 : 4,
       ),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [AppColors.liveGradientStart, AppColors.liveGradientEnd],
-        ),
+        gradient: paused || planned
+            ? null
+            : const LinearGradient(
+                colors: [AppColors.liveGradientStart, AppColors.liveGradientEnd],
+              ),
+        color: paused
+            ? const Color(0xFFFFAB00)
+            : planned
+            ? const Color(0xFF00B0FF)
+            : null,
         borderRadius: BorderRadius.circular(4),
       ),
       child: Row(
@@ -33,15 +48,26 @@ class LiveBadge extends StatelessWidget {
                   shape: BoxShape.circle,
                 ),
               )
-              .animate(onPlay: pulse ? (c) => c.repeat(reverse: true) : null)
-              .fade(begin: 1, end: 0.25, duration: 600.ms),
+              .animate(
+                onPlay: (!paused && !planned && pulse)
+                    ? (c) => c.repeat(reverse: true)
+                    : null,
+              )
+              .fade(begin: 1, end: paused || planned ? 1 : 0.25, duration: 600.ms),
           SizedBox(width: compact ? 3 : 4),
-          Text('LIVE', style: AppTextStyles.liveBadge),
+          Text(
+            paused
+                ? 'PAUSED'
+                : planned
+                ? 'PLANNED'
+                : 'LIVE',
+            style: AppTextStyles.liveBadge,
+          ),
         ],
       ),
     );
 
-    if (!pulse) return badge;
+    if (paused || planned || !pulse) return badge;
     return badge
         .animate(onPlay: (c) => c.repeat(reverse: true))
         .scale(

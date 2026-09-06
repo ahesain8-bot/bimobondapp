@@ -17,6 +17,8 @@ import 'package:bimobondapp/features/live_viewer/data/datasources/live_remote_da
 import 'package:bimobondapp/features/live_viewer/domain/entities/live_entity.dart';
 import 'package:bimobondapp/features/live_viewer/domain/entities/live_feed_page_result.dart';
 import 'package:bimobondapp/features/live_viewer/domain/entities/live_session_entity.dart';
+import 'package:bimobondapp/features/live/domain/entities/live_moderator.dart';
+import 'package:bimobondapp/features/live/domain/entities/live_share_result.dart';
 import 'package:bimobondapp/core/theme/app_theme.dart';
 import 'package:bimobondapp/features/live_viewer/presentation/di/live_viewer_injector.dart'
     as live_viewer_di;
@@ -198,6 +200,7 @@ class _PkFirstDataSource implements LiveRemoteDataSource {
     bool followingOnly = false,
     double? latitude,
     double? longitude,
+    bool audioOnly = false,
   }) async {
     final pageResult = await _inner.getLiveFeed(
       page: page,
@@ -206,6 +209,7 @@ class _PkFirstDataSource implements LiveRemoteDataSource {
       followingOnly: followingOnly,
       latitude: latitude,
       longitude: longitude,
+      audioOnly: audioOnly,
     );
     if (pageResult.lives.isEmpty) return pageResult;
     final lives = pageResult.lives;
@@ -262,4 +266,16 @@ class _PkFirstDataSource implements LiveRemoteDataSource {
     required String liveId,
     required String userId,
   }) => _inner.unmuteViewerChat(liveId: liveId, userId: userId);
+
+  @override
+  Future<LiveShareResult> shareLive(String liveId, {String? channel}) =>
+      _inner.shareLive(liveId, channel: channel);
+
+  @override
+  Future<void> reportLive(String liveId, {required String reason}) =>
+      _inner.reportLive(liveId, reason: reason);
+
+  @override
+  Future<List<LiveModerator>> listModerators(String liveId) =>
+      _inner.listModerators(liveId);
 }

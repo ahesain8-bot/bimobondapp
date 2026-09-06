@@ -1,9 +1,14 @@
 import '../entities/live_chat_message.dart';
 import '../entities/live_gallery_item.dart';
 import '../entities/live_guest.dart';
+import '../entities/live_house.dart';
 import '../entities/live_interactive.dart';
 import '../entities/live_leaderboard_entry.dart';
+import '../entities/live_moderator.dart';
+import '../entities/live_scene.dart';
 import '../entities/live_session.dart';
+import '../entities/live_share_result.dart';
+import '../entities/live_studio.dart';
 import '../../../../core/models/live_media_hints.dart';
 import '../entities/live_viewer.dart';
 import '../../../../core/models/live_battle.dart';
@@ -54,6 +59,42 @@ class LiveHudEndedEvent extends LiveHudEvent {
   final String? reason;
 }
 
+/// Socket `livePaused` `{ paused, pausedAt }` — status stays `LIVE`.
+class LiveHudPausedEvent extends LiveHudEvent {
+  const LiveHudPausedEvent({
+    required this.paused,
+    this.liveId,
+    this.pausedAt,
+  });
+  final bool paused;
+  final String? liveId;
+  final DateTime? pausedAt;
+}
+
+/// Socket `liveScene` after `PATCH /lives/:id/scene`.
+class LiveHudSceneEvent extends LiveHudEvent {
+  const LiveHudSceneEvent({
+    required this.scene,
+    this.liveId,
+  });
+  final LiveScene scene;
+  final String? liveId;
+}
+
+/// Socket `liveCameraChanged` `{ liveId, userId, facing, role, at }`.
+class LiveHudCameraChangedEvent extends LiveHudEvent {
+  const LiveHudCameraChangedEvent({
+    required this.userId,
+    required this.facing,
+    this.liveId,
+    this.role,
+  });
+  final String userId;
+  final String facing;
+  final String? liveId;
+  final String? role;
+}
+
 class LiveHudCommentPinnedEvent extends LiveHudEvent {
   const LiveHudCommentPinnedEvent(this.message);
   final LiveChatMessage message;
@@ -70,11 +111,37 @@ class LiveHudModerationEvent extends LiveHudEvent {
     required this.liveId,
     this.userId,
     this.reason,
+    this.chatRules,
   });
   final String type;
   final String liveId;
   final String? userId;
   final String? reason;
+
+  /// Present on `chat_rules_updated`.
+  final Map<String, dynamic>? chatRules;
+}
+
+/// Socket `liveHouse` — room attached or house closed. Payload is thin.
+class LiveHudHouseEvent extends LiveHudEvent {
+  const LiveHudHouseEvent({
+    this.liveId,
+    this.houseId,
+    this.action,
+    this.status,
+    this.payload = const {},
+  });
+
+  final String? liveId;
+  final String? houseId;
+  final String? action;
+  final String? status;
+  final Map<String, dynamic> payload;
+
+  bool get isClosed {
+    final value = (status ?? action ?? '').toUpperCase();
+    return value == 'CLOSED' || value == 'CLOSE' || value == 'HOUSE_CLOSED';
+  }
 }
 
 class LiveHudGiftEvent extends LiveHudEvent {
@@ -226,7 +293,20 @@ class LiveGuestStageCredentials {
 /// Contract for loading and updating an active live session.
 abstract class LiveSessionRepository {
   /// Creates and starts a host live (`POST /lives` with `startNow: true`).
-  Future<LiveSession> startHostSession({required String title});
+  Future<LiveSession> startHostSession({
+    required String title,
+    String mediaMode = 'VIDEO',
+    String? topic,
+  });
+
+  /// Creates a `PLANNED` live (`POST /lives` with `scheduledAt`, no `startNow`).
+  /// Does not connect LiveKit. Host starts later via [reconnectHostSession].
+  Future<LiveSession> createPlannedSession({
+    required String title,
+    required DateTime scheduledAt,
+    String mediaMode = 'VIDEO',
+    String? topic,
+  });
 
   /// Reconnects to an existing LIVE as host (`POST /lives/:id/start`).
   Future<LiveSession> reconnectHostSession(String liveId);
@@ -236,6 +316,29 @@ abstract class LiveSessionRepository {
 
   /// Ends the active session (`POST /lives/:id/end`) and disconnects HUD/media.
   Future<void> endSession(String sessionId);
+
+  /// Pause without ending (`POST /lives/:id/pause`). Status stays `LIVE`.
+  /// Returns the server `paused` flag from `{ paused, pausedAt }`.
+  Future<bool> pauseLive(String liveId);
+
+  /// Resume (`POST /lives/:id/resume`). Returns the server `paused` flag.
+  Future<bool> resumeLive(String liveId);
+
+  /// Host-only OBS / RTMP bundle (`GET /lives/:id/studio`).
+  /// Missing Ingress returns null credentials — never fails go-live.
+  Future<LiveStudio?> loadStudio(String liveId);
+
+  /// Persist scene / facing (`PATCH /lives/:id/scene`). Socket `liveScene`.
+  Future<LiveScene> updateScene({
+    required String liveId,
+    required LiveScene scene,
+  });
+
+  /// Signaling after a local camera flip (`switchLiveCamera`).
+  void emitSwitchLiveCamera({
+    required String liveId,
+    required String facing,
+  });
 
   /// Loads comments (`GET /lives/:id/comments`).
   Future<List<LiveChatMessage>> loadComments(
@@ -288,8 +391,52 @@ abstract class LiveSessionRepository {
   /// Unbans a viewer for this live.
   Future<void> unbanViewer({required String liveId, required String userId});
 
+  /// Host-only chat rules (`PATCH /lives/:id/chat-rules`).
+  Future<LiveSession> updateChatRules({
+    required String liveId,
+    String? chatMode,
+    int? slowModeSeconds,
+    List<String>? blockedKeywords,
+  });
+
+  /// Assigned live moderators (`GET /lives/:id/moderators`).
+  Future<List<LiveModerator>> loadModerators(String liveId);
+
+  /// Host-only (`POST /lives/:id/moderators` `{ "userId" }`).
+  Future<LiveModerator> addModerator({
+    required String liveId,
+    required String userId,
+  });
+
+  /// Host-only (`DELETE /lives/:id/moderators/:userId`).
+  Future<void> removeModerator({
+    required String liveId,
+    required String userId,
+  });
+
+  /// `POST /lives/houses` `{ "title" }`.
+  Future<LiveHouse> createHouse({required String title});
+
+  /// `GET /lives/houses`.
+  Future<List<LiveHouse>> loadHouses();
+
+  /// `GET /lives/houses/:houseId`.
+  Future<LiveHouse?> loadHouse(String houseId);
+
+  /// Host attaches their own live (`POST …/houses/:houseId/rooms` `{ liveId }`).
+  Future<void> attachLiveToHouse({
+    required String houseId,
+    required String liveId,
+  });
+
+  /// Host closes the house (`PATCH /lives/houses/:houseId`).
+  Future<void> closeHouse(String houseId);
+
   /// Registers a like tap (`POST /lives/:id/like`).
   Future<int> like(String liveId);
+
+  /// Increments `shareCount` (`POST /lives/:id/share`). Use [LiveShareResult.shareUrl].
+  Future<LiveShareResult> shareLive(String liveId, {String? channel});
 
   /// Updates live title (`PATCH /lives/:id`).
   Future<LiveSession> updateTitle({
@@ -306,6 +453,8 @@ abstract class LiveSessionRepository {
     String? layout,
     bool? allowGuestCamera,
     bool? moderatorsCanManageGuests,
+    String? topic,
+    bool? ageRestricted,
   });
 
   /// Refreshes gallery counts (`GET /lives/:id/gallery`).
@@ -443,6 +592,11 @@ abstract class LiveSessionRepository {
     bool useArBeautyCamera = false,
   });
 
+  /// Publish or stop LiveKit screen share (`SCREEN` / `DUAL` scenes).
+  Future<void> setScreenShareEnabled(bool enabled);
+
+  Object? get localScreenShareTrack;
+
   /// Viewer subscribe-only LiveKit connect.
   Future<void> connectMediaSubscribe({
     required String url,
@@ -453,6 +607,8 @@ abstract class LiveSessionRepository {
   Future<void> disconnectMedia();
 
   Future<void> setMicrophoneEnabled(bool enabled);
+
+  Future<void> setCameraEnabled(bool enabled);
 
   /// Flip LiveKit camera (front/back).
   Future<void> flipMediaCamera({required bool useFront});
@@ -480,6 +636,6 @@ abstract class LiveSessionRepository {
   /// True while the PK opponent LiveKit room is connected and usable.
   bool get isBattleRoomUsable;
 
-  /// Whether LiveKit host/guest publish is active (video published).
+  /// Whether LiveKit host/guest publish is active (mic and/or video).
   bool get isMediaConnected;
 }

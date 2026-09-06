@@ -35,6 +35,12 @@ class RealLiveKitService implements LiveKitService {
   var _battleConnectionGeneration = 0;
   Timer? _primaryVideoHealthTimer;
   Timer? _battleVideoHealthTimer;
+  Timer? _screenShareDiagTimer;
+  var _screenShareDiagInFlight = false;
+  num? _screenShareDiagPreviousBytes;
+  DateTime? _screenShareDiagPreviousAt;
+  num? _cameraDiagPreviousBytes;
+  DateTime? _cameraDiagPreviousAt;
   bool _primaryHealthCheckInFlight = false;
   bool _battleHealthCheckInFlight = false;
   int _primaryMissingTrackSamples = 0;
@@ -52,6 +58,126 @@ class RealLiveKitService implements LiveKitService {
     final id = roomId ?? _roomName ?? '-';
     final extra = detail == null || detail.isEmpty ? '' : ' | $detail';
     debugPrint('[PK-DIAG][$ts] $event room=$id$extra');
+  }
+
+  void _startScreenShareDiagnostics(Room room) {
+    _screenShareDiagTimer?.cancel();
+    _screenShareDiagPreviousBytes = null;
+    _screenShareDiagPreviousAt = null;
+    _cameraDiagPreviousBytes = null;
+    _cameraDiagPreviousAt = null;
+    _screenShareDiagTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (_screenShareDiagInFlight || _room != room) return;
+      _screenShareDiagInFlight = true;
+      unawaited(
+        _sampleScreenShareDiagnostics(room).whenComplete(() {
+          _screenShareDiagInFlight = false;
+        }),
+      );
+    });
+  }
+
+  void _stopScreenShareDiagnostics() {
+    _screenShareDiagTimer?.cancel();
+    _screenShareDiagTimer = null;
+    _screenShareDiagPreviousBytes = null;
+    _screenShareDiagPreviousAt = null;
+    _cameraDiagPreviousBytes = null;
+    _cameraDiagPreviousAt = null;
+  }
+
+  Future<void> _sampleScreenShareDiagnostics(Room room) async {
+    RemoteTrackPublication<RemoteVideoTrack>? screen;
+    RemoteTrackPublication<RemoteVideoTrack>? camera;
+    for (final participant in room.remoteParticipants.values) {
+      for (final candidate in participant.videoTrackPublications) {
+        if (candidate.source == TrackSource.screenShareVideo) {
+          screen ??= candidate;
+        } else if (camera == null || (camera.muted && !candidate.muted)) {
+          camera = candidate;
+        }
+      }
+    }
+    if (screen != null) {
+      final next = await _logViewerReceiver(
+        screen,
+        previousBytes: _screenShareDiagPreviousBytes,
+        previousAt: _screenShareDiagPreviousAt,
+      );
+      if (next != null) {
+        _screenShareDiagPreviousBytes = next.$1;
+        _screenShareDiagPreviousAt = next.$2;
+      }
+    }
+    if (camera != null) {
+      final next = await _logViewerReceiver(
+        camera,
+        previousBytes: _cameraDiagPreviousBytes,
+        previousAt: _cameraDiagPreviousAt,
+      );
+      if (next != null) {
+        _cameraDiagPreviousBytes = next.$1;
+        _cameraDiagPreviousAt = next.$2;
+      }
+    }
+  }
+
+  Future<(num, DateTime)?> _logViewerReceiver(
+    RemoteTrackPublication<RemoteVideoTrack> publication, {
+    required num? previousBytes,
+    required DateTime? previousAt,
+  }) async {
+    final track = publication.track;
+    num? framesReceived;
+    num? framesDecoded;
+    num? bytesReceived;
+    num? width;
+    num? height;
+    num? bitrateKbps;
+    DateTime? now;
+    try {
+      final stats = track == null ? null : await track.getReceiverStats();
+      if (stats != null) {
+        framesReceived = stats.framesReceived;
+        framesDecoded = stats.framesDecoded;
+        bytesReceived = stats.bytesReceived;
+        width = stats.frameWidth;
+        height = stats.frameHeight;
+        now = DateTime.now();
+        if (previousBytes != null &&
+            previousAt != null &&
+            bytesReceived != null) {
+          bitrateKbps = ((bytesReceived - previousBytes) *
+                    8 /
+                    now.difference(previousAt).inMicroseconds *
+                    1000 /
+                    1000)
+                .round();
+        }
+      }
+    } catch (error) {
+      debugPrint(
+        'LIVE_SCREEN_DIAG viewer receiver error=$error'
+        ' source=${publication.source.name}'
+        ' sid=${publication.sid}',
+      );
+    }
+    debugPrint(
+      'LIVE_SCREEN_DIAG viewer receiver'
+      ' sid=${publication.sid}'
+      ' source=${publication.source.name}'
+      ' subscribed=${publication.subscribed}'
+      ' muted=${publication.muted}'
+      ' framesReceived=${framesReceived ?? "?"}'
+      ' framesDecoded=${framesDecoded ?? "?"}'
+      ' bytesReceived=${bytesReceived ?? "?"}'
+      ' bitrateKbps=${bitrateKbps ?? "?"}'
+      ' decoded=${width ?? "?"}x${height ?? "?"}',
+    );
+    if (bytesReceived != null && now != null) {
+      return (bytesReceived, now);
+    }
+    return null;
   }
 
   /// Whether this service currently holds [LiveAudioSession]. The battle room
@@ -841,6 +967,7 @@ class RealLiveKitService implements LiveKitService {
         // Every listener below checks identity so a late disconnect from the
         // room we just replaced cannot mark the new room disconnected.
         _room = room;
+        _startScreenShareDiagnostics(room);
         room.events
           ..on<RoomDisconnectedEvent>((event) {
             if (_room != room) return;
@@ -1001,19 +1128,15 @@ class RealLiveKitService implements LiveKitService {
       throw StateError('Guest publish url/token missing');
     }
 
-    // The viewer app is subscribe-only, so it has never asked for the camera
-    // or the mic. Going on stage is the first moment it needs them, and
-    // setCameraEnabled() on Android without CAMERA granted fails without ever
-    // opening the lens — the guest joins and stays a black tile.
-    await _ensureCapturePermissions();
-
-    // A fresh connect, not an upgrade: the viewer's token carries no publish
-    // grant, so the room has to be re-established with the one the server
-    // issued on accept before the camera can go out.
     final hints = mediaHints ?? LiveMediaHints.defaultsForRole('guest');
     if (!hints.canPublish) {
-      throw StateError('الخادم لم يمنح الضيف صلاحية نشر الكاميرا والمايك.');
+      throw StateError(
+        hints.audioOnly
+            ? 'الخادم لم يمنح المتحدث صلاحية نشر المايك.'
+            : 'الخادم لم يمنح الضيف صلاحية نشر الكاميرا والمايك.',
+      );
     }
+    await _ensureCapturePermissions(audioOnly: hints.audioOnly);
     await connect(
       url: url,
       token: token,
@@ -1046,21 +1169,29 @@ class RealLiveKitService implements LiveKitService {
     // Keep the existing audio source alive across mute/unmute and explicitly
     // use the refreshed role hints for the camera publication.
     await local.setMicrophoneEnabled(true);
-    await local.setCameraEnabled(true);
+    if (!hints.audioOnly) {
+      await local.setCameraEnabled(true);
+    }
 
     for (var attempt = 0; attempt < 10; attempt++) {
       if (_room != room) return;
       final audioReady = local.audioTrackPublications.any(
         (publication) => !publication.muted && publication.track != null,
       );
-      final videoReady = local.videoTrackPublications.any(
-        (publication) => !publication.muted && publication.track != null,
-      );
+      final videoReady = hints.audioOnly
+          ? true
+          : local.videoTrackPublications.any(
+              (publication) => !publication.muted && publication.track != null,
+            );
       if (audioReady && videoReady) {
         await _preferMediaSpeaker();
         return;
       }
       await Future<void>.delayed(const Duration(milliseconds: 200));
+    }
+
+    if (hints.audioOnly) {
+      throw StateError('لم يكتمل نشر المايك للمتحدث.');
     }
 
     // One controlled republish handles camera sources that were lost while
@@ -1088,19 +1219,24 @@ class RealLiveKitService implements LiveKitService {
   }
 
   /// Requests camera + mic, throwing a message the room can show verbatim.
-  Future<void> _ensureCapturePermissions() async {
-    final statuses = await [Permission.camera, Permission.microphone].request();
+  Future<void> _ensureCapturePermissions({bool audioOnly = false}) async {
+    final statuses = await [
+      if (!audioOnly) Permission.camera,
+      Permission.microphone,
+    ].request();
     final camera = statuses[Permission.camera];
     final mic = statuses[Permission.microphone];
 
-    if (camera != null && camera.isPermanentlyDenied) {
-      throw StateError(
-        'صلاحية الكاميرا مرفوضة نهائياً. فعّلها من إعدادات التطبيق للانضمام '
-        'إلى المسرح.',
-      );
-    }
-    if (camera == null || !camera.isGranted) {
-      throw StateError('لا يمكن الانضمام إلى المسرح بدون صلاحية الكاميرا.');
+    if (!audioOnly) {
+      if (camera != null && camera.isPermanentlyDenied) {
+        throw StateError(
+          'صلاحية الكاميرا مرفوضة نهائياً. فعّلها من إعدادات التطبيق للانضمام '
+          'إلى المسرح.',
+        );
+      }
+      if (camera == null || !camera.isGranted) {
+        throw StateError('لا يمكن الانضمام إلى المسرح بدون صلاحية الكاميرا.');
+      }
     }
     if (mic == null || !mic.isGranted) {
       if (mic?.isPermanentlyDenied == true) {
@@ -1149,6 +1285,7 @@ class RealLiveKitService implements LiveKitService {
 
   Future<void> _disposePrimaryRoom({required bool notify}) async {
     _stopPrimaryVideoWatchdog();
+    _stopScreenShareDiagnostics();
     final room = _room;
     // Clear identity first so a late RoomDisconnectedEvent from the room being
     // replaced cannot mutate the state of its successor.

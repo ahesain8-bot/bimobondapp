@@ -197,6 +197,64 @@ class SocketMapper {
     );
   }
 
+  static LivePausedEvent? pausedEvent(dynamic data, String? fallbackLiveId) {
+    final map = _asMap(data);
+    if (map == null) return null;
+
+    return LivePausedEvent(
+      liveId: map['liveId']?.toString() ?? fallbackLiveId ?? '',
+      paused: map['paused'] == true,
+      pausedAt: DateTime.tryParse(map['pausedAt']?.toString() ?? ''),
+      timestamp: DateTime.now(),
+    );
+  }
+
+  static LiveSceneChangedEvent? sceneEvent(
+    dynamic data,
+    String? fallbackLiveId,
+  ) {
+    final map = _asMap(data);
+    if (map == null) return null;
+    final nested = _asMap(map['scene']);
+    final scene =
+        (nested?['scene'] ?? map['scene'])?.toString().toUpperCase() ??
+        'CAMERA';
+    final facing =
+        (nested?['cameraFacing'] ?? map['cameraFacing'])
+            ?.toString()
+            .toLowerCase() ??
+        'front';
+    return LiveSceneChangedEvent(
+      liveId: map['liveId']?.toString() ?? fallbackLiveId ?? '',
+      scene: scene == 'SCREEN' || scene == 'DUAL' ? scene : 'CAMERA',
+      cameraFacing: facing == 'back' ? 'back' : 'front',
+      dualCameraEnabled:
+          nested?['dualCameraEnabled'] == true ||
+          map['dualCameraEnabled'] == true,
+      timestamp: DateTime.now(),
+    );
+  }
+
+  static LiveCameraChangedEvent? cameraChangedEvent(
+    dynamic data,
+    String? fallbackLiveId,
+  ) {
+    final map = _asMap(data);
+    if (map == null) return null;
+    final userId = map['userId']?.toString() ?? '';
+    if (userId.isEmpty) return null;
+    final facing = map['facing']?.toString().toLowerCase() == 'back'
+        ? 'back'
+        : 'front';
+    return LiveCameraChangedEvent(
+      liveId: map['liveId']?.toString() ?? fallbackLiveId ?? '',
+      userId: userId,
+      facing: facing,
+      role: map['role']?.toString(),
+      timestamp: DateTime.now(),
+    );
+  }
+
   static LiveCommentDeletedEvent? commentDeletedEvent(
     dynamic data,
     String? fallbackLiveId,
@@ -253,6 +311,7 @@ class SocketMapper {
       moderationType: type,
       userId: map['userId']?.toString(),
       reason: map['reason']?.toString(),
+      chatRules: _asMap(map['chatRules']),
       timestamp: DateTime.now(),
     );
   }
@@ -378,6 +437,21 @@ class SocketMapper {
     final handle = user?['username']?.toString().trim();
     if (handle != null && handle.isNotEmpty) return handle;
     return fallback;
+  }
+
+  static LiveHouseSocketEvent? houseEvent(
+    dynamic data,
+    String? fallbackLiveId,
+  ) {
+    final map = _asMap(data);
+    if (map == null) return null;
+    return LiveHouseSocketEvent(
+      liveId: map['liveId']?.toString() ?? fallbackLiveId ?? '',
+      houseId: map['houseId']?.toString() ?? map['id']?.toString(),
+      action: map['action']?.toString() ?? map['type']?.toString(),
+      status: map['status']?.toString(),
+      timestamp: DateTime.now(),
+    );
   }
 
   static Map<String, dynamic>? _asMap(dynamic value) {

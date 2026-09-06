@@ -3,6 +3,8 @@ import 'package:bimobondapp/features/live_viewer/core/errors/failures.dart';
 import '../entities/live_entity.dart';
 import '../entities/live_feed_page_result.dart';
 import '../entities/live_session_entity.dart';
+import '../../../live/domain/entities/live_moderator.dart';
+import '../../../live/domain/entities/live_share_result.dart';
 
 abstract class LiveRepository {
   /// GET /lives/feed
@@ -17,6 +19,7 @@ abstract class LiveRepository {
     double? latitude,
     double? longitude,
     bool forceRefresh = false,
+    bool audioOnly = false,
   });
 
   /// GET /lives/{id}
@@ -92,4 +95,13 @@ abstract class LiveRepository {
     required String liveId,
     required String userId,
   });
+
+  /// POST /lives/:id/share
+  Future<Either<Failure, LiveShareResult>> shareLive(
+    String liveId, {
+    String? channel,
+  });
+
+  /// GET /lives/:id/moderators
+  Future<Either<Failure, List<LiveModerator>>> listModerators(String liveId);
 }

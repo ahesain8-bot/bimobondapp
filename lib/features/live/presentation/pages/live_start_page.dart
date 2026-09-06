@@ -13,6 +13,7 @@ import '../../../live/domain/usecases/dispose_camera.dart';
 import '../../../live/domain/usecases/initialize_camera.dart';
 import '../bloc/start_live/live_bloc.dart';
 import '../bloc/start_live/live_event.dart';
+import '../bloc/start_live/live_state.dart';
 import 'service_plus_page.dart';
 import 'fans_community_page.dart';
 import 'start_live_share_page.dart';
@@ -23,6 +24,7 @@ import '../widgets/start_live/camera_preview_layer.dart';
 import '../widgets/start_live/beautify_panel.dart';
 import '../widgets/start_live/effects_panel.dart';
 import '../widgets/start_live/live_container.dart';
+import '../widgets/start_live/live_start_topic_schedule.dart';
 import '../widgets/start_live/options_row.dart';
 import '../widgets/start_live/settings_panel.dart';
 import '../widgets/start_live/status_bar_area.dart';
@@ -108,6 +110,10 @@ class _LiveStartPageState extends State<LiveStartPage>
       ArCameraBridge.onLiveStartInteract = () =>
           _openFromNative(_openStartLiveInteractionSheet);
       ArCameraBridge.onLiveStartComingSoon = _showComingSoon;
+      ArCameraBridge.onLiveStartAddTopic = () =>
+          _openFromNative(() => showLiveTopicDialog(context));
+      ArCameraBridge.onLiveStartSchedule = () =>
+          _openFromNative(() => showLiveSchedulePicker(context));
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _enableNativeChrome();
       });
@@ -133,11 +139,20 @@ class _LiveStartPageState extends State<LiveStartPage>
     try {
       await _hideNativeChrome();
       if (!mounted) return;
-      await openLiveRoomFromStart(
+      await startOrScheduleFromStart(
         context,
         title: title.trim(),
         liveBloc: _liveBloc,
       );
+      if (mounted && _useNativeChrome) {
+        await _enableNativeChrome();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not start live: $e')),
+        );
+      }
       if (mounted && _useNativeChrome) {
         await _enableNativeChrome();
       }
@@ -234,6 +249,8 @@ class _LiveStartPageState extends State<LiveStartPage>
       ArCameraBridge.onLiveStartServicePlus = null;
       ArCameraBridge.onLiveStartInteract = null;
       ArCameraBridge.onLiveStartComingSoon = null;
+      ArCameraBridge.onLiveStartAddTopic = null;
+      ArCameraBridge.onLiveStartSchedule = null;
       ArCameraBridge.setLiveStartChrome(visible: false);
     }
     WidgetsBinding.instance.removeObserver(this);
@@ -400,22 +417,33 @@ class _LiveStartPageState extends State<LiveStartPage>
               top: 0,
               left: 0,
               right: 0,
-              child: StatusBarArea(
-                onClose: _closeToMainPage,
-                titleController: _titleController,
-                onChangeCover: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Change cover coming soon')),
-                  );
+              child: BlocBuilder<LiveBloc, LiveState>(
+                buildWhen: (prev, curr) {
+                  if (prev is! LiveReady || curr is! LiveReady) return true;
+                  return prev.topic != curr.topic ||
+                      prev.scheduledAt != curr.scheduledAt;
                 },
-                onAddTopic: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Add topic coming soon')),
-                  );
-                },
-                onAddGoal: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('LIVE goal coming soon')),
+                builder: (context, state) {
+                  final ready = state is LiveReady ? state : null;
+                  return StatusBarArea(
+                    onClose: _closeToMainPage,
+                    titleController: _titleController,
+                    topic: ready?.topic,
+                    scheduledAt: ready?.scheduledAt,
+                    onChangeCover: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Change cover coming soon'),
+                        ),
+                      );
+                    },
+                    onAddTopic: () => showLiveTopicDialog(context),
+                    onSchedule: () => showLiveSchedulePicker(context),
+                    onAddGoal: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('LIVE goal coming soon')),
+                      );
+                    },
                   );
                 },
               ),

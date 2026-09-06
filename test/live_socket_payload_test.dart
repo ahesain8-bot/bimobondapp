@@ -1,8 +1,16 @@
 import 'package:bimobondapp/app/auctions/data/datasources/auction_socket_service.dart';
 import 'package:bimobondapp/app/gifts/domain/entities/gift_entity.dart';
+import 'package:bimobondapp/core/models/live_media_hints.dart';
+import 'package:bimobondapp/core/models/live_media_mode.dart';
+import 'package:bimobondapp/core/models/live_topic.dart';
+import 'package:bimobondapp/core/network/api_endpoints.dart';
 import 'package:bimobondapp/features/live/data/datasources/lives_socket_datasource.dart';
 import 'package:bimobondapp/features/live/data/mappers/live_session_mapper.dart';
+import 'package:bimobondapp/features/live/domain/entities/live_share_result.dart';
+import 'package:bimobondapp/features/live/domain/entities/live_studio.dart';
+import 'package:bimobondapp/features/live_viewer/data/mappers/live_mapper.dart';
 import 'package:bimobondapp/features/live_viewer/data/mappers/socket_mapper.dart';
+import 'package:bimobondapp/features/live_viewer/domain/entities/live_entity.dart';
 import 'package:bimobondapp/features/live_viewer/domain/entities/socket_event.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -340,6 +348,431 @@ void main() {
 
       expect(event!.liveId, 'live-2');
       expect(event.avatarUrls, isEmpty);
+    });
+  });
+
+  group('pause / resume contract', () {
+    test('LiveSessionMapper maps paused without changing LIVE status', () {
+      final session = LiveSessionMapper.fromLiveJson({
+        'id': 'live-1',
+        'status': 'LIVE',
+        'paused': true,
+        'pausedAt': '2026-09-05T12:00:00.000Z',
+        'viewers': 12,
+        'likeCount': 3,
+        'user': {'id': 'h1', 'fullName': 'Host'},
+      });
+
+      expect(session.status, 'LIVE');
+      expect(session.isLive, isTrue);
+      expect(session.paused, isTrue);
+    });
+
+    test('SocketMapper maps livePaused { paused, pausedAt }', () {
+      final event = SocketMapper.pausedEvent({
+        'liveId': 'live-1',
+        'paused': true,
+        'pausedAt': '2026-09-05T12:00:00.000Z',
+      }, null);
+
+      expect(event, isA<LivePausedEvent>());
+      expect(event!.liveId, 'live-1');
+      expect(event.paused, isTrue);
+      expect(event.pausedAt, DateTime.parse('2026-09-05T12:00:00.000Z'));
+    });
+
+    test('SocketMapper maps resume as paused: false', () {
+      final event = SocketMapper.pausedEvent({
+        'paused': false,
+      }, 'live-2');
+
+      expect(event!.liveId, 'live-2');
+      expect(event.paused, isFalse);
+      expect(event.pausedAt, isNull);
+    });
+
+    test('LiveMapper keeps status LIVE and exposes paused', () {
+      final live = LiveMapper.fromJson({
+        'id': 'live-1',
+        'status': 'LIVE',
+        'paused': true,
+        'title': 'Hello',
+        'user': {'id': 'h1', 'fullName': 'Host'},
+        'startedAt': '2026-09-05T12:00:00.000Z',
+      });
+
+      expect(live.status, LiveStatus.live);
+      expect(live.isLive, isTrue);
+      expect(live.paused, isTrue);
+    });
+  });
+
+  group('audio rooms / scene / studio contract', () {
+    test('LiveMediaMode aliases VOICE and SOUND to AUDIO', () {
+      expect(LiveMediaMode.normalize('VOICE'), LiveMediaMode.audio);
+      expect(LiveMediaMode.normalize('SOUND'), LiveMediaMode.audio);
+      expect(LiveMediaMode.normalize('video'), LiveMediaMode.video);
+      expect(LiveMediaMode.isAudio(mediaMode: 'AUDIO'), isTrue);
+    });
+
+    test('LiveSessionMapper maps AUDIO mediaMode, audioOnly, PANEL, scene', () {
+      final session = LiveSessionMapper.fromLiveJson({
+        'id': 'live-1',
+        'status': 'LIVE',
+        'mediaMode': 'AUDIO',
+        'audioOnly': true,
+        'layout': 'PANEL',
+        'allowGuestCamera': false,
+        'scene': {
+          'scene': 'CAMERA',
+          'cameraFacing': 'front',
+          'dualCameraEnabled': false,
+        },
+        'user': {'id': 'h1', 'fullName': 'Host'},
+      });
+
+      expect(session.mediaMode, 'AUDIO');
+      expect(session.audioOnly, isTrue);
+      expect(session.isAudioOnly, isTrue);
+      expect(session.layout, 'PANEL');
+      expect(session.scene.scene, 'CAMERA');
+    });
+
+    test('LiveMapper audioOnly skips treating the card as camera video', () {
+      final live = LiveMapper.fromJson({
+        'id': 'live-1',
+        'status': 'LIVE',
+        'mediaMode': 'VOICE',
+        'title': 'Talk',
+        'user': {'id': 'h1', 'fullName': 'Host'},
+        'startedAt': '2026-09-05T12:00:00.000Z',
+      });
+
+      expect(live.mediaMode, 'AUDIO');
+      expect(live.audioOnly, isTrue);
+      expect(live.isAudioOnly, isTrue);
+    });
+
+    test('LiveMapper maps nested scene DUAL + facing', () {
+      final live = LiveMapper.fromJson({
+        'id': 'live-1',
+        'status': 'LIVE',
+        'mediaMode': 'VIDEO',
+        'scene': {
+          'scene': 'DUAL',
+          'cameraFacing': 'back',
+          'dualCameraEnabled': true,
+        },
+        'user': {'id': 'h1', 'fullName': 'Host'},
+        'startedAt': '2026-09-05T12:00:00.000Z',
+      });
+
+      expect(live.scene, 'DUAL');
+      expect(live.cameraFacing, 'back');
+      expect(live.dualCameraEnabled, isTrue);
+    });
+
+    test('LiveMediaHints.fromPayload maps audioOnly host token', () {
+      final hints = LiveMediaHints.fromPayload({
+        'role': 'host',
+        'mediaHints': {
+          'role': 'host',
+          'canPublish': true,
+          'audioOnly': true,
+          'maxVideoResolution': null,
+          'maxBitrateKbps': 0,
+          'simulcast': false,
+          'adaptiveStream': false,
+          'dynacast': false,
+        },
+      }, fallbackRole: 'host');
+
+      expect(hints.audioOnly, isTrue);
+      expect(hints.canPublish, isTrue);
+      expect(hints.maxBitrateKbps, 0);
+      expect(hints.simulcast, isFalse);
+    });
+
+    test('LiveStudio.fromJson maps RTMP + recording + screenShare', () {
+      final studio = LiveStudio.fromJson({
+        'rtmpUrl': 'rtmp://livekit.example/live',
+        'streamKey': 'sk-secret',
+        'ingressId': 'IN_1',
+        'recording': {
+          'status': 'RECORDING',
+          'egressId': 'EG_1',
+          'autoRecord': true,
+        },
+        'screenShare': {'canPublish': true},
+      });
+
+      expect(studio, isNotNull);
+      expect(studio!.hasRtmpCredentials, isTrue);
+      expect(studio.rtmpUrl, 'rtmp://livekit.example/live');
+      expect(studio.streamKey, 'sk-secret');
+      expect(studio.recordingStatus, 'RECORDING');
+      expect(studio.autoRecord, isTrue);
+      expect(studio.canPublishScreen, isTrue);
+    });
+
+    test('LiveStudio.fromJson missing Ingress is non-fatal empty credentials', () {
+      final studio = LiveStudio.fromJson({
+        'rtmpUrl': null,
+        'streamKey': null,
+        'recording': {'status': 'NONE'},
+      });
+
+      expect(studio, isNotNull);
+      expect(studio!.hasRtmpCredentials, isFalse);
+      expect(studio.recordingStatus, 'NONE');
+    });
+
+    test('SocketMapper maps liveScene nested or flat payload', () {
+      final nested = SocketMapper.sceneEvent({
+        'liveId': 'live-1',
+        'scene': {
+          'scene': 'SCREEN',
+          'cameraFacing': 'front',
+          'dualCameraEnabled': false,
+        },
+      }, null);
+      expect(nested, isA<LiveSceneChangedEvent>());
+      expect(nested!.scene, 'SCREEN');
+      expect(nested.cameraFacing, 'front');
+
+      final flat = SocketMapper.sceneEvent({
+        'scene': 'DUAL',
+        'cameraFacing': 'back',
+        'dualCameraEnabled': true,
+      }, 'live-2');
+      expect(flat!.liveId, 'live-2');
+      expect(flat.scene, 'DUAL');
+      expect(flat.dualCameraEnabled, isTrue);
+    });
+
+    test('SocketMapper maps liveCameraChanged { liveId, userId, facing }', () {
+      final event = SocketMapper.cameraChangedEvent({
+        'liveId': 'live-1',
+        'userId': 'h1',
+        'facing': 'back',
+        'role': 'host',
+      }, null);
+
+      expect(event, isA<LiveCameraChangedEvent>());
+      expect(event!.userId, 'h1');
+      expect(event.facing, 'back');
+      expect(event.role, 'host');
+    });
+  });
+
+  group('topic / scheduledAt / share contract', () {
+    test('LiveTopic.normalize trims and caps at 80', () {
+      expect(LiveTopic.normalize('  late night  '), 'late night');
+      expect(LiveTopic.normalize('   '), isNull);
+      expect(LiveTopic.normalize('x' * 90), 'x' * 80);
+    });
+
+    test('LiveSchedule serializes UTC ISO with Z and round-trips local time', () {
+      final utc = DateTime.utc(2026, 8, 25, 20, 0);
+      expect(LiveSchedule.toUtcIso(utc), '2026-08-25T20:00:00.000Z');
+
+      final local = DateTime(2026, 8, 25, 23, 0);
+      final iso = LiveSchedule.toUtcIso(local);
+      expect(iso.endsWith('Z'), isTrue);
+      final roundTrip = DateTime.parse(iso).toLocal();
+      expect(roundTrip.year, local.year);
+      expect(roundTrip.month, local.month);
+      expect(roundTrip.day, local.day);
+      expect(roundTrip.hour, local.hour);
+      expect(roundTrip.minute, local.minute);
+    });
+
+    test('LiveSessionMapper maps topic, scheduledAt, PLANNED, shareCount', () {
+      final session = LiveSessionMapper.fromLiveJson({
+        'id': 'live-1',
+        'status': 'PLANNED',
+        'topic': '  late night radio  ',
+        'scheduledAt': '2026-08-25T20:00:00.000Z',
+        'shareCount': 42,
+        'user': {'id': 'h1', 'fullName': 'Host'},
+      });
+
+      expect(session.status, 'PLANNED');
+      expect(session.isPlanned, isTrue);
+      expect(session.topic, 'late night radio');
+      expect(session.scheduledAt, DateTime.parse('2026-08-25T20:00:00.000Z'));
+      expect(session.shareCount, 42);
+    });
+
+    test('LiveMapper maps PLANNED to scheduled and exposes topic', () {
+      final live = LiveMapper.fromJson({
+        'id': 'live-1',
+        'status': 'PLANNED',
+        'topic': 'Q&A',
+        'scheduledAt': '2026-08-25T20:00:00.000Z',
+        'shareCount': 3,
+        'title': 'Tonight',
+        'user': {'id': 'h1', 'fullName': 'Host'},
+      });
+
+      expect(live.status, LiveStatus.scheduled);
+      expect(live.isLive, isFalse);
+      expect(live.topic, 'Q&A');
+      expect(live.shareCount, 3);
+      expect(live.metadata?['topic'], 'Q&A');
+      expect(live.metadata?['shareCount'], 3);
+      expect(live.scheduledAt, DateTime.parse('2026-08-25T20:00:00.000Z'));
+    });
+
+    test('LiveShareResult.fromJson reads shareUrl and shareCount', () {
+      final result = LiveShareResult.fromJson({
+        'liveId': 'live-1',
+        'shareUrl': 'https://app.example.com/lives/live-1',
+        'deepLink': 'dcc://lives/live-1',
+        'shareCount': 42,
+      });
+      expect(result.shareUrl, 'https://app.example.com/lives/live-1');
+      expect(result.shareCount, 42);
+    });
+  });
+
+  group('Feature #12 chat rules and moderators', () {
+    test('LiveSessionMapper maps chatMode, slowModeSeconds, blockedKeywords', () {
+      final session = LiveSessionMapper.fromLiveJson({
+        'id': 'live-1',
+        'status': 'LIVE',
+        'chatMode': 'FOLLOWERS',
+        'slowModeSeconds': 5,
+        'blockedKeywords': ['badword', 'spam'],
+        'user': {'id': 'h1', 'fullName': 'Host'},
+      });
+
+      expect(session.chatMode, 'FOLLOWERS');
+      expect(session.slowModeSeconds, 5);
+      expect(session.blockedKeywords, ['badword', 'spam']);
+    });
+
+    test('SocketMapper reads chat_rules_updated chatRules', () {
+      final event = SocketMapper.moderationEvent({
+        'liveId': 'live-1',
+        'type': 'chat_rules_updated',
+        'chatRules': {
+          'chatMode': 'SUBSCRIBERS',
+          'slowModeSeconds': 10,
+          'blockedKeywords': ['x'],
+        },
+      }, 'live-1');
+
+      expect(event, isNotNull);
+      expect(event!.moderationType, 'chat_rules_updated');
+      expect(event.chatRules?['chatMode'], 'SUBSCRIBERS');
+      expect(event.chatRules?['slowModeSeconds'], 10);
+    });
+  });
+
+  group('Feature #13 maxGuests default and Feature #23 houseId', () {
+    test('LiveMapper defaults maxGuests to 8 and maps houseId', () {
+      final live = LiveMapper.fromJson({
+        'id': 'live-1',
+        'status': 'LIVE',
+        'houseId': 'house-9',
+        'title': 'Campus',
+        'user': {'id': 'h1', 'fullName': 'Host'},
+        'startedAt': '2026-09-05T12:00:00.000Z',
+      });
+
+      expect(live.houseId, 'house-9');
+      expect(live.metadata?['houseId'], 'house-9');
+      expect(live.metadata?['maxGuests'], 8);
+      expect(live.metadata?['moderatorsCanManageGuests'], isTrue);
+    });
+
+    test('LiveSessionMapper maps houseId', () {
+      final session = LiveSessionMapper.fromLiveJson({
+        'id': 'live-1',
+        'status': 'LIVE',
+        'houseId': 'house-9',
+        'user': {'id': 'h1', 'fullName': 'Host'},
+      });
+      expect(session.houseId, 'house-9');
+    });
+
+    test('SocketMapper maps liveHouse attach and close', () {
+      final attached = SocketMapper.houseEvent({
+        'liveId': 'live-1',
+        'houseId': 'house-9',
+        'action': 'attached',
+      }, 'live-1');
+      expect(attached, isNotNull);
+      expect(attached!.houseId, 'house-9');
+      expect(attached.isClosed, isFalse);
+
+      final closed = SocketMapper.houseEvent({
+        'liveId': 'live-1',
+        'houseId': 'house-9',
+        'status': 'CLOSED',
+      }, 'live-1');
+      expect(closed!.isClosed, isTrue);
+    });
+  });
+
+  group('Feature #31 profile currentLive and Feature #32 ageRestricted', () {
+    test('LiveMapper maps ageRestricted on the live card', () {
+      final live = LiveMapper.fromJson({
+        'id': 'live-1',
+        'ageRestricted': true,
+        'user': {'id': 'host-1', 'fullName': 'Host'},
+      });
+      expect(live.ageRestricted, isTrue);
+      expect(live.metadata?['ageRestricted'], isTrue);
+    });
+
+    test('LiveSessionMapper maps ageRestricted', () {
+      final session = LiveSessionMapper.fromLiveJson({
+        'id': 'live-1',
+        'ageRestricted': true,
+      });
+      expect(session.ageRestricted, isTrue);
+    });
+
+    test('LiveMapper.fromProfileCurrentLive reuses LiveEntity fields', () {
+      final live = LiveMapper.fromProfileCurrentLive(
+        isLive: true,
+        currentLive: {
+          'id': 'live-9',
+          'title': 'Late night',
+          'coverUrl': 'https://example.com/c.jpg',
+          'viewers': 42,
+          'mediaMode': 'AUDIO',
+          'audioOnly': true,
+        },
+        hostId: 'host-1',
+        hostName: 'Maya',
+        hostAvatar: 'https://example.com/h.jpg',
+      );
+      expect(live, isNotNull);
+      expect(live!.id, 'live-9');
+      expect(live.title, 'Late night');
+      expect(live.thumbnailUrl, 'https://example.com/c.jpg');
+      expect(live.viewerCount, 42);
+      expect(live.audioOnly, isTrue);
+      expect(live.hostId, 'host-1');
+      expect(live.hostName, 'Maya');
+    });
+
+    test('LiveMapper.fromProfileCurrentLive is null when not live', () {
+      expect(
+        LiveMapper.fromProfileCurrentLive(
+          isLive: false,
+          currentLive: {'id': 'live-9'},
+          hostId: 'host-1',
+        ),
+        isNull,
+      );
+    });
+
+    test('report live path is POST /lives/:id/report', () {
+      expect(ApiEndpoints.liveReport('abc'), '/lives/abc/report');
     });
   });
 }

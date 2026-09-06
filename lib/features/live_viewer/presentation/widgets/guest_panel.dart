@@ -29,12 +29,14 @@ class GuestSlotData {
 class GuestRequestPanel extends StatelessWidget {
   final List<GuestSlotData> slots;
   final VoidCallback onRequestTap;
+  final VoidCallback? onManageTap;
   final int maxSlots;
 
   const GuestRequestPanel({
     super.key,
     required this.slots,
     required this.onRequestTap,
+    this.onManageTap,
     this.maxSlots = 8,
   });
 
@@ -53,6 +55,25 @@ class GuestRequestPanel extends StatelessWidget {
       width: _tile + 4,
       child: Column(
         children: [
+          if (onManageTap != null) ...[
+            GestureDetector(
+              onTap: onManageTap,
+              child: Container(
+                width: _tile,
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1C1C1E),
+                  borderRadius: BorderRadius.circular(_radius),
+                ),
+                child: const Icon(
+                  Icons.shield_outlined,
+                  color: Colors.white70,
+                  size: 16,
+                ),
+              ),
+            ),
+            const SizedBox(height: _gap),
+          ],
           for (var i = 0; i < items.length; i++) ...[
             if (i > 0) const SizedBox(height: _gap),
             _GuestSlotTile(
@@ -238,6 +259,7 @@ Future<bool?> showGuestRequestSheet(
   required String hostName,
   String? hostAvatar,
   String? viewerAvatar,
+  bool audioOnly = false,
 }) {
   return showModalBottomSheet<bool>(
     context: context,
@@ -371,8 +393,8 @@ Future<bool?> showGuestRequestSheet(
                     borderRadius: BorderRadius.circular(24),
                   ),
                 ),
-                child: const Text(
-                  'Request',
+                child: Text(
+                  audioOnly ? 'Raise hand' : 'Request',
                   style: TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w700,

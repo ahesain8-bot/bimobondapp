@@ -37,6 +37,7 @@ class LiveViewerState extends Equatable {
   final String? currentUserId;
   final Set<String> bannedUserIds;
   final Set<String> mutedUserIds;
+  final List<String> moderatorIds;
   final bool isCommentSending;
 
   /// Everyone on or waiting for the stage (`GET /lives/:id/guests`).
@@ -65,6 +66,14 @@ class LiveViewerState extends Equatable {
   /// whether the Equatable battle snapshot changed.
   final Room? battleRoom;
 
+  /// One-shot `shareUrl` from `POST /lives/:id/share` for copy/external apps.
+  final String? lastShareUrl;
+  final String? shareError;
+  final bool isReporting;
+  final String? reportFeedback;
+  /// Viewer must enter DOB before join on an `ageRestricted` live.
+  final bool needsDateOfBirth;
+
   const LiveViewerState({
     this.session,
     this.comments = const [],
@@ -84,6 +93,7 @@ class LiveViewerState extends Equatable {
     this.currentUserId,
     this.bannedUserIds = const {},
     this.mutedUserIds = const {},
+    this.moderatorIds = const [],
     this.isCommentSending = false,
     this.guests = const [],
     this.pendingGuestInvite,
@@ -92,6 +102,11 @@ class LiveViewerState extends Equatable {
     this.battle,
     this.battleOpponentLive,
     this.battleRoom,
+    this.lastShareUrl,
+    this.shareError,
+    this.isReporting = false,
+    this.reportFeedback,
+    this.needsDateOfBirth = false,
   });
 
   /// Guests actually publishing right now — what the stage renders.
@@ -130,6 +145,7 @@ class LiveViewerState extends Equatable {
     String? currentUserId,
     Set<String>? bannedUserIds,
     Set<String>? mutedUserIds,
+    List<String>? moderatorIds,
     bool? isCommentSending,
     List<GuestSummary>? guests,
     PendingGuestInvite? pendingGuestInvite,
@@ -141,6 +157,11 @@ class LiveViewerState extends Equatable {
     LiveEntity? battleOpponentLive,
     bool clearBattleOpponent = false,
     Object? battleRoom = _unset,
+    Object? lastShareUrl = _unset,
+    Object? shareError = _unset,
+    bool? isReporting,
+    Object? reportFeedback = _unset,
+    bool? needsDateOfBirth,
   }) {
     return LiveViewerState(
       session: session ?? this.session,
@@ -170,6 +191,7 @@ class LiveViewerState extends Equatable {
       currentUserId: currentUserId ?? this.currentUserId,
       bannedUserIds: bannedUserIds ?? this.bannedUserIds,
       mutedUserIds: mutedUserIds ?? this.mutedUserIds,
+      moderatorIds: moderatorIds ?? this.moderatorIds,
       isCommentSending: isCommentSending ?? this.isCommentSending,
       guests: guests ?? this.guests,
       pendingGuestInvite: clearPendingGuestInvite
@@ -184,6 +206,17 @@ class LiveViewerState extends Equatable {
       battleRoom: identical(battleRoom, _unset)
           ? this.battleRoom
           : battleRoom as Room?,
+      lastShareUrl: identical(lastShareUrl, _unset)
+          ? this.lastShareUrl
+          : lastShareUrl as String?,
+      shareError: identical(shareError, _unset)
+          ? this.shareError
+          : shareError as String?,
+      isReporting: isReporting ?? this.isReporting,
+      reportFeedback: identical(reportFeedback, _unset)
+          ? this.reportFeedback
+          : reportFeedback as String?,
+      needsDateOfBirth: needsDateOfBirth ?? this.needsDateOfBirth,
     );
   }
 
@@ -207,6 +240,7 @@ class LiveViewerState extends Equatable {
     currentUserId,
     bannedUserIds,
     mutedUserIds,
+    moderatorIds,
     isCommentSending,
     guests,
     pendingGuestInvite,
@@ -215,6 +249,11 @@ class LiveViewerState extends Equatable {
     battle,
     battleOpponentLive,
     battleRoom,
+    lastShareUrl,
+    shareError,
+    isReporting,
+    reportFeedback,
+    needsDateOfBirth,
   ];
 }
 

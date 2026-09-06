@@ -5,6 +5,7 @@ import 'package:bimobondapp/app/auth/presentation/widgets/profile/profile_links_
 import 'package:bimobondapp/app/auth/presentation/widgets/profile/profile_verification_badge.dart';
 import 'package:bimobondapp/app/auth/presentation/widgets/profile/user_profile_stat_item.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_avatar_tap_handler.dart';
+import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_live_now_badge.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/stories/story_profile_avatar.dart';
 import 'package:bimobondapp/app/social/presentation/widgets/profile_follow_button.dart';
 import 'package:bimobondapp/core/constants/profile_layout_constants.dart';
@@ -70,7 +71,9 @@ class UserProfileHeaderDetails extends StatelessWidget {
         if (isLoadingUser && user == null)
           const SkeletonWidget.circular(size: 96)
         else
-          StoryProfileAvatar(
+          ProfileLiveNowBadge(
+            user: user,
+            child: StoryProfileAvatar(
             userId: userId,
             imageUrl: user?.avatarUrl,
             radius: ProfileLayoutConstants.avatarRadius,
@@ -84,6 +87,7 @@ class UserProfileHeaderDetails extends StatelessWidget {
               userId: userId,
               avatarUrl: user?.avatarUrl,
             ),
+          ),
           ),
         const SizedBox(height: AppSizes.p12),
         if (isLoadingUser && user?.fullName == null)

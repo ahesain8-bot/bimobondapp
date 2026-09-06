@@ -8,15 +8,21 @@ class StatusBarArea extends StatelessWidget {
     super.key,
     required this.onClose,
     required this.titleController,
+    this.topic,
+    this.scheduledAt,
     this.onChangeCover,
     this.onAddTopic,
+    this.onSchedule,
     this.onAddGoal,
   });
 
   final VoidCallback onClose;
   final TextEditingController titleController;
+  final String? topic;
+  final DateTime? scheduledAt;
   final VoidCallback? onChangeCover;
   final VoidCallback? onAddTopic;
+  final VoidCallback? onSchedule;
   final VoidCallback? onAddGoal;
 
   @override
@@ -44,8 +50,11 @@ class StatusBarArea extends StatelessWidget {
           ),
           LiveStartInfoCard(
             titleController: titleController,
+            topic: topic,
+            scheduledAt: scheduledAt,
             onChangeCover: onChangeCover,
             onAddTopic: onAddTopic,
+            onSchedule: onSchedule,
             onAddGoal: onAddGoal,
           ),
         ],

@@ -10,21 +10,27 @@ import 'package:bimobondapp/app/auctions/data/datasources/auction_socket_service
 import '../../../../../core/network/api_exceptions.dart';
 import '../../../../../core/models/live_battle.dart';
 import '../../../../../core/models/live_competition_request.dart';
+import '../../../../../core/models/live_media_hints.dart';
+import '../../../../../core/models/live_media_mode.dart';
 import '../../../../../core/services/live_feed_refresh_bus.dart';
 import '../../../domain/effects/live_effects_catalog.dart';
 import '../../../domain/entities/live_chat_feed_merge.dart';
 import '../../../domain/entities/live_guest.dart';
 import '../../../domain/entities/live_chat_message.dart';
 import '../../../domain/entities/live_host.dart';
+import '../../../domain/entities/live_scene.dart';
 import '../../../domain/entities/live_session.dart';
 import '../../../domain/repositories/live_session_repository.dart';
 import '../../../domain/usecases/dispose_camera.dart';
 import '../../../domain/usecases/end_live_session.dart';
 import '../../../domain/usecases/initialize_camera.dart';
 import '../../../domain/usecases/like_live_session.dart';
+import '../../../domain/usecases/pause_live_session.dart';
 import '../../../domain/usecases/send_live_comment.dart';
 import '../../../domain/usecases/start_live_session.dart';
 import '../../../domain/usecases/update_live_title.dart';
+import '../../../data/datasources/lives_media_datasource.dart'
+    show ScreenSharePermissionDenied;
 import 'live_room_event.dart';
 import 'live_room_state.dart';
 import '../../../domain/entities/live_gift_banner.dart';
@@ -41,6 +47,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     required SendLiveComment sendLiveComment,
     required LikeLiveSession likeLiveSession,
     required UpdateLiveTitle updateLiveTitle,
+    required PauseLiveSession pauseLiveSession,
     required LiveSessionRepository sessionRepository,
     required AuctionSocketService giftSocketService,
   }) : _startLiveSession = startLiveSession,
@@ -50,6 +57,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
        _sendLiveComment = sendLiveComment,
        _likeLiveSession = likeLiveSession,
        _updateLiveTitle = updateLiveTitle,
+       _pauseLiveSession = pauseLiveSession,
        _sessionRepository = sessionRepository,
        _giftSocketService = giftSocketService,
        super(const LiveRoomInitial()) {
@@ -83,6 +91,8 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     on<LiveRoomEffectSelected>(_onEffectSelected);
     on<LiveRoomEffectsCategorySelected>(_onEffectsCategorySelected);
     on<LiveRoomFlipCameraRequested>(_onFlipCamera);
+    on<LiveRoomSceneRequested>(_onSceneRequested);
+    on<LiveRoomStudioRequested>(_onStudioRequested);
     on<LiveRoomMirrorToggled>(_onMirrorToggled);
     on<LiveRoomMicMuteToggled>(_onMicMuteToggled);
     on<LiveRoomStabilizationToggled>(_onStabilizationToggled);
@@ -92,6 +102,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     on<LiveRoomMenuDestinationRequested>(_onMenuDestination);
     on<LiveRoomShareContactSelected>(_onShareContactSelected);
     on<LiveRoomShareChannelRequested>(_onShareChannelRequested);
+    on<LiveRoomShareCountUpdated>(_onShareCountUpdated);
     on<LiveRoomGuestsChanged>(_onGuestsChanged);
     on<LiveRoomBattleChanged>(_onBattleChanged);
     on<LiveRoomBattlePollRequested>(_onBattlePollRequested);
@@ -102,6 +113,10 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     on<LiveRoomSupportersRefreshRequested>(_onSupportersRefreshRequested);
     on<LiveRoomGalleryChanged>(_onGalleryChanged);
     on<LiveRoomSettingsApplied>(_onSettingsApplied);
+    on<LiveRoomChatRulesApplied>(_onChatRulesApplied);
+    on<LiveRoomModeratorsChanged>(_onModeratorsChanged);
+    on<LiveRoomModeratorsRefreshRequested>(_onModeratorsRefreshRequested);
+    on<LiveRoomHouseChanged>(_onHouseChanged);
     on<LiveRoomModerationRequested>(_onModerationRequested);
     on<LiveRoomHudEventReceived>(_onHudEvent);
     on<LiveRoomMediaEventReceived>(_onMediaEvent);
@@ -116,6 +131,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
   final SendLiveComment _sendLiveComment;
   final LikeLiveSession _likeLiveSession;
   final UpdateLiveTitle _updateLiveTitle;
+  final PauseLiveSession _pauseLiveSession;
   final LiveSessionRepository _sessionRepository;
 
   StreamSubscription<LiveHudEvent>? _hudSub;
@@ -175,7 +191,8 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     emit(const LiveRoomLoading());
     _sessionTeardownDone = false;
     _cameraOpInFlight = false;
-    _useArBeautyCamera = event.useArBeautyCamera;
+    final audioOnly = LiveMediaMode.isAudio(mediaMode: event.mediaMode);
+    _useArBeautyCamera = event.useArBeautyCamera && !audioOnly;
     if (_useArBeautyCamera) {
       // Same FaceWarp camera as Add Post — publish raw until Beautify is used.
       ArLiveBeautyDefaults.clear();
@@ -188,14 +205,21 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
 
     // Critical path: open local camera immediately — never wait for Nest/LiveKit.
     // AR beauty keeps Kotlin CameraX; do not open Flutter camera.
+    // Voice Chat never opens a camera.
     // If the start screen handed us its RUNNING camera, reuse it (same lens,
     // no reopen, no black flicker); otherwise open a fresh one.
-    final cameraFuture = _useArBeautyCamera
+    final cameraFuture = audioOnly
+        ? Future<CameraController?>.value(null)
+        : _useArBeautyCamera
         ? Future<CameraController?>.value(null)
         : event.initialCamera != null
         ? Future<CameraController?>.value(event.initialCamera)
         : _initializeCamera(useFront: true);
-    final sessionFuture = _startLiveSession(title: title);
+    final sessionFuture = _startLiveSession(
+      title: title,
+      mediaMode: LiveMediaMode.normalize(event.mediaMode),
+      topic: event.topic,
+    );
 
     final controller = await cameraFuture;
     if (isClosed) {
@@ -219,6 +243,15 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
           isFrontCamera: true,
         ),
       );
+    } else if (audioOnly) {
+      emit(
+        const LiveRoomOpening(
+          controller: null,
+          isCameraInitialized: false,
+          isFrontCamera: true,
+          isAudioOnly: true,
+        ),
+      );
     }
 
     late final LiveSession session;
@@ -240,6 +273,8 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
                 'لديك بث مباشر نشط بالفعل. أنهِه قبل بدء بث جديد، أو استأنف البث الحالي.',
             isActiveLiveConflict: true,
             pendingTitle: title,
+            pendingTopic: event.topic,
+            pendingMediaMode: event.mediaMode,
           ),
         );
         return;
@@ -262,6 +297,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         messages: const [],
         title: title,
         status: 'LIVE',
+        topic: event.topic,
       );
     }
     if (isClosed) {
@@ -293,6 +329,8 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         message: failure.message,
         isActiveLiveConflict: true,
         pendingTitle: failure.pendingTitle,
+        pendingTopic: failure.pendingTopic,
+        pendingMediaMode: failure.pendingMediaMode,
         isRecovering: true,
       ),
     );
@@ -309,6 +347,8 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
           message: e.message,
           isActiveLiveConflict: true,
           pendingTitle: failure.pendingTitle,
+          pendingTopic: failure.pendingTopic,
+          pendingMediaMode: failure.pendingMediaMode,
         ),
       );
       return;
@@ -319,13 +359,21 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
           message: e.toString(),
           isActiveLiveConflict: true,
           pendingTitle: failure.pendingTitle,
+          pendingTopic: failure.pendingTopic,
+          pendingMediaMode: failure.pendingMediaMode,
         ),
       );
       return;
     }
 
     if (isClosed) return;
-    add(LiveRoomStarted(title: failure.pendingTitle));
+    add(
+      LiveRoomStarted(
+        title: failure.pendingTitle,
+        topic: failure.pendingTopic,
+        mediaMode: failure.pendingMediaMode ?? 'VIDEO',
+      ),
+    );
   }
 
   Future<void> _onRecoverResumeActive(
@@ -344,6 +392,8 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         message: failure.message,
         isActiveLiveConflict: true,
         pendingTitle: failure.pendingTitle,
+        pendingTopic: failure.pendingTopic,
+        pendingMediaMode: failure.pendingMediaMode,
         isRecovering: true,
       ),
     );
@@ -356,12 +406,16 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
           LiveRoomFailure(
             message: 'لم يتم العثور على بث نشط. يمكنك المحاولة من جديد.',
             pendingTitle: failure.pendingTitle,
+            pendingTopic: failure.pendingTopic,
+            pendingMediaMode: failure.pendingMediaMode,
           ),
         );
         return;
       }
 
-      final cameraFuture = _initializeCamera(useFront: true);
+      final cameraFuture = active.isAudioOnly
+          ? Future<CameraController?>.value(null)
+          : _initializeCamera(useFront: active.scene.isFront);
       final sessionFuture = _sessionRepository.reconnectHostSession(active.id);
       final controller = await cameraFuture;
       if (isClosed) {
@@ -396,6 +450,8 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
           message: _mapStartFailureMessage(e),
           isActiveLiveConflict: true,
           pendingTitle: failure.pendingTitle,
+          pendingTopic: failure.pendingTopic,
+          pendingMediaMode: failure.pendingMediaMode,
         ),
       );
     } catch (e) {
@@ -405,6 +461,8 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
           message: e.toString(),
           isActiveLiveConflict: true,
           pendingTitle: failure.pendingTitle,
+          pendingTopic: failure.pendingTopic,
+          pendingMediaMode: failure.pendingMediaMode,
         ),
       );
     }
@@ -593,6 +651,8 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     // `liveTopGiftersUpdated`, with a debounced re-read behind every gift for
     // backends that do not push it.
     add(const LiveRoomSupportersRefreshRequested());
+    add(const LiveRoomStudioRequested());
+    add(const LiveRoomModeratorsRefreshRequested());
   }
 
   Future<LiveBattle?> _loadBattleSafely(String liveId) async {
@@ -665,12 +725,17 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         url: url,
         token: token,
         useFrontCamera: useFront,
-        beforeVideoCapture: _useArBeautyCamera ? null : releaseLocalCamera,
-        mediaHints: current.session.mediaHints,
-        useArBeautyCamera: _useArBeautyCamera,
+        beforeVideoCapture: current.session.isAudioOnly || _useArBeautyCamera
+            ? null
+            : releaseLocalCamera,
+        mediaHints:
+            (current.session.mediaHints ??
+                    LiveMediaHints.defaultsForRole('host'))
+                .copyWith(audioOnly: current.session.isAudioOnly),
+        useArBeautyCamera: _useArBeautyCamera && !current.session.isAudioOnly,
       );
       debugPrint('🔍 [BLoC] connectMedia SUCCESS ✅');
-      } catch (e) {
+    } catch (e) {
       debugPrint('🔴 [BLoC] connectMedia failed: $e');
       CameraController? fallback = localReleased ? null : local;
       if (localReleased && !_useArBeautyCamera) {
@@ -865,6 +930,9 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     // Keep publishing through a PK. Dropping the camera here empties
     // `live_{id}` and the server ends both streams after ~10s.
     if (current.isBattleActive) return;
+    // MediaProjection's system dialog also pauses the activity. Disposing
+    // the camera there blacks DUAL after the host grants capture.
+    if (_cameraOpInFlight) return;
     final controller = current.controller;
     if (controller == null || !current.isCameraInitialized) return;
 
@@ -993,6 +1061,13 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     emit(current.copyWith(floatingHeartBurst: 0));
   }
 
+  int? _asHudInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value.toString());
+  }
+
   String _moderationMessage(String type) {
     switch (type) {
       case 'chat_muted':
@@ -1003,6 +1078,8 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         return 'تم حظر مشاهد من البث';
       case 'viewer_unbanned':
         return 'تم إلغاء حظر مشاهد';
+      case 'chat_rules_updated':
+        return 'تم تحديث قواعد الدردشة';
       default:
         return 'تحديث إشراف: $type';
     }
@@ -1390,6 +1467,16 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
       return;
     }
 
+    if (current.isLivePaused) {
+      emit(
+        current.copyWith(
+          pendingCompetitionRequest: null,
+          actionMessage: 'لا يمكن بدء منافسة أثناء الإيقاف المؤقت',
+        ),
+      );
+      return;
+    }
+
     final guestStillActive = current.activeGuests.any(
       (guest) => guest.userId == request.userId,
     );
@@ -1588,8 +1675,80 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
           layout: s.layout,
           allowGuestCamera: s.allowGuestCamera,
           moderatorsCanManageGuests: s.moderatorsCanManageGuests,
+          ageRestricted: s.ageRestricted,
         ),
         actionMessage: 'تم تحديث إعدادات البث',
+      ),
+    );
+  }
+
+  void _onChatRulesApplied(
+    LiveRoomChatRulesApplied event,
+    Emitter<LiveRoomState> emit,
+  ) {
+    final current = _readyOrNull;
+    if (current == null) return;
+    final s = event.session;
+    emit(
+      current.copyWith(
+        session: current.session.copyWith(
+          chatMode: s.chatMode,
+          slowModeSeconds: s.slowModeSeconds,
+          blockedKeywords: s.blockedKeywords,
+        ),
+        actionMessage: 'تم تحديث قواعد الدردشة',
+      ),
+    );
+  }
+
+  void _onModeratorsChanged(
+    LiveRoomModeratorsChanged event,
+    Emitter<LiveRoomState> emit,
+  ) {
+    final current = _readyOrNull;
+    if (current == null) return;
+    emit(
+      current.copyWith(
+        session: current.session.copyWith(moderatorIds: event.moderatorIds),
+      ),
+    );
+  }
+
+  Future<void> _onModeratorsRefreshRequested(
+    LiveRoomModeratorsRefreshRequested event,
+    Emitter<LiveRoomState> emit,
+  ) async {
+    final current = _readyOrNull;
+    if (current == null) return;
+    try {
+      final mods = await _sessionRepository.loadModerators(current.session.id);
+      if (isClosed) return;
+      final ready = _readyOrNull;
+      if (ready == null) return;
+      emit(
+        ready.copyWith(
+          session: ready.session.copyWith(
+            moderatorIds: mods.map((m) => m.userId).toList(growable: false),
+          ),
+        ),
+      );
+    } catch (e) {
+      debugPrint('GET /lives/:id/moderators failed (non-fatal): $e');
+    }
+  }
+
+  void _onHouseChanged(
+    LiveRoomHouseChanged event,
+    Emitter<LiveRoomState> emit,
+  ) {
+    final current = _readyOrNull;
+    if (current == null) return;
+    emit(
+      current.copyWith(
+        session: current.session.copyWith(houseId: event.houseId),
+        actionMessage: event.houseId == null
+            ? 'تم إغلاق بيت البث'
+            : 'تم ربط البث ببيت البث',
       ),
     );
   }
@@ -1659,6 +1818,40 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
           }
           await _sessionRepository.banViewer(liveId: liveId, userId: userId);
           emit(current.copyWith(actionMessage: 'تم حظر المشاهد من البث'));
+        case LiveRoomModerationAction.assignModerator:
+          final userId = event.userId;
+          if (userId == null || userId.isEmpty) {
+            emit(current.copyWith(actionMessage: 'لا يوجد معرف مستخدم'));
+            return;
+          }
+          await _sessionRepository.addModerator(liveId: liveId, userId: userId);
+          final ids = {...current.session.moderatorIds, userId}.toList();
+          emit(
+            current.copyWith(
+              session: current.session.copyWith(moderatorIds: ids),
+              actionMessage: 'تم تعيين مشرف لهذه الغرفة',
+            ),
+          );
+        case LiveRoomModerationAction.removeModerator:
+          final userId = event.userId;
+          if (userId == null || userId.isEmpty) {
+            emit(current.copyWith(actionMessage: 'لا يوجد معرف مستخدم'));
+            return;
+          }
+          await _sessionRepository.removeModerator(
+            liveId: liveId,
+            userId: userId,
+          );
+          emit(
+            current.copyWith(
+              session: current.session.copyWith(
+                moderatorIds: current.session.moderatorIds
+                    .where((id) => id != userId)
+                    .toList(growable: false),
+              ),
+              actionMessage: 'تم إزالة المشرف',
+            ),
+          );
       }
     } on ApiException catch (e) {
       emit(current.copyWith(actionMessage: e.message));
@@ -1706,9 +1899,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         }
       case LiveHudBattleEvent(:final type, :final battle):
         add(
-          LiveRoomBattleChanged(
-            battle.normalizedForUpdate(updateType: type),
-          ),
+          LiveRoomBattleChanged(battle.normalizedForUpdate(updateType: type)),
         );
       case LiveHudConnectionEvent(:final connected):
         // Comments, viewers and likes all ride this socket. The flag is kept in
@@ -1790,8 +1981,29 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
             ),
           ),
         );
-      case LiveHudModerationEvent(:final type):
-        emit(current.copyWith(actionMessage: _moderationMessage(type)));
+      case LiveHudModerationEvent(:final type, :final chatRules):
+        var session = current.session;
+        if (type == 'chat_rules_updated' && chatRules != null) {
+          final keywords = chatRules['blockedKeywords'];
+          session = session.copyWith(
+            chatMode: chatRules['chatMode']?.toString() ?? session.chatMode,
+            slowModeSeconds:
+                _asHudInt(chatRules['slowModeSeconds']) ??
+                session.slowModeSeconds,
+            blockedKeywords: keywords is List
+                ? keywords
+                      .map((e) => e.toString())
+                      .where((s) => s.isNotEmpty)
+                      .toList(growable: false)
+                : session.blockedKeywords,
+          );
+        }
+        emit(
+          current.copyWith(
+            session: session,
+            actionMessage: _moderationMessage(type),
+          ),
+        );
       case LiveHudViewersEvent(:final viewers):
         emit(
           current.copyWith(
@@ -1845,6 +2057,46 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
       case LiveHudEndedEvent(:final liveId):
         if (liveId.isNotEmpty && liveId != current.session.id) return;
         add(const LiveRoomRemoteEnded());
+      case LiveHudPausedEvent(:final paused, :final liveId):
+        if (liveId != null &&
+            liveId.isNotEmpty &&
+            liveId != current.session.id) {
+          return;
+        }
+        emit(
+          current.copyWith(session: current.session.copyWith(paused: paused)),
+        );
+      case LiveHudSceneEvent(:final scene, :final liveId):
+        if (liveId != null &&
+            liveId.isNotEmpty &&
+            liveId != current.session.id) {
+          return;
+        }
+        emit(
+          current.copyWith(
+            session: current.session.copyWith(scene: scene),
+            isFrontCamera: scene.isFront,
+          ),
+        );
+      case LiveHudCameraChangedEvent(
+        :final userId,
+        :final facing,
+        :final liveId,
+      ):
+        if (liveId != null &&
+            liveId.isNotEmpty &&
+            liveId != current.session.id) {
+          return;
+        }
+        if (userId.isNotEmpty && userId != current.session.host.id) return;
+        emit(
+          current.copyWith(
+            isFrontCamera: facing != 'back',
+            session: current.session.copyWith(
+              scene: current.session.scene.copyWith(cameraFacing: facing),
+            ),
+          ),
+        );
       case LiveHudGiftComboEvent(:final payload, :final totalEarnedCoins):
         final giftCombo = GiftComboPayload.fromMap(payload);
         if (giftCombo == null ||
@@ -1939,6 +2191,20 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         // Polls, Q&A, treasure boxes and auctions are owned by
         // LiveInteractiveBloc, which listens to the same HUD stream.
         break;
+      case LiveHudHouseEvent(:final liveId, :final houseId, :final isClosed):
+        if (liveId != null &&
+            liveId.isNotEmpty &&
+            liveId != current.session.id) {
+          return;
+        }
+        emit(
+          current.copyWith(
+            session: current.session.copyWith(
+              houseId: isClosed ? null : (houseId ?? current.session.houseId),
+            ),
+            actionMessage: isClosed ? 'تم إغلاق بيت البث' : 'تم تحديث بيت البث',
+          ),
+        );
     }
   }
 
@@ -2031,9 +2297,9 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         final stallDuringPk =
             current.isBattleActive &&
             (event.event.reason ?? '').contains('outbound_video_stalled');
-        if (stallDuringPk) {
+        if (stallDuringPk || _appPaused || _cameraOpInFlight) {
           debugPrint(
-            '[Host] ignoring outbound stall during PK — stay in live_${current.session.id}',
+            '[Host] ignoring outbound stall during PK/screen-share — stay in live_${current.session.id}',
           );
           return;
         }
@@ -2075,6 +2341,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         if (isClosed || _sessionTeardownDone || _appPaused) return;
 
         try {
+          final sceneToRestore = before.session.scene;
           final refreshed = await _sessionRepository.reconnectHostSession(
             liveId,
           );
@@ -2114,6 +2381,49 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
               clearActionMessage: true,
             ),
           );
+          if (!sceneToRestore.isCamera) {
+            debugPrint(
+              'LIVE_SCREEN_DIAG host recoverScene'
+              ' before=${sceneToRestore.scene}'
+              ' after=${sceneToRestore.scene}'
+              ' phase=beforeApply',
+            );
+            _cameraOpInFlight = true;
+            _sessionRepository.pauseOutboundMediaHealthCheck();
+            try {
+              await _applySceneMedia(sceneToRestore);
+              final restored = _readyOrNull;
+              if (restored != null && restored.session.id == liveId) {
+                emit(
+                  restored.copyWith(
+                    localVideoTrack:
+                        _sessionRepository.localPreviewTrack as VideoTrack?,
+                    localScreenShareTrack:
+                        _sessionRepository.localScreenShareTrack as VideoTrack?,
+                    isMediaConnected: true,
+                  ),
+                );
+              }
+              debugPrint(
+                'LIVE_SCREEN_DIAG host recoverScene'
+                ' before=${sceneToRestore.scene}'
+                ' after=${sceneToRestore.scene}'
+                ' phase=afterApply',
+              );
+            } on ScreenSharePermissionDenied {
+              debugPrint(
+                'LIVE_SCREEN_DIAG host recoverScene'
+                ' before=${sceneToRestore.scene}'
+                ' after=CAMERA'
+                ' phase=permissionDenied',
+              );
+            } catch (e) {
+              debugPrint('Host scene restore after recovery failed: $e');
+            } finally {
+              _sessionRepository.resumeOutboundMediaHealthCheck();
+              _cameraOpInFlight = false;
+            }
+          }
           _mediaConnectedAt = DateTime.now();
           debugPrint('[Host] media recovered on attempt $attempt');
           return;
@@ -2198,6 +2508,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
   ) async {
     final current = _readyOrNull;
     if (current == null || _cameraOpInFlight) return;
+    if (current.session.isAudioOnly) return;
     _cameraOpInFlight = true;
     final nextIsFront = !current.isFrontCamera;
 
@@ -2205,8 +2516,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
       if (current.isMediaConnected) {
         // Frame gap during flip must not trip outbound stall → full reconnect.
         _sessionRepository.pauseOutboundMediaHealthCheck();
-        final framesBefore =
-            _useArBeautyCamera
+        final framesBefore = _useArBeautyCamera
             ? await ArCameraBridge.beautyPushedFrameCount()
             : 0;
         try {
@@ -2322,6 +2632,182 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
       );
     } finally {
       _cameraOpInFlight = false;
+      final ready = _readyOrNull;
+      if (ready != null && ready.isFrontCamera == nextIsFront) {
+        unawaited(_persistCameraFacing(ready, nextIsFront));
+      }
+    }
+  }
+
+  Future<void> _persistCameraFacing(LiveRoomReady ready, bool isFront) async {
+    final facing = isFront ? 'front' : 'back';
+    final liveId = ready.session.id;
+    if (liveId.isEmpty) return;
+    _sessionRepository.emitSwitchLiveCamera(liveId: liveId, facing: facing);
+    try {
+      await _sessionRepository.updateScene(
+        liveId: liveId,
+        scene: ready.session.scene.copyWith(cameraFacing: facing),
+      );
+    } catch (e) {
+      debugPrint('PATCH /scene cameraFacing failed (non-fatal): $e');
+    }
+  }
+
+  Future<void> _onSceneRequested(
+    LiveRoomSceneRequested event,
+    Emitter<LiveRoomState> emit,
+  ) async {
+    final current = _readyOrNull;
+    if (current == null || current.session.isAudioOnly) return;
+    if (_cameraOpInFlight) return;
+    final liveId = current.session.id;
+    if (liveId.isEmpty) return;
+    final previousScene = current.session.scene;
+    final next = LiveScene(
+      scene: LiveScene.normalizeScene(event.scene),
+      cameraFacing: current.isFrontCamera ? 'front' : 'back',
+      dualCameraEnabled:
+          LiveScene.normalizeScene(event.scene) == LiveScene.dual,
+    );
+    if (next.scene == previousScene.scene &&
+        next.dualCameraEnabled == previousScene.dualCameraEnabled) {
+      return;
+    }
+    _cameraOpInFlight = true;
+    try {
+      debugPrint(
+        'LIVE_SCREEN_DIAG host sceneBeforeAfter'
+        ' before=${previousScene.scene}'
+        ' after=${next.scene}'
+        ' phase=beforeApply',
+      );
+      // Capture must succeed before PATCH /scene. Committing SCREEN/DUAL
+      // first left the backend on a scene the host never actually published,
+      // and Android MediaProjection crashed the process before revert.
+      await _applySceneMedia(next);
+      debugPrint(
+        'LIVE_SCREEN_DIAG host sceneBeforeAfter'
+        ' before=${previousScene.scene}'
+        ' after=${next.scene}'
+        ' phase=afterApply',
+      );
+      if (isClosed) return;
+      if ((next.isScreen || next.isDual) &&
+          _sessionRepository.localScreenShareTrack == null) {
+        throw StateError('Screen share track was not published');
+      }
+      final saved = await _sessionRepository.updateScene(
+        liveId: liveId,
+        scene: next,
+      );
+      if (isClosed) return;
+      final ready = _readyOrNull ?? current;
+      emit(
+        ready.copyWith(
+          session: ready.session.copyWith(scene: saved),
+          localScreenShareTrack:
+              _sessionRepository.localScreenShareTrack as VideoTrack?,
+          localVideoTrack: _sessionRepository.localPreviewTrack as VideoTrack?,
+          isMediaConnected: true,
+        ),
+      );
+    } on ScreenSharePermissionDenied {
+      if (!isClosed) {
+        emit(
+          (_readyOrNull ?? current).copyWith(
+            session: current.session.copyWith(scene: previousScene),
+            localScreenShareTrack: null,
+            actionMessage: 'تم إلغاء مشاركة الشاشة',
+          ),
+        );
+      }
+    } on ApiException catch (e) {
+      await _revertSceneMedia(previousScene);
+      if (!isClosed) {
+        emit(
+          (_readyOrNull ?? current).copyWith(
+            session: current.session.copyWith(scene: previousScene),
+            localScreenShareTrack:
+                _sessionRepository.localScreenShareTrack as VideoTrack?,
+            actionMessage: e.message,
+          ),
+        );
+      }
+    } catch (e) {
+      await _revertSceneMedia(previousScene);
+      if (!isClosed) {
+        emit(
+          (_readyOrNull ?? current).copyWith(
+            session: current.session.copyWith(scene: previousScene),
+            localScreenShareTrack:
+                _sessionRepository.localScreenShareTrack as VideoTrack?,
+            actionMessage: 'تعذر بدء مشاركة الشاشة',
+          ),
+        );
+      }
+    } finally {
+      _cameraOpInFlight = false;
+    }
+  }
+
+  Future<void> _revertSceneMedia(LiveScene previous) async {
+    try {
+      await _applySceneMedia(previous);
+    } catch (e) {
+      debugPrint('Scene media revert failed (non-fatal): $e');
+    }
+  }
+
+  Future<void> _applySceneMedia(LiveScene scene) async {
+    final ready = _readyOrNull;
+    if (ready == null || !ready.isMediaConnected) return;
+    if (ready.session.isAudioOnly) return;
+    try {
+      if (scene.isCamera) {
+        await _sessionRepository.setScreenShareEnabled(false);
+        await _sessionRepository.setCameraEnabled(true);
+      } else if (scene.isScreen) {
+        await _sessionRepository.setScreenShareEnabled(true);
+        await _sessionRepository.setCameraEnabled(false);
+      } else {
+        // DUAL = AR camera + screen share. Never use LiveKit's default
+        // setCameraEnabled (stopOnMute + restartTrack → generic Camera2).
+        // CAMERA → DUAL: unmute is a no-op on the live AR publication.
+        // SCREEN → DUAL: unmute the same FaceWarp track (stopOnMute: false).
+        await _sessionRepository.setCameraEnabled(true);
+        await _sessionRepository.setScreenShareEnabled(true);
+      }
+      if (isClosed) return;
+      final latest = _readyOrNull;
+      if (latest == null) return;
+      add(const LiveRoomGuestsChanged());
+    } catch (e) {
+      debugPrint('Screen share apply failed: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> _onStudioRequested(
+    LiveRoomStudioRequested event,
+    Emitter<LiveRoomState> emit,
+  ) async {
+    final current = _readyOrNull;
+    if (current == null || current.session.id.isEmpty) return;
+    try {
+      final studio = await _sessionRepository.loadStudio(current.session.id);
+      if (isClosed) return;
+      final ready = _readyOrNull;
+      if (ready == null) return;
+      emit(
+        ready.copyWith(
+          session: ready.session.copyWith(
+            studio: studio ?? ready.session.studio,
+          ),
+        ),
+      );
+    } catch (e) {
+      debugPrint('GET /studio failed (non-fatal): $e');
     }
   }
 
@@ -2412,21 +2898,51 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     emit(current.copyWith(isAiContentTagged: !current.isAiContentTagged));
   }
 
-  void _onPauseLiveTapped(
+  Future<void> _onPauseLiveTapped(
     LiveRoomPauseLiveTapped event,
     Emitter<LiveRoomState> emit,
-  ) {
+  ) async {
     final current = _readyOrNull;
-    if (current == null) return;
-    // Pause is client-only — no backend pause API in lives docs.
-    emit(
-      current.copyWith(
-        isLivePaused: !current.isLivePaused,
-        actionMessage: current.isLivePaused
-            ? null
-            : 'إيقاف مؤقت محلي فقط (لا يوجد API للإيقاف المؤقت)',
-      ),
-    );
+    if (current == null ||
+        current.isEnding ||
+        current.isPauseActionBusy ||
+        !current.session.isLive) {
+      return;
+    }
+
+    emit(current.copyWith(isPauseActionBusy: true, clearActionMessage: true));
+    try {
+      final paused = current.isLivePaused
+          ? await _pauseLiveSession.resume(current.session.id)
+          : await _pauseLiveSession.pause(current.session.id);
+      if (isClosed) return;
+      final ready = _readyOrNull;
+      if (ready == null) return;
+      emit(
+        ready.copyWith(
+          isPauseActionBusy: false,
+          session: ready.session.copyWith(paused: paused),
+        ),
+      );
+    } on ApiException catch (e) {
+      if (!isClosed) {
+        emit(
+          (_readyOrNull ?? current).copyWith(
+            isPauseActionBusy: false,
+            actionMessage: e.message,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!isClosed) {
+        emit(
+          (_readyOrNull ?? current).copyWith(
+            isPauseActionBusy: false,
+            actionMessage: e.toString(),
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _onMenuDestination(
@@ -2443,7 +2959,14 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         emit(current.copyWith(isChatComposerVisible: true));
       case LiveRoomMenuDestination.settings:
       case LiveRoomMenuDestination.startBattle:
-        // Sheet opened from presentation layer.
+        if (event.destination == LiveRoomMenuDestination.startBattle &&
+            current.isLivePaused) {
+          emit(
+            current.copyWith(
+              actionMessage: 'لا يمكن بدء منافسة أثناء الإيقاف المؤقت',
+            ),
+          );
+        }
         return;
       case LiveRoomMenuDestination.liveGifts:
         emit(
@@ -2453,6 +2976,11 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
             showLiveGiftsBadge: false,
           ),
         );
+      case LiveRoomMenuDestination.studio:
+      case LiveRoomMenuDestination.sceneCamera:
+      case LiveRoomMenuDestination.sceneScreen:
+      case LiveRoomMenuDestination.sceneDual:
+        return;
       default:
         emit(
           current.copyWith(
@@ -2480,7 +3008,21 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     LiveRoomShareChannelRequested event,
     Emitter<LiveRoomState> emit,
   ) {
-    // Clipboard / url_launcher stay in presentation; no share API in docs.
+    // Clipboard / url_launcher stay in the share sheet. It calls
+    // POST /lives/:id/share and then [LiveRoomShareCountUpdated].
+  }
+
+  void _onShareCountUpdated(
+    LiveRoomShareCountUpdated event,
+    Emitter<LiveRoomState> emit,
+  ) {
+    final current = _readyOrNull;
+    if (current == null) return;
+    emit(
+      current.copyWith(
+        session: current.session.copyWith(shareCount: event.shareCount),
+      ),
+    );
   }
 
   void _onClearActionMessage(

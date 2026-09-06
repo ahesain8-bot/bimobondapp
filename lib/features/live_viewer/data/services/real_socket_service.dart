@@ -20,7 +20,7 @@ import 'fake_socket_service.dart' show SocketService;
 /// Client → server: `joinLive { liveId }` / `leaveLive { liveId }`.
 /// Server → client (`live_{id}`): liveComment, liveCommentDeleted,
 /// liveCommentPinned, liveCommentUnpinned, liveModeration, liveGift,
-/// liveLike, liveViewers, liveEnded, userJoined, liveHourlyRankUpdated,
+/// liveLike, liveViewers, liveEnded, livePaused, userJoined, liveHourlyRankUpdated,
 /// liveTopGiftersUpdated, livePopularStatus + reconnect lifecycle.
 class RealSocketService implements SocketService {
   RealSocketService({Future<String?> Function()? idTokenProvider})
@@ -205,6 +205,21 @@ class RealSocketService implements SocketService {
       if (event != null) _controller.add(event);
     });
 
+    _on(socket, 'livePaused', (data) {
+      final event = SocketMapper.pausedEvent(data, _liveId);
+      if (event != null) _controller.add(event);
+    });
+
+    _on(socket, 'liveScene', (data) {
+      final event = SocketMapper.sceneEvent(data, _liveId);
+      if (event != null) _controller.add(event);
+    });
+
+    _on(socket, 'liveCameraChanged', (data) {
+      final event = SocketMapper.cameraChangedEvent(data, _liveId);
+      if (event != null) _controller.add(event);
+    });
+
     _on(socket, 'userJoined', (data) {
       final event = SocketMapper.userJoinedEvent(data, _liveId);
       if (event != null) _controller.add(event);
@@ -247,6 +262,11 @@ class RealSocketService implements SocketService {
 
     _on(socket, 'livePopularStatus', (data) {
       final event = SocketMapper.hourlyRankEvent(data, _liveId);
+      if (event != null) _controller.add(event);
+    });
+
+    _on(socket, 'liveHouse', (data) {
+      final event = SocketMapper.houseEvent(data, _liveId);
       if (event != null) _controller.add(event);
     });
 

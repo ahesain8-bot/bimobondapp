@@ -2,10 +2,15 @@ import 'dart:math' as math;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:livekit_client/livekit_client.dart';
+import 'package:bimobondapp/app/auth/domain/usecases/update_profile_usecase.dart';
+import 'package:bimobondapp/app/auth/presentation/di/auth_injector.dart'
+    as auth_di;
 import 'package:bimobondapp/app/home/presentation/widgets/home_feed/live_gift_sheet.dart';
+import 'package:bimobondapp/app/posts/presentation/widgets/report_post_sheet.dart';
 import '../../../../core/utils/build_safe_notifier.dart';
 
 import '../../../../core/models/live_battle.dart';
@@ -41,6 +46,7 @@ import 'multi_guest_grid.dart';
 import 'ranking_sheet.dart';
 import 'tiktok_live_chrome.dart';
 import 'tiktok_live_tokens.dart';
+import 'live_viewer_guest_manage_sheet.dart';
 
 class LiveRoomPage extends StatefulWidget {
   final LiveEntity live;
@@ -166,17 +172,87 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   }
 
   Future<void> _openGuestRequest(LiveEntity live) async {
+    if (live.paused) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            live.isAudioOnly
+                ? 'لا يمكن رفع اليد أثناء إيقاف البث مؤقتاً'
+                : 'لا يمكن طلب الانضمام أثناء إيقاف البث مؤقتاً',
+          ),
+          backgroundColor: AppColors.surface,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
     final bloc = context.read<LiveViewerBloc>();
     final requested = await showGuestRequestSheet(
       context,
       hostName: live.hostName,
       hostAvatar: live.hostAvatar,
       viewerAvatar: 'https://i.pravatar.cc/150?u=me',
+      audioOnly: live.isAudioOnly,
     );
     if (requested != true) return;
     // Real request now (`POST /lives/:id/guests/request`) — this used to stop
     // at a SnackBar, so the host never saw anyone asking to come on stage.
     bloc.add(const LiveViewerGuestSeatRequested());
+  }
+
+  bool _isOwnLive(LiveEntity live, LiveViewerState state) {
+    final me = state.currentUserId;
+    return me != null && me.isNotEmpty && me == live.hostId;
+  }
+
+  Future<void> _openLiveReport(LiveEntity live) async {
+    final bloc = context.read<LiveViewerBloc>();
+    if (bloc.state.isReporting) return;
+    final result = await ReportPostBottomSheet.show(
+      context,
+      title: 'الإبلاغ عن البث',
+      message: 'اختر سبب الإبلاغ. سيُرسل البلاغ عن المضيف.',
+    );
+    if (result == null || !mounted) return;
+    bloc.add(
+      LiveViewerReportRequested(
+        reason: result.reason,
+        details: result.details,
+      ),
+    );
+  }
+
+  Future<void> _submitDateOfBirth(DateTime dob) async {
+    final formatted =
+        '${dob.year.toString().padLeft(4, '0')}-${dob.month.toString().padLeft(2, '0')}-${dob.day.toString().padLeft(2, '0')}';
+    try {
+      final result = await auth_di.sl<UpdateProfileUseCase>()(
+        {'dateOfBirth': formatted},
+      );
+      if (!mounted) return;
+      final ok = result.fold((_) => false, (_) => true);
+      if (!ok) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تعذر حفظ تاريخ الميلاد'),
+            backgroundColor: AppColors.surface,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+      context.read<LiveViewerBloc>().add(const LiveViewerRetryRequested());
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('تعذر حفظ تاريخ الميلاد'),
+          backgroundColor: AppColors.surface,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   void _openRanking(LiveEntity live) {
@@ -252,10 +328,20 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     }).toList();
   }
 
-  List<String> _moderatorIdsFrom(LiveEntity live) {
+  List<String> _moderatorIdsFrom(LiveEntity live, LiveViewerState state) {
+    final fromState = state.moderatorIds;
+    if (fromState.isNotEmpty) return fromState;
     final raw = live.metadata?['moderators'];
     if (raw is! List) return const [];
     return raw.map((e) => e.toString()).where((s) => s.isNotEmpty).toList();
+  }
+
+  bool _canManageGuests(LiveEntity live, LiveViewerState state) {
+    final uid = state.currentUserId;
+    if (uid == null || uid.isEmpty) return false;
+    if (uid == live.hostId) return false;
+    if (!_moderatorIdsFrom(live, state).contains(uid)) return false;
+    return live.metadata?['moderatorsCanManageGuests'] != false;
   }
 
   Widget _buildCommentsSection({
@@ -266,7 +352,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     bool alignTop = false,
     bool highContrast = false,
   }) {
-    final moderators = _moderatorIdsFrom(live);
+    final moderators = _moderatorIdsFrom(live, state);
     final bloc = context.read<LiveViewerBloc>();
     return CommentsSection(
       comments: state.comments,
@@ -285,6 +371,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
             targetUserId: targetUserId,
           ),
         );
+      },
+      onPinComment: (commentId, {required bool unpin}) {
+        bloc.add(LiveViewerCommentPinRequested(commentId, unpin: unpin));
       },
       onMuteUser: (userId, username, reason) {
         bloc.add(
@@ -324,7 +413,56 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   }
 
   Widget _buildRoom() {
-    return BlocBuilder<LiveViewerBloc, LiveViewerState>(
+    return BlocListener<LiveViewerBloc, LiveViewerState>(
+      listenWhen: (prev, curr) =>
+          prev.lastShareUrl != curr.lastShareUrl ||
+          prev.shareError != curr.shareError ||
+          prev.reportFeedback != curr.reportFeedback,
+      listener: (context, state) async {
+        final report = state.reportFeedback;
+        if (report != null && report.isNotEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(report),
+              backgroundColor: AppColors.surface,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+          context.read<LiveViewerBloc>().add(
+            const LiveViewerReportFeedbackConsumed(),
+          );
+          return;
+        }
+        final error = state.shareError;
+        if (error != null && error.isNotEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(error),
+              backgroundColor: AppColors.surface,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+          context.read<LiveViewerBloc>().add(
+            const LiveViewerShareFeedbackConsumed(),
+          );
+          return;
+        }
+        final url = state.lastShareUrl;
+        if (url == null || url.isEmpty) return;
+        await Clipboard.setData(ClipboardData(text: url));
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Link copied'),
+            backgroundColor: AppColors.surface,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        context.read<LiveViewerBloc>().add(
+          const LiveViewerShareFeedbackConsumed(),
+        );
+      },
+      child: BlocBuilder<LiveViewerBloc, LiveViewerState>(
       buildWhen: (prev, curr) {
         final prevLive = prev.live;
         final currLive = curr.live;
@@ -345,6 +483,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                 prevLive.endTime,
                 prevLive.isLive,
                 prevLive.isFollowing,
+                prevLive.paused,
                 prevLive.metadata,
               );
         final currInfo = currLive == null
@@ -364,6 +503,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                 currLive.endTime,
                 currLive.isLive,
                 currLive.isFollowing,
+                currLive.paused,
                 currLive.metadata,
               );
         return prev.connectionState != curr.connectionState ||
@@ -405,6 +545,17 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
             endTime: l.endTime,
             isLive: l.isLive,
             isFollowing: l.isFollowing,
+            paused: l.paused,
+            mediaMode: l.mediaMode,
+            audioOnly: l.audioOnly,
+            scene: l.scene,
+            cameraFacing: l.cameraFacing,
+            dualCameraEnabled: l.dualCameraEnabled,
+            topic: l.topic,
+            scheduledAt: l.scheduledAt,
+            shareCount: l.shareCount,
+            houseId: l.houseId,
+            ageRestricted: l.ageRestricted,
             metadata: l.metadata,
             viewerCount: 0,
             likeCount: 0,
@@ -824,7 +975,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                       curr.live?.isFollowing ?? false,
                     );
                     return prev.topViewerAvatars != curr.topViewerAvatars ||
-                        pCount != cCount;
+                        pCount != cCount ||
+                        prev.currentUserId != curr.currentUserId ||
+                        prev.isReporting != curr.isReporting;
                   },
                   builder: (context, state) {
                     final avatars = isThisRoom
@@ -881,6 +1034,10 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                       onLeagueTap: widget.isActive
                           ? () => _openLeague(live)
                           : null,
+                      onMoreTap: widget.isActive &&
+                              !_isOwnLive(live, state)
+                          ? () => _openLiveReport(live)
+                          : null,
                     );
                   },
                 ),
@@ -916,6 +1073,13 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                       ...guests,
                     ],
                     onRequestTap: () => _openGuestRequest(live),
+                    onManageTap: _canManageGuests(live, state)
+                        ? () => LiveViewerGuestManageSheet.show(
+                            context,
+                            liveId: live.id,
+                            audioOnly: live.isAudioOnly,
+                          )
+                        : null,
                   ),
                 ),
               if (isPk && isThisRoom)
@@ -1176,7 +1340,10 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                         ? (state.live?.metadata?['shareCount'] as int?)
                         : (live.metadata?['shareCount'] as int?);
                     final canRequestGuest =
-                        widget.isActive && isThisRoom && !state.isOnStage;
+                        widget.isActive &&
+                        isThisRoom &&
+                        !state.isOnStage &&
+                        !live.paused;
                     return TikTokLiveBottomBar(
                       onTypeTap: () {
                         if (chatMuted) {
@@ -1192,15 +1359,13 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                         setState(() => _showComposer = true);
                       },
                       onGiftTap: _openGifts,
-                      onShareTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Share @${live.hostName}'),
-                            backgroundColor: AppColors.surface,
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
-                      },
+                      onShareTap: widget.isActive
+                          ? () {
+                              context.read<LiveViewerBloc>().add(
+                                const LiveViewerShareRequested(),
+                              );
+                            }
+                          : () {},
                       onLikeTap: () {
                         _spawnHearts(3);
                         if (widget.isActive) {
@@ -1251,6 +1416,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                   },
                 ),
               ),
+              if (live.paused &&
+                  connectionState != LiveConnectionState.liveEnded)
+                const IgnorePointer(child: _PausedIndicator()),
               if (widget.isActive && isThisRoom)
                 BlocBuilder<LiveViewerBloc, LiveViewerState>(
                   buildWhen: (prev, curr) =>
@@ -1258,8 +1426,15 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                       prev.session?.errorMessage !=
                           curr.session?.errorMessage ||
                       prev.session?.reconnectAttempt !=
-                          curr.session?.reconnectAttempt,
+                          curr.session?.reconnectAttempt ||
+                      prev.needsDateOfBirth != curr.needsDateOfBirth,
                   builder: (context, state) {
+                    if (state.needsDateOfBirth) {
+                      return _AgeDobGateOverlay(
+                        onSubmit: (dob) => _submitDateOfBirth(dob),
+                        onLeave: widget.onClose,
+                      );
+                    }
                     return LiveStateOverlay(
                       state: state.connectionState,
                       message: state.session?.errorMessage,
@@ -1275,6 +1450,42 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
           ),
         );
       },
+      ),
+    );
+  }
+}
+
+class _PausedIndicator extends StatelessWidget {
+  const _PausedIndicator();
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.center,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.55),
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.pause_circle_filled, color: Colors.white, size: 18),
+              SizedBox(width: 6),
+              Text(
+                'Paused',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -1800,6 +2011,66 @@ class _GuestChip extends StatelessWidget {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+class _AgeDobGateOverlay extends StatelessWidget {
+  const _AgeDobGateOverlay({required this.onSubmit, this.onLeave});
+
+  final ValueChanged<DateTime> onSubmit;
+  final VoidCallback? onLeave;
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned.fill(
+      child: Container(
+        color: Colors.black.withValues(alpha: 0.72),
+        alignment: Alignment.center,
+        child: Padding(
+          padding: const EdgeInsets.all(28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.shield_outlined, color: Colors.white, size: 48),
+              const SizedBox(height: 12),
+              const Text(
+                'هذا البث +18',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'أدخل تاريخ ميلادك للمتابعة. بدون تاريخ ميلاد لا يمكن المشاهدة.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white70, fontSize: 14),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () async {
+                  final now = DateTime.now();
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: DateTime(2000, 1, 1),
+                    firstDate: DateTime(now.year - 120),
+                    lastDate: now,
+                  );
+                  if (picked != null) onSubmit(picked);
+                },
+                child: const Text('إدخال تاريخ الميلاد'),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: onLeave,
+                child: const Text('مغادرة', style: TextStyle(color: Colors.white70)),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

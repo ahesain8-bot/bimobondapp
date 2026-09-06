@@ -11,6 +11,8 @@ import '../../../../../core/utils/app_text_styles.dart';
 import '../../bloc/live_room/live_room_bloc.dart';
 import '../../bloc/live_room/live_room_event.dart';
 import '../../bloc/live_room/live_room_state.dart';
+import '../../../domain/entities/live_share_result.dart';
+import '../../../domain/repositories/live_session_repository.dart';
 import 'live_room_share_actions.dart';
 import 'live_room_share_option.dart';
 
@@ -51,7 +53,11 @@ class LiveRoomShareSheet {
       },
     );
     if (context.mounted && bloc.state is LiveRoomEnded) {
-      if (context.canPop()) { context.pop(); } else { context.go('/'); }
+      if (context.canPop()) {
+        context.pop();
+      } else {
+        context.go('/');
+      }
     }
   }
 }
@@ -111,6 +117,43 @@ class _LiveRoomShareSheetBodyState extends State<_LiveRoomShareSheetBody> {
       );
   }
 
+  String? _shareChannelName(LiveRoomShareChannel channel) {
+    switch (channel) {
+      case LiveRoomShareChannel.copyLink:
+        return LiveShareChannel.copyLink;
+      case LiveRoomShareChannel.status:
+      case LiveRoomShareChannel.addToStory:
+        return LiveShareChannel.story;
+      case LiveRoomShareChannel.whatsApp:
+      case LiveRoomShareChannel.telegram:
+      case LiveRoomShareChannel.facebook:
+      case LiveRoomShareChannel.instagramDirect:
+        return LiveShareChannel.external;
+      case LiveRoomShareChannel.feedback:
+      case LiveRoomShareChannel.promote:
+      case LiveRoomShareChannel.search:
+        return null;
+    }
+  }
+
+  Future<String?> _registerShare(String? channel) async {
+    final sessionId = _sessionId;
+    if (sessionId == null) return null;
+    try {
+      final repo = context.read<LiveSessionRepository>();
+      final result = await repo.shareLive(sessionId, channel: channel);
+      if (!mounted) return result.shareUrl;
+      context.read<LiveRoomBloc>().add(
+        LiveRoomShareCountUpdated(result.shareCount),
+      );
+      final url = result.shareUrl?.trim();
+      if (url == null || url.isEmpty) return null;
+      return url;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> _onContact(LiveShareContact contact) async {
     context.read<LiveRoomBloc>().add(
       LiveRoomShareContactSelected(
@@ -118,10 +161,13 @@ class _LiveRoomShareSheetBodyState extends State<_LiveRoomShareSheetBody> {
         displayName: contact.displayName,
       ),
     );
-    final sessionId = _sessionId;
-    if (sessionId != null) {
-      await LiveRoomShareActions.copyLink(sessionId);
+    final url = await _registerShare(LiveShareChannel.messages);
+    if (!mounted) return;
+    if (url == null) {
+      _snack('تعذر مشاركة البث');
+      return;
     }
+    await LiveRoomShareActions.copyUrl(url);
     if (!mounted) return;
     _snack('جاهز للمشاركة مع ${contact.displayName}');
     _close();
@@ -130,21 +176,46 @@ class _LiveRoomShareSheetBodyState extends State<_LiveRoomShareSheetBody> {
   Future<void> _onChannel(LiveRoomShareChannel channel) async {
     context.read<LiveRoomBloc>().add(LiveRoomShareChannelRequested(channel));
 
+    if (channel == LiveRoomShareChannel.promote) {
+      final sessionId = _sessionId;
+      if (sessionId == null) {
+        _close();
+        return;
+      }
+      await LivePromotionsScreen.show(context, liveId: sessionId);
+      return;
+    }
+    if (channel == LiveRoomShareChannel.search) {
+      setState(() {
+        _searching = true;
+      });
+      return;
+    }
+    if (channel == LiveRoomShareChannel.feedback) {
+      _snack('الآراء والملاحظات — قريبًا');
+      _close();
+      return;
+    }
+
     final sessionId = _sessionId;
     if (sessionId == null) {
       _close();
       return;
     }
 
-    final url = LiveRoomShareActions.liveUrl(sessionId);
-    final message = LiveRoomShareActions.shareMessage(
-      sessionId,
-      hostName: _hostName,
-    );
+    final url = await _registerShare(_shareChannelName(channel));
+    if (!mounted) return;
+    if (url == null) {
+      _snack('تعذر مشاركة البث');
+      _close();
+      return;
+    }
+
+    final message = LiveRoomShareActions.shareMessage(url, hostName: _hostName);
 
     switch (channel) {
       case LiveRoomShareChannel.copyLink:
-        await LiveRoomShareActions.copyLink(sessionId);
+        await LiveRoomShareActions.copyUrl(url);
         if (!mounted) return;
         _snack('تم نسخ الرابط');
         _close();
@@ -171,34 +242,27 @@ class _LiveRoomShareSheetBodyState extends State<_LiveRoomShareSheetBody> {
         _close();
         return;
       case LiveRoomShareChannel.instagramDirect:
-        await LiveRoomShareActions.copyLink(sessionId);
+        await LiveRoomShareActions.copyUrl(url);
         if (!mounted) return;
         _snack('تم نسخ الرابط — الصقه في Instagram');
         _close();
         return;
       case LiveRoomShareChannel.status:
-        await LiveRoomShareActions.copyLink(sessionId);
+        await LiveRoomShareActions.copyUrl(url);
         if (!mounted) return;
         _snack('تم نسخ الرابط لحالة WhatsApp');
         _close();
         return;
       case LiveRoomShareChannel.addToStory:
+        await LiveRoomShareActions.copyUrl(url);
         if (!mounted) return;
-        _snack('إضافة إلى القصة — قريبًا');
+        _snack('تم نسخ الرابط لإضافته إلى القصة');
         _close();
         return;
       case LiveRoomShareChannel.feedback:
-        if (!mounted) return;
-        _snack('الآراء والملاحظات — قريبًا');
-        _close();
-        return;
       case LiveRoomShareChannel.promote:
-        await LivePromotionsScreen.show(context, liveId: sessionId);
         return;
       case LiveRoomShareChannel.search:
-        setState(() {
-          _searching = true;
-        });
         return;
     }
   }

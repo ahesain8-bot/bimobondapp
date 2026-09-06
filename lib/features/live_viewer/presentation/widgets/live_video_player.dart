@@ -11,6 +11,7 @@ import '../../data/services/fake_livekit_service.dart'
 import '../../domain/entities/live_entity.dart';
 import '../di/live_viewer_injector.dart' as di;
 import 'fallback_media.dart';
+import '../../../live/presentation/widgets/room/live_audio_room_stage.dart';
 
 class LiveVideoPlayer extends StatefulWidget {
   final LiveEntity live;
@@ -37,11 +38,13 @@ class _LiveVideoPlayerState extends State<LiveVideoPlayer> {
   bool _buffering = false;
   bool _hasError = false;
   int _gen = 0;
+  final GlobalKey _cameraRendererKey = GlobalKey();
 
   LiveKitService? _liveKit;
   StreamSubscription<LiveKitConnectionState>? _liveKitSub;
   Room? _room;
   RemoteVideoTrack? _track;
+  String _pubFingerprint = '';
 
   @override
   void initState() {
@@ -109,9 +112,46 @@ class _LiveVideoPlayerState extends State<LiveVideoPlayer> {
   RemoteTrackPublication<RemoteVideoTrack>? _findVideoPub() {
     final roomObj = _room;
     if (roomObj == null) return null;
+    RemoteTrackPublication<RemoteVideoTrack>? camera;
+    RemoteTrackPublication<RemoteVideoTrack>? screen;
     for (final p in roomObj.remoteParticipants.values) {
       for (final vp in p.videoTrackPublications) {
-        if (vp.subscribed) return vp;
+        if (!vp.subscribed) continue;
+        if (vp.source == TrackSource.screenShareVideo) {
+          screen ??= vp;
+        } else if (camera == null || (camera.muted && !vp.muted)) {
+          camera = vp;
+        }
+      }
+    }
+    final screenLive = screen != null && !screen.muted;
+    // DUAL main tile is the camera. A muted camera with a live screen share
+    // is a stale SCREEN (socket still DUAL) — never keep the black camera.
+    if (widget.live.scene == 'DUAL') {
+      if (camera != null && !camera.muted) return camera;
+      if (screenLive) return screen;
+      return camera ?? screen;
+    }
+    // Bind screenShareVideo by TrackSource whenever that publication is live,
+    // even if liveScene is still CAMERA. A muted camera must never win.
+    if (screenLive &&
+        (widget.live.scene == 'SCREEN' || camera == null || camera.muted)) {
+      return screen;
+    }
+    if (widget.live.scene == 'SCREEN') return screen;
+    return camera ?? screen;
+  }
+
+  RemoteVideoTrack? _screenShareTrack() {
+    final roomObj = _room;
+    if (roomObj == null) return null;
+    for (final p in roomObj.remoteParticipants.values) {
+      for (final vp in p.videoTrackPublications) {
+        if (vp.subscribed &&
+            vp.source == TrackSource.screenShareVideo &&
+            vp.track != null) {
+          return vp.track;
+        }
       }
     }
     return null;
@@ -229,29 +269,90 @@ class _LiveVideoPlayerState extends State<LiveVideoPlayer> {
     _room = null;
     if (room != null) room.removeListener(_onRoomChanged);
     _track = null;
+    _pubFingerprint = '';
   }
 
   void _onRoomChanged() {
     _refreshTrack();
   }
 
-  void _refreshTrack() {
+  String _videoPublicationFingerprint() {
     final room = _room;
-    final next = room == null ? null : _firstSubscribedVideoTrack(room);
-    if (identical(next, _track)) return;
-    _track = next;
-    if (mounted) setState(() {});
-  }
-
-  RemoteVideoTrack? _firstSubscribedVideoTrack(Room room) {
+    if (room == null) return '';
+    final parts = <String>[];
     for (final participant in room.remoteParticipants.values) {
       for (final pub in participant.videoTrackPublications) {
-        if (pub.subscribed && pub.track is RemoteVideoTrack) {
-          return pub.track as RemoteVideoTrack;
+        parts.add(
+          '${pub.sid}:${pub.source.name}:${pub.subscribed}:${pub.muted}',
+        );
+      }
+    }
+    parts.sort();
+    return parts.join('|');
+  }
+
+  void _refreshTrack() {
+    final pub = _findVideoPub();
+    final next = pub?.track;
+    final fingerprint = _videoPublicationFingerprint();
+    final trackChanged = !identical(next, _track);
+    final pubsChanged = fingerprint != _pubFingerprint;
+    if (!trackChanged && !pubsChanged) return;
+    _track = next;
+    _pubFingerprint = fingerprint;
+    debugPrint(
+      '[LiveVideoPlayer] scene=${widget.live.scene}'
+      ' mainSource=${pub?.source.name}'
+      ' mainSid=${pub?.sid}'
+      ' muted=${pub?.muted}'
+      ' pubs=$fingerprint',
+    );
+    final attachedPub = pub;
+    if (attachedPub != null &&
+        (attachedPub.source == TrackSource.screenShareVideo ||
+            widget.live.scene == 'DUAL')) {
+      debugPrint(
+        'LIVE_SCREEN_DIAG viewer rendererAttach'
+        ' scene=${widget.live.scene}'
+        ' sid=${attachedPub.sid}'
+        ' source=${attachedPub.source.name}'
+        ' subscribed=${attachedPub.subscribed}'
+        ' muted=${attachedPub.muted}',
+      );
+    }
+    RemoteTrackPublication<RemoteVideoTrack>? cameraPub;
+    RemoteTrackPublication<RemoteVideoTrack>? screenPub;
+    final roomObj = _room;
+    if (roomObj != null) {
+      for (final participant in roomObj.remoteParticipants.values) {
+        for (final candidate in participant.videoTrackPublications) {
+          if (candidate.source == TrackSource.screenShareVideo) {
+            screenPub ??= candidate;
+          } else if (cameraPub == null ||
+              (cameraPub.muted && !candidate.muted)) {
+            cameraPub = candidate;
+          }
         }
       }
     }
-    return null;
+    if (cameraPub != null && screenPub != null) {
+      debugPrint(
+        'LIVE_SCREEN_DIAG viewer dualPubs'
+        ' scene=${widget.live.scene}'
+        ' cameraSid=${cameraPub.sid}'
+        ' screenSid=${screenPub.sid}'
+        ' cameraSubscribed=${cameraPub.subscribed}'
+        ' screenSubscribed=${screenPub.subscribed}'
+        ' cameraMuted=${cameraPub.muted}'
+        ' screenMuted=${screenPub.muted}'
+        ' mainSid=${attachedPub?.sid ?? "-"}'
+        ' pipSid=${_screenShareTrack()?.sid ?? screenPub.sid}',
+      );
+    }
+    if (mounted) setState(() {});
+    if (trackChanged && widget.isActive) {
+      unawaited(_applyQualityFloor(widget.isActive));
+    }
   }
 
   @override
@@ -260,7 +361,22 @@ class _LiveVideoPlayerState extends State<LiveVideoPlayer> {
     if (oldWidget.live.id != widget.live.id) {
       _disposeController();
       if (widget.isActive) _init();
-    } else if (oldWidget.isActive != widget.isActive) {
+      _refreshTrack();
+      unawaited(_applyQualityFloor(widget.isActive));
+      return;
+    }
+    if (oldWidget.live.scene != widget.live.scene) {
+      _refreshTrack();
+      // CAMERA↔DUAL keeps the same camera publication. Re-applying the
+      // subscribe floor here tore down both renderers (unsubscribed camera
+      // and screen) and dropped decode to 360p in the DUAL logs.
+      final mainIsCamera =
+          _track != null && _track!.source != TrackSource.screenShareVideo;
+      if (!mainIsCamera) {
+        unawaited(_applyQualityFloor(widget.isActive));
+      }
+    }
+    if (oldWidget.isActive != widget.isActive) {
       unawaited(_applyQualityFloor(widget.isActive));
       if (widget.isActive) {
         if (_controller == null) {
@@ -282,6 +398,16 @@ class _LiveVideoPlayerState extends State<LiveVideoPlayer> {
   }
 
   Future<void> _init() async {
+    if (widget.live.isAudioOnly) {
+      if (mounted) {
+        setState(() {
+          _initializing = false;
+          _buffering = false;
+          _hasError = false;
+        });
+      }
+      return;
+    }
     final gen = ++_gen;
     if (!mounted) return;
 
@@ -364,23 +490,61 @@ class _LiveVideoPlayerState extends State<LiveVideoPlayer> {
   }
 
   Widget _buildMedia() {
+    if (widget.live.isAudioOnly) {
+      return LiveAudioRoomStage(
+        hostName: widget.live.hostName,
+        hostAvatarUrl: widget.live.hostAvatar,
+        coverUrl: widget.live.thumbnailUrl,
+        paused: widget.live.paused,
+      );
+    }
     final room = widget.isActive ? _room : null;
+    final scene = widget.live.scene;
+    final screen = _screenShareTrack();
+    // Main tile follows _findVideoPub() so a live screenShareVideo wins even
+    // when the scene socket is still CAMERA and the camera pub is muted.
     final track = room == null ? null : _track;
     if (track != null) {
-      return ColoredBox(
-        color: Colors.black,
-        child: VideoTrackRenderer(
-          track,
-          fit: widget.fit == BoxFit.cover
-              ? VideoViewFit.cover
-              : VideoViewFit.contain,
-          placeholderBuilder: (_) => AnimatedVideoPlaceholder(
-            seed: widget.live.id,
-            category: widget.live.category,
-            hostInitial: widget.live.hostName,
-          ),
+      final isScreenShare = track.source == TrackSource.screenShareVideo;
+      Widget renderer = VideoTrackRenderer(
+        track,
+        key: isScreenShare ? ValueKey('screen-${track.sid}') : _cameraRendererKey,
+        fit: widget.fit == BoxFit.cover
+            ? VideoViewFit.cover
+            : VideoViewFit.contain,
+        placeholderBuilder: (_) => AnimatedVideoPlaceholder(
+          seed: widget.live.id,
+          category: widget.live.category,
+          hostInitial: widget.live.hostName,
         ),
       );
+      if (widget.live.isFrontCamera && !isScreenShare) {
+        renderer = Transform.flip(flipX: true, child: renderer);
+      }
+      final showDualPip =
+          screen != null &&
+          screen != track &&
+          !isScreenShare &&
+          scene != 'SCREEN';
+      if (showDualPip) {
+        renderer = Stack(
+          fit: StackFit.expand,
+          children: [
+            renderer,
+            Positioned(
+              right: 12,
+              bottom: 140,
+              width: 120,
+              height: 180,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: VideoTrackRenderer(screen, fit: VideoViewFit.cover),
+              ),
+            ),
+          ],
+        );
+      }
+      return ColoredBox(color: Colors.black, child: renderer);
     }
 
     final controller = _controller;

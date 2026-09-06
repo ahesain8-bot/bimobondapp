@@ -60,6 +60,7 @@ class MainActivity : FlutterActivity() {
         NativeCameraPlugin.register(flutterEngine, this)
         // Template timeline → Media3 Transformer / MediaCodec export.
         TemplateExportPlugin.register(flutterEngine, this)
+        LiveScreenShareBridge.register(flutterEngine, this)
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, KEYGUARD_CHANNEL)
             .setMethodCallHandler { call, result ->

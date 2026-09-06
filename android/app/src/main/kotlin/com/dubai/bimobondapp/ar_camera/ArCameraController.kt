@@ -3627,12 +3627,24 @@ object ArCameraController {
         )
         if (!started) return
         // Live beauty publish must keep CameraX open. Activity onPause fires for
-        // dialogs / brief inactive transitions and previously unbound the lens,
-        // leaving viewers with audio-only streams.
+        // MediaProjection / brief inactive transitions and previously unbound
+        // the lens, leaving viewers with audio-only streams.
+        //
+        // CameraX stays bound, but the GLSurfaceView window is still destroyed
+        // *after* onResume (see CAMERA→DUAL logs). Pair GL pause/resume and
+        // mark hostWasPaused so onHostResume rebinds the OES producer instead
+        // of SKIP noRealPause (which kept publishing black FaceWarp readbacks).
         if (ArLiveBeautyPublisher.isLivePublishingExclusive()) {
+            hostWasPaused = true
+            hostResumeGeneration++
+            try {
+                ArCameraBridge.warpGlView?.onPause()
+            } catch (_: Throwable) {
+            }
             Log.w(
                 "ArCameraLifecycle",
-                "Controller.onHostPause skipped unbind — live beauty publish owns CameraX",
+                "LIVE_SCREEN_DIAG host glPause liveExclusive=true " +
+                    "skippedCameraXUnbind=true glPaused=true",
             )
             return
         }
@@ -3760,11 +3772,21 @@ object ArCameraController {
         }
         hostWasPaused = false
         val resumeGeneration = ++hostResumeGeneration
+        val recoverLiveBeauty = ArLiveBeautyPublisher.isLivePublishingExclusive()
+        if (recoverLiveBeauty) {
+            ArLiveBeautyPublisher.pauseForCameraSwitch()
+            Log.i(
+                "ArCameraLifecycle",
+                "LIVE_SCREEN_DIAG host glRecover pauseBeauty liveExclusive=true " +
+                    "generation=$resumeGeneration",
+            )
+        }
         Log.i(
             "ArCameraLifecycle",
             "Controller.onHostResume SCHEDULE generation=$resumeGeneration " +
                 "gl=${gl?.width}x${gl?.height} glVis=${gl?.visibility} " +
-                "previewVis=${ArCameraBridge.previewView?.visibility}",
+                "previewVis=${ArCameraBridge.previewView?.visibility} " +
+                "recoverLiveBeauty=$recoverLiveBeauty",
         )
 
         try {
@@ -3835,6 +3857,14 @@ object ArCameraController {
                         )
                         ArCameraBridge.applyCurrentFilter()
                         gl?.requestRender()
+                        if (recoverLiveBeauty) {
+                            ArLiveBeautyPublisher.resumeAfterCameraSwitch(delayMs = 400L)
+                            Log.i(
+                                "ArCameraLifecycle",
+                                "LIVE_SCREEN_DIAG host glRecover resumeBeauty " +
+                                    "liveExclusive=true generation=$resumeGeneration",
+                            )
+                        }
                     } else {
                         Log.w(
                             "ArCameraLifecycle",

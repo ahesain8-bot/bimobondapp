@@ -25,6 +25,7 @@ import '../../domain/usecases/dispose_camera.dart';
 import '../../domain/usecases/end_live_session.dart';
 import '../../domain/usecases/initialize_camera.dart';
 import '../../domain/usecases/like_live_session.dart';
+import '../../domain/usecases/pause_live_session.dart';
 import '../../domain/usecases/send_live_comment.dart';
 import '../../domain/usecases/start_live_session.dart';
 import '../../domain/usecases/update_live_title.dart';
@@ -60,6 +61,8 @@ class LiveRoomPage extends StatefulWidget {
     this.title,
     this.initialCamera,
     this.useArBeautyCamera = false,
+    this.mediaMode = 'VIDEO',
+    this.topic,
   });
 
   /// Optional title entered on the start screen.
@@ -71,6 +74,12 @@ class LiveRoomPage extends StatefulWidget {
 
   /// Android: stream FaceWarp beauty frames via LiveKit (no raw camera track).
   final bool useArBeautyCamera;
+
+  /// `VIDEO` or `AUDIO`. Cannot be switched after start.
+  final String mediaMode;
+
+  /// Optional topic from the start screen (`POST /lives` `topic`, max 80).
+  final String? topic;
 
   @override
   State<LiveRoomPage> createState() => _LiveRoomPageState();
@@ -100,7 +109,10 @@ class _LiveRoomPageState extends State<LiveRoomPage>
 
   Future<void> _preRequestPermissions() async {
     try {
-      await [Permission.camera, Permission.microphone].request();
+      final perms = widget.mediaMode.toUpperCase() == 'AUDIO'
+          ? <Permission>[Permission.microphone]
+          : [Permission.camera, Permission.microphone];
+      await perms.request();
     } catch (_) {}
   }
 
@@ -144,6 +156,7 @@ class _LiveRoomPageState extends State<LiveRoomPage>
           sendLiveComment: SendLiveComment(_sessionRepository!),
           likeLiveSession: LikeLiveSession(_sessionRepository!),
           updateLiveTitle: UpdateLiveTitle(_sessionRepository!),
+          pauseLiveSession: PauseLiveSession(_sessionRepository!),
           sessionRepository: _sessionRepository!,
           giftSocketService: auctions_di.sl<AuctionSocketService>(),
         )..add(
@@ -151,6 +164,8 @@ class _LiveRoomPageState extends State<LiveRoomPage>
             title: widget.title,
             initialCamera: widget.initialCamera,
             useArBeautyCamera: widget.useArBeautyCamera,
+            mediaMode: widget.mediaMode,
+            topic: widget.topic,
           ),
         );
   }

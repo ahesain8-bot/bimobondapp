@@ -396,6 +396,7 @@ class _HostBattleVideo extends StatelessWidget {
             previous.isMediaConnected != current.isMediaConnected ||
             previous.isMirrorEnabled != current.isMirrorEnabled ||
             previous.isLivePaused != current.isLivePaused ||
+            previous.session.paused != current.session.paused ||
             previous.isFrontCamera != current.isFrontCamera;
       },
       builder: (context, state) {

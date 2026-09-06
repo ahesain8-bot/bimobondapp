@@ -9,24 +9,62 @@ class LivesRemoteDataSource {
   final LiveApiClient _api;
 
   /// `POST /lives` with `startNow: true` → `{ live, token, url, role }`.
+  /// Never send [scheduledAt] with `startNow: true`.
   Future<Map<String, dynamic>> createAndStart({
     required String title,
     String? coverUrl,
     String? categoryId,
+    String mediaMode = 'VIDEO',
+    String? topic,
   }) {
     return _api.post(
       ApiEndpoints.lives,
       body: {
         'title': title,
         'startNow': true,
+        'mediaMode': mediaMode,
         if (coverUrl != null) 'coverUrl': coverUrl,
         if (categoryId != null) 'categoryId': categoryId,
+        if (topic != null && topic.isNotEmpty) 'topic': topic,
+      },
+    );
+  }
+
+  /// `POST /lives` as `PLANNED`. Do not send `startNow: true`.
+  Future<Map<String, dynamic>> createPlanned({
+    required String title,
+    required String scheduledAt,
+    String? coverUrl,
+    String? categoryId,
+    String mediaMode = 'VIDEO',
+    String? topic,
+  }) {
+    return _api.post(
+      ApiEndpoints.lives,
+      body: {
+        'title': title,
+        'startNow': false,
+        'scheduledAt': scheduledAt,
+        'mediaMode': mediaMode,
+        if (coverUrl != null) 'coverUrl': coverUrl,
+        if (categoryId != null) 'categoryId': categoryId,
+        if (topic != null && topic.isNotEmpty) 'topic': topic,
       },
     );
   }
 
   Future<Map<String, dynamic>> end(String liveId) {
     return _api.post(ApiEndpoints.liveEnd(liveId));
+  }
+
+  /// `POST /lives/:id/pause` → `{ paused: true, pausedAt }`. Status stays `LIVE`.
+  Future<Map<String, dynamic>> pause(String liveId) {
+    return _api.post(ApiEndpoints.livePause(liveId));
+  }
+
+  /// `POST /lives/:id/resume` → `{ paused: false, pausedAt }`. Socket `livePaused`.
+  Future<Map<String, dynamic>> resume(String liveId) {
+    return _api.post(ApiEndpoints.liveResume(liveId));
   }
 
   /// `POST /lives/:id/start` → `{ live, token, url, role: "host" }`.
@@ -79,18 +117,28 @@ class LivesRemoteDataSource {
     String liveId, {
     String? title,
     String? coverUrl,
+    String? topic,
   }) {
     return _api.patch(
       ApiEndpoints.liveById(liveId),
       body: {
         if (title != null) 'title': title,
         if (coverUrl != null) 'coverUrl': coverUrl,
+        if (topic != null) 'topic': topic,
       },
     );
   }
 
   Future<Map<String, dynamic>> like(String liveId) {
     return _api.post(ApiEndpoints.liveLike(liveId));
+  }
+
+  /// `POST /lives/:id/share` → `{ shareUrl, deepLink, shareCount }`.
+  Future<Map<String, dynamic>> share(String liveId, {String? channel}) {
+    return _api.post(
+      ApiEndpoints.liveShare(liveId),
+      body: {if (channel != null && channel.isNotEmpty) 'channel': channel},
+    );
   }
 
   Future<Map<String, dynamic>> sendComment({
@@ -169,6 +217,69 @@ class LivesRemoteDataSource {
     required String userId,
   }) {
     return _api.post(ApiEndpoints.liveViewerUnban(liveId, userId));
+  }
+
+  Future<Map<String, dynamic>> updateChatRules({
+    required String liveId,
+    String? chatMode,
+    int? slowModeSeconds,
+    List<String>? blockedKeywords,
+  }) {
+    return _api.patch(
+      ApiEndpoints.liveChatRules(liveId),
+      body: {
+        if (chatMode != null) 'chatMode': chatMode,
+        if (slowModeSeconds != null) 'slowModeSeconds': slowModeSeconds,
+        if (blockedKeywords != null) 'blockedKeywords': blockedKeywords,
+      },
+    );
+  }
+
+  Future<Map<String, dynamic>> listModerators(String liveId) {
+    return _api.get(ApiEndpoints.liveModerators(liveId));
+  }
+
+  Future<Map<String, dynamic>> addModerator({
+    required String liveId,
+    required String userId,
+  }) {
+    return _api.post(
+      ApiEndpoints.liveModerators(liveId),
+      body: {'userId': userId},
+    );
+  }
+
+  Future<Map<String, dynamic>> removeModerator({
+    required String liveId,
+    required String userId,
+  }) {
+    return _api.delete(ApiEndpoints.liveModeratorByUser(liveId, userId));
+  }
+
+  Future<Map<String, dynamic>> createHouse({required String title}) {
+    return _api.post(ApiEndpoints.liveHouses, body: {'title': title});
+  }
+
+  Future<Map<String, dynamic>> listHouses() {
+    return _api.get(ApiEndpoints.liveHouses);
+  }
+
+  Future<Map<String, dynamic>> getHouse(String houseId) {
+    return _api.get(ApiEndpoints.liveHouseById(houseId));
+  }
+
+  Future<Map<String, dynamic>> attachLiveToHouse({
+    required String houseId,
+    required String liveId,
+  }) {
+    return _api.post(
+      ApiEndpoints.liveHouseRooms(houseId),
+      body: {'liveId': liveId},
+    );
+  }
+
+  Future<Map<String, dynamic>> closeHouse(String houseId) {
+    return _api.patch(ApiEndpoints.liveHouseById(houseId), body: {});
   }
 
   Future<Map<String, dynamic>> gallery(String liveId) {
@@ -391,6 +502,8 @@ class LivesRemoteDataSource {
     String? layout,
     bool? allowGuestCamera,
     bool? moderatorsCanManageGuests,
+    String? topic,
+    bool? ageRestricted,
   }) {
     return _api.patch(
       ApiEndpoints.liveSettings(liveId),
@@ -402,6 +515,30 @@ class LivesRemoteDataSource {
         if (allowGuestCamera != null) 'allowGuestCamera': allowGuestCamera,
         if (moderatorsCanManageGuests != null)
           'moderatorsCanManageGuests': moderatorsCanManageGuests,
+        if (topic != null) 'topic': topic,
+        if (ageRestricted != null) 'ageRestricted': ageRestricted,
+      },
+    );
+  }
+
+  /// `GET /lives/:id/studio` — host-only RTMP / recording. Null Ingress is OK.
+  Future<Map<String, dynamic>> studio(String liveId) {
+    return _api.get(ApiEndpoints.liveStudio(liveId), auth: true);
+  }
+
+  /// `PATCH /lives/:id/scene` — persist CAMERA/SCREEN/DUAL + facing.
+  Future<Map<String, dynamic>> updateScene(
+    String liveId, {
+    required String scene,
+    required String cameraFacing,
+    required bool dualCameraEnabled,
+  }) {
+    return _api.patch(
+      ApiEndpoints.liveScene(liveId),
+      body: {
+        'scene': scene,
+        'cameraFacing': cameraFacing,
+        'dualCameraEnabled': dualCameraEnabled,
       },
     );
   }

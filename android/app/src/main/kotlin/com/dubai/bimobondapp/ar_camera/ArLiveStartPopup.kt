@@ -194,7 +194,22 @@ object ArLiveStartPopup {
                 }
             }
         }
-        chips.addView(chip("Add topic", "🪙"))
+        val topicChip = chip("Add topic", "🪙")
+        topicChip.setOnClickListener {
+            ArCameraBridge.liveStartEventSink?.invoke("onLiveStartAddTopic", null)
+        }
+        chips.addView(topicChip)
+        val scheduleChip = chip("Schedule", "📅")
+        scheduleChip.setOnClickListener {
+            ArCameraBridge.liveStartEventSink?.invoke("onLiveStartSchedule", null)
+        }
+        chips.addView(
+            scheduleChip,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).apply { marginStart = dp(8) },
+        )
         chips.addView(
             chip("Add a LIVE goal", "🏆"),
             LinearLayout.LayoutParams(

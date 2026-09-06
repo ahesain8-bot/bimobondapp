@@ -27,7 +27,10 @@ class LiveReady extends LiveState {
     this.isFrontCamera = true,
     this.isToolsExpanded = true,
     this.isDeviceCamera = true,
+    this.isAudioMode = false,
     this.selectedIndex = 2,
+    this.topic,
+    this.scheduledAt,
   });
 
   /// Active camera controller, `null` while not initialized.
@@ -49,8 +52,17 @@ class LiveReady extends LiveState {
   /// Whether the source is the device camera (vs mobile games).
   final bool isDeviceCamera;
 
+  /// Voice Chat (`mediaMode: AUDIO`) vs Video LIVE.
+  final bool isAudioMode;
+
   /// Selected bottom tab index.
   final int selectedIndex;
+
+  /// Optional radio/room topic (max 80).
+  final String? topic;
+
+  /// Local wall-clock time the host picked. Serialized to UTC ISO on create.
+  final DateTime? scheduledAt;
 
   LiveReady copyWith({
     Object? controller = _unset,
@@ -59,7 +71,10 @@ class LiveReady extends LiveState {
     bool? isFrontCamera,
     bool? isToolsExpanded,
     bool? isDeviceCamera,
+    bool? isAudioMode,
     int? selectedIndex,
+    Object? topic = _unset,
+    Object? scheduledAt = _unset,
   }) {
     return LiveReady(
       controller: identical(controller, _unset)
@@ -72,7 +87,12 @@ class LiveReady extends LiveState {
       isFrontCamera: isFrontCamera ?? this.isFrontCamera,
       isToolsExpanded: isToolsExpanded ?? this.isToolsExpanded,
       isDeviceCamera: isDeviceCamera ?? this.isDeviceCamera,
+      isAudioMode: isAudioMode ?? this.isAudioMode,
       selectedIndex: selectedIndex ?? this.selectedIndex,
+      topic: identical(topic, _unset) ? this.topic : topic as String?,
+      scheduledAt: identical(scheduledAt, _unset)
+          ? this.scheduledAt
+          : scheduledAt as DateTime?,
     );
   }
 
@@ -86,7 +106,10 @@ class LiveReady extends LiveState {
         other.isFrontCamera == isFrontCamera &&
         other.isToolsExpanded == isToolsExpanded &&
         other.isDeviceCamera == isDeviceCamera &&
-        other.selectedIndex == selectedIndex;
+        other.isAudioMode == isAudioMode &&
+        other.selectedIndex == selectedIndex &&
+        other.topic == topic &&
+        other.scheduledAt == scheduledAt;
   }
 
   @override
@@ -98,7 +121,10 @@ class LiveReady extends LiveState {
       isFrontCamera,
       isToolsExpanded,
       isDeviceCamera,
+      isAudioMode,
       selectedIndex,
+      topic,
+      scheduledAt,
     );
   }
 }

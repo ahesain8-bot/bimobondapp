@@ -23,7 +23,8 @@ class LiveRoomCompetitionRequestPrompt extends StatelessWidget {
           previous is! LiveRoomReady ||
           previous.pendingCompetitionRequest !=
               current.pendingCompetitionRequest ||
-          previous.isCompetitionActionBusy != current.isCompetitionActionBusy,
+          previous.isCompetitionActionBusy != current.isCompetitionActionBusy ||
+          previous.isLivePaused != current.isLivePaused,
       builder: (context, state) {
         if (state is! LiveRoomReady) return const SizedBox.shrink();
         final request = state.pendingCompetitionRequest;
@@ -33,7 +34,7 @@ class LiveRoomCompetitionRequestPrompt extends StatelessWidget {
         final bloc = context.read<LiveRoomBloc>();
         return LiveRoomCompetitionRequestCard(
           request: request,
-          busy: state.isCompetitionActionBusy,
+          busy: state.isCompetitionActionBusy || state.isLivePaused,
           onRejected: () => bloc.add(
             LiveRoomCompetitionRequestAnswered(
               commentId: request.commentId,
@@ -43,15 +44,17 @@ class LiveRoomCompetitionRequestPrompt extends StatelessWidget {
           // Accepting retires the request, then opens the opponent picker: a
           // PK is live-vs-live, so the host still has to choose which
           // broadcast to go up against (or tap quick-match inside the sheet).
-          onAccepted: () {
-            bloc.add(
-              LiveRoomCompetitionRequestAnswered(
-                commentId: request.commentId,
-                accepted: true,
-              ),
-            );
-            LiveRoomBattleOpponentsSheet.show(context);
-          },
+          onAccepted: state.isLivePaused
+              ? () {}
+              : () {
+                  bloc.add(
+                    LiveRoomCompetitionRequestAnswered(
+                      commentId: request.commentId,
+                      accepted: true,
+                    ),
+                  );
+                  LiveRoomBattleOpponentsSheet.show(context);
+                },
         );
       },
     );

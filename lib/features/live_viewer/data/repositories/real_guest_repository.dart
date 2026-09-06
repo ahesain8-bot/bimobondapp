@@ -78,6 +78,97 @@ class RealGuestRepository implements GuestRepository {
     }
   }
 
+  Future<Either<Failure, void>> _postGuestAction(
+    String path,
+    String errorLabel,
+  ) async {
+    try {
+      await _api.post(path);
+      return const Right(null);
+    } catch (e) {
+      return Left(ServerFailure('$errorLabel: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> acceptGuest({
+    required String liveId,
+    required String userId,
+  }) => _postGuestAction(
+    ApiEndpoints.liveGuestAccept(liveId, userId),
+    'Failed to accept guest',
+  );
+
+  @override
+  Future<Either<Failure, void>> rejectGuest({
+    required String liveId,
+    required String userId,
+  }) => _postGuestAction(
+    ApiEndpoints.liveGuestReject(liveId, userId),
+    'Failed to reject guest',
+  );
+
+  @override
+  Future<Either<Failure, void>> kickGuest({
+    required String liveId,
+    required String userId,
+  }) => _postGuestAction(
+    ApiEndpoints.liveGuestKick(liveId, userId),
+    'Failed to kick guest',
+  );
+
+  @override
+  Future<Either<Failure, void>> muteGuest({
+    required String liveId,
+    required String userId,
+  }) => _postGuestAction(
+    ApiEndpoints.liveGuestMute(liveId, userId),
+    'Failed to mute guest',
+  );
+
+  @override
+  Future<Either<Failure, void>> unmuteGuest({
+    required String liveId,
+    required String userId,
+  }) => _postGuestAction(
+    ApiEndpoints.liveGuestUnmute(liveId, userId),
+    'Failed to unmute guest',
+  );
+
+  @override
+  Future<Either<Failure, void>> setGuestCameraOff({
+    required String liveId,
+    required String userId,
+  }) => _postGuestAction(
+    ApiEndpoints.liveGuestCameraOff(liveId, userId),
+    'Failed to turn guest camera off',
+  );
+
+  @override
+  Future<Either<Failure, void>> setGuestCameraOn({
+    required String liveId,
+    required String userId,
+  }) => _postGuestAction(
+    ApiEndpoints.liveGuestCameraOn(liveId, userId),
+    'Failed to turn guest camera on',
+  );
+
+  @override
+  Future<Either<Failure, void>> inviteGuest({
+    required String liveId,
+    required String userId,
+  }) async {
+    try {
+      await _api.post(
+        ApiEndpoints.liveGuestInvite(liveId),
+        body: {'userId': userId, 'role': 'GUEST'},
+      );
+      return const Right(null);
+    } catch (e) {
+      return Left(ServerFailure('Failed to invite guest: $e'));
+    }
+  }
+
   GuestSummary _guestFromJson(Map<String, dynamic> json) {
     final user = json['user'];
     final userMap = user is Map ? Map<String, dynamic>.from(user) : null;
@@ -95,6 +186,7 @@ class RealGuestRepository implements GuestRepository {
           userMap?['profilePicture']?.toString(),
       mutedByHost: json['mutedByHost'] == true,
       cameraOffByHost: json['cameraOffByHost'] == true,
+      seat: json['seat']?.toString(),
     );
   }
 

@@ -4,6 +4,8 @@ import '../../core/constants/api_constants.dart';
 import '../../domain/entities/live_entity.dart';
 import '../../domain/entities/live_feed_page_result.dart';
 import '../../domain/entities/live_session_entity.dart';
+import '../../../live/domain/entities/live_moderator.dart';
+import '../../../live/domain/entities/live_share_result.dart';
 import '../services/fake_livekit_service.dart';
 
 /// Remote API contract. Today this is an in-memory mock that mimics
@@ -16,6 +18,7 @@ abstract class LiveRemoteDataSource {
     bool followingOnly = false,
     double? latitude,
     double? longitude,
+    bool audioOnly = false,
   });
 
   Future<LiveEntity> getLiveById(String liveId);
@@ -48,6 +51,15 @@ abstract class LiveRemoteDataSource {
     required String liveId,
     required String userId,
   });
+
+  /// POST /lives/:id/share
+  Future<LiveShareResult> shareLive(String liveId, {String? channel});
+
+  /// POST /lives/:id/report `{ "reason": "…" }`
+  Future<void> reportLive(String liveId, {required String reason});
+
+  /// GET /lives/:id/moderators
+  Future<List<LiveModerator>> listModerators(String liveId);
 }
 
 class FakeLiveRemoteDataSource implements LiveRemoteDataSource {
@@ -103,6 +115,7 @@ class FakeLiveRemoteDataSource implements LiveRemoteDataSource {
     bool followingOnly = false,
     double? latitude,
     double? longitude,
+    bool audioOnly = false,
   }) async {
     await Future.delayed(const Duration(milliseconds: 700));
 
@@ -221,7 +234,35 @@ class FakeLiveRemoteDataSource implements LiveRemoteDataSource {
     await Future.delayed(const Duration(milliseconds: 300));
   }
 
-  /// Endpoint path helpers for documentation / future Dio mapping.
+  @override
+  Future<LiveShareResult> shareLive(String liveId, {String? channel}) async {
+    await Future.delayed(const Duration(milliseconds: 200));
+    final live = _cache[liveId];
+    final next = (live?.shareCount ?? 0) + 1;
+    if (live != null) {
+      final meta = Map<String, dynamic>.from(live.metadata ?? {});
+      meta['shareCount'] = next;
+      _cache[liveId] = live.copyWith(shareCount: next, metadata: meta);
+    }
+    return LiveShareResult(
+      liveId: liveId,
+      shareUrl: 'https://live.bimobond.app/l/$liveId',
+      deepLink: 'dcc://lives/$liveId',
+      shareCount: next,
+    );
+  }
+
+  @override
+  Future<void> reportLive(String liveId, {required String reason}) async {
+    await Future.delayed(const Duration(milliseconds: 200));
+  }
+
+  @override
+  Future<List<LiveModerator>> listModerators(String liveId) async {
+    await Future.delayed(const Duration(milliseconds: 150));
+    return const [];
+  }
+
   String feedPath() => ApiConstants.livesFeed;
   String joinPath(String id) => ApiConstants.joinLive.replaceAll('{id}', id);
   String leavePath(String id) => ApiConstants.leaveLive.replaceAll('{id}', id);

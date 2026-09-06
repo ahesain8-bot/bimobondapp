@@ -2,11 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../../core/utils/app_colors.dart';
+import '../../../../../core/network/api_exceptions.dart';
 import '../../../domain/repositories/live_session_repository.dart';
 import '../../bloc/live_room/live_room_bloc.dart';
+import '../../bloc/live_room/live_room_event.dart';
 import '../../bloc/live_room/live_room_state.dart';
 import 'live_room_host_sheet_chrome.dart';
 import 'live_room_multi_guest_settings_sheet.dart';
+import 'live_room_chat_rules_sheet.dart';
+import 'live_room_moderators_sheet.dart';
+import 'live_room_house_sheet.dart';
 
 /// Host stream settings. Guest policy lives one level deeper, in
 /// [LiveRoomMultiGuestSettingsSheet], so a single screen owns
@@ -38,19 +43,55 @@ class _LiveRoomSettingsSheetBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LiveRoomHostSheetChrome(
-      title: 'إعدادات البث',
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-        children: [
-          _SettingsNavRow(
-            icon: Icons.groups_outlined,
-            title: 'إعدادات وضع تعدد الضيوف',
-            subtitle: 'التخطيط وأذونات الانضمام إلى المسرح.',
-            onTap: () => LiveRoomMultiGuestSettingsSheet.show(context),
+    return BlocBuilder<LiveRoomBloc, LiveRoomState>(
+      buildWhen: (prev, curr) =>
+          prev is LiveRoomReady &&
+          curr is LiveRoomReady &&
+          prev.session.ageRestricted != curr.session.ageRestricted,
+      builder: (context, state) {
+        final session = state is LiveRoomReady ? state.session : null;
+        final ageRestricted = session?.ageRestricted ?? false;
+        return LiveRoomHostSheetChrome(
+          title: 'إعدادات البث',
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+            children: [
+              _SettingsNavRow(
+                icon: Icons.groups_outlined,
+                title: 'إعدادات وضع تعدد الضيوف',
+                subtitle: 'التخطيط وأذونات الانضمام إلى المسرح.',
+                onTap: () => LiveRoomMultiGuestSettingsSheet.show(context),
+              ),
+              const SizedBox(height: 8),
+              _SettingsNavRow(
+                icon: Icons.chat_bubble_outline,
+                title: 'قواعد الدردشة',
+                subtitle: 'وضع الدردشة والوضع البطيء والكلمات المحظورة.',
+                onTap: () => LiveRoomChatRulesSheet.show(context),
+              ),
+              const SizedBox(height: 8),
+              _SettingsNavRow(
+                icon: Icons.shield_outlined,
+                title: 'مشرفو الغرفة',
+                subtitle: 'تعيين أو إزالة مشرف لهذا البث فقط.',
+                onTap: () => LiveRoomModeratorsSheet.show(context),
+              ),
+              const SizedBox(height: 8),
+              _SettingsNavRow(
+                icon: Icons.home_outlined,
+                title: 'بيت البث',
+                subtitle: 'إنشاء بيت وربط هذا البث كغرفة.',
+                onTap: () => LiveRoomHouseSheet.show(context),
+              ),
+              const SizedBox(height: 8),
+              _AgeRestrictedToggle(
+                value: ageRestricted,
+                enabled: session != null,
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -115,6 +156,84 @@ class _SettingsNavRow extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _AgeRestrictedToggle extends StatefulWidget {
+  const _AgeRestrictedToggle({required this.value, required this.enabled});
+
+  final bool value;
+  final bool enabled;
+
+  @override
+  State<_AgeRestrictedToggle> createState() => _AgeRestrictedToggleState();
+}
+
+class _AgeRestrictedToggleState extends State<_AgeRestrictedToggle> {
+  var _saving = false;
+
+  Future<void> _set(bool value) async {
+    if (_saving || !widget.enabled) return;
+    final ready = context.read<LiveRoomBloc>().state;
+    if (ready is! LiveRoomReady) return;
+    setState(() => _saving = true);
+    try {
+      final updated = await context.read<LiveSessionRepository>().updateSettings(
+        liveId: ready.session.id,
+        ageRestricted: value,
+      );
+      if (!mounted) return;
+      context.read<LiveRoomBloc>().add(LiveRoomSettingsApplied(updated));
+    } catch (e) {
+      if (!mounted) return;
+      final message = e is ApiException ? e.message : e.toString();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          const Icon(Icons.shield_outlined, color: Colors.white, size: 24),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'تقييد العمر +18',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                SizedBox(height: 3),
+                Text(
+                  'يتطلب تاريخ ميلاد المشاهد وعمراً 18+ للانضمام.',
+                  style: TextStyle(
+                    color: AppColors.optionsSubtitle,
+                    fontSize: 12,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Switch(
+            value: widget.value,
+            onChanged: (_saving || !widget.enabled) ? null : _set,
+          ),
+        ],
       ),
     );
   }

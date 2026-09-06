@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Bimo Bond</string>
+    <string name="live_screen_share_notification_channel">Screen share</string>
+    <string name="live_screen_share_notification_title">Sharing screen</string>
+    <string name="live_screen_share_notification_text">Your LIVE is sharing the screen.</string>
 </resources>

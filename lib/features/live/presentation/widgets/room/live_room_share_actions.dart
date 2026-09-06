@@ -11,16 +11,19 @@ class LiveRoomShareActions {
   static String liveUrl(String sessionId) =>
       'https://live.bimobond.app/l/$sessionId';
 
-  static String shareMessage(String sessionId, {String? hostName}) {
-    final url = liveUrl(sessionId);
+  static String shareMessage(String url, {String? hostName}) {
     if (hostName == null || hostName.trim().isEmpty) {
       return 'شاهد البث المباشر الآن: $url';
     }
     return 'شاهد بث $hostName المباشر الآن: $url';
   }
 
+  static Future<void> copyUrl(String url) async {
+    await Clipboard.setData(ClipboardData(text: url));
+  }
+
   static Future<void> copyLink(String sessionId) async {
-    await Clipboard.setData(ClipboardData(text: liveUrl(sessionId)));
+    await copyUrl(liveUrl(sessionId));
   }
 
   static Future<bool> openWhatsApp(String message) {

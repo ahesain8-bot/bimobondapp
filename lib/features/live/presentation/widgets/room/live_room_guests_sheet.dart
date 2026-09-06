@@ -58,6 +58,11 @@ class _LiveRoomGuestsSheetBodyState extends State<_LiveRoomGuestsSheetBody>
   LiveBattle? _battle;
   final _inviteController = TextEditingController();
 
+  bool get _audioOnly {
+    final state = context.read<LiveRoomBloc>().state;
+    return state is LiveRoomReady && state.session.isAudioOnly;
+  }
+
   @override
   LiveSessionRepository get repository => context.read<LiveSessionRepository>();
 
@@ -127,6 +132,10 @@ class _LiveRoomGuestsSheetBodyState extends State<_LiveRoomGuestsSheetBody>
       snack('هناك جولة منافسة نشطة بالفعل');
       return;
     }
+    if (ready is LiveRoomReady && ready.isLivePaused) {
+      snack('لا يمكن بدء منافسة أثناء الإيقاف المؤقت');
+      return;
+    }
     setState(() => _busy = true);
     try {
       final battle = await action();
@@ -186,6 +195,8 @@ class _LiveRoomGuestsSheetBodyState extends State<_LiveRoomGuestsSheetBody>
   Widget build(BuildContext context) {
     final pending = _guests.where((g) => g.isPending).toList();
     final active = _guests.where((g) => g.isActive).toList();
+    final room = context.watch<LiveRoomBloc>().state;
+    final paused = room is LiveRoomReady && room.isLivePaused;
 
     return BlocListener<LiveRoomBloc, LiveRoomState>(
       listenWhen: (previous, current) =>
@@ -215,7 +226,7 @@ class _LiveRoomGuestsSheetBodyState extends State<_LiveRoomGuestsSheetBody>
             : ListView(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                 children: [
-                  _battleSection(),
+                  _battleSection(paused: paused),
                   const SizedBox(height: 22),
                   const Text(
                     'دعوة ضيف',
@@ -284,7 +295,7 @@ class _LiveRoomGuestsSheetBodyState extends State<_LiveRoomGuestsSheetBody>
     );
   }
 
-  Widget _battleSection() {
+  Widget _battleSection({required bool paused}) {
     final battle = _battle;
     if (battle?.isActive == true) {
       final mine = battle!.scoreFor(widget.liveId);
@@ -363,13 +374,15 @@ class _LiveRoomGuestsSheetBodyState extends State<_LiveRoomGuestsSheetBody>
           ),
         ),
         const SizedBox(height: 6),
-        const Text(
-          'اختر مضيفاً لديه بث مباشر الآن لتتنافس معه.',
-          style: TextStyle(color: Colors.white54, fontSize: 12),
+        Text(
+          paused
+              ? 'بدء المنافسة غير متاح أثناء الإيقاف المؤقت.'
+              : 'اختر مضيفاً لديه بث مباشر الآن لتتنافس معه.',
+          style: const TextStyle(color: Colors.white54, fontSize: 12),
         ),
         const SizedBox(height: 10),
         FilledButton.icon(
-          onPressed: _busy
+          onPressed: _busy || paused
               ? null
               : () => _runBattle(
                   () => repository.matchBattle(widget.liveId),
@@ -387,13 +400,13 @@ class _LiveRoomGuestsSheetBodyState extends State<_LiveRoomGuestsSheetBody>
         ] else ...[
           const SizedBox(height: 12),
           _sectionTitle('بثوث مباشرة (${_opponents.length})'),
-          ..._opponents.take(12).map(_opponentTile),
+          ..._opponents.take(12).map((o) => _opponentTile(o, paused: paused)),
         ],
       ],
     );
   }
 
-  Widget _opponentTile(LiveBattleOpponent opponent) {
+  Widget _opponentTile(LiveBattleOpponent opponent, {required bool paused}) {
     final avatar = opponent.hostAvatar;
     final hasAvatar = avatar != null && avatar.isNotEmpty;
     return ListTile(
@@ -419,7 +432,7 @@ class _LiveRoomGuestsSheetBodyState extends State<_LiveRoomGuestsSheetBody>
         style: const TextStyle(color: Colors.white54, fontSize: 12),
       ),
       trailing: FilledButton(
-        onPressed: _busy
+        onPressed: _busy || paused
             ? null
             : () => _runBattle(
                 () => repository.startBattle(
@@ -528,20 +541,21 @@ class _LiveRoomGuestsSheetBodyState extends State<_LiveRoomGuestsSheetBody>
                         ),
                 ),
               ),
-              _actionChip(
-                guest.cameraOffByHost ? 'تفعيل الكاميرا' : 'إغلاق الكاميرا',
-                () => _run(
-                  () => guest.cameraOffByHost
-                      ? repository.setGuestCameraOn(
-                          liveId: widget.liveId,
-                          userId: guest.userId,
-                        )
-                      : repository.setGuestCameraOff(
-                          liveId: widget.liveId,
-                          userId: guest.userId,
-                        ),
+              if (!_audioOnly)
+                _actionChip(
+                  guest.cameraOffByHost ? 'تفعيل الكاميرا' : 'إغلاق الكاميرا',
+                  () => _run(
+                    () => guest.cameraOffByHost
+                        ? repository.setGuestCameraOn(
+                            liveId: widget.liveId,
+                            userId: guest.userId,
+                          )
+                        : repository.setGuestCameraOff(
+                            liveId: widget.liveId,
+                            userId: guest.userId,
+                          ),
+                  ),
                 ),
-              ),
               if (guest.role == 'GUEST')
                 _actionChip(
                   'ترقية لمضيف مشارك',

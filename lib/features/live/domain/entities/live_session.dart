@@ -1,6 +1,9 @@
 import 'live_chat_message.dart';
 import 'live_host.dart';
+import 'live_scene.dart';
+import 'live_studio.dart';
 import '../../../../core/models/live_media_hints.dart';
+import '../../../../core/models/live_media_mode.dart';
 
 /// Snapshot of an active live broadcasting session (fields from mobile-api.md §5).
 class LiveSession {
@@ -34,6 +37,20 @@ class LiveSession {
     this.totalEarnedCoins = 0,
     this.isPopular,
     this.popularReason,
+    this.paused = false,
+    this.mediaMode = LiveMediaMode.video,
+    this.audioOnly = false,
+    this.scene = const LiveScene(),
+    this.studio,
+    this.topic,
+    this.scheduledAt,
+    this.shareCount = 0,
+    this.chatMode = 'EVERYONE',
+    this.slowModeSeconds = 0,
+    this.blockedKeywords = const [],
+    this.moderatorIds = const [],
+    this.houseId,
+    this.ageRestricted = false,
   });
 
   final String id;
@@ -82,7 +99,53 @@ class LiveSession {
   final bool? isPopular;
   final String? popularReason;
 
+  /// Server pause flag (`paused`). Status stays `LIVE` while this is true.
+  final bool paused;
+
+  /// Stored `VIDEO` | `AUDIO`. Cannot change after the live has started.
+  final String mediaMode;
+
+  /// True for Voice Chat rooms. Host/speakers publish microphone only.
+  final bool audioOnly;
+
+  /// Backend-backed scene (CAMERA / SCREEN / DUAL + facing).
+  final LiveScene scene;
+
+  /// Host-only OBS / RTMP bundle. Never expose [LiveStudio.streamKey] to viewers.
+  final LiveStudio? studio;
+
+  /// Radio / room topic (max 80). Shown on the card; Feature #3 filters feed.
+  final String? topic;
+
+  /// Future start time for `PLANNED` lives. Immediate `startNow` lives omit this.
+  final DateTime? scheduledAt;
+
+  final int shareCount;
+
+  /// `EVERYONE` | `FOLLOWERS` | `SUBSCRIBERS` (`PATCH /lives/:id/chat-rules`).
+  final String chatMode;
+
+  /// Seconds between viewer comments. 0 disables slow mode. Max 60.
+  final int slowModeSeconds;
+
+  final List<String> blockedKeywords;
+
+  /// User ids from `GET /lives/:id/moderators`.
+  final List<String> moderatorIds;
+
+  /// LIVE House venue id when this live is attached as a room.
+  final String? houseId;
+
+  /// 18+ join/detail gate (`PATCH /lives/:id/settings`).
+  final bool ageRestricted;
+
   bool get isLive => status == 'LIVE';
+
+  bool get isPlanned => status.toUpperCase() == 'PLANNED';
+
+  bool get isAudioOnly =>
+      LiveMediaMode.isAudio(mediaMode: mediaMode, audioOnly: audioOnly) ||
+      (mediaHints?.audioOnly ?? false);
 
   LiveSession copyWith({
     String? id,
@@ -114,6 +177,20 @@ class LiveSession {
     int? totalEarnedCoins,
     bool? isPopular,
     String? popularReason,
+    bool? paused,
+    String? mediaMode,
+    bool? audioOnly,
+    LiveScene? scene,
+    LiveStudio? studio,
+    String? topic,
+    DateTime? scheduledAt,
+    int? shareCount,
+    String? chatMode,
+    int? slowModeSeconds,
+    List<String>? blockedKeywords,
+    List<String>? moderatorIds,
+    Object? houseId = _liveSessionUnset,
+    bool? ageRestricted,
   }) {
     return LiveSession(
       id: id ?? this.id,
@@ -146,6 +223,24 @@ class LiveSession {
       totalEarnedCoins: totalEarnedCoins ?? this.totalEarnedCoins,
       isPopular: isPopular ?? this.isPopular,
       popularReason: popularReason ?? this.popularReason,
+      paused: paused ?? this.paused,
+      mediaMode: mediaMode ?? this.mediaMode,
+      audioOnly: audioOnly ?? this.audioOnly,
+      scene: scene ?? this.scene,
+      studio: studio ?? this.studio,
+      topic: topic ?? this.topic,
+      scheduledAt: scheduledAt ?? this.scheduledAt,
+      shareCount: shareCount ?? this.shareCount,
+      chatMode: chatMode ?? this.chatMode,
+      slowModeSeconds: slowModeSeconds ?? this.slowModeSeconds,
+      blockedKeywords: blockedKeywords ?? this.blockedKeywords,
+      moderatorIds: moderatorIds ?? this.moderatorIds,
+      houseId: identical(houseId, _liveSessionUnset)
+          ? this.houseId
+          : houseId as String?,
+      ageRestricted: ageRestricted ?? this.ageRestricted,
     );
   }
 }
+
+const Object _liveSessionUnset = Object();

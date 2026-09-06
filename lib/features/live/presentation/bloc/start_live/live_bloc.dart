@@ -23,6 +23,9 @@ class LiveBloc extends Bloc<LiveEvent, LiveState> {
     on<LiveCameraSwitchRequested>(_onSwitchCamera);
     on<LiveToolsToggleRequested>(_onToggleTools);
     on<LiveSourceChanged>(_onSourceChanged);
+    on<LiveMediaModeChanged>(_onMediaModeChanged);
+    on<LiveTopicChanged>(_onTopicChanged);
+    on<LiveScheduleChanged>(_onScheduleChanged);
     on<LiveTabChanged>(_onTabChanged);
     on<LiveAppPaused>(_onAppPaused);
     on<LiveAppResumed>(_onAppResumed);
@@ -160,6 +163,24 @@ class LiveBloc extends Bloc<LiveEvent, LiveState> {
   void _onSourceChanged(LiveSourceChanged event, Emitter<LiveState> emit) {
     final current = _ready(state);
     emit(current.copyWith(isDeviceCamera: event.isDeviceCamera));
+  }
+
+  void _onMediaModeChanged(
+    LiveMediaModeChanged event,
+    Emitter<LiveState> emit,
+  ) {
+    final current = _ready(state);
+    emit(current.copyWith(isAudioMode: event.isAudioMode));
+  }
+
+  void _onTopicChanged(LiveTopicChanged event, Emitter<LiveState> emit) {
+    final current = _ready(state);
+    emit(current.copyWith(topic: event.topic));
+  }
+
+  void _onScheduleChanged(LiveScheduleChanged event, Emitter<LiveState> emit) {
+    final current = _ready(state);
+    emit(current.copyWith(scheduledAt: event.scheduledAt));
   }
 
   void _onTabChanged(LiveTabChanged event, Emitter<LiveState> emit) {

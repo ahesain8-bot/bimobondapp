@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart' as rtc;
 import 'package:flutter_webrtc/src/native/media_stream_track_impl.dart'
     show MediaStreamTrackNative;
@@ -31,15 +32,27 @@ class LivesMediaDataSource {
   /// acquire/release pair balanced no matter which connect path ran.
   var _holdsAudioSession = false;
   LocalVideoTrack? _videoTrack;
+  LocalVideoTrack? _screenShareTrack;
   LocalAudioTrack? _audioTrack;
   var _videoPublished = false;
+  /// Custom FaceWarp/CameraX camera — never mute-stop or restartTrack() into
+  /// generic Camera2, which steals the lens and blacks DUAL.
+  var _arBeautyPublished = false;
   Timer? _videoHealthTimer;
   var _videoHealthCheckInFlight = false;
+  Timer? _screenShareDiagTimer;
+  var _screenShareDiagInFlight = false;
+  num? _screenShareDiagPreviousBytes;
+  DateTime? _screenShareDiagPreviousAt;
+  num? _cameraDiagPreviousBytes;
+  DateTime? _cameraDiagPreviousAt;
   // 3 samples at 2s: about six seconds of a stream that decodes no frames
   // while signalling still says the room is up. Long enough that ordinary
   // rebuffering is not mistaken for a stall, short enough that the host is not
   // broadcasting a frozen picture for a quarter of a minute.
   final _videoProgress = MediaProgressWatchdog(stalledSampleLimit: 3);
+  final _screenShareProgress = MediaProgressWatchdog(stalledSampleLimit: 3);
+
   /// True while front/back flip pauses frames — must not tear down the room.
   var _outboundHealthPaused = false;
   Timer? _battleVideoHealthTimer;
@@ -80,6 +93,8 @@ class LivesMediaDataSource {
 
   /// Local camera track for [VideoTrackRenderer] preview (host/guest).
   LocalVideoTrack? get localVideoTrack => _videoTrack;
+
+  LocalVideoTrack? get localScreenShareTrack => _screenShareTrack;
 
   /// Capture request for [profile] on the given lens.
   CameraCaptureOptions _captureOptionsFor(
@@ -150,7 +165,9 @@ class LivesMediaDataSource {
       } catch (_) {}
       return null;
     }
-    debugPrint('🟢 [Host] AR beauty native frames=$nativeFrames before publish');
+    debugPrint(
+      '🟢 [Host] AR beauty native frames=$nativeFrames before publish',
+    );
     await stream.getMediaTracks();
     var tracks = stream.getVideoTracks();
 
@@ -189,13 +206,15 @@ class LivesMediaDataSource {
       tracks.first,
       CameraCaptureOptions(
         cameraPosition: CameraPosition.front,
+        // SCREEN/DUAL mute must not stop() this MediaStream — unmute would
+        // then restartTrack() via getUserMedia Camera2 beside FaceWarp.
+        stopCameraCaptureOnMute: false,
         params: VideoParameters(
           dimensions: const VideoDimensions(beautyW, beautyH),
           encoding: VideoEncoding(
-            maxBitrate: math.max(profile.maxBitrate, 2_500_000).clamp(
-              2_500_000,
-              3_500_000,
-            ),
+            maxBitrate: math
+                .max(profile.maxBitrate, 2_500_000)
+                .clamp(2_500_000, 3_500_000),
             maxFramerate: profile.maxFps.clamp(18, 24),
           ),
         ),
@@ -234,10 +253,9 @@ class LivesMediaDataSource {
         videoCodec: 'h264',
         backupVideoCodec: const BackupVideoCodec(enabled: false),
         videoEncoding: VideoEncoding(
-          maxBitrate: math.max(profile.maxBitrate, 2_500_000).clamp(
-            2_500_000,
-            3_500_000,
-          ),
+          maxBitrate: math
+              .max(profile.maxBitrate, 2_500_000)
+              .clamp(2_500_000, 3_500_000),
           maxFramerate: profile.maxFps.clamp(18, 24),
         ),
         videoSimulcastLayers: const [],
@@ -381,6 +399,7 @@ class LivesMediaDataSource {
   void _startOutboundVideoWatchdog(Room room, LocalVideoTrack track) {
     _stopOutboundVideoWatchdog();
     _videoProgress.reset();
+    _screenShareProgress.reset();
     _videoHealthTimer = Timer.periodic(_kMediaHealthTick, (_) {
       if (_videoHealthCheckInFlight ||
           _room != room ||
@@ -397,51 +416,121 @@ class LivesMediaDataSource {
     });
   }
 
+  num? _progressFromSenderStats(Iterable<dynamic> stats) {
+    if (stats.isEmpty) return null;
+    num frames = 0;
+    num packets = 0;
+    var hasFrameCounter = false;
+    var hasPacketCounter = false;
+    for (final layer in stats) {
+      final sentFrames = layer.framesSent;
+      final sentPackets = layer.packetsSent;
+      if (sentFrames != null) {
+        hasFrameCounter = true;
+        frames += sentFrames;
+      }
+      if (sentPackets != null) {
+        hasPacketCounter = true;
+        packets += sentPackets;
+      }
+    }
+    if (hasFrameCounter) return frames;
+    if (hasPacketCounter) return packets;
+    return null;
+  }
+
+  LocalVideoTrack? _publishedScreenShareTrack() {
+    final held = _screenShareTrack;
+    if (held != null) return held;
+    final local = _room?.localParticipant;
+    if (local == null) return null;
+    for (final publication in local.videoTrackPublications) {
+      if (publication.source == TrackSource.screenShareVideo &&
+          publication.track is LocalVideoTrack) {
+        return publication.track as LocalVideoTrack;
+      }
+    }
+    return null;
+  }
+
   Future<void> _sampleOutboundVideo(Room room, LocalVideoTrack track) async {
     try {
-      // A host who turned their camera off stops sending frames on purpose.
-      // Without this the watchdog read that as a stall and forced a full
-      // reconnect, which republished the camera the host had just closed.
-      if (track.muted || room.localParticipant?.isCameraEnabled() == false) {
-        _videoProgress.reset();
-        return;
-      }
       // Front/back flip pauses beauty frames briefly — do not tear down LiveKit.
       if (_outboundHealthPaused) {
         _videoProgress.reset();
+        _screenShareProgress.reset();
         return;
       }
       // During PK, brief encoder/stats dips are common. Treating them as a
       // stall tears down the host publish and blacks BOTH sides for viewers.
       if (_battleRoom != null) {
         _videoProgress.reset();
+        _screenShareProgress.reset();
         return;
       }
-      final stats = await track.getSenderStats();
-      if (_room != room || _videoTrack != track || stats.isEmpty) return;
-      num frames = 0;
-      num packets = 0;
-      var hasFrameCounter = false;
-      var hasPacketCounter = false;
-      for (final layer in stats) {
-        final sentFrames = layer.framesSent;
-        final sentPackets = layer.packetsSent;
-        if (sentFrames != null) {
-          hasFrameCounter = true;
-          frames += sentFrames;
-        }
-        if (sentPackets != null) {
-          hasPacketCounter = true;
-          packets += sentPackets;
-        }
+
+      final cameraSending =
+          !track.muted && room.localParticipant?.isCameraEnabled() != false;
+      var cameraStalled = false;
+      if (!cameraSending) {
+        _videoProgress.reset();
+      } else {
+        final stats = await track.getSenderStats();
+        if (_room != room || _videoTrack != track) return;
+        cameraStalled = _videoProgress.addSample(
+          _progressFromSenderStats(stats),
+        );
       }
-      final progress = hasFrameCounter
-          ? frames
-          : (hasPacketCounter ? packets : null);
-      if (!_videoProgress.addSample(progress)) return;
+
+      final screen = _publishedScreenShareTrack();
+      final screenSending =
+          screen != null && !screen.muted && screen.mediaStreamTrack.enabled;
+      var screenStalled = false;
+      if (!screenSending) {
+        _screenShareProgress.reset();
+      } else {
+        final stats = await screen.getSenderStats();
+        if (_room != room) return;
+        screenStalled = _screenShareProgress.addSample(
+          _progressFromSenderStats(stats),
+        );
+      }
+
+      // DUAL / SCREEN: a stalled camera must not destroy a healthy screen
+      // publication. Tear the room down only when every active outbound
+      // video source has stopped advancing.
+      if (screenSending && !screenStalled) {
+        if (cameraStalled) {
+          debugPrint(
+            'LIVE_SCREEN_DIAG host watchdog cameraStalled=true '
+            'screenAdvancing=true action=keepRoom',
+          );
+          _videoProgress.reset();
+        }
+        return;
+      }
+      if (cameraSending && !cameraStalled) {
+        if (screenStalled) {
+          debugPrint(
+            'LIVE_SCREEN_DIAG host watchdog cameraStalled=false '
+            'screenAdvancing=false action=keepRoom',
+          );
+          _screenShareProgress.reset();
+        }
+        return;
+      }
+
+      final shouldTearDown =
+          (cameraSending && cameraStalled) || (screenSending && screenStalled);
+      if (!shouldTearDown) return;
 
       debugPrint(
         '🔴 [Host] outbound video stopped advancing while room remained connected',
+      );
+      debugPrint(
+        'LIVE_SCREEN_DIAG host watchdog cameraStalled=$cameraStalled '
+        'screenStalled=$screenStalled cameraSending=$cameraSending '
+        'screenSending=$screenSending action=teardown',
       );
       _stopOutboundVideoWatchdog();
       onRoomEvent?.call('room', 'disconnected:outbound_video_stalled');
@@ -492,6 +581,165 @@ class LivesMediaDataSource {
     _videoHealthTimer?.cancel();
     _videoHealthTimer = null;
     _videoProgress.reset();
+    _screenShareProgress.reset();
+  }
+
+  String _screenSharePublicationSummary(LocalParticipant local) {
+    return local.videoTrackPublications
+        .map(
+          (publication) =>
+              '${publication.sid}:${publication.source.name}'
+              ':muted=${publication.muted}'
+              ':track=${publication.track?.mediaStreamTrack.id ?? "-"}',
+        )
+        .join('|');
+  }
+
+  void _startScreenShareDiagnostics(LocalParticipant local) {
+    _screenShareDiagTimer?.cancel();
+    _screenShareDiagPreviousBytes = null;
+    _screenShareDiagPreviousAt = null;
+    _cameraDiagPreviousBytes = null;
+    _cameraDiagPreviousAt = null;
+    _screenShareDiagTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (_screenShareDiagInFlight) return;
+      _screenShareDiagInFlight = true;
+      unawaited(
+        _sampleScreenShareDiagnostics(local).whenComplete(() {
+          _screenShareDiagInFlight = false;
+        }),
+      );
+    });
+  }
+
+  void _stopScreenShareDiagnostics() {
+    _screenShareDiagTimer?.cancel();
+    _screenShareDiagTimer = null;
+    _screenShareDiagPreviousBytes = null;
+    _screenShareDiagPreviousAt = null;
+    _cameraDiagPreviousBytes = null;
+    _cameraDiagPreviousAt = null;
+  }
+
+  LocalTrackPublication? _publicationBySource(
+    LocalParticipant local,
+    TrackSource source,
+  ) {
+    LocalTrackPublication? match;
+    for (final publication in local.videoTrackPublications) {
+      if (publication.source != source) continue;
+      if (match == null || (match.muted && !publication.muted)) {
+        match = publication;
+      }
+    }
+    return match;
+  }
+
+  Future<void> _sampleScreenShareDiagnostics(LocalParticipant local) async {
+    final screen = _publicationBySource(local, TrackSource.screenShareVideo);
+    if (screen != null) {
+      final next = await _logHostSender(
+        screen,
+        previousBytes: _screenShareDiagPreviousBytes,
+        previousAt: _screenShareDiagPreviousAt,
+      );
+      if (next != null) {
+        _screenShareDiagPreviousBytes = next.$1;
+        _screenShareDiagPreviousAt = next.$2;
+      }
+    }
+
+    final camera = _publicationBySource(local, TrackSource.camera);
+    if (camera != null) {
+      final next = await _logHostSender(
+        camera,
+        previousBytes: _cameraDiagPreviousBytes,
+        previousAt: _cameraDiagPreviousAt,
+      );
+      if (next != null) {
+        _cameraDiagPreviousBytes = next.$1;
+        _cameraDiagPreviousAt = next.$2;
+      }
+    }
+
+    if (_arBeautyPublished) {
+      final nativeFrames = await ArCameraBridge.beautyPushedFrameCount();
+      final track = _videoTrack;
+      debugPrint(
+        'LIVE_SCREEN_DIAG host arBeauty'
+        ' nativePushedFrames=$nativeFrames'
+        ' trackId=${track?.mediaStreamTrack.id ?? "-"}'
+        ' muted=${track?.muted ?? "?"}'
+        ' active=${track?.isActive ?? "?"}'
+        ' enabled=${track?.mediaStreamTrack.enabled ?? "?"}',
+      );
+    }
+  }
+
+  Future<(num, DateTime)?> _logHostSender(
+    LocalTrackPublication publication, {
+    required num? previousBytes,
+    required DateTime? previousAt,
+  }) async {
+    final track = publication.track;
+    if (track is! LocalVideoTrack) {
+      debugPrint(
+        'LIVE_SCREEN_DIAG host sender'
+        ' sid=${publication.sid}'
+        ' source=${publication.source.name}'
+        ' muted=${publication.muted}'
+        ' track=missing',
+      );
+      return null;
+    }
+    try {
+      final stats = await track.getSenderStats();
+      num frames = 0;
+      num packets = 0;
+      num bytes = 0;
+      num? width;
+      num? height;
+      String? codec;
+      for (final layer in stats) {
+        frames += layer.framesSent ?? 0;
+        packets += layer.packetsSent ?? 0;
+        bytes += layer.bytesSent ?? 0;
+        width ??= layer.frameWidth;
+        height ??= layer.frameHeight;
+        codec ??= layer.mimeType;
+      }
+      final now = DateTime.now();
+      final bitrateKbps = previousBytes == null || previousAt == null
+          ? null
+          : ((bytes - previousBytes) *
+                    8 /
+                    now.difference(previousAt).inMicroseconds *
+                    1000 /
+                    1000)
+                .round();
+      debugPrint(
+        'LIVE_SCREEN_DIAG host sender'
+        ' sid=${publication.sid}'
+        ' trackId=${track.mediaStreamTrack.id}'
+        ' source=${publication.source.name}'
+        ' muted=${track.muted}'
+        ' enabled=${track.mediaStreamTrack.enabled}'
+        ' framesSent=$frames'
+        ' packetsSent=$packets'
+        ' bytesSent=$bytes'
+        ' bitrateKbps=${bitrateKbps ?? "?"}'
+        ' encoded=${width ?? "?"}x${height ?? "?"}'
+        ' codec=${codec ?? "?"}',
+      );
+      return (bytes, now);
+    } catch (error) {
+      debugPrint(
+        'LIVE_SCREEN_DIAG host sender error=$error'
+        ' source=${publication.source.name}'
+        ' sid=${publication.sid}',
+      );
+      return null;
+    }
   }
 
   /// Host/guest: connect then publish camera + mic (production.md §3.4).
@@ -522,6 +770,7 @@ class LivesMediaDataSource {
 
     if (useArBeautyCamera) {
       await ArCameraBridge.setLivePublishingExclusive(true);
+      _arBeautyPublished = true;
     }
 
     // ── RoomOptions tuned for stable host publishing ──────────────────────
@@ -561,6 +810,9 @@ class LivesMediaDataSource {
         defaultAudioPublishOptions: const AudioPublishOptions(
           dtx: true,
           red: true,
+        ),
+        defaultCameraCaptureOptions: CameraCaptureOptions(
+          stopCameraCaptureOnMute: !useArBeautyCamera,
         ),
         defaultVideoPublishOptions: _publishOptionsFor(requestedProfile),
       ),
@@ -641,9 +893,10 @@ class LivesMediaDataSource {
 
     Object? audioError;
     Object? videoError;
+    final audioOnly = hints.audioOnly;
 
     // AR beauty does not open Camera2 — prepare the track while audio publishes.
-    Future<LocalVideoTrack?>? arBeautyPrep = useArBeautyCamera
+    Future<LocalVideoTrack?>? arBeautyPrep = useArBeautyCamera && !audioOnly
         ? _createArBeautyVideoTrack(requestedProfile)
         : null;
 
@@ -693,242 +946,252 @@ class LivesMediaDataSource {
     // it exactly here, immediately before WebRTC asks Camera2 for the lens.
     // This avoids both a long black gap and the two-capturer race that froze
     // the first several seconds on Android.
-    try {
-      await beforeVideoCapture?.call();
-    } catch (e, st) {
-      debugPrint('🔴 [Host] camera handoff failed: $e\n$st');
-      await disconnect();
-      rethrow;
+    if (!audioOnly) {
+      try {
+        await beforeVideoCapture?.call();
+      } catch (e, st) {
+        debugPrint('🔴 [Host] camera handoff failed: $e\n$st');
+        await disconnect();
+        rethrow;
+      }
     }
 
-    try {
-      Object? lastError;
-      final fallbacks = requestedProfile.fallbacks;
-      final ladder = <LiveCaptureProfile>[
-        requestedProfile,
-        ...fallbacks.skip(1),
-      ];
-      final attemptCount = maxAttempts.clamp(1, ladder.length);
-      final local = room.localParticipant;
-      if (local == null) {
-        throw StateError('LiveKit local participant unavailable');
-      }
-
-      for (var attempt = 0; attempt < attemptCount; attempt++) {
-        final profile = ladder[attempt];
-        LocalVideoTrack? candidate;
-        String? publicationSid;
-        try {
-          debugPrint(
-            '🔍 [Host] connectAndPublish: '
-            'camera/publish attempt ${attempt + 1}/$attemptCount '
-            'at ${profile.label}...',
-          );
-          if (useArBeautyCamera) {
-            // Consume the overlapped prep at most once; later ladder retries
-            // create a fresh track.
-            if (arBeautyPrep != null) {
-              candidate = await arBeautyPrep;
-              arBeautyPrep = null;
-            } else {
-              candidate = await _createArBeautyVideoTrack(profile);
-            }
-            if (candidate == null) {
-              // Keep room + mic up; host still sees Kotlin beauty locally.
-              // Do not open Flutter camera and do not abort the live.
-              throw StateError('ar_beauty_track_unavailable');
-            }
-          } else {
-            candidate = await LocalVideoTrack.createCameraTrack(
-              _captureOptionsFor(profile, cameraPosition),
-            );
-          }
-
-          final opts = candidate.currentOptions;
-          final params = opts.params;
-          final dims = params.dimensions;
-          final enc = params.encoding;
-          debugPrint(
-            '[DEBUG-QOS] HOST-CAPTURE:'
-            '  position=${cameraPosition.name}'
-            '  dimensions(WxH)=${dims.width}x${dims.height}'
-            '  requestedFps=${enc?.maxFramerate ?? opts.maxFrameRate ?? 30}'
-            '  requestedBitrate='
-            '${((enc?.maxBitrate ?? 2500000) / 1000).toStringAsFixed(0)}kbps'
-            '  track.sid=${candidate.sid}',
-          );
-
-          final publication = await local.publishVideoTrack(
-            candidate,
-            publishOptions: _publishOptionsFor(
-              profile,
-              forArBeauty: useArBeautyCamera,
-            ),
-          );
-          publicationSid = publication.sid;
-
-          // Camera2 can report success and fail its capture-session setup a
-          // few milliseconds later. Do not replace the visible camera with a
-          // LiveKit texture until RTC proves that real frames are leaving the
-          // handset. This specifically prevents "published but black" lives.
-          //
-          // AR beauty: sender stats are often empty for custom I420 tracks even
-          // while FaceWarp frames are flowing — trust native frame counter and
-          // do NOT unpublish (that caused audio-only viewers).
-          if (useArBeautyCamera) {
-            final nativeFrames = await ArCameraBridge.beautyPushedFrameCount();
-            // Custom I420 capturer often has empty sender stats; FaceWarp
-            // frames are enough proof. Waiting 2.5s here delayed first frame.
-            if (nativeFrames >= 3) {
-              debugPrint(
-                '🟢 [Host] AR beauty native frames=$nativeFrames — '
-                'skipping outbound stats wait',
-              );
-            } else {
-              final hasStats = await _waitForOutboundVideo(
-                candidate,
-                timeoutMs: 1200,
-              );
-              final framesNow =
-                  await ArCameraBridge.beautyPushedFrameCount();
-              if (!hasStats && framesNow < 3) {
-                throw StateError(
-                  'AR beauty published but no frames '
-                  '(native=$framesNow stats=$hasStats)',
-                );
-              }
-              if (!hasStats) {
-                debugPrint(
-                  '🟡 [Host] AR beauty sender stats empty but native '
-                  'frames=$framesNow — keeping published track',
-                );
-              }
-            }
-          } else {
-            final hasFrames = await _waitForOutboundVideo(candidate);
-            if (!hasFrames) {
-              throw StateError(
-                'camera opened at ${profile.label} but produced no video frames',
-              );
-            }
-          }
-
-          _videoTrack = candidate;
-          _activeProfile = profile;
-          _videoPublished = true;
-          lastError = null;
-          debugPrint(
-            '🔍 [Host] connectAndPublish: video frames verified '
-            'at ${profile.label} ✅ '
-            '(${publishSw.elapsedMilliseconds}ms)',
-          );
-          break;
-        } catch (e, st) {
-          lastError = e;
-          _videoTrack = null;
-          _videoPublished = false;
-          debugPrint(
-            '🔴 [Host] LiveKit video attempt ${attempt + 1} '
-            'failed: $e\n$st',
-          );
-          if (publicationSid != null) {
-            try {
-              await local.removePublishedTrack(publicationSid);
-            } catch (_) {}
-          }
-          try {
-            await candidate?.dispose();
-          } catch (_) {}
-          if (attempt < attemptCount - 1) {
-            await Future<void>.delayed(const Duration(milliseconds: 300));
-          }
-        }
-      }
-      if (_videoTrack == null || !_videoPublished) {
-        if (useArBeautyCamera && _audioTrack != null && _room != null) {
-          // Stay live with mic + local Kotlin beauty preview; retry video later
-          // is possible without tearing down the room.
-          debugPrint(
-            '🟡 [Host] AR beauty video not published — '
-            'keeping room/mic, local FaceWarp preview. err=$lastError',
-          );
-        } else {
-          throw StateError('LiveKit camera publish failed: $lastError');
-        }
-      } else {
-        debugPrint('🔍 [Host] connectAndPublish: video published OK ✅');
-      }
-
-      if (_videoPublished) {
-      // ============================================================
-      // [DEBUG-QOS HOST 2/4] Actual PUBLISHED simulcast layers.
-      // Prove what the SFU sees — if HIGH layer is missing here,
-      // the viewer CAN NEVER RECEIVE 720p no matter what viewer does.
-      // Uses correct 2.11.0 API only:
-      //   TrackPublication.mimeType (direct String getter, no .codec wrapper)
-      //   LocalVideoTrack.lastPublishOptions.videoSimulcastLayers
-      //   LocalVideoTrack.simulcastCodecs.entries (RIDs + encodings)
-      //   TrackPublication.dimensions (server reported W×H from TrackInfo)
-      // ============================================================
+    if (!audioOnly) {
       try {
-        final pubs = room.localParticipant?.videoTrackPublications ?? [];
-        for (final p in pubs) {
-          final lvTrack = p.track;
-          final sim = p.simulcasted;
-          final mime = p.mimeType; // 2.11.0 direct getter (no .codec wrapper)
-          final trackCodec = lvTrack?.codec; // LocalTrack.codec String
-          final pubDim = p.dimensions; // server-reported dimensions
+        Object? lastError;
+        final fallbacks = requestedProfile.fallbacks;
+        final ladder = <LiveCaptureProfile>[
+          requestedProfile,
+          ...fallbacks.skip(1),
+        ];
+        final attemptCount = maxAttempts.clamp(1, ladder.length);
+        final local = room.localParticipant;
+        if (local == null) {
+          throw StateError('LiveKit local participant unavailable');
+        }
 
-          // Published layer definitions (what we declared + SDK accepted):
-          final simLayers = lvTrack?.lastPublishOptions?.videoSimulcastLayers;
-
-          // Actual active RIDs:
-          final scEntries = lvTrack?.simulcastCodecs.entries.toList() ?? [];
-
-          debugPrint(
-            '[DEBUG-QOS] HOST-PUBLISH:'
-            '  sid=${p.sid}'
-            '  trackId=${p.track?.mediaStreamTrack.id}'
-            '  simulcasted=$sim'
-            '  mime=$mime'
-            '  trackCodec=$trackCodec'
-            '  pubDimensions=${pubDim?.width}x${pubDim?.height}'
-            '  declaredSimLayers=${simLayers == null ? "null" : simLayers.map((l) => "${l.dimensions.width}x${l.dimensions.height}@${l.encoding?.maxFramerate}fps/${l.encoding == null ? "?" : "${(l.encoding!.maxBitrate ~/ 1000)}kbps"}").toList()}'
-            '  scCount=${scEntries.length}'
-            '  scRIDs=${scEntries.map((e) => "${e.key}(${e.value.codec})").toList()}'
-            '  encodings_per_rid=${scEntries.map((e) => "rid:${e.key} enc=${e.value.encodings?.map((en) => "rid:${en.rid ?? "f"} on:${en.active} scale:${en.scaleResolutionDownBy ?? 1.0} fps:${en.maxFramerate ?? "?"} br:${en.maxBitrate ?? "?"}").toList()}").toList()}',
-          );
-
-          if (simLayers == null || simLayers.isEmpty) {
-            // Fallback: SDK stored no explicit layers (or not yet set).
-            final roomOpts = room.roomOptions.defaultVideoPublishOptions;
+        for (var attempt = 0; attempt < attemptCount; attempt++) {
+          final profile = ladder[attempt];
+          LocalVideoTrack? candidate;
+          String? publicationSid;
+          try {
             debugPrint(
-              '[DEBUG-QOS] HOST-PUBLISH (fallback-room-publish-opts):'
-              '  videoCodec=${roomOpts.videoCodec}'
-              '  simulcast=${roomOpts.simulcast}'
-              '  br=${roomOpts.videoEncoding?.maxBitrate}'
-              '  fps=${roomOpts.videoEncoding?.maxFramerate}'
-              '  simlayers.count=${roomOpts.videoSimulcastLayers.length}'
-              '  layers=${roomOpts.videoSimulcastLayers.map((l) => "${l.dimensions.width}x${l.dimensions.height}@${l.encoding?.maxFramerate}").toList()}',
+              '🔍 [Host] connectAndPublish: '
+              'camera/publish attempt ${attempt + 1}/$attemptCount '
+              'at ${profile.label}...',
             );
+            if (useArBeautyCamera) {
+              // Consume the overlapped prep at most once; later ladder retries
+              // create a fresh track.
+              if (arBeautyPrep != null) {
+                candidate = await arBeautyPrep;
+                arBeautyPrep = null;
+              } else {
+                candidate = await _createArBeautyVideoTrack(profile);
+              }
+              if (candidate == null) {
+                // Keep room + mic up; host still sees Kotlin beauty locally.
+                // Do not open Flutter camera and do not abort the live.
+                throw StateError('ar_beauty_track_unavailable');
+              }
+            } else {
+              candidate = await LocalVideoTrack.createCameraTrack(
+                _captureOptionsFor(profile, cameraPosition),
+              );
+            }
+
+            final opts = candidate.currentOptions;
+            final params = opts.params;
+            final dims = params.dimensions;
+            final enc = params.encoding;
+            debugPrint(
+              '[DEBUG-QOS] HOST-CAPTURE:'
+              '  position=${cameraPosition.name}'
+              '  dimensions(WxH)=${dims.width}x${dims.height}'
+              '  requestedFps=${enc?.maxFramerate ?? opts.maxFrameRate ?? 30}'
+              '  requestedBitrate='
+              '${((enc?.maxBitrate ?? 2500000) / 1000).toStringAsFixed(0)}kbps'
+              '  track.sid=${candidate.sid}',
+            );
+
+            final publication = await local.publishVideoTrack(
+              candidate,
+              publishOptions: _publishOptionsFor(
+                profile,
+                forArBeauty: useArBeautyCamera,
+              ),
+            );
+            publicationSid = publication.sid;
+
+            // Camera2 can report success and fail its capture-session setup a
+            // few milliseconds later. Do not replace the visible camera with a
+            // LiveKit texture until RTC proves that real frames are leaving the
+            // handset. This specifically prevents "published but black" lives.
+            //
+            // AR beauty: sender stats are often empty for custom I420 tracks even
+            // while FaceWarp frames are flowing — trust native frame counter and
+            // do NOT unpublish (that caused audio-only viewers).
+            if (useArBeautyCamera) {
+              final nativeFrames =
+                  await ArCameraBridge.beautyPushedFrameCount();
+              // Custom I420 capturer often has empty sender stats; FaceWarp
+              // frames are enough proof. Waiting 2.5s here delayed first frame.
+              if (nativeFrames >= 3) {
+                debugPrint(
+                  '🟢 [Host] AR beauty native frames=$nativeFrames — '
+                  'skipping outbound stats wait',
+                );
+              } else {
+                final hasStats = await _waitForOutboundVideo(
+                  candidate,
+                  timeoutMs: 1200,
+                );
+                final framesNow = await ArCameraBridge.beautyPushedFrameCount();
+                if (!hasStats && framesNow < 3) {
+                  throw StateError(
+                    'AR beauty published but no frames '
+                    '(native=$framesNow stats=$hasStats)',
+                  );
+                }
+                if (!hasStats) {
+                  debugPrint(
+                    '🟡 [Host] AR beauty sender stats empty but native '
+                    'frames=$framesNow — keeping published track',
+                  );
+                }
+              }
+            } else {
+              final hasFrames = await _waitForOutboundVideo(candidate);
+              if (!hasFrames) {
+                throw StateError(
+                  'camera opened at ${profile.label} but produced no video frames',
+                );
+              }
+            }
+
+            _videoTrack = candidate;
+            _activeProfile = profile;
+            _videoPublished = true;
+            lastError = null;
+            debugPrint(
+              '🔍 [Host] connectAndPublish: video frames verified '
+              'at ${profile.label} ✅ '
+              '(${publishSw.elapsedMilliseconds}ms)',
+            );
+            break;
+          } catch (e, st) {
+            lastError = e;
+            _videoTrack = null;
+            _videoPublished = false;
+            debugPrint(
+              '🔴 [Host] LiveKit video attempt ${attempt + 1} '
+              'failed: $e\n$st',
+            );
+            if (publicationSid != null) {
+              try {
+                await local.removePublishedTrack(publicationSid);
+              } catch (_) {}
+            }
+            try {
+              await candidate?.dispose();
+            } catch (_) {}
+            if (attempt < attemptCount - 1) {
+              await Future<void>.delayed(const Duration(milliseconds: 300));
+            }
           }
         }
-      } catch (e) {
-        debugPrint('[DEBUG-QOS] HOST-PUBLISH (err): $e');
+        if (_videoTrack == null || !_videoPublished) {
+          if (useArBeautyCamera && _audioTrack != null && _room != null) {
+            // Stay live with mic + local Kotlin beauty preview; retry video later
+            // is possible without tearing down the room.
+            debugPrint(
+              '🟡 [Host] AR beauty video not published — '
+              'keeping room/mic, local FaceWarp preview. err=$lastError',
+            );
+          } else {
+            throw StateError('LiveKit camera publish failed: $lastError');
+          }
+        } else {
+          debugPrint('🔍 [Host] connectAndPublish: video published OK ✅');
+        }
+
+        if (_videoPublished) {
+          // ============================================================
+          // [DEBUG-QOS HOST 2/4] Actual PUBLISHED simulcast layers.
+          // Prove what the SFU sees — if HIGH layer is missing here,
+          // the viewer CAN NEVER RECEIVE 720p no matter what viewer does.
+          // Uses correct 2.11.0 API only:
+          //   TrackPublication.mimeType (direct String getter, no .codec wrapper)
+          //   LocalVideoTrack.lastPublishOptions.videoSimulcastLayers
+          //   LocalVideoTrack.simulcastCodecs.entries (RIDs + encodings)
+          //   TrackPublication.dimensions (server reported W×H from TrackInfo)
+          // ============================================================
+          try {
+            final pubs = room.localParticipant?.videoTrackPublications ?? [];
+            for (final p in pubs) {
+              final lvTrack = p.track;
+              final sim = p.simulcasted;
+              final mime =
+                  p.mimeType; // 2.11.0 direct getter (no .codec wrapper)
+              final trackCodec = lvTrack?.codec; // LocalTrack.codec String
+              final pubDim = p.dimensions; // server-reported dimensions
+
+              // Published layer definitions (what we declared + SDK accepted):
+              final simLayers =
+                  lvTrack?.lastPublishOptions?.videoSimulcastLayers;
+
+              // Actual active RIDs:
+              final scEntries = lvTrack?.simulcastCodecs.entries.toList() ?? [];
+
+              debugPrint(
+                '[DEBUG-QOS] HOST-PUBLISH:'
+                '  sid=${p.sid}'
+                '  trackId=${p.track?.mediaStreamTrack.id}'
+                '  simulcasted=$sim'
+                '  mime=$mime'
+                '  trackCodec=$trackCodec'
+                '  pubDimensions=${pubDim?.width}x${pubDim?.height}'
+                '  declaredSimLayers=${simLayers == null ? "null" : simLayers.map((l) => "${l.dimensions.width}x${l.dimensions.height}@${l.encoding?.maxFramerate}fps/${l.encoding == null ? "?" : "${(l.encoding!.maxBitrate ~/ 1000)}kbps"}").toList()}'
+                '  scCount=${scEntries.length}'
+                '  scRIDs=${scEntries.map((e) => "${e.key}(${e.value.codec})").toList()}'
+                '  encodings_per_rid=${scEntries.map((e) => "rid:${e.key} enc=${e.value.encodings?.map((en) => "rid:${en.rid ?? "f"} on:${en.active} scale:${en.scaleResolutionDownBy ?? 1.0} fps:${en.maxFramerate ?? "?"} br:${en.maxBitrate ?? "?"}").toList()}").toList()}',
+              );
+
+              if (simLayers == null || simLayers.isEmpty) {
+                // Fallback: SDK stored no explicit layers (or not yet set).
+                final roomOpts = room.roomOptions.defaultVideoPublishOptions;
+                debugPrint(
+                  '[DEBUG-QOS] HOST-PUBLISH (fallback-room-publish-opts):'
+                  '  videoCodec=${roomOpts.videoCodec}'
+                  '  simulcast=${roomOpts.simulcast}'
+                  '  br=${roomOpts.videoEncoding?.maxBitrate}'
+                  '  fps=${roomOpts.videoEncoding?.maxFramerate}'
+                  '  simlayers.count=${roomOpts.videoSimulcastLayers.length}'
+                  '  layers=${roomOpts.videoSimulcastLayers.map((l) => "${l.dimensions.width}x${l.dimensions.height}@${l.encoding?.maxFramerate}").toList()}',
+                );
+              }
+            }
+          } catch (e) {
+            debugPrint('[DEBUG-QOS] HOST-PUBLISH (err): $e');
+          }
+        } // if (_videoPublished)
+      } catch (e, st) {
+        videoError = e;
+        debugPrint('🔴 [Host] LiveKit video publish failed: $e\n$st');
       }
-      } // if (_videoPublished)
-    } catch (e, st) {
-      videoError = e;
-      debugPrint('🔴 [Host] LiveKit video publish failed: $e\n$st');
+    } else {
+      debugPrint(
+        '🔍 [Host] connectAndPublish: AUDIO room — skipping camera publish',
+      );
     }
 
     debugPrint(
       '🔍 [Host] connectAndPublish: '
-      '_videoPublished=$_videoPublished, '
+      '_videoPublished=$_videoPublished, audioOnly=$audioOnly, '
       'videoError=$videoError, audioError=$audioError',
     );
 
-    if (!_videoPublished || _audioTrack == null) {
+    if (_audioTrack == null || (!audioOnly && !_videoPublished)) {
       final arPreviewOnly =
           useArBeautyCamera && _audioTrack != null && _room != null;
       if (arPreviewOnly) {
@@ -939,7 +1202,7 @@ class LivesMediaDataSource {
         return;
       }
       debugPrint(
-        '🔴 [Host] connectAndPublish: video NOT published → disconnect + throw',
+        '🔴 [Host] connectAndPublish: media NOT published → disconnect + throw',
       );
       await disconnect();
       throw StateError(
@@ -947,6 +1210,12 @@ class LivesMediaDataSource {
         '${videoError != null ? ': $videoError' : ''}'
         '${audioError != null ? ' (audio: $audioError)' : ''}',
       );
+    }
+    if (audioOnly) {
+      debugPrint(
+        '🟢 [Host] connectAndPublish: SUCCESS — AUDIO room + microphone up',
+      );
+      return;
     }
     debugPrint(
       '🟢 [Host] connectAndPublish: SUCCESS — room + video + audio all up',
@@ -1339,7 +1608,194 @@ class LivesMediaDataSource {
   }
 
   Future<void> setCameraEnabled(bool enabled) async {
+    if (_arBeautyPublished) {
+      await _setArBeautyCameraSending(enabled);
+      return;
+    }
     await _room?.localParticipant?.setCameraEnabled(enabled);
+  }
+
+  bool _arBeautyTrackNeedsRestore(LocalVideoTrack track) {
+    return !track.isActive;
+  }
+
+  Future<void> _setArBeautyCameraSending(bool enabled) async {
+    final track = _videoTrack;
+    final local = _room?.localParticipant;
+    debugPrint(
+      'LIVE_SCREEN_DIAG host arCamera'
+      ' action=${enabled ? "enable" : "disable"}'
+      ' trackId=${track?.mediaStreamTrack.id ?? "-"}'
+      ' muted=${track?.muted ?? "?"}'
+      ' active=${track?.isActive ?? "?"}'
+      ' enabled=${track?.mediaStreamTrack.enabled ?? "?"}'
+      ' pubs=${local == null ? "-" : _screenSharePublicationSummary(local)}',
+    );
+    if (!enabled) {
+      if (track != null && !track.muted) {
+        await track.mute(stopOnMute: false);
+      }
+      return;
+    }
+    if (track == null || _arBeautyTrackNeedsRestore(track)) {
+      await _restoreArBeautyCamera(
+        reason: track == null ? 'missing' : 'ended',
+      );
+      return;
+    }
+    if (track.muted) {
+      await track.unmute(stopOnMute: false);
+    }
+  }
+
+  /// Re-attach FaceWarp I420 after a previous mute-stop killed the AR stream.
+  /// Never calls [LocalVideoTrack.createCameraTrack] / getUserMedia Camera2.
+  Future<void> _restoreArBeautyCamera({required String reason}) async {
+    final room = _room;
+    final local = room?.localParticipant;
+    if (room == null || local == null) {
+      throw StateError('LiveKit room unavailable for AR camera restore');
+    }
+    debugPrint(
+      'LIVE_SCREEN_DIAG host arCamera action=restore reason=$reason'
+      ' pubs=${_screenSharePublicationSummary(local)}',
+    );
+    for (final publication in local.videoTrackPublications.toList()) {
+      if (publication.source == TrackSource.camera) {
+        try {
+          await local.removePublishedTrack(publication.sid);
+        } catch (_) {}
+      }
+    }
+    try {
+      await _videoTrack?.dispose();
+    } catch (_) {}
+    _videoTrack = null;
+    _videoPublished = false;
+
+    await ArCameraBridge.releaseBeautyVideoTrack();
+    await ArCameraBridge.setLivePublishingExclusive(true);
+    final candidate = await _createArBeautyVideoTrack(_activeProfile);
+    if (candidate == null) {
+      throw StateError('AR beauty camera restore failed');
+    }
+    await local.publishVideoTrack(
+      candidate,
+      publishOptions: _publishOptionsFor(_activeProfile, forArBeauty: true),
+    );
+    _videoTrack = candidate;
+    _videoPublished = true;
+    _arBeautyPublished = true;
+    _startOutboundVideoWatchdog(room, candidate);
+  }
+
+  Future<void> setScreenShareEnabled(bool enabled) async {
+    final room = _room;
+    final local = room?.localParticipant;
+    if (room == null || local == null) {
+      throw StateError('LiveKit room unavailable for screen share');
+    }
+    if (!enabled) {
+      debugPrint(
+        'LIVE_SCREEN_DIAG host before screen disable'
+        ' pubs=${_screenSharePublicationSummary(local)}',
+      );
+      _stopScreenShareDiagnostics();
+      try {
+        await local.setScreenShareEnabled(false);
+      } catch (_) {}
+      try {
+        await _screenShareTrack?.dispose();
+      } catch (_) {}
+      _screenShareTrack = null;
+      _screenShareProgress.reset();
+      await _stopScreenShareForeground();
+      debugPrint(
+        'LIVE_SCREEN_DIAG host after screen disable'
+        ' pubs=${_screenSharePublicationSummary(local)}',
+      );
+      return;
+    }
+    debugPrint(
+      'LIVE_SCREEN_DIAG host before screen enable'
+      ' pubs=${_screenSharePublicationSummary(local)}',
+    );
+    final alreadyLive = _publishedScreenShareTrack();
+    if (alreadyLive != null &&
+        !alreadyLive.muted &&
+        alreadyLive.mediaStreamTrack.enabled) {
+      _screenShareTrack = alreadyLive;
+      if (_screenShareDiagTimer == null) {
+        _startScreenShareDiagnostics(local);
+      }
+      debugPrint(
+        'LIVE_SCREEN_DIAG host screen enable skipped already-live'
+        ' pubs=${_screenSharePublicationSummary(local)}',
+      );
+      return;
+    }
+    // Android 14+/targetSdk 36: request MediaProjection, then start a
+    // mediaProjection FGS, then LiveKit. Calling setScreenShareEnabled
+    // first lets OrientationAwareScreenCapturer.getMediaProjection throw
+    // an uncaught SecurityException and kill the process.
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      pauseOutboundHealthCheck();
+      try {
+        final granted = await rtc.Helper.requestCapturePermission();
+        if (!granted) {
+          throw const ScreenSharePermissionDenied();
+        }
+        await _startScreenShareForeground();
+      } finally {
+        resumeOutboundHealthCheck();
+      }
+    }
+    try {
+      await local.setScreenShareEnabled(true);
+    } catch (e) {
+      await _stopScreenShareForeground();
+      rethrow;
+    }
+    LocalVideoTrack? track;
+    for (final pub in local.videoTrackPublications) {
+      if (pub.source == TrackSource.screenShareVideo &&
+          pub.track is LocalVideoTrack) {
+        track = pub.track as LocalVideoTrack;
+        break;
+      }
+    }
+    if (track == null) {
+      try {
+        await local.setScreenShareEnabled(false);
+      } catch (_) {}
+      await _stopScreenShareForeground();
+      throw StateError('Screen share track was not published');
+    }
+    _screenShareTrack = track;
+    _screenShareProgress.reset();
+    _startScreenShareDiagnostics(local);
+    debugPrint(
+      'LIVE_SCREEN_DIAG host after screen enable'
+      ' pubs=${_screenSharePublicationSummary(local)}',
+    );
+  }
+
+  static const _screenShareChannel = MethodChannel(
+    'com.dubai.bimobondapp/live_screen_share',
+  );
+
+  Future<void> _startScreenShareForeground() async {
+    if (defaultTargetPlatform != TargetPlatform.android) return;
+    await _screenShareChannel.invokeMethod<bool>('start');
+  }
+
+  Future<void> _stopScreenShareForeground() async {
+    if (defaultTargetPlatform != TargetPlatform.android) return;
+    try {
+      await _screenShareChannel.invokeMethod<bool>('stop');
+    } catch (e) {
+      debugPrint('Screen-share FGS stop failed: $e');
+    }
   }
 
   /// Flip between front/back by restarting the camera capturer when possible.
@@ -1450,6 +1906,8 @@ class LivesMediaDataSource {
       '_audioTrack=${_audioTrack != null ? "SET" : "NULL"}',
     );
     _stopOutboundVideoWatchdog();
+    _stopScreenShareDiagnostics();
+    _arBeautyPublished = false;
     if (!keepBattleRoom) {
       await disconnectBattle();
     }
@@ -1463,6 +1921,7 @@ class LivesMediaDataSource {
     // teardown must not start the host recovery loop.
     _room = null;
     try {
+      await _stopScreenShareForeground();
       // Fully release the native camera/audio sources. stop() alone can leave
       // flutter_webrtc's capturer cached ("camera already active ... reusing
       // VideoSource") which breaks the NEXT live with a dead video source.
@@ -1470,6 +1929,8 @@ class LivesMediaDataSource {
       await ArCameraBridge.setLivePublishingExclusive(false);
       await _videoTrack?.dispose();
       _videoTrack = null;
+      await _screenShareTrack?.dispose();
+      _screenShareTrack = null;
       await _audioTrack?.dispose();
       _audioTrack = null;
       await room?.disconnect();
@@ -1478,11 +1939,21 @@ class LivesMediaDataSource {
       debugPrint('LiveKit disconnect error: $e\n$st');
     } finally {
       _videoTrack = null;
+      _screenShareTrack = null;
       _audioTrack = null;
       _room = null;
       _videoPublished = false;
+      _arBeautyPublished = false;
       unawaited(ArCameraBridge.releaseBeautyVideoTrack());
       unawaited(ArCameraBridge.setLivePublishingExclusive(false));
     }
   }
+}
+
+/// User cancelled or denied the Android MediaProjection dialog.
+class ScreenSharePermissionDenied implements Exception {
+  const ScreenSharePermissionDenied();
+
+  @override
+  String toString() => 'SCREEN_SHARE_PERMISSION_DENIED';
 }

@@ -147,6 +147,32 @@ class RealCommentRepository implements CommentRepository {
   }
 
   @override
+  Future<Either<Failure, void>> pinComment({
+    required String liveId,
+    required String commentId,
+  }) async {
+    try {
+      await _api.post(ApiEndpoints.liveCommentPin(liveId, commentId));
+      return const Right(null);
+    } catch (e) {
+      return Left(ServerFailure('Failed to pin comment: $e'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> unpinComment({
+    required String liveId,
+    required String commentId,
+  }) async {
+    try {
+      await _api.post(ApiEndpoints.liveCommentUnpin(liveId, commentId));
+      return const Right(null);
+    } catch (e) {
+      return Left(ServerFailure('Failed to unpin comment: $e'));
+    }
+  }
+
+  @override
   Future<Either<Failure, void>> reportComment({
     required String commentId,
     required String reason,

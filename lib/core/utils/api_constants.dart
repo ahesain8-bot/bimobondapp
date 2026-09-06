@@ -312,9 +312,13 @@ class ApiConstants {
   static String liveById(String id) => '/lives/$id';
   static String liveStart(String id) => '/lives/$id/start';
   static String liveEnd(String id) => '/lives/$id/end';
+  static String livePause(String id) => '/lives/$id/pause';
+  static String liveResume(String id) => '/lives/$id/resume';
   static String liveJoin(String id) => '/lives/$id/join';
   static String liveLeave(String id) => '/lives/$id/leave';
   static String liveLike(String id) => '/lives/$id/like';
+  static String liveShare(String id) => '/lives/$id/share';
+  static String liveReport(String id) => '/lives/$id/report';
   static String liveComments(String id) => '/lives/$id/comments';
   static String liveCommentById(String liveId, String commentId) =>
       '/lives/$liveId/comments/$commentId';
@@ -361,6 +365,14 @@ class ApiConstants {
       '/lives/$liveId/viewers/$userId/ban';
   static String liveViewerUnban(String liveId, String userId) =>
       '/lives/$liveId/viewers/$userId/unban';
+  static String liveChatRules(String id) => '/lives/$id/chat-rules';
+  static String liveModerators(String id) => '/lives/$id/moderators';
+  static String liveModeratorByUser(String liveId, String userId) =>
+      '/lives/$liveId/moderators/$userId';
+  static const String liveHouses = '/lives/houses';
+  static String liveHouseById(String houseId) => '/lives/houses/$houseId';
+  static String liveHouseRooms(String houseId) =>
+      '/lives/houses/$houseId/rooms';
   static String liveSummary(String id) => '/lives/$id/summary';
 
   // ── Fan Club ──────────────────
