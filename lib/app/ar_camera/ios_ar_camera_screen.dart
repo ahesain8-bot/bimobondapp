@@ -11,7 +11,9 @@ import 'package:bimobondapp/app/home/presentation/utils/media_gallery_import_flo
 import 'package:bimobondapp/app/home/presentation/utils/media_gallery_picker.dart';
 
 class IosArCameraScreen extends StatefulWidget {
-  const IosArCameraScreen({super.key});
+  final bool isStory;
+
+  const IosArCameraScreen({super.key, this.isStory = false});
 
   @override
   State<IosArCameraScreen> createState() => _IosArCameraScreenState();
@@ -60,6 +62,7 @@ class _IosArCameraScreenState extends State<IosArCameraScreen> {
       edited = await MediaGalleryImportFlow.openBatchEditor(
         context,
         items: items,
+        isStory: widget.isStory,
       );
     } finally {
       unawaited(ArCameraBridge.resumePreview());
@@ -72,7 +75,7 @@ class _IosArCameraScreenState extends State<IosArCameraScreen> {
       extra: {
         'files': postFiles,
         'type': MediaGalleryImportFlow.composerType(edited),
-        'isStory': false,
+        'isStory': widget.isStory,
         'initialSound': edited.sound,
         'initialSoundOffset': edited.soundOffset,
         'initialSoundWindow': edited.soundWindow,

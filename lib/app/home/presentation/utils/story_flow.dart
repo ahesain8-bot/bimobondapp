@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:bimobondapp/app/ar_camera/ios_ar_camera_screen.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_state.dart';
 import 'package:bimobondapp/core/services/feed_playback_gate.dart';
@@ -30,6 +33,15 @@ class StoryFlow {
   static Future<void> start(BuildContext context) async {
     if (!_ensureLoggedIn(context)) return;
     FeedPlaybackGate.instance.setBlocked(true);
+
+    if (Platform.isIOS) {
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => const IosArCameraScreen(isStory: true),
+        ),
+      );
+      return;
+    }
     context.pushNamed(
       'add_post_camera',
       extra: const {'isStory': true},
