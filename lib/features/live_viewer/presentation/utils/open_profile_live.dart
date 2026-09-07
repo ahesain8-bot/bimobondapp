@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../app/auth/domain/entities/user_entity.dart';
+import '../../../../core/constants/live_traffic_source.dart';
 import '../../../live/presentation/utils/live_screen_wakelock.dart';
 import '../../data/mappers/live_mapper.dart';
 import '../../domain/entities/live_entity.dart';
@@ -29,9 +30,7 @@ Future<void> openProfileCurrentLive(
   );
   if (live == null || live.id.isEmpty) return;
   await Navigator.of(context).push(
-    MaterialPageRoute<void>(
-      builder: (_) => _ProfileLiveWatchPage(live: live),
-    ),
+    MaterialPageRoute<void>(builder: (_) => _ProfileLiveWatchPage(live: live)),
   );
 }
 
@@ -51,6 +50,15 @@ class _ProfileLiveWatchPageState extends State<_ProfileLiveWatchPage> {
   void initState() {
     super.initState();
     _bloc = di.sl<LiveViewerBloc>();
+    // Entering from a profile badge uses the same activation event as the feed,
+    // so the ticket and age gates run before join. The room page never joins on
+    // its own. PROFILE is the documented traffic bucket for this entry.
+    _bloc.add(
+      LiveViewerActivated(
+        widget.live,
+        trafficSource: LiveTrafficSource.profile,
+      ),
+    );
     LiveScreenWakelock.enable();
   }
 
