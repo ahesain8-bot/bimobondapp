@@ -86,6 +86,27 @@ class ApiEndpoints {
       '/lives/$id/battle/multiplier';
   static String liveBattleEnd(String id, String battleId) =>
       '/lives/$id/battle/$battleId/end';
+
+  // ── 2v2 team PK + BO3 (lives/live-p1-parity.md §7, p2 §3) ──
+  static String liveBattleOpenTeams(String id) =>
+      '/lives/$id/battle/open-teams';
+  static String liveBattleJoin(String id, String battleId) =>
+      '/lives/$id/battle/$battleId/join';
+  static String liveBattleInvite(String id, String battleId) =>
+      '/lives/$id/battle/$battleId/invite';
+  static String liveBattleLeave(String id, String battleId) =>
+      '/lives/$id/battle/$battleId/leave';
+  static String liveBattlePowerUp(String id, String battleId) =>
+      '/lives/$id/battle/$battleId/power-up';
+
+  // ── Multi-room co-host (lives/live-p1-parity.md §6, p2 §2) ──
+  static String liveCohost(String id) => '/lives/$id/cohost';
+  static String liveCohostHosts(String id) => '/lives/$id/cohost/hosts';
+  static String liveCohostInvite(String id) => '/lives/$id/cohost/invite';
+  static String liveCohostAccept(String id, String sessionId) =>
+      '/lives/$id/cohost/$sessionId/accept';
+  static String liveCohostEnd(String id, String sessionId) =>
+      '/lives/$id/cohost/$sessionId/end';
   static String liveGallery(String id) => '/lives/$id/gallery';
   static String liveGiftGoal(String id) => '/lives/$id/gift-goal';
   static String livePolls(String id) => '/lives/$id/polls';

@@ -1,5 +1,6 @@
 import '../../domain/entities/live_chat_message.dart';
 import '../../domain/entities/live_host.dart';
+import '../../domain/entities/live_cohost.dart';
 import '../../domain/entities/live_interactive.dart';
 import '../../domain/entities/live_scene.dart';
 import '../../domain/entities/live_session.dart';
@@ -44,6 +45,7 @@ class LiveSessionMapper {
     int? galleryTotal,
     int? guestInviteCount,
     String? hourlyRankingLabel,
+    LiveCohostPayload cohost = LiveCohostPayload.none,
   }) {
     final hourlyRank = _asInt(live['hourlyRank']);
     final label =
@@ -51,6 +53,7 @@ class LiveSessionMapper {
         (hourlyRank != null ? 'ترتيب #$hourlyRank' : 'ترتيب كل ساعة');
 
     return LiveSession(
+      cohost: cohost,
       id: live['id']?.toString() ?? '',
       host: hostFromUser(
         live['user'] as Map<String, dynamic>?,

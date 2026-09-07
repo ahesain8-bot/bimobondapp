@@ -1,3 +1,4 @@
+import '../../../../core/models/live_battle.dart';
 import '../../../../core/network/api_endpoints.dart';
 import '../../../../core/network/live_api_client.dart';
 
@@ -419,16 +420,49 @@ class LivesRemoteDataSource {
     );
   }
 
+  /// `POST /lives/:id/battle`.
+  ///
+  /// Solo (1v1) stays the default: [mode] is only sent when the caller asked
+  /// for TEAM. A 2v2 lobby opens with the two captains — teammate ids are
+  /// optional, exactly as `lives/live-p1-parity.md` §7 describes.
   Future<Map<String, dynamic>> startBattle({
     required String liveId,
     required String opponentLiveId,
     int durationSeconds = 300,
+    String? mode,
+    String? scoringMode,
+    String? scoringGiftId,
+    int? bestOf,
+    String? teammateLiveId,
+    String? opponentTeammateLiveId,
   }) {
+    if (bestOf != null && bestOf != 1 && bestOf != 3) {
+      throw ArgumentError.value(bestOf, 'bestOf', 'Only 1 or 3 are documented.');
+    }
+    final wireMode = mode?.trim().toUpperCase();
+    if (wireMode != null && wireMode != 'TEAM' && wireMode != 'SOLO') {
+      throw ArgumentError.value(mode, 'mode', 'Only SOLO or TEAM.');
+    }
+    if (wireMode != 'TEAM' &&
+        (teammateLiveId != null || opponentTeammateLiveId != null)) {
+      throw ArgumentError('Teammates belong to a TEAM battle.');
+    }
     return _api.post(
       ApiEndpoints.liveBattle(liveId),
       body: {
         'opponentLiveId': opponentLiveId,
         'durationSeconds': durationSeconds,
+        if (wireMode != null) 'mode': wireMode,
+        if (scoringMode != null && scoringMode.trim().isNotEmpty)
+          'scoringMode': scoringMode.trim().toUpperCase(),
+        if (scoringGiftId != null && scoringGiftId.trim().isNotEmpty)
+          'scoringGiftId': scoringGiftId.trim(),
+        if (bestOf != null) 'bestOf': bestOf,
+        if (teammateLiveId != null && teammateLiveId.trim().isNotEmpty)
+          'teammateLiveId': teammateLiveId.trim(),
+        if (opponentTeammateLiveId != null &&
+            opponentTeammateLiveId.trim().isNotEmpty)
+          'opponentTeammateLiveId': opponentTeammateLiveId.trim(),
       },
     );
   }
@@ -436,10 +470,76 @@ class LivesRemoteDataSource {
   Future<Map<String, dynamic>> matchBattle({
     required String liveId,
     int durationSeconds = 300,
+    String? mode,
   }) {
     return _api.post(
       ApiEndpoints.liveBattleMatch(liveId),
-      body: {'durationSeconds': durationSeconds},
+      body: {
+        'durationSeconds': durationSeconds,
+        if (mode != null && mode.trim().isNotEmpty)
+          'mode': mode.trim().toUpperCase(),
+      },
+    );
+  }
+
+  /// `GET /lives/:id/battle/open-teams` — lobbies with `openSlots`.
+  Future<Map<String, dynamic>> battleOpenTeams(String liveId) {
+    return _api.get(ApiEndpoints.liveBattleOpenTeams(liveId));
+  }
+
+  /// `POST /lives/:yourLiveId/battle/:battleId/join` `{ "team": 1 }`.
+  /// Omitting [team] takes the first open slot, per the contract.
+  Future<Map<String, dynamic>> joinBattleTeam({
+    required String liveId,
+    required String battleId,
+    int? team,
+  }) {
+    if (team != null && team != 1 && team != 2) {
+      throw ArgumentError.value(team, 'team', 'Teams are 1 or 2.');
+    }
+    return _api.post(
+      ApiEndpoints.liveBattleJoin(liveId, battleId),
+      body: {if (team != null) 'team': team},
+    );
+  }
+
+  /// `POST /lives/:captainLiveId/battle/:battleId/invite`.
+  Future<Map<String, dynamic>> inviteBattleTeammate({
+    required String liveId,
+    required String battleId,
+    required String teammateLiveId,
+  }) {
+    if (teammateLiveId.trim().isEmpty) {
+      throw ArgumentError('A teammate live id is required.');
+    }
+    return _api.post(
+      ApiEndpoints.liveBattleInvite(liveId, battleId),
+      body: {'teammateLiveId': teammateLiveId.trim()},
+    );
+  }
+
+  /// `POST /lives/:teammateLiveId/battle/:battleId/leave` — teammates only;
+  /// a captain ends the battle instead.
+  Future<Map<String, dynamic>> leaveBattleTeam({
+    required String liveId,
+    required String battleId,
+  }) {
+    return _api.post(ApiEndpoints.liveBattleLeave(liveId, battleId));
+  }
+
+  /// `POST /lives/:id/battle/:battleId/power-up` `{ "type": "GLOVE" }`.
+  Future<Map<String, dynamic>> battlePowerUp({
+    required String liveId,
+    required String battleId,
+    required String type,
+  }) {
+    final wire = type.trim().toUpperCase();
+    if (!LiveBattlePowerUpType.isDocumented(wire)) {
+      throw ArgumentError.value(type, 'type', 'STUN, TIME or GLOVE only.');
+    }
+    return _api.post(
+      ApiEndpoints.liveBattlePowerUp(liveId, battleId),
+      body: {'type': wire},
     );
   }
 
@@ -459,6 +559,54 @@ class LivesRemoteDataSource {
     required String battleId,
   }) {
     return _api.post(ApiEndpoints.liveBattleEnd(liveId, battleId));
+  }
+
+  // ── Multi-room co-host (lives/live-p1-parity.md §6, p2 §2) ──
+
+  /// `GET /lives/:id/cohost/hosts` — hosts that still have a free slot.
+  Future<Map<String, dynamic>> cohostHosts(String liveId) {
+    return _api.get(ApiEndpoints.liveCohostHosts(liveId));
+  }
+
+  /// `GET /lives/:id/cohost` — this room's sessions.
+  Future<Map<String, dynamic>> cohostSessions(String liveId) {
+    return _api.get(ApiEndpoints.liveCohost(liveId));
+  }
+
+  /// `POST /lives/:id/cohost/invite` `{ "guestLiveId": "…" }`.
+  Future<Map<String, dynamic>> inviteCohost({
+    required String liveId,
+    required String guestLiveId,
+  }) {
+    if (guestLiveId.trim().isEmpty) {
+      throw ArgumentError('A partner live id is required.');
+    }
+    return _api.post(
+      ApiEndpoints.liveCohostInvite(liveId),
+      body: {'guestLiveId': guestLiveId.trim()},
+    );
+  }
+
+  /// `POST /lives/:id/cohost/:sessionId/accept`.
+  Future<Map<String, dynamic>> acceptCohost({
+    required String liveId,
+    required String sessionId,
+  }) {
+    if (sessionId.trim().isEmpty) {
+      throw ArgumentError('A co-host session id is required.');
+    }
+    return _api.post(ApiEndpoints.liveCohostAccept(liveId, sessionId.trim()));
+  }
+
+  /// `POST /lives/:id/cohost/:sessionId/end`.
+  Future<Map<String, dynamic>> endCohost({
+    required String liveId,
+    required String sessionId,
+  }) {
+    if (sessionId.trim().isEmpty) {
+      throw ArgumentError('A co-host session id is required.');
+    }
+    return _api.post(ApiEndpoints.liveCohostEnd(liveId, sessionId.trim()));
   }
 
   Future<Map<String, dynamic>> hourlyLeaderboard(String liveId) {

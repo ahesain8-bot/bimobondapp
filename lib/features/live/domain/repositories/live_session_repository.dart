@@ -5,6 +5,8 @@ import '../entities/live_house.dart';
 import '../entities/live_interactive.dart';
 import '../entities/live_host_league.dart';
 import '../entities/live_leaderboard_entry.dart';
+import '../entities/live_cohost.dart';
+import '../../data/mappers/live_cohost_mapper.dart' show LiveCohostCandidate;
 import '../entities/live_moderator.dart';
 import '../entities/live_replay.dart';
 import '../entities/live_scene.dart';
@@ -533,13 +535,87 @@ abstract class LiveSessionRepository {
     int limit = 20,
   });
 
+  /// `POST /lives/:id/battle`. Solo (1v1) stays the default; [teamMode] opens
+  /// a 2v2 lobby with the two captains and optional teammate seats
+  /// (`lives/live-p1-parity.md` §7). [bestOf] is 1 or 3 (`live-p2-parity.md`).
   Future<LiveBattle> startBattle({
     required String liveId,
     required String opponentLiveId,
     int durationSeconds = 300,
+    bool teamMode = false,
+    String? scoringMode,
+    String? scoringGiftId,
+    int? bestOf,
+    String? teammateLiveId,
+    String? opponentTeammateLiveId,
   });
 
-  Future<LiveBattle> matchBattle(String liveId, {int durationSeconds = 300});
+  Future<LiveBattle> matchBattle(
+    String liveId, {
+    int durationSeconds = 300,
+    bool teamMode = false,
+  });
+
+  /// `GET /lives/:id/battle/open-teams` — lobbies with a free teammate slot.
+  Future<List<LiveBattle>> loadOpenTeamBattles(String liveId);
+
+  /// `POST /lives/:yourLiveId/battle/:battleId/join`. Omit [team] to take the
+  /// first open slot.
+  Future<LiveBattle> joinBattleTeam({
+    required String liveId,
+    required String battleId,
+    int? team,
+  });
+
+  /// `POST /lives/:captainLiveId/battle/:battleId/invite`.
+  Future<LiveBattle> inviteBattleTeammate({
+    required String liveId,
+    required String battleId,
+    required String teammateLiveId,
+  });
+
+  /// `POST /lives/:teammateLiveId/battle/:battleId/leave` — teammates only.
+  Future<LiveBattle?> leaveBattleTeam({
+    required String liveId,
+    required String battleId,
+  });
+
+  /// `POST /lives/:id/battle/:battleId/power-up` — STUN, TIME or GLOVE.
+  Future<LiveBattle> activateBattlePowerUp({
+    required String liveId,
+    required String battleId,
+    required String type,
+  });
+
+  // ── Multi-room co-host ─────────────────────────────────────
+
+  /// `GET /lives/:id/cohost/hosts` — hosts with a free slot.
+  Future<List<LiveCohostCandidate>> loadCohostCandidates(String liveId);
+
+  /// `GET /lives/:id/cohost` — this room's sessions.
+  Future<List<LiveCohostSession>> loadCohostSessions(String liveId);
+
+  /// `POST /lives/:id/cohost/invite`.
+  Future<LiveCohostSession?> inviteCohost({
+    required String liveId,
+    required String guestLiveId,
+  });
+
+  /// `POST /lives/:id/cohost/:sessionId/accept`.
+  Future<LiveCohostSession?> acceptCohost({
+    required String liveId,
+    required String sessionId,
+  });
+
+  /// `POST /lives/:id/cohost/:sessionId/end`.
+  Future<void> endCohost({required String liveId, required String sessionId});
+
+  /// Tiles every partner room from `cohosts[]` as its own subscribe-only
+  /// LiveKit connection, and drops the ones no longer listed.
+  Future<void> syncCohostMedia(LiveCohostPayload payload);
+
+  /// Closes every partner room. The primary room is untouched.
+  Future<void> disconnectCohostMedia();
 
   Future<LiveBattle> activateBattleMultiplier({
     required String liveId,

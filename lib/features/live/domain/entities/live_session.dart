@@ -1,5 +1,6 @@
 import 'live_chat_message.dart';
 import 'live_host.dart';
+import 'live_cohost.dart';
 import 'live_interactive.dart';
 import 'live_scene.dart';
 import 'live_studio.dart';
@@ -44,6 +45,7 @@ class LiveSession {
     this.paused = false,
     this.mediaMode = LiveMediaMode.video,
     this.audioOnly = false,
+    this.cohost = LiveCohostPayload.none,
     this.scene = const LiveScene(),
     this.studio,
     this.topic,
@@ -120,6 +122,10 @@ class LiveSession {
   /// True for Voice Chat rooms. Host/speakers publish microphone only.
   final bool audioOnly;
 
+  /// Partner rooms to tile beside this one, from `cohost` / `cohosts[]` on the
+  /// join/start payload (`lives/live-p2-parity.md` §2). Empty for a solo room.
+  final LiveCohostPayload cohost;
+
   /// Backend-backed scene (CAMERA / SCREEN / DUAL + facing).
   final LiveScene scene;
 
@@ -194,6 +200,7 @@ class LiveSession {
     bool? paused,
     String? mediaMode,
     bool? audioOnly,
+    LiveCohostPayload? cohost,
     LiveScene? scene,
     LiveStudio? studio,
     String? topic,
@@ -242,6 +249,7 @@ class LiveSession {
       paused: paused ?? this.paused,
       mediaMode: mediaMode ?? this.mediaMode,
       audioOnly: audioOnly ?? this.audioOnly,
+      cohost: cohost ?? this.cohost,
       scene: scene ?? this.scene,
       studio: studio ?? this.studio,
       topic: topic ?? this.topic,

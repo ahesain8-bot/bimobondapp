@@ -10,6 +10,7 @@ import '../../domain/entities/live_chat_message.dart';
 import '../../domain/entities/live_gallery_item.dart';
 import '../../domain/entities/live_guest.dart';
 import '../../domain/entities/live_host_league.dart';
+import '../../domain/entities/live_cohost.dart';
 import '../../domain/entities/live_house.dart';
 import '../../domain/entities/live_replay.dart';
 import '../../domain/entities/live_leaderboard_entry.dart';
@@ -21,8 +22,10 @@ import '../../domain/entities/live_studio.dart';
 import '../../../../core/models/live_topic.dart';
 import '../../domain/repositories/live_session_repository.dart';
 import '../datasources/lives_media_datasource.dart';
+import '../datasources/live_secondary_rooms.dart';
 import '../datasources/lives_remote_datasource.dart';
 import '../datasources/lives_socket_datasource.dart';
+import '../mappers/live_cohost_mapper.dart';
 import '../mappers/live_host_extras_mapper.dart';
 import '../mappers/live_session_mapper.dart';
 import '../../domain/entities/live_viewer.dart';
@@ -34,9 +37,13 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
     required LivesRemoteDataSource remote,
     required LivesSocketDataSource socket,
     required LivesMediaDataSource media,
+    LiveSecondaryRooms? secondaryRooms,
   }) : _remote = remote,
        _socket = socket,
-       _media = media {
+       _media = media,
+       // Co-host partner tiles live in their own registry: the 1v1 PK opponent
+       // room stays exactly where it was, on the media datasource.
+       _secondaryRooms = secondaryRooms ?? LiveSecondaryRooms() {
     _media.onRoomEvent = (tag, message) {
       if (message == 'reconnecting') {
         _mediaEvents.add(
@@ -74,6 +81,10 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
   final LivesRemoteDataSource _remote;
   final LivesSocketDataSource _socket;
   final LivesMediaDataSource _media;
+  final LiveSecondaryRooms _secondaryRooms;
+
+  /// Partner rooms currently tiled, for the renderers to read.
+  LiveSecondaryRooms get cohostRooms => _secondaryRooms;
   final _mediaEvents = StreamController<LiveMediaConnectionEvent>.broadcast();
   String? _battleOpponentLiveId;
   String? _battleRequestedOpponentLiveId;
@@ -185,6 +196,11 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
       liveKitRole: role,
       mediaHints: LiveMediaHints.fromPayload(response, fallbackRole: role),
       studio: LiveStudio.fromJson(response['studio']),
+      // `cohost` / `cohosts[]` sit next to the token, not inside the live.
+      cohost: LiveCohostMapper.payloadFromJson(
+        response,
+        selfLiveId: liveMap['id']?.toString(),
+      ),
     );
   }
 
@@ -207,6 +223,10 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
         liveKitRole: response['role']?.toString() ?? 'host',
         mediaHints: LiveMediaHints.fromPayload(response, fallbackRole: 'host'),
         studio: LiveStudio.fromJson(response['studio']),
+        cohost: LiveCohostMapper.payloadFromJson(
+          response,
+          selfLiveId: liveMap['id']?.toString(),
+        ),
       );
     } on ApiException catch (e) {
       if (isEndedLiveStartError(e)) {
@@ -801,6 +821,12 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
     required String liveId,
     required String opponentLiveId,
     int durationSeconds = 300,
+    bool teamMode = false,
+    String? scoringMode,
+    String? scoringGiftId,
+    int? bestOf,
+    String? teammateLiveId,
+    String? opponentTeammateLiveId,
   }) async {
     try {
       return _battleFrom(
@@ -808,6 +834,13 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
           liveId: liveId,
           opponentLiveId: opponentLiveId,
           durationSeconds: durationSeconds,
+          // Solo omits `mode` entirely, which is the documented 1v1 request.
+          mode: teamMode ? 'TEAM' : null,
+          scoringMode: scoringMode,
+          scoringGiftId: scoringGiftId,
+          bestOf: bestOf,
+          teammateLiveId: teammateLiveId,
+          opponentTeammateLiveId: opponentTeammateLiveId,
         ),
       );
     } on ApiException catch (e) {
@@ -818,15 +851,142 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
   }
 
   @override
+  Future<List<LiveBattle>> loadOpenTeamBattles(String liveId) async {
+    if (liveId.isEmpty) return const [];
+    final payload = await _remote.battleOpenTeams(liveId);
+    final raw = payload['data'] ?? payload['battles'] ?? payload['items'];
+    if (raw is! List) return const [];
+    final battles = <LiveBattle>[];
+    for (final entry in raw.whereType<Map>()) {
+      final battle = LiveBattle.fromJson(Map<String, dynamic>.from(entry));
+      if (battle.id.isNotEmpty) battles.add(battle);
+    }
+    return List.unmodifiable(battles);
+  }
+
+  @override
+  Future<LiveBattle> joinBattleTeam({
+    required String liveId,
+    required String battleId,
+    int? team,
+  }) async {
+    return _battleFrom(
+      await _remote.joinBattleTeam(
+        liveId: liveId,
+        battleId: battleId,
+        team: team,
+      ),
+    );
+  }
+
+  @override
+  Future<LiveBattle> inviteBattleTeammate({
+    required String liveId,
+    required String battleId,
+    required String teammateLiveId,
+  }) async {
+    return _battleFrom(
+      await _remote.inviteBattleTeammate(
+        liveId: liveId,
+        battleId: battleId,
+        teammateLiveId: teammateLiveId,
+      ),
+    );
+  }
+
+  @override
+  Future<LiveBattle?> leaveBattleTeam({
+    required String liveId,
+    required String battleId,
+  }) async {
+    final payload = await _remote.leaveBattleTeam(
+      liveId: liveId,
+      battleId: battleId,
+    );
+    final battle = _battleFrom(payload);
+    // An empty body is a valid "you left"; it is not a battle snapshot.
+    return battle.id.isEmpty ? null : battle;
+  }
+
+  @override
+  Future<LiveBattle> activateBattlePowerUp({
+    required String liveId,
+    required String battleId,
+    required String type,
+  }) async {
+    return _battleFrom(
+      await _remote.battlePowerUp(
+        liveId: liveId,
+        battleId: battleId,
+        type: type,
+      ),
+    );
+  }
+
+  @override
+  Future<List<LiveCohostCandidate>> loadCohostCandidates(String liveId) async {
+    if (liveId.isEmpty) return const [];
+    return LiveCohostMapper.candidatesFromJson(
+      await _remote.cohostHosts(liveId),
+    );
+  }
+
+  @override
+  Future<List<LiveCohostSession>> loadCohostSessions(String liveId) async {
+    if (liveId.isEmpty) return const [];
+    return LiveCohostMapper.sessionsFromJson(
+      await _remote.cohostSessions(liveId),
+    );
+  }
+
+  @override
+  Future<LiveCohostSession?> inviteCohost({
+    required String liveId,
+    required String guestLiveId,
+  }) async {
+    return LiveCohostMapper.sessionFromJson(
+      await _remote.inviteCohost(liveId: liveId, guestLiveId: guestLiveId),
+    );
+  }
+
+  @override
+  Future<LiveCohostSession?> acceptCohost({
+    required String liveId,
+    required String sessionId,
+  }) async {
+    return LiveCohostMapper.sessionFromJson(
+      await _remote.acceptCohost(liveId: liveId, sessionId: sessionId),
+    );
+  }
+
+  @override
+  Future<void> endCohost({
+    required String liveId,
+    required String sessionId,
+  }) async {
+    await _remote.endCohost(liveId: liveId, sessionId: sessionId);
+  }
+
+  @override
+  Future<void> syncCohostMedia(LiveCohostPayload payload) {
+    return _secondaryRooms.sync(payload.rooms);
+  }
+
+  @override
+  Future<void> disconnectCohostMedia() => _secondaryRooms.disconnectAll();
+
+  @override
   Future<LiveBattle> matchBattle(
     String liveId, {
     int durationSeconds = 300,
+    bool teamMode = false,
   }) async {
     try {
       return _battleFrom(
         await _remote.matchBattle(
           liveId: liveId,
           durationSeconds: durationSeconds,
+          mode: teamMode ? 'TEAM' : null,
         ),
       );
     } on ApiException catch (e) {
