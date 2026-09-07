@@ -198,8 +198,6 @@ class _PkFirstDataSource implements LiveRemoteDataSource {
     int limit = 10,
     String? category,
     bool followingOnly = false,
-    double? latitude,
-    double? longitude,
     bool audioOnly = false,
     String? topic,
   }) async {
@@ -208,8 +206,6 @@ class _PkFirstDataSource implements LiveRemoteDataSource {
       limit: limit,
       category: category,
       followingOnly: followingOnly,
-      latitude: latitude,
-      longitude: longitude,
       audioOnly: audioOnly,
       topic: topic,
     );

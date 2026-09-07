@@ -16,8 +16,6 @@ abstract class LiveRemoteDataSource {
     int limit = 10,
     String? category,
     bool followingOnly = false,
-    double? latitude,
-    double? longitude,
     bool audioOnly = false,
     String? topic,
   });
@@ -135,8 +133,6 @@ class FakeLiveRemoteDataSource implements LiveRemoteDataSource {
     int limit = 10,
     String? category,
     bool followingOnly = false,
-    double? latitude,
-    double? longitude,
     bool audioOnly = false,
     String? topic,
   }) async {
