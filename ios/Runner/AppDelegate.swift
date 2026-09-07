@@ -49,6 +49,11 @@ import GoogleMaps
                           result(FlutterError(code: "flip_failed", message: "cannot_flip", details: nil))
                       }
                   }
+              case "setFlash":
+                  let enabled = (call.arguments as? [String: Any])?["enabled"] as? Bool ?? false
+                  ArCameraController.shared.setFlash(enabled) { ok in
+                      result(ok)
+                  }
               default:
                   result(FlutterMethodNotImplemented)
               }

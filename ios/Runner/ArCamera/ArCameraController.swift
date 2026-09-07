@@ -23,6 +23,7 @@ final class ArCameraController: NSObject {
     private let photoOutput = AVCapturePhotoOutput()
     private var currentInput: AVCaptureDeviceInput?
     private(set) var isFrontCamera = true
+    private(set) var isFlashOn = false
     private var photoCaptureDelegate: PhotoCaptureDelegate?
 
     private override init() { super.init() }
@@ -126,6 +127,13 @@ final class ArCameraController: NSObject {
             }
         }
     }
+    func setFlash(_ enabled: Bool, completion: ((Bool) -> Void)? = nil) {
+        sessionQueue.async { [weak self] in
+            guard let self else { return }
+            self.isFlashOn = enabled
+            DispatchQueue.main.async { completion?(true) }
+        }
+    }
 
     func takePhoto(completion: @escaping (String?, String?) -> Void) {
         let settings = AVCapturePhotoSettings()
@@ -134,6 +142,11 @@ final class ArCameraController: NSObject {
         } else {
             settings.isHighResolutionPhotoEnabled = true
         }
+        if !isFrontCamera, isFlashOn, photoOutput.supportedFlashModes.contains(.on) {
+              settings.flashMode = .on
+          } else {
+              settings.flashMode = .off
+          }
         let delegate = PhotoCaptureDelegate { path in
             completion(path, path == nil ? "photo_failed" : nil)
         }

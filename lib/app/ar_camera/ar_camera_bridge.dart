@@ -231,6 +231,13 @@ class ArCameraBridge {
     return enabled ?? false;
   }
 
+  static Future<bool> setFlash(bool enabled) async {
+    final ok = await _channel.invokeMethod<bool>('setFlash', {
+      'enabled': enabled,
+    });
+    return ok ?? false;
+  }
+
   /// Stops the native camera pipeline (camera stream, GL view and any
   /// screen-overlay Lottie animation) while the camera screen is still mounted
   /// but hidden behind another route.
