@@ -58,6 +58,7 @@ Future<void> initShop() async {
   sl.registerLazySingleton(() => GetLiveProductsUseCase(sl()));
   sl.registerLazySingleton(() => AddLiveProductUseCase(sl()));
   sl.registerLazySingleton(() => PinLiveProductUseCase(sl()));
+  sl.registerLazySingleton(() => SetLiveProductDealUseCase(sl()));
   sl.registerLazySingleton(() => RemoveLiveProductUseCase(sl()));
 
   sl.registerLazySingleton(

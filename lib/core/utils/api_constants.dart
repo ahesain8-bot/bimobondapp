@@ -305,6 +305,11 @@ class ApiConstants {
   static String productsLiveItemsReorder(String liveId) =>
       '/products/lives/$liveId/items/reorder';
 
+  /// `PATCH …/items/:productId/deal` — host flash price + coupon on one bag
+  /// item (`lives/live-p0-parity.md` §3).
+  static String productsLiveItemDeal(String liveId, String productId) =>
+      '/products/lives/$liveId/items/$productId/deal';
+
   // ── Lives (from bimo-bond-live) ───────────────────
   static const String lives = '/lives';
   static const String livesFeed = '/lives/feed';

@@ -2549,5 +2549,16 @@
       }
     }
   },
-  "liveGameUnsupported": "نوع لعبة غير مدعوم في هذا الإصدار."
+  "liveGameUnsupported": "نوع لعبة غير مدعوم في هذا الإصدار.",
+  "shopLiveDealTitle": "عرض خاص بالبث",
+  "shopLiveDealFlashPrice": "سعر الفلاش (عملات)",
+  "shopLiveDealFlashEnds": "ينتهي بعد (دقائق)",
+  "shopLiveDealCouponCode": "رمز الكوبون",
+  "shopLiveDealCouponOff": "خصم الكوبون (عملات)",
+  "shopLiveDealSave": "حفظ العرض",
+  "shopLiveDealClearFlash": "إلغاء عرض الفلاش",
+  "shopLiveDealClearCoupon": "إلغاء الكوبون",
+  "shopLiveDealNote": "السعر النهائي يحسبه السيرفر ويظهر في معاينة الدفع.",
+  "shopLiveDealNeedsBoth": "أدخل السعر ومدة الانتهاء معًا، والرمز والخصم معًا.",
+  "shopLiveDealSaved": "تم تحديث العرض"
 }

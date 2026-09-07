@@ -2640,5 +2640,16 @@
       }
     }
   },
-  "liveGameUnsupported": "This game type is not supported in this build."
+  "liveGameUnsupported": "This game type is not supported in this build.",
+  "shopLiveDealTitle": "Live-only deal",
+  "shopLiveDealFlashPrice": "Flash price (coins)",
+  "shopLiveDealFlashEnds": "Ends in (minutes)",
+  "shopLiveDealCouponCode": "Coupon code",
+  "shopLiveDealCouponOff": "Coupon amount (coins)",
+  "shopLiveDealSave": "Save deal",
+  "shopLiveDealClearFlash": "Clear flash deal",
+  "shopLiveDealClearCoupon": "Clear coupon",
+  "shopLiveDealNote": "The server calculates the final price; checkout preview shows it.",
+  "shopLiveDealNeedsBoth": "Enter the price and the end time together, and the code and amount together.",
+  "shopLiveDealSaved": "Deal updated"
 }

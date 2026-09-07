@@ -200,6 +200,35 @@ class PinLiveProductUseCase {
   );
 }
 
+/// Host sets or clears the live-only flash price and coupon on a bag item.
+///
+/// Amounts are sent exactly as typed; the server decides the resulting
+/// `livePriceCoins`, `flashActive`, `hasCoupon` and `dealApplied`.
+class SetLiveProductDealUseCase {
+  SetLiveProductDealUseCase(this._repository);
+  final ShopRepository _repository;
+
+  Future<Either<Failure, LiveProductPinEntity>> call({
+    required String liveId,
+    required String productId,
+    int? flashPriceCoins,
+    DateTime? flashEndsAt,
+    String? couponCode,
+    int? couponOffCoins,
+    bool clearFlash = false,
+    bool clearCoupon = false,
+  }) => _repository.setLiveProductDeal(
+    liveId: liveId,
+    productId: productId,
+    flashPriceCoins: flashPriceCoins,
+    flashEndsAt: flashEndsAt,
+    couponCode: couponCode,
+    couponOffCoins: couponOffCoins,
+    clearFlash: clearFlash,
+    clearCoupon: clearCoupon,
+  );
+}
+
 class RemoveLiveProductUseCase {
   RemoveLiveProductUseCase(this._repository);
   final ShopRepository _repository;

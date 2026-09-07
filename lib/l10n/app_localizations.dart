@@ -10684,6 +10684,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This game type is not supported in this build.'**
   String get liveGameUnsupported;
+
+  /// No description provided for @shopLiveDealTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Live-only deal'**
+  String get shopLiveDealTitle;
+
+  /// No description provided for @shopLiveDealFlashPrice.
+  ///
+  /// In en, this message translates to:
+  /// **'Flash price (coins)'**
+  String get shopLiveDealFlashPrice;
+
+  /// No description provided for @shopLiveDealFlashEnds.
+  ///
+  /// In en, this message translates to:
+  /// **'Ends in (minutes)'**
+  String get shopLiveDealFlashEnds;
+
+  /// No description provided for @shopLiveDealCouponCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Coupon code'**
+  String get shopLiveDealCouponCode;
+
+  /// No description provided for @shopLiveDealCouponOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Coupon amount (coins)'**
+  String get shopLiveDealCouponOff;
+
+  /// No description provided for @shopLiveDealSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save deal'**
+  String get shopLiveDealSave;
+
+  /// No description provided for @shopLiveDealClearFlash.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear flash deal'**
+  String get shopLiveDealClearFlash;
+
+  /// No description provided for @shopLiveDealClearCoupon.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear coupon'**
+  String get shopLiveDealClearCoupon;
+
+  /// No description provided for @shopLiveDealNote.
+  ///
+  /// In en, this message translates to:
+  /// **'The server calculates the final price; checkout preview shows it.'**
+  String get shopLiveDealNote;
+
+  /// No description provided for @shopLiveDealNeedsBoth.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the price and the end time together, and the code and amount together.'**
+  String get shopLiveDealNeedsBoth;
+
+  /// No description provided for @shopLiveDealSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Deal updated'**
+  String get shopLiveDealSaved;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

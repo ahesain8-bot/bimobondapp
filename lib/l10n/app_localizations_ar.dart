@@ -5570,4 +5570,37 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get liveGameUnsupported => 'نوع لعبة غير مدعوم في هذا الإصدار.';
+
+  @override
+  String get shopLiveDealTitle => 'عرض خاص بالبث';
+
+  @override
+  String get shopLiveDealFlashPrice => 'سعر الفلاش (عملات)';
+
+  @override
+  String get shopLiveDealFlashEnds => 'ينتهي بعد (دقائق)';
+
+  @override
+  String get shopLiveDealCouponCode => 'رمز الكوبون';
+
+  @override
+  String get shopLiveDealCouponOff => 'خصم الكوبون (عملات)';
+
+  @override
+  String get shopLiveDealSave => 'حفظ العرض';
+
+  @override
+  String get shopLiveDealClearFlash => 'إلغاء عرض الفلاش';
+
+  @override
+  String get shopLiveDealClearCoupon => 'إلغاء الكوبون';
+
+  @override
+  String get shopLiveDealNote => 'السعر النهائي يحسبه السيرفر ويظهر في معاينة الدفع.';
+
+  @override
+  String get shopLiveDealNeedsBoth => 'أدخل السعر ومدة الانتهاء معًا، والرمز والخصم معًا.';
+
+  @override
+  String get shopLiveDealSaved => 'تم تحديث العرض';
 }

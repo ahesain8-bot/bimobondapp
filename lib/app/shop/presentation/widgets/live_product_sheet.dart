@@ -17,6 +17,7 @@ import 'package:bimobondapp/core/widgets/glass_bottom_sheet.dart';
 import 'package:bimobondapp/core/widgets/safe_network_image.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -52,6 +53,7 @@ class _LiveProductSheetBodyState extends State<_LiveProductSheetBody> {
   final _addLiveProduct = shop_di.sl<AddLiveProductUseCase>();
   final _pinLiveProduct = shop_di.sl<PinLiveProductUseCase>();
   final _removeLiveProduct = shop_di.sl<RemoveLiveProductUseCase>();
+  final _setLiveProductDeal = shop_di.sl<SetLiveProductDealUseCase>();
   final _browseProducts = shop_di.sl<BrowseProductsUseCase>();
 
   List<LiveProductPinEntity> _items = const [];
@@ -129,6 +131,42 @@ class _LiveProductSheetBodyState extends State<_LiveProductSheetBody> {
         context,
       ).showSnackBar(SnackBar(content: Text(failure.message))),
       (_) => _load(),
+    );
+  }
+
+  /// Host flash price + coupon for one bag item. The server owns the resulting
+  /// price: this only sends what the host typed and reloads the bag.
+  Future<void> _editDeal(LiveProductPinEntity pin) async {
+    final l10n = AppLocalizations.of(context)!;
+    final request = await showModalBottomSheet<_LiveDealRequest>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => _LiveDealSheet(pin: pin),
+    );
+    if (request == null || !mounted) return;
+    final result = await _setLiveProductDeal(
+      liveId: widget.liveId,
+      productId: pin.productId,
+      flashPriceCoins: request.flashPriceCoins,
+      flashEndsAt: request.flashEndsAt,
+      couponCode: request.couponCode,
+      couponOffCoins: request.couponOffCoins,
+      clearFlash: request.clearFlash,
+      clearCoupon: request.clearCoupon,
+    );
+    if (!mounted) return;
+    result.fold(
+      (failure) => ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(failure.message))),
+      (_) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l10n.shopLiveDealSaved)));
+        // The socket also pushes `liveProduct` action `deal`; reloading here
+        // keeps the host's own sheet correct even if that push is missed.
+        _load();
+      },
     );
   }
 
@@ -395,6 +433,15 @@ class _LiveProductSheetBodyState extends State<_LiveProductSheetBody> {
                   ),
                   if (widget.isHost) ...[
                     IconButton(
+                      tooltip: l10n.shopLiveDealTitle,
+                      onPressed: () => _editDeal(pin),
+                      icon: Icon(
+                        LucideIcons.badgePercent,
+                        color: theme.primary,
+                        size: 18,
+                      ),
+                    ),
+                    IconButton(
                       tooltip: pin.isPinned ? l10n.shopUnpin : l10n.shopPin,
                       onPressed: () => _togglePin(pin),
                       icon: Icon(
@@ -488,4 +535,179 @@ class _BagChip extends StatelessWidget {
     label,
     style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 11),
   );
+}
+
+
+/// What the host asked for in the deal sheet.
+class _LiveDealRequest {
+  const _LiveDealRequest({
+    this.flashPriceCoins,
+    this.flashEndsAt,
+    this.couponCode,
+    this.couponOffCoins,
+    this.clearFlash = false,
+    this.clearCoupon = false,
+  });
+
+  final int? flashPriceCoins;
+  final DateTime? flashEndsAt;
+  final String? couponCode;
+  final int? couponOffCoins;
+  final bool clearFlash;
+  final bool clearCoupon;
+}
+
+/// Host editor for `PATCH …/items/:productId/deal`
+/// (`lives/live-p0-parity.md` §3).
+///
+/// It collects a flash price with its end time and a coupon code with its
+/// amount. No discount is computed here — `livePriceCoins`, `flashActive`,
+/// `hasCoupon` and `dealApplied` all come back from the server.
+class _LiveDealSheet extends StatefulWidget {
+  const _LiveDealSheet({required this.pin});
+
+  final LiveProductPinEntity pin;
+
+  @override
+  State<_LiveDealSheet> createState() => _LiveDealSheetState();
+}
+
+class _LiveDealSheetState extends State<_LiveDealSheet> {
+  final _flashPrice = TextEditingController();
+  final _flashMinutes = TextEditingController();
+  final _couponCode = TextEditingController();
+  final _couponOff = TextEditingController();
+  String? _error;
+
+  @override
+  void dispose() {
+    _flashPrice.dispose();
+    _flashMinutes.dispose();
+    _couponCode.dispose();
+    _couponOff.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final bag = widget.pin.bag;
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          16,
+          16,
+          16,
+          16 + MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                l10n.shopLiveDealTitle,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(l10n.shopLiveDealNote, style: const TextStyle(fontSize: 12)),
+              TextField(
+                controller: _flashPrice,
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                decoration: InputDecoration(
+                  labelText: l10n.shopLiveDealFlashPrice,
+                ),
+              ),
+              TextField(
+                controller: _flashMinutes,
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                decoration: InputDecoration(
+                  labelText: l10n.shopLiveDealFlashEnds,
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _couponCode,
+                maxLength: 24,
+                decoration: InputDecoration(
+                  labelText: l10n.shopLiveDealCouponCode,
+                  counterText: '',
+                ),
+              ),
+              TextField(
+                controller: _couponOff,
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                decoration: InputDecoration(
+                  labelText: l10n.shopLiveDealCouponOff,
+                ),
+              ),
+              if (_error != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    _error!,
+                    style: const TextStyle(color: Colors.red, fontSize: 12),
+                  ),
+                ),
+              const SizedBox(height: 12),
+              FilledButton(
+                onPressed: _submit,
+                child: Text(l10n.shopLiveDealSave),
+              ),
+              if (bag?.flashActive == true)
+                TextButton(
+                  onPressed: () => Navigator.of(
+                    context,
+                  ).pop(const _LiveDealRequest(clearFlash: true)),
+                  child: Text(l10n.shopLiveDealClearFlash),
+                ),
+              if (bag?.hasCoupon == true)
+                TextButton(
+                  onPressed: () => Navigator.of(
+                    context,
+                  ).pop(const _LiveDealRequest(clearCoupon: true)),
+                  child: Text(l10n.shopLiveDealClearCoupon),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _submit() {
+    final l10n = AppLocalizations.of(context)!;
+    final price = int.tryParse(_flashPrice.text.trim());
+    final minutes = int.tryParse(_flashMinutes.text.trim());
+    final code = _couponCode.text.trim();
+    final off = int.tryParse(_couponOff.text.trim());
+
+    // Each half of a deal needs its other half; the API rejects a lone value.
+    final flashComplete = (price == null) == (minutes == null);
+    final couponComplete = code.isEmpty == (off == null);
+    if (!flashComplete || !couponComplete) {
+      setState(() => _error = l10n.shopLiveDealNeedsBoth);
+      return;
+    }
+    if (price == null && code.isEmpty) {
+      Navigator.of(context).pop();
+      return;
+    }
+    Navigator.of(context).pop(
+      _LiveDealRequest(
+        flashPriceCoins: price,
+        flashEndsAt: minutes == null
+            ? null
+            : DateTime.now().add(Duration(minutes: minutes)),
+        couponCode: code.isEmpty ? null : code,
+        couponOffCoins: off,
+      ),
+    );
+  }
 }

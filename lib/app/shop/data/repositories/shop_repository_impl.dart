@@ -392,6 +392,35 @@ class ShopRepositoryImpl implements ShopRepository {
   }
 
   @override
+  Future<Either<Failure, LiveProductPinEntity>> setLiveProductDeal({
+    required String liveId,
+    required String productId,
+    int? flashPriceCoins,
+    DateTime? flashEndsAt,
+    String? couponCode,
+    int? couponOffCoins,
+    bool clearFlash = false,
+    bool clearCoupon = false,
+  }) async {
+    try {
+      return Right(
+        await remoteDataSource.setLiveProductDeal(
+          liveId: liveId,
+          productId: productId,
+          flashPriceCoins: flashPriceCoins,
+          flashEndsAt: flashEndsAt,
+          couponCode: couponCode,
+          couponOffCoins: couponOffCoins,
+          clearFlash: clearFlash,
+          clearCoupon: clearCoupon,
+        ),
+      );
+    } catch (e) {
+      return Left(_map(e));
+    }
+  }
+
+  @override
   Future<Either<Failure, Unit>> removeLiveProduct({
     required String liveId,
     required String productId,

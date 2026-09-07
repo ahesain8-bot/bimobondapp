@@ -109,6 +109,22 @@ abstract class ShopRemoteDataSource {
     required String liveId,
     required String productId,
   });
+
+  /// `PATCH /products/lives/:liveId/items/:productId/deal` — host flash price
+  /// and coupon for one bag item (`lives/live-p0-parity.md` §3).
+  ///
+  /// Clearing a field is an explicit null in the request, which is why each
+  /// argument has its own "clear" flag rather than relying on a null default.
+  Future<LiveProductPinModel> setLiveProductDeal({
+    required String liveId,
+    required String productId,
+    int? flashPriceCoins,
+    DateTime? flashEndsAt,
+    String? couponCode,
+    int? couponOffCoins,
+    bool clearFlash = false,
+    bool clearCoupon = false,
+  });
 }
 
 class ShopRemoteDataSourceImpl implements ShopRemoteDataSource {
@@ -929,6 +945,43 @@ class ShopRemoteDataSourceImpl implements ShopRemoteDataSource {
   }
 
   @override
+  Future<LiveProductPinModel> setLiveProductDeal({
+    required String liveId,
+    required String productId,
+    int? flashPriceCoins,
+    DateTime? flashEndsAt,
+    String? couponCode,
+    int? couponOffCoins,
+    bool clearFlash = false,
+    bool clearCoupon = false,
+  }) async {
+    final body = buildLiveProductDealBody(
+      flashPriceCoins: flashPriceCoins,
+      flashEndsAt: flashEndsAt,
+      couponCode: couponCode,
+      couponOffCoins: couponOffCoins,
+      clearFlash: clearFlash,
+      clearCoupon: clearCoupon,
+    );
+    try {
+      final response = await apiClient.dio.patch(
+        ApiConstants.productsLiveItemDeal(liveId, productId),
+        data: body,
+        options: Options(headers: await _authHeaders(required: true)),
+      );
+      if (response.statusCode == 200) {
+        return LiveProductPinModel.fromJson(_asMap(response.data));
+      }
+      throw ServerException(
+        message:
+            _extractErrorMessage(response.data) ?? 'Failed to update the deal',
+      );
+    } catch (e) {
+      throw DioHandler.handle(e);
+    }
+  }
+
+  @override
   Future<void> removeLiveProduct({
     required String liveId,
     required String productId,
@@ -948,4 +1001,58 @@ class ShopRemoteDataSourceImpl implements ShopRemoteDataSource {
       throw DioHandler.handle(e);
     }
   }
+}
+
+
+/// Builds the body of `PATCH /products/lives/:liveId/items/:productId/deal`
+/// (`lives/live-p0-parity.md` §3), and refuses a request the API would reject.
+///
+/// Prices are coin amounts the host typed. Nothing here computes a discount:
+/// `livePriceCoins`, `flashActive`, `hasCoupon` and `dealApplied` all come back
+/// from the server. Clearing sends an explicit null for that half of the deal.
+Map<String, dynamic> buildLiveProductDealBody({
+  int? flashPriceCoins,
+  DateTime? flashEndsAt,
+  String? couponCode,
+  int? couponOffCoins,
+  bool clearFlash = false,
+  bool clearCoupon = false,
+}) {
+  if (flashPriceCoins != null && flashPriceCoins < 0) {
+    throw ArgumentError.value(
+      flashPriceCoins,
+      'flashPriceCoins',
+      'A flash price cannot be negative.',
+    );
+  }
+  if (couponOffCoins != null && couponOffCoins < 0) {
+    throw ArgumentError.value(
+      couponOffCoins,
+      'couponOffCoins',
+      'A coupon amount cannot be negative.',
+    );
+  }
+  if (!clearFlash && (flashPriceCoins == null) != (flashEndsAt == null)) {
+    throw ArgumentError('A flash deal needs both a price and an end time.');
+  }
+  if (!clearCoupon &&
+      (couponCode == null || couponCode.trim().isEmpty) !=
+          (couponOffCoins == null)) {
+    throw ArgumentError('A coupon needs both a code and an amount.');
+  }
+  final body = <String, dynamic>{
+    if (clearFlash) ...{'flashPriceCoins': null, 'flashEndsAt': null},
+    if (!clearFlash && flashPriceCoins != null)
+      'flashPriceCoins': flashPriceCoins,
+    if (!clearFlash && flashEndsAt != null)
+      'flashEndsAt': flashEndsAt.toUtc().toIso8601String(),
+    if (clearCoupon) ...{'couponCode': null, 'couponOffCoins': null},
+    if (!clearCoupon && couponCode != null && couponCode.trim().isNotEmpty)
+      'couponCode': couponCode.trim(),
+    if (!clearCoupon && couponOffCoins != null) 'couponOffCoins': couponOffCoins,
+  };
+  if (body.isEmpty) {
+    throw ArgumentError('Nothing to change on this deal.');
+  }
+  return body;
 }

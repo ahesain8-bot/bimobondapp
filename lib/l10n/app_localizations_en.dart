@@ -5570,4 +5570,37 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get liveGameUnsupported => 'This game type is not supported in this build.';
+
+  @override
+  String get shopLiveDealTitle => 'Live-only deal';
+
+  @override
+  String get shopLiveDealFlashPrice => 'Flash price (coins)';
+
+  @override
+  String get shopLiveDealFlashEnds => 'Ends in (minutes)';
+
+  @override
+  String get shopLiveDealCouponCode => 'Coupon code';
+
+  @override
+  String get shopLiveDealCouponOff => 'Coupon amount (coins)';
+
+  @override
+  String get shopLiveDealSave => 'Save deal';
+
+  @override
+  String get shopLiveDealClearFlash => 'Clear flash deal';
+
+  @override
+  String get shopLiveDealClearCoupon => 'Clear coupon';
+
+  @override
+  String get shopLiveDealNote => 'The server calculates the final price; checkout preview shows it.';
+
+  @override
+  String get shopLiveDealNeedsBoth => 'Enter the price and the end time together, and the code and amount together.';
+
+  @override
+  String get shopLiveDealSaved => 'Deal updated';
 }

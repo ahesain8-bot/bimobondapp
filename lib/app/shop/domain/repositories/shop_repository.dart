@@ -134,4 +134,17 @@ abstract class ShopRepository {
     required String liveId,
     required String productId,
   });
+
+  /// Host flash price / coupon on one bag item
+  /// (`PATCH /products/lives/:liveId/items/:productId/deal`).
+  Future<Either<Failure, LiveProductPinEntity>> setLiveProductDeal({
+    required String liveId,
+    required String productId,
+    int? flashPriceCoins,
+    DateTime? flashEndsAt,
+    String? couponCode,
+    int? couponOffCoins,
+    bool clearFlash,
+    bool clearCoupon,
+  });
 }
