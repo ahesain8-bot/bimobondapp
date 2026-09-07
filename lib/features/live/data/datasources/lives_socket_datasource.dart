@@ -14,9 +14,8 @@ import '../mappers/live_session_mapper.dart';
 
 /// Socket.IO HUD client for `live_{id}` (lives/mobile-api.md §16).
 class LivesSocketDataSource {
-  LivesSocketDataSource({
-    required Future<String?> Function() idTokenProvider,
-  }) : _idTokenProvider = idTokenProvider;
+  LivesSocketDataSource({required Future<String?> Function() idTokenProvider})
+    : _idTokenProvider = idTokenProvider;
 
   /// Legacy aliases retained for payload compatibility. Visual combo delivery
   /// is owned by the shared AuctionSocketService stream.
@@ -303,11 +302,7 @@ class LivesSocketDataSource {
     // Keep the legacy liveGift callback only for old display/comment payloads;
     // rich combo payloads are ignored here so the host has one visual owner.
     _on(socket, 'liveGift', (data) {
-      _handleGiftPayload(
-        data,
-        fallbackLiveId: liveId,
-        sourceEvent: 'liveGift',
-      );
+      _handleGiftPayload(data, fallbackLiveId: liveId, sourceEvent: 'liveGift');
     });
 
     // Personal room `user_*`, not the live room: an invite can land while the
@@ -410,6 +405,9 @@ class LivesSocketDataSource {
       'liveTreasureBoxClaimed',
       'liveAuction',
       'liveGiftGoalUpdate',
+      // Official games (lives/live-p3-parity.md §3). The payload is forwarded
+      // intact; the games BLoC owns its meaning.
+      'liveGame',
     ]) {
       _on(socket, eventName, (data) {
         final map = _asMap(data);
@@ -479,14 +477,8 @@ class LivesSocketDataSource {
     socket.emit('joinUser', {});
   }
 
-  void emitSwitchLiveCamera({
-    required String liveId,
-    required String facing,
-  }) {
-    _socket?.emit('switchLiveCamera', {
-      'liveId': liveId,
-      'facing': facing,
-    });
+  void emitSwitchLiveCamera({required String liveId, required String facing}) {
+    _socket?.emit('switchLiveCamera', {'liveId': liveId, 'facing': facing});
   }
 
   void _handleGiftPayload(

@@ -16,6 +16,8 @@ import '../../data/datasources/lives_remote_datasource.dart';
 import '../../data/datasources/lives_socket_datasource.dart';
 import '../../data/repositories/camera_repository_impl.dart';
 import '../../data/repositories/live_interactive_repository_impl.dart';
+import '../../data/datasources/live_games_remote_datasource.dart';
+import '../../data/repositories/live_games_repository_impl.dart';
 import '../../data/repositories/live_session_repository_impl.dart';
 import '../../domain/effects/live_effects_catalog.dart';
 import '../../domain/repositories/camera_repository.dart';
@@ -29,6 +31,7 @@ import '../../domain/usecases/pause_live_session.dart';
 import '../../domain/usecases/send_live_comment.dart';
 import '../../domain/usecases/start_live_session.dart';
 import '../../domain/usecases/update_live_title.dart';
+import '../bloc/live_games/live_games_bloc.dart';
 import '../bloc/live_interactive/live_interactive_bloc.dart';
 import '../bloc/live_interactive/live_interactive_event.dart';
 import '../bloc/live_room/live_room_bloc.dart';
@@ -89,6 +92,7 @@ class _LiveRoomPageState extends State<LiveRoomPage>
     with WidgetsBindingObserver {
   LiveRoomBloc? _bloc;
   LiveInteractiveBloc? _interactiveBloc;
+  LiveGamesBloc? _gamesBloc;
   LiveInteractiveRepository? _interactiveRepository;
   LiveSessionRepository? _sessionRepository;
   late final CameraRepository _cameraRepository;
@@ -141,6 +145,13 @@ class _LiveRoomPageState extends State<LiveRoomPage>
       userIdProvider: () => fb.FirebaseAuth.instance.currentUser?.uid ?? '',
       remote: LiveInteractiveRemoteDataSource(apiClient: apiClient),
     );
+    // Official games share the room's HUD socket for their `liveGame` pushes.
+    _gamesBloc = LiveGamesBloc(
+      repository: LiveGamesRepositoryImpl(
+        remote: LiveGamesRemoteDataSource(apiClient: apiClient),
+      ),
+      socketEvents: socket.events,
+    );
     // The room's own HUD socket already carries the interactive pushes, so the
     // BLoC listens to it instead of opening a second connection.
     _interactiveBloc = LiveInteractiveBloc(
@@ -192,6 +203,7 @@ class _LiveRoomPageState extends State<LiveRoomPage>
     _faceTracker.dispose();
     _bloc?.close();
     _interactiveBloc?.close();
+    _gamesBloc?.close();
     LiveScreenWakelock.disable();
     super.dispose();
   }
@@ -210,6 +222,7 @@ class _LiveRoomPageState extends State<LiveRoomPage>
       providers: [
         BlocProvider<LiveRoomBloc>.value(value: bloc),
         BlocProvider<LiveInteractiveBloc>.value(value: _interactiveBloc!),
+        BlocProvider<LiveGamesBloc>.value(value: _gamesBloc!),
       ],
       child: RepositoryProvider<LiveSessionRepository>.value(
         value: _sessionRepository!,
@@ -269,6 +282,9 @@ class _LiveRoomPageState extends State<LiveRoomPage>
                         session.id,
                         giftGoal: session.giftGoal,
                       ),
+                    );
+                    context.read<LiveGamesBloc>().add(
+                      LiveGamesStarted(session.id),
                     );
                   },
                 ),

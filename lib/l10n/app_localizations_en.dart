@@ -5494,4 +5494,80 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get liveClipOpenPost => 'Open post';
+
+  @override
+  String get liveGamesTitle => 'Official games';
+
+  @override
+  String get liveGamesStart => 'Start a game';
+
+  @override
+  String get liveGamesActiveOne => 'A game is already running.';
+
+  @override
+  String get liveGamesNone => 'No game right now.';
+
+  @override
+  String get liveGameQuiz => 'Quiz';
+
+  @override
+  String get liveGameWheel => 'Prize wheel';
+
+  @override
+  String get liveGameLuckyDraw => 'Lucky draw';
+
+  @override
+  String get liveGameQuestion => 'Question';
+
+  @override
+  String liveGameOption(int index) {
+    return 'Option $index';
+  }
+
+  @override
+  String get liveGameCorrectOption => 'Correct answer';
+
+  @override
+  String liveGamePrize(int index) {
+    return 'Prize $index';
+  }
+
+  @override
+  String get liveGameAddOption => 'Add option';
+
+  @override
+  String get liveGameAddPrize => 'Add prize';
+
+  @override
+  String get liveGameEnd => 'End game';
+
+  @override
+  String get liveGamePlay => 'Play';
+
+  @override
+  String get liveGamePlayed => 'You already played';
+
+  @override
+  String get liveGameAnswerHidden => 'The answer appears after the host ends the game.';
+
+  @override
+  String get liveGameWaitingResult => 'Waiting for the server result…';
+
+  @override
+  String liveGameWinner(String name) {
+    return 'Winner: $name';
+  }
+
+  @override
+  String liveGameResultPrize(String prize) {
+    return 'Prize: $prize';
+  }
+
+  @override
+  String liveGamePlays(int count) {
+    return 'Plays: $count';
+  }
+
+  @override
+  String get liveGameUnsupported => 'This game type is not supported in this build.';
 }

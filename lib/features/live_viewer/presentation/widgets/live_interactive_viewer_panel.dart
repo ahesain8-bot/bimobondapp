@@ -27,6 +27,7 @@ abstract final class LiveInteractiveViewerToolsSheet {
     required LiveInteractiveBloc bloc,
     required VoidCallback onSendGift,
     required VoidCallback onShowActivity,
+    VoidCallback? onShowGames,
   }) {
     final state = bloc.state;
     final poll = state.activePoll;
@@ -77,6 +78,13 @@ abstract final class LiveInteractiveViewerToolsSheet {
           enabled: auctions.isNotEmpty,
           onTap: onShowActivity,
         ),
+        if (onShowGames != null)
+          AppActionTile(
+            icon: Icons.sports_esports_rounded,
+            title: 'Games',
+            subtitle: 'Play the quiz, wheel or lucky draw',
+            onTap: onShowGames,
+          ),
       ],
     );
   }
@@ -119,7 +127,9 @@ class LiveInteractiveViewerPanel extends StatelessWidget {
           ..showSnackBar(
             SnackBar(
               content: Text(
-                claim != null ? 'You won ${claim.coinsWon} coins' : state.error!,
+                claim != null
+                    ? 'You won ${claim.coinsWon} coins'
+                    : state.error!,
               ),
             ),
           );

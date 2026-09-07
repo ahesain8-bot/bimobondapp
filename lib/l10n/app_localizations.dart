@@ -10552,6 +10552,138 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Open post'**
   String get liveClipOpenPost;
+
+  /// No description provided for @liveGamesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Official games'**
+  String get liveGamesTitle;
+
+  /// No description provided for @liveGamesStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Start a game'**
+  String get liveGamesStart;
+
+  /// No description provided for @liveGamesActiveOne.
+  ///
+  /// In en, this message translates to:
+  /// **'A game is already running.'**
+  String get liveGamesActiveOne;
+
+  /// No description provided for @liveGamesNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No game right now.'**
+  String get liveGamesNone;
+
+  /// No description provided for @liveGameQuiz.
+  ///
+  /// In en, this message translates to:
+  /// **'Quiz'**
+  String get liveGameQuiz;
+
+  /// No description provided for @liveGameWheel.
+  ///
+  /// In en, this message translates to:
+  /// **'Prize wheel'**
+  String get liveGameWheel;
+
+  /// No description provided for @liveGameLuckyDraw.
+  ///
+  /// In en, this message translates to:
+  /// **'Lucky draw'**
+  String get liveGameLuckyDraw;
+
+  /// No description provided for @liveGameQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Question'**
+  String get liveGameQuestion;
+
+  /// No description provided for @liveGameOption.
+  ///
+  /// In en, this message translates to:
+  /// **'Option {index}'**
+  String liveGameOption(int index);
+
+  /// No description provided for @liveGameCorrectOption.
+  ///
+  /// In en, this message translates to:
+  /// **'Correct answer'**
+  String get liveGameCorrectOption;
+
+  /// No description provided for @liveGamePrize.
+  ///
+  /// In en, this message translates to:
+  /// **'Prize {index}'**
+  String liveGamePrize(int index);
+
+  /// No description provided for @liveGameAddOption.
+  ///
+  /// In en, this message translates to:
+  /// **'Add option'**
+  String get liveGameAddOption;
+
+  /// No description provided for @liveGameAddPrize.
+  ///
+  /// In en, this message translates to:
+  /// **'Add prize'**
+  String get liveGameAddPrize;
+
+  /// No description provided for @liveGameEnd.
+  ///
+  /// In en, this message translates to:
+  /// **'End game'**
+  String get liveGameEnd;
+
+  /// No description provided for @liveGamePlay.
+  ///
+  /// In en, this message translates to:
+  /// **'Play'**
+  String get liveGamePlay;
+
+  /// No description provided for @liveGamePlayed.
+  ///
+  /// In en, this message translates to:
+  /// **'You already played'**
+  String get liveGamePlayed;
+
+  /// No description provided for @liveGameAnswerHidden.
+  ///
+  /// In en, this message translates to:
+  /// **'The answer appears after the host ends the game.'**
+  String get liveGameAnswerHidden;
+
+  /// No description provided for @liveGameWaitingResult.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for the server result…'**
+  String get liveGameWaitingResult;
+
+  /// No description provided for @liveGameWinner.
+  ///
+  /// In en, this message translates to:
+  /// **'Winner: {name}'**
+  String liveGameWinner(String name);
+
+  /// No description provided for @liveGameResultPrize.
+  ///
+  /// In en, this message translates to:
+  /// **'Prize: {prize}'**
+  String liveGameResultPrize(String prize);
+
+  /// No description provided for @liveGamePlays.
+  ///
+  /// In en, this message translates to:
+  /// **'Plays: {count}'**
+  String liveGamePlays(int count);
+
+  /// No description provided for @liveGameUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'This game type is not supported in this build.'**
+  String get liveGameUnsupported;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

@@ -3,8 +3,10 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../../core/widgets/app_action_sheet.dart';
 import '../../../../../core/widgets/app_form_dialog.dart';
+import '../../bloc/live_games/live_games_bloc.dart';
 import '../../bloc/live_interactive/live_interactive_bloc.dart';
 import '../../bloc/live_interactive/live_interactive_event.dart';
+import 'live_games_sheet.dart';
 
 /// Everything the host can start mid-stream, behind one entry point.
 ///
@@ -67,7 +69,31 @@ abstract final class LiveInteractiveTools {
           enabled: !busy,
           onTap: () => _spawnTreasureBox(context, bloc),
         ),
+        AppActionTile(
+          icon: Icons.sports_esports_rounded,
+          title: 'Games',
+          subtitle: 'Quiz, prize wheel or lucky draw',
+          enabled: !busy,
+          onTap: () => showGamesSheet(context, isHost: true),
+        ),
       ],
+    );
+  }
+
+  /// Opens the official games sheet on the bloc that already runs in the room,
+  /// so the same single ACTIVE game is shown to whoever opens it.
+  static Future<void> showGamesSheet(
+    BuildContext context, {
+    required bool isHost,
+  }) {
+    final gamesBloc = context.read<LiveGamesBloc>();
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => BlocProvider<LiveGamesBloc>.value(
+        value: gamesBloc,
+        child: LiveGamesSheet(isHost: isHost),
+      ),
     );
   }
 }

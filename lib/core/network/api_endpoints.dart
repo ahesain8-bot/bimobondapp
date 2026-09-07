@@ -139,6 +139,16 @@ class ApiEndpoints {
   static String liveSummary(String id) => '/lives/$id/summary';
   static const String giftsSend = '/gifts/send';
 
+  // ── Official LIVE games (lives/live-p3-parity.md §3) ──
+  static const String liveGamesCatalog = '/lives/games/catalog';
+  static String liveGames(String liveId) => '/lives/$liveId/games';
+  static String liveGamesActive(String liveId) =>
+      '/lives/$liveId/games/active';
+  static String liveGamePlay(String liveId, String gameId) =>
+      '/lives/$liveId/games/$gameId/play';
+  static String liveGameEnd(String liveId, String gameId) =>
+      '/lives/$liveId/games/$gameId/end';
+
   // ── Fan Club (lives/mobile-api.md §20) ────────────────
   static String creatorsFanClub(String creatorId) =>
       '/creators/$creatorId/fan-club';

@@ -2583,5 +2583,62 @@
   "liveClipDescription": "Post description",
   "liveClipsTitle": "Clips",
   "liveClipsEmpty": "No clips yet.",
-  "liveClipOpenPost": "Open post"
+  "liveClipOpenPost": "Open post",
+  "liveGamesTitle": "Official games",
+  "liveGamesStart": "Start a game",
+  "liveGamesActiveOne": "A game is already running.",
+  "liveGamesNone": "No game right now.",
+  "liveGameQuiz": "Quiz",
+  "liveGameWheel": "Prize wheel",
+  "liveGameLuckyDraw": "Lucky draw",
+  "liveGameQuestion": "Question",
+  "liveGameOption": "Option {index}",
+  "@liveGameOption": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      }
+    }
+  },
+  "liveGameCorrectOption": "Correct answer",
+  "liveGamePrize": "Prize {index}",
+  "@liveGamePrize": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      }
+    }
+  },
+  "liveGameAddOption": "Add option",
+  "liveGameAddPrize": "Add prize",
+  "liveGameEnd": "End game",
+  "liveGamePlay": "Play",
+  "liveGamePlayed": "You already played",
+  "liveGameAnswerHidden": "The answer appears after the host ends the game.",
+  "liveGameWaitingResult": "Waiting for the server result…",
+  "liveGameWinner": "Winner: {name}",
+  "@liveGameWinner": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "liveGameResultPrize": "Prize: {prize}",
+  "@liveGameResultPrize": {
+    "placeholders": {
+      "prize": {
+        "type": "String"
+      }
+    }
+  },
+  "liveGamePlays": "Plays: {count}",
+  "@liveGamePlays": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "liveGameUnsupported": "This game type is not supported in this build."
 }

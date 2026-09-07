@@ -27,7 +27,11 @@ import '../../../live/data/datasources/lives_remote_datasource.dart';
 import '../../../live/data/datasources/lives_socket_datasource.dart';
 import '../../../live/data/repositories/live_session_repository_impl.dart';
 import '../../../live/domain/repositories/live_interactive_repository.dart';
+import '../../../live/data/datasources/live_games_remote_datasource.dart';
+import '../../../live/data/repositories/live_games_repository_impl.dart';
+import '../../../live/presentation/bloc/live_games/live_games_bloc.dart';
 import '../../../live/presentation/pages/live_replay_page.dart';
+import '../../../live/presentation/widgets/room/live_games_sheet.dart';
 import '../../../live/presentation/bloc/live_interactive/live_interactive_bloc.dart';
 import '../../../live/presentation/bloc/live_interactive/live_interactive_event.dart';
 import '../bloc/live_viewer/live_viewer_bloc.dart';
@@ -82,9 +86,16 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     socketEvents: di.sl<SocketService>().events,
   );
 
+  /// Official games share the viewer's existing room socket for `liveGame`.
+  late final LiveGamesBloc _gamesBloc = LiveGamesBloc(
+    repository: LiveGamesRepositoryImpl(remote: LiveGamesRemoteDataSource()),
+    socketEvents: di.sl<SocketService>().events,
+  );
+
   @override
   void dispose() {
     _interactiveBloc.close();
+    _gamesBloc.close();
     super.dispose();
   }
 
@@ -141,6 +152,23 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
         if (!mounted) return;
         setState(() => _showLiveFeatures = true);
       },
+      onShowGames: _openGames,
+    );
+  }
+
+  /// Opens the official games sheet. The active game is re-read on open, so a
+  /// viewer who joined mid-game sees the server's current state.
+  void _openGames() {
+    final liveId = widget.live.id;
+    if (liveId.isEmpty) return;
+    _gamesBloc.add(LiveGamesStarted(liveId));
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => BlocProvider<LiveGamesBloc>.value(
+        value: _gamesBloc,
+        child: const LiveGamesSheet(isHost: false),
+      ),
     );
   }
 

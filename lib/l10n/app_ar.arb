@@ -2492,5 +2492,62 @@
   "liveClipDescription": "وصف المنشور",
   "liveClipsTitle": "المقاطع",
   "liveClipsEmpty": "لا توجد مقاطع بعد.",
-  "liveClipOpenPost": "فتح المنشور"
+  "liveClipOpenPost": "فتح المنشور",
+  "liveGamesTitle": "الألعاب الرسمية",
+  "liveGamesStart": "بدء لعبة",
+  "liveGamesActiveOne": "توجد لعبة نشطة بالفعل.",
+  "liveGamesNone": "لا توجد لعبة الآن.",
+  "liveGameQuiz": "أسئلة سريعة",
+  "liveGameWheel": "عجلة الجوائز",
+  "liveGameLuckyDraw": "السحب المحظوظ",
+  "liveGameQuestion": "السؤال",
+  "liveGameOption": "خيار {index}",
+  "@liveGameOption": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      }
+    }
+  },
+  "liveGameCorrectOption": "الإجابة الصحيحة",
+  "liveGamePrize": "جائزة {index}",
+  "@liveGamePrize": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      }
+    }
+  },
+  "liveGameAddOption": "إضافة خيار",
+  "liveGameAddPrize": "إضافة جائزة",
+  "liveGameEnd": "إنهاء اللعبة",
+  "liveGamePlay": "شارك",
+  "liveGamePlayed": "شاركت بالفعل",
+  "liveGameAnswerHidden": "تظهر الإجابة بعد إنهاء المضيف للعبة.",
+  "liveGameWaitingResult": "بانتظار نتيجة السيرفر…",
+  "liveGameWinner": "الفائز: {name}",
+  "@liveGameWinner": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "liveGameResultPrize": "الجائزة: {prize}",
+  "@liveGameResultPrize": {
+    "placeholders": {
+      "prize": {
+        "type": "String"
+      }
+    }
+  },
+  "liveGamePlays": "عدد المشاركات: {count}",
+  "@liveGamePlays": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "liveGameUnsupported": "نوع لعبة غير مدعوم في هذا الإصدار."
 }

@@ -5494,4 +5494,80 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get liveClipOpenPost => 'فتح المنشور';
+
+  @override
+  String get liveGamesTitle => 'الألعاب الرسمية';
+
+  @override
+  String get liveGamesStart => 'بدء لعبة';
+
+  @override
+  String get liveGamesActiveOne => 'توجد لعبة نشطة بالفعل.';
+
+  @override
+  String get liveGamesNone => 'لا توجد لعبة الآن.';
+
+  @override
+  String get liveGameQuiz => 'أسئلة سريعة';
+
+  @override
+  String get liveGameWheel => 'عجلة الجوائز';
+
+  @override
+  String get liveGameLuckyDraw => 'السحب المحظوظ';
+
+  @override
+  String get liveGameQuestion => 'السؤال';
+
+  @override
+  String liveGameOption(int index) {
+    return 'خيار $index';
+  }
+
+  @override
+  String get liveGameCorrectOption => 'الإجابة الصحيحة';
+
+  @override
+  String liveGamePrize(int index) {
+    return 'جائزة $index';
+  }
+
+  @override
+  String get liveGameAddOption => 'إضافة خيار';
+
+  @override
+  String get liveGameAddPrize => 'إضافة جائزة';
+
+  @override
+  String get liveGameEnd => 'إنهاء اللعبة';
+
+  @override
+  String get liveGamePlay => 'شارك';
+
+  @override
+  String get liveGamePlayed => 'شاركت بالفعل';
+
+  @override
+  String get liveGameAnswerHidden => 'تظهر الإجابة بعد إنهاء المضيف للعبة.';
+
+  @override
+  String get liveGameWaitingResult => 'بانتظار نتيجة السيرفر…';
+
+  @override
+  String liveGameWinner(String name) {
+    return 'الفائز: $name';
+  }
+
+  @override
+  String liveGameResultPrize(String prize) {
+    return 'الجائزة: $prize';
+  }
+
+  @override
+  String liveGamePlays(int count) {
+    return 'عدد المشاركات: $count';
+  }
+
+  @override
+  String get liveGameUnsupported => 'نوع لعبة غير مدعوم في هذا الإصدار.';
 }

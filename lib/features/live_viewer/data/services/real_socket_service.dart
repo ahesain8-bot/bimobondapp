@@ -276,6 +276,8 @@ class RealSocketService implements SocketService {
       'liveTreasureBoxSpawned',
       'liveTreasureBoxClaimed',
       'liveAuction',
+      // Official games (lives/live-p3-parity.md §3).
+      'liveGame',
     ]) {
       _on(socket, eventName, (data) {
         final event = SocketMapper.interactiveEvent(data, eventName, _liveId);
