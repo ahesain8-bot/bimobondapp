@@ -28,6 +28,21 @@
 	<string>AIzaSyC4CoGuenT6EzeS__F-ibMR8o56dB4xVb8</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<!-- The deployed API currently serves this host over HTTP only. Keep the
+	     exception scoped to that host; do not disable ATS for all traffic. -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSExceptionDomains</key>
+		<dict>
+			<key>159.65.227.87</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+				<key>NSIncludesSubdomains</key>
+				<false/>
+			</dict>
+		</dict>
+	</dict>
 	<key>NSCameraUsageDescription</key>
 	<string>This app needs camera access to record posts, stories, and chat media.</string>
 	<key>NSContactsUsageDescription</key>

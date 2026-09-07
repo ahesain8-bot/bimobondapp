@@ -64,3 +64,11 @@
 - `flutter test --no-pub test/live_ticket_service_test.dart test/live_operation_guard_test.dart test/live_poll_treasure_test.dart`: 16 Passed.
 - `flutter test --no-pub --reporter expanded`: 297 Passed؛ exit 0.
 - `flutter analyze --no-pub` للملفات المعدلة في التذاكر وإعدادات المضيف والحقيبة: لا errors؛ ثلاث ملاحظات style سابقة في `shop_remote_data_source.dart`.
+
+## اختبار الأجهزة — 2026-09-07
+
+- Android فعلي (`LGN LX2`، Android 15): راقبت جلسة LIVE القائمة دون إرسال تعليق أو هدية أو إنهاء/بدء بث. الواجهة عرضت فيديو المضيف وأزرار التفاعل، وسجل الكاميرا تعافى بعد hot reload إلى تحليل يقارب 26.7fps وعرض يقارب 22.9fps، من دون crash أو exception للتطبيق.
+- iPhone 17 Pro وiPhone Air (محاكيا iOS 26.5): بني التطبيق وشغّل على كليهما. الخلاصة العامة داخل التطبيق أعادت 200 خلال 641ms و698ms على الترتيب، وظهرت بطاقة منشور كاملة على المقاسين.
+- عولجت ثلاثة عوائق ظهرت أثناء الاختبار: دعم ML Kit لمحاكي Apple Silicon، وصول iOS المحدود إلى خادم API الذي يعمل عبر HTTP، وتحذير محلل SVG لأيقونة المشاركة.
+- التحقق البرمجي النهائي بعد الإصلاح: `flutter test --no-pub --reporter expanded` — 297 Passed، exit 0؛ `plutil -lint ios/Runner/Info.plist` و`xmllint --noout assets/icons/share-arrow-svgrepo-com.svg` و`git diff --check` اجتازت.
+- لم أنفذ عمليات تغيّر حالة خادم الإنتاج أو تستهلك رصيدًا: شراء تذكرة/عملات، إرسال هدية، مطالبة كنز، مزاد/دفع، نشر قصاصة، أو بدء/إيقاف بث عام. هذه المسارات مغطاة باختبارات العقد والحماية، وتحتاج بيئة قبول وحسابات اختبار وأرصدة اختبار لتشغيلها يدويًا.
