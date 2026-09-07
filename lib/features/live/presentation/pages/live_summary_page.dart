@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../domain/repositories/live_interactive_repository.dart';
+import '../../domain/repositories/live_session_repository.dart';
 import '../bloc/live_summary/live_summary_bloc.dart';
+import 'live_replay_page.dart';
 
 /// Recap shown to the host once their live has ended.
 class LiveSummaryPage extends StatelessWidget {
@@ -11,10 +13,15 @@ class LiveSummaryPage extends StatelessWidget {
     super.key,
     required this.liveId,
     required this.repository,
+    this.sessionRepository,
   });
 
   final String liveId;
   final LiveInteractiveRepository repository;
+
+  /// Enables the replay and clips screen. Null in contexts that do not own a
+  /// session repository; the entry point is then simply not offered.
+  final LiveSessionRepository? sessionRepository;
 
   @override
   Widget build(BuildContext context) {
@@ -25,7 +32,25 @@ class LiveSummaryPage extends StatelessWidget {
           LiveSummaryBloc(repository: repository)
             ..add(LiveSummaryRequested(liveId)),
       child: Scaffold(
-        appBar: AppBar(title: Text(l.liveSummaryTitle)),
+        appBar: AppBar(
+          title: Text(l.liveSummaryTitle),
+          actions: [
+            if (sessionRepository != null)
+              IconButton(
+                tooltip: l.liveReplayTitle,
+                icon: const Icon(Icons.movie_creation_outlined),
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => LiveReplayPage(
+                      liveId: liveId,
+                      repository: sessionRepository!,
+                      isHost: true,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
         body: BlocBuilder<LiveSummaryBloc, LiveSummaryState>(
           builder: (context, state) {
             if (state.isLoading) {

@@ -13,6 +13,10 @@ class LiveStateOverlay extends StatelessWidget {
   final VoidCallback? onRetry;
   final VoidCallback? onLeave;
 
+  /// Opens the replay of a finished LIVE. Null when this build has no way to
+  /// reach it; the button is then not shown at all.
+  final VoidCallback? onWatchReplay;
+
   const LiveStateOverlay({
     super.key,
     required this.state,
@@ -20,6 +24,7 @@ class LiveStateOverlay extends StatelessWidget {
     this.reconnectAttempt = 0,
     this.onRetry,
     this.onLeave,
+    this.onWatchReplay,
   });
 
   @override
@@ -76,6 +81,10 @@ class LiveStateOverlay extends StatelessWidget {
             subtitle: message ?? 'The host ended this live',
             primaryLabel: 'Back to LIVE',
             onPrimary: onLeave,
+            // A replay only opens if this build can reach it; whether one
+            // exists is the server's answer on the replay screen itself.
+            secondaryLabel: onWatchReplay == null ? null : 'Watch replay',
+            onSecondary: onWatchReplay,
           ),
         );
       case LiveConnectionState.banned:

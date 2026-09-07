@@ -244,6 +244,7 @@ class _LiveRoomPageState extends State<LiveRoomPage>
                           builder: (_) => LiveSummaryPage(
                             liveId: liveId,
                             repository: _interactiveRepository!,
+                            sessionRepository: _sessionRepository,
                           ),
                         ),
                       );

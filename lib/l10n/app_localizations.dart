@@ -10444,6 +10444,114 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Save'**
   String get liveFanClubSave;
+
+  /// No description provided for @liveReplayRefresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh'**
+  String get liveReplayRefresh;
+
+  /// No description provided for @liveReplayViews.
+  ///
+  /// In en, this message translates to:
+  /// **'Views: {count}'**
+  String liveReplayViews(int count);
+
+  /// No description provided for @liveReplayExpires.
+  ///
+  /// In en, this message translates to:
+  /// **'Expires on {date}'**
+  String liveReplayExpires(String date);
+
+  /// No description provided for @liveReplayPreparing.
+  ///
+  /// In en, this message translates to:
+  /// **'The recording is still being prepared; the replay is not ready yet.'**
+  String get liveReplayPreparing;
+
+  /// No description provided for @liveReplayGone.
+  ///
+  /// In en, this message translates to:
+  /// **'This replay is no longer available.'**
+  String get liveReplayGone;
+
+  /// No description provided for @liveReplayPublish.
+  ///
+  /// In en, this message translates to:
+  /// **'Publish replay URL'**
+  String get liveReplayPublish;
+
+  /// No description provided for @liveReplayRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete replay'**
+  String get liveReplayRemove;
+
+  /// No description provided for @liveReplayUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'Replay file URL'**
+  String get liveReplayUrl;
+
+  /// No description provided for @liveClipSelect.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose the clip start and end'**
+  String get liveClipSelect;
+
+  /// No description provided for @liveClipRange.
+  ///
+  /// In en, this message translates to:
+  /// **'From {start} to {end} ({seconds} seconds)'**
+  String liveClipRange(String start, String end, int seconds);
+
+  /// No description provided for @liveClipPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview selection'**
+  String get liveClipPreview;
+
+  /// No description provided for @liveClipCreate.
+  ///
+  /// In en, this message translates to:
+  /// **'Create clip'**
+  String get liveClipCreate;
+
+  /// No description provided for @liveClipPublish.
+  ///
+  /// In en, this message translates to:
+  /// **'Publish clip'**
+  String get liveClipPublish;
+
+  /// No description provided for @liveClipTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Clip title'**
+  String get liveClipTitle;
+
+  /// No description provided for @liveClipDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Post description'**
+  String get liveClipDescription;
+
+  /// No description provided for @liveClipsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Clips'**
+  String get liveClipsTitle;
+
+  /// No description provided for @liveClipsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No clips yet.'**
+  String get liveClipsEmpty;
+
+  /// No description provided for @liveClipOpenPost.
+  ///
+  /// In en, this message translates to:
+  /// **'Open post'**
+  String get liveClipOpenPost;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

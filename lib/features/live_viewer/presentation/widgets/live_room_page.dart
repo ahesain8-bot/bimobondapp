@@ -3,6 +3,7 @@ import '../../domain/repositories/ranking_repository.dart';
 import 'dart:math' as math;
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:firebase_auth/firebase_auth.dart' as fb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -21,7 +22,12 @@ import '../../core/theme/app_colors.dart';
 import '../../domain/entities/live_entity.dart';
 import '../../domain/entities/live_session_entity.dart';
 import '../../domain/repositories/guest_repository.dart';
+import '../../../live/data/datasources/lives_media_datasource.dart';
+import '../../../live/data/datasources/lives_remote_datasource.dart';
+import '../../../live/data/datasources/lives_socket_datasource.dart';
+import '../../../live/data/repositories/live_session_repository_impl.dart';
 import '../../../live/domain/repositories/live_interactive_repository.dart';
+import '../../../live/presentation/pages/live_replay_page.dart';
 import '../../../live/presentation/bloc/live_interactive/live_interactive_bloc.dart';
 import '../../../live/presentation/bloc/live_interactive/live_interactive_event.dart';
 import '../bloc/live_viewer/live_viewer_bloc.dart';
@@ -184,6 +190,29 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     if (result == null || !mounted) return;
     bloc.add(
       LiveViewerReportRequested(reason: result.reason, details: result.details),
+    );
+  }
+
+  /// Opens the replay of a finished LIVE. The screen itself asks the server
+  /// whether a replay exists and whether this viewer may watch it; this only
+  /// provides the route. `GET /lives/:id/replay` counts a view, so it is not
+  /// called from here.
+  Future<void> _openReplay(String liveId) async {
+    if (liveId.isEmpty) return;
+    // Replay reads are plain REST; the socket datasource is only constructed
+    // because the repository owns one, and this screen never connects it.
+    final repository = LiveSessionRepositoryImpl(
+      remote: LivesRemoteDataSource(),
+      socket: LivesSocketDataSource(
+        idTokenProvider: () async =>
+            fb.FirebaseAuth.instance.currentUser?.getIdToken(),
+      ),
+      media: LivesMediaDataSource(),
+    );
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => LiveReplayPage(liveId: liveId, repository: repository),
+      ),
     );
   }
 
@@ -1445,6 +1474,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                           const LiveViewerRetryRequested(),
                         ),
                         onLeave: widget.onClose,
+                        onWatchReplay: () => _openReplay(live.id),
                       );
                     },
                   ),

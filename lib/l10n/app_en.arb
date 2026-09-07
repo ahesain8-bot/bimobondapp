@@ -2538,5 +2538,50 @@
   "liveFanClubEmoteCode": "Emote code",
   "liveFanClubEmoteImage": "Image URL",
   "liveFanClubEmoteMinTier": "Minimum tier",
-  "liveFanClubSave": "Save"
+  "liveFanClubSave": "Save",
+  "liveReplayRefresh": "Refresh",
+  "liveReplayViews": "Views: {count}",
+  "@liveReplayViews": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "liveReplayExpires": "Expires on {date}",
+  "@liveReplayExpires": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "liveReplayPreparing": "The recording is still being prepared; the replay is not ready yet.",
+  "liveReplayGone": "This replay is no longer available.",
+  "liveReplayPublish": "Publish replay URL",
+  "liveReplayRemove": "Delete replay",
+  "liveReplayUrl": "Replay file URL",
+  "liveClipSelect": "Choose the clip start and end",
+  "liveClipRange": "From {start} to {end} ({seconds} seconds)",
+  "@liveClipRange": {
+    "placeholders": {
+      "start": {
+        "type": "String"
+      },
+      "end": {
+        "type": "String"
+      },
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "liveClipPreview": "Preview selection",
+  "liveClipCreate": "Create clip",
+  "liveClipPublish": "Publish clip",
+  "liveClipTitle": "Clip title",
+  "liveClipDescription": "Post description",
+  "liveClipsTitle": "Clips",
+  "liveClipsEmpty": "No clips yet.",
+  "liveClipOpenPost": "Open post"
 }

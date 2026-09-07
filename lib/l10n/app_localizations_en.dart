@@ -5434,4 +5434,64 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get liveFanClubSave => 'Save';
+
+  @override
+  String get liveReplayRefresh => 'Refresh';
+
+  @override
+  String liveReplayViews(int count) {
+    return 'Views: $count';
+  }
+
+  @override
+  String liveReplayExpires(String date) {
+    return 'Expires on $date';
+  }
+
+  @override
+  String get liveReplayPreparing => 'The recording is still being prepared; the replay is not ready yet.';
+
+  @override
+  String get liveReplayGone => 'This replay is no longer available.';
+
+  @override
+  String get liveReplayPublish => 'Publish replay URL';
+
+  @override
+  String get liveReplayRemove => 'Delete replay';
+
+  @override
+  String get liveReplayUrl => 'Replay file URL';
+
+  @override
+  String get liveClipSelect => 'Choose the clip start and end';
+
+  @override
+  String liveClipRange(String start, String end, int seconds) {
+    return 'From $start to $end ($seconds seconds)';
+  }
+
+  @override
+  String get liveClipPreview => 'Preview selection';
+
+  @override
+  String get liveClipCreate => 'Create clip';
+
+  @override
+  String get liveClipPublish => 'Publish clip';
+
+  @override
+  String get liveClipTitle => 'Clip title';
+
+  @override
+  String get liveClipDescription => 'Post description';
+
+  @override
+  String get liveClipsTitle => 'Clips';
+
+  @override
+  String get liveClipsEmpty => 'No clips yet.';
+
+  @override
+  String get liveClipOpenPost => 'Open post';
 }

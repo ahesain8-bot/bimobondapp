@@ -2447,5 +2447,50 @@
   "liveFanClubEmoteCode": "رمز الملصق",
   "liveFanClubEmoteImage": "رابط الصورة",
   "liveFanClubEmoteMinTier": "أقل شريحة",
-  "liveFanClubSave": "حفظ"
+  "liveFanClubSave": "حفظ",
+  "liveReplayRefresh": "تحديث",
+  "liveReplayViews": "عدد المشاهدات: {count}",
+  "@liveReplayViews": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "liveReplayExpires": "تنتهي في {date}",
+  "@liveReplayExpires": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "liveReplayPreparing": "التسجيل قيد التجهيز، والإعادة غير جاهزة بعد.",
+  "liveReplayGone": "لم تعد الإعادة متاحة.",
+  "liveReplayPublish": "نشر رابط الإعادة",
+  "liveReplayRemove": "حذف الإعادة",
+  "liveReplayUrl": "رابط ملف الإعادة",
+  "liveClipSelect": "اختر بداية ونهاية المقطع",
+  "liveClipRange": "من {start} إلى {end} ({seconds} ثانية)",
+  "@liveClipRange": {
+    "placeholders": {
+      "start": {
+        "type": "String"
+      },
+      "end": {
+        "type": "String"
+      },
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "liveClipPreview": "معاينة الاختيار",
+  "liveClipCreate": "إنشاء مقطع",
+  "liveClipPublish": "نشر المقطع",
+  "liveClipTitle": "عنوان المقطع",
+  "liveClipDescription": "وصف المنشور",
+  "liveClipsTitle": "المقاطع",
+  "liveClipsEmpty": "لا توجد مقاطع بعد.",
+  "liveClipOpenPost": "فتح المنشور"
 }

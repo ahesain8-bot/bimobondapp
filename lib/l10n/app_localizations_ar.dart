@@ -5434,4 +5434,64 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get liveFanClubSave => 'حفظ';
+
+  @override
+  String get liveReplayRefresh => 'تحديث';
+
+  @override
+  String liveReplayViews(int count) {
+    return 'عدد المشاهدات: $count';
+  }
+
+  @override
+  String liveReplayExpires(String date) {
+    return 'تنتهي في $date';
+  }
+
+  @override
+  String get liveReplayPreparing => 'التسجيل قيد التجهيز، والإعادة غير جاهزة بعد.';
+
+  @override
+  String get liveReplayGone => 'لم تعد الإعادة متاحة.';
+
+  @override
+  String get liveReplayPublish => 'نشر رابط الإعادة';
+
+  @override
+  String get liveReplayRemove => 'حذف الإعادة';
+
+  @override
+  String get liveReplayUrl => 'رابط ملف الإعادة';
+
+  @override
+  String get liveClipSelect => 'اختر بداية ونهاية المقطع';
+
+  @override
+  String liveClipRange(String start, String end, int seconds) {
+    return 'من $start إلى $end ($seconds ثانية)';
+  }
+
+  @override
+  String get liveClipPreview => 'معاينة الاختيار';
+
+  @override
+  String get liveClipCreate => 'إنشاء مقطع';
+
+  @override
+  String get liveClipPublish => 'نشر المقطع';
+
+  @override
+  String get liveClipTitle => 'عنوان المقطع';
+
+  @override
+  String get liveClipDescription => 'وصف المنشور';
+
+  @override
+  String get liveClipsTitle => 'المقاطع';
+
+  @override
+  String get liveClipsEmpty => 'لا توجد مقاطع بعد.';
+
+  @override
+  String get liveClipOpenPost => 'فتح المنشور';
 }
