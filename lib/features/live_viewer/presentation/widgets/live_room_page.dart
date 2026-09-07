@@ -31,7 +31,7 @@ import 'floating_hearts.dart';
 import 'gift_goal_card.dart';
 import '../../data/services/fake_livekit_service.dart' show LiveKitService;
 import '../../data/services/fake_socket_service.dart' show SocketService;
-import '../../data/services/live_ticket_service.dart';
+import 'package:bimobondapp/l10n/app_localizations.dart';
 import '../di/live_viewer_injector.dart' as di;
 import 'guest_panel.dart';
 import 'live_interactive_viewer_panel.dart';
@@ -64,11 +64,6 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   bool _showComposer = false;
   bool _giftGoalDismissed = false;
   bool _showLiveFeatures = false;
-  _TicketGateState _ticketGateState = _TicketGateState.open;
-  LiveTicketAccess? _ticketAccess;
-  String? _ticketMessage;
-  int _ticketRequestGeneration = 0;
-  String? _activatedLiveId;
   final List<FloatingHeart> _tapHearts = [];
   late final LiveInteractiveBloc _interactiveBloc = LiveInteractiveBloc(
     repository: di.sl<LiveInteractiveRepository>(),
@@ -76,144 +71,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   );
 
   @override
-  void initState() {
-    super.initState();
-    _scheduleActivate();
-  }
-
-  @override
-  void didUpdateWidget(covariant LiveRoomPage oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.live.id != widget.live.id ||
-        oldWidget.live.ticketEnabled != widget.live.ticketEnabled ||
-        oldWidget.live.ticketPriceCoins != widget.live.ticketPriceCoins) {
-      _scheduleActivate();
-    } else if (widget.isActive && !oldWidget.isActive) {
-      _scheduleActivate();
-    }
-  }
-
-  @override
   void dispose() {
-    _deactivateIfThis();
     _interactiveBloc.close();
     super.dispose();
-  }
-
-  void _deactivateIfThis() {
-    final viewerBloc = context.read<LiveViewerBloc>();
-    if (viewerBloc.activeLiveId == widget.live.id) {
-      viewerBloc.add(const LiveViewerDeactivated());
-    }
-  }
-
-  void _scheduleActivate() {
-    // PageView keeps neighbouring TikTok-style pages mounted. An off-screen
-    // page must never replace the one LiveKit room owned by the visible page.
-    if (!widget.isActive) return;
-    final live = widget.live;
-    if (live.ticketEnabled) {
-      _checkTicketAccess(live);
-      return;
-    }
-    _ticketRequestGeneration++;
-    _ticketAccess = null;
-    _ticketMessage = null;
-    _ticketGateState = _TicketGateState.open;
-    _activateRoom(live);
-  }
-
-  void _activateRoom(LiveEntity live) {
-    if (!widget.isActive) return;
-    final viewerBloc = context.read<LiveViewerBloc>();
-    if (_activatedLiveId == live.id && viewerBloc.activeLiveId == live.id) {
-      return;
-    }
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !widget.isActive || widget.live.id != live.id) return;
-      final viewerBloc = context.read<LiveViewerBloc>();
-      if (_activatedLiveId == live.id && viewerBloc.activeLiveId == live.id) {
-        return;
-      }
-      _activatedLiveId = live.id;
-      viewerBloc.add(LiveViewerActivated(live));
-      _interactiveBloc.add(
-        LiveInteractiveStarted(live.id, giftGoal: live.giftGoal),
-      );
-    });
-  }
-
-  Future<void> _checkTicketAccess(LiveEntity live) async {
-    final request = ++_ticketRequestGeneration;
-    if (mounted) {
-      setState(() {
-        _ticketGateState = _TicketGateState.checking;
-        _ticketMessage = null;
-      });
-    }
-    try {
-      final access = await di.sl<LiveTicketService>().status(live.id);
-      if (!mounted ||
-          request != _ticketRequestGeneration ||
-          widget.live.id != live.id) {
-        return;
-      }
-      setState(() {
-        _ticketAccess = access;
-        _ticketGateState = access.hasTicket
-            ? _TicketGateState.open
-            : _TicketGateState.required;
-      });
-      if (access.hasTicket) {
-        _activateRoom(live);
-      }
-    } catch (_) {
-      if (!mounted ||
-          request != _ticketRequestGeneration ||
-          widget.live.id != live.id) {
-        return;
-      }
-      setState(() {
-        _ticketGateState = _TicketGateState.unavailable;
-        _ticketMessage =
-            'Could not verify ticket access. Refresh to try again.';
-      });
-    }
-  }
-
-  Future<void> _purchaseTicket() async {
-    final live = widget.live;
-    if (!live.ticketEnabled ||
-        _ticketGateState == _TicketGateState.purchasing) {
-      return;
-    }
-    setState(() {
-      _ticketGateState = _TicketGateState.purchasing;
-      _ticketMessage = null;
-    });
-    try {
-      final access = await di.sl<LiveTicketService>().purchase(live.id);
-      if (!mounted || widget.live.id != live.id) return;
-      setState(() {
-        _ticketAccess = access;
-        _ticketGateState = access.hasTicket
-            ? _TicketGateState.open
-            : _TicketGateState.unavailable;
-        _ticketMessage = access.hasTicket
-            ? null
-            : 'Payment needs server confirmation before entry.';
-      });
-      if (access.hasTicket) _activateRoom(live);
-    } catch (_) {
-      if (!mounted || widget.live.id != live.id) return;
-      // Do not send a second charge after an uncertain result. A read-only
-      // status request is the only reconciliation action offered here.
-      setState(() {
-        _ticketGateState = _TicketGateState.unavailable;
-        _ticketMessage =
-            'Payment is awaiting server confirmation. Refresh before trying again.';
-      });
-    }
   }
 
   void _spawnHearts(int count) {
@@ -422,6 +282,11 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
           previous.connectionState != LiveConnectionState.connected,
       listener: (context, state) {
         final live = state.live;
+        if (live != null) {
+          _interactiveBloc.add(
+            LiveInteractiveStarted(live.id, giftGoal: live.giftGoal),
+          );
+        }
         if (live != null &&
             live.metadata?.containsKey('giftGoalTarget') == true) {
           _interactiveBloc.add(
@@ -470,7 +335,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                 currLive.isFollowing,
                 currLive.metadata,
               );
-        return prev.connectionState != curr.connectionState ||
+        return prev.ticketGate != curr.ticketGate ||
+            prev.ticketPriceCoins != curr.ticketPriceCoins ||
+            prev.connectionState != curr.connectionState ||
             (prev.live?.id) != (curr.live?.id) ||
             prev.guests != curr.guests ||
             prev.isOnStage != curr.isOnStage ||
@@ -1390,19 +1257,20 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                   },
                 ),
               if (widget.isActive &&
-                  widget.live.ticketEnabled &&
-                  _ticketGateState != _TicketGateState.open)
+                  isThisRoom &&
+                  state.ticketGate != LiveTicketGateState.open)
                 Positioned.fill(
                   child: _LiveTicketGate(
-                    state: _ticketGateState,
-                    priceCoins:
-                        _ticketAccess?.priceCoins ??
-                        widget.live.ticketPriceCoins,
-                    message: _ticketMessage,
-                    onPurchase: _ticketGateState == _TicketGateState.required
-                        ? _purchaseTicket
+                    state: state.ticketGate,
+                    priceCoins: state.ticketPriceCoins,
+                    onPurchase: state.ticketGate == LiveTicketGateState.required
+                        ? () => context.read<LiveViewerBloc>().add(
+                            const LiveViewerTicketPurchaseRequested(),
+                          )
                         : null,
-                    onRefresh: () => _checkTicketAccess(widget.live),
+                    onRefresh: () => context.read<LiveViewerBloc>().add(
+                      const LiveViewerRetryRequested(),
+                    ),
                     onClose: widget.onClose,
                   ),
                 ),
@@ -1414,21 +1282,17 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   }
 }
 
-enum _TicketGateState { open, checking, required, purchasing, unavailable }
-
 class _LiveTicketGate extends StatelessWidget {
   const _LiveTicketGate({
     required this.state,
     required this.priceCoins,
-    required this.message,
     required this.onPurchase,
     required this.onRefresh,
     required this.onClose,
   });
 
-  final _TicketGateState state;
+  final LiveTicketGateState state;
   final int? priceCoins;
-  final String? message;
   final VoidCallback? onPurchase;
   final VoidCallback onRefresh;
   final VoidCallback? onClose;
@@ -1436,16 +1300,16 @@ class _LiveTicketGate extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final checking =
-        state == _TicketGateState.checking ||
-        state == _TicketGateState.purchasing;
-    final purchaseLabel = priceCoins == null
-        ? 'Buy ticket'
-        : 'Buy ticket for $priceCoins coins';
-    final detail =
-        message ??
-        (state == _TicketGateState.required
-            ? 'This LIVE requires a ticket before you can enter.'
-            : 'Checking ticket access…');
+        state == LiveTicketGateState.checking ||
+        state == LiveTicketGateState.purchasing;
+    final l10n = AppLocalizations.of(context)!;
+    final purchaseLabel = l10n.liveTicketBuy(priceCoins ?? 0);
+    final detail = switch (state) {
+      LiveTicketGateState.required => l10n.liveTicketRequiredDetail,
+      LiveTicketGateState.unavailable => l10n.liveTicketUnavailable,
+      LiveTicketGateState.paymentUnresolved => l10n.livePaymentUnresolved,
+      _ => l10n.liveTicketChecking,
+    };
     return Material(
       color: Colors.black.withValues(alpha: 0.94),
       child: SafeArea(
@@ -1463,8 +1327,8 @@ class _LiveTicketGate extends StatelessWidget {
                     size: 42,
                   ),
                   const SizedBox(height: 14),
-                  const Text(
-                    'Ticket required',
+                  Text(
+                    l10n.liveTicketTitle,
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: Colors.white,
@@ -1496,11 +1360,14 @@ class _LiveTicketGate extends StatelessWidget {
                       width: double.infinity,
                       child: OutlinedButton(
                         onPressed: onRefresh,
-                        child: const Text('Refresh ticket status'),
+                        child: Text(l10n.liveTicketRefresh),
                       ),
                     ),
                     if (onClose != null)
-                      TextButton(onPressed: onClose, child: const Text('Back')),
+                      TextButton(
+                        onPressed: onClose,
+                        child: Text(l10n.liveEntryBack),
+                      ),
                   ],
                 ],
               ),

@@ -114,16 +114,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get phoneLoginTitle => 'Phone Login';
 
   @override
-  String get phoneLoginSubtitle =>
-      'Enter your phone number to receive a verification code';
+  String get phoneLoginSubtitle => 'Enter your phone number to receive a verification code';
 
   @override
-  String get phoneLoginUsageNote =>
-      'Your phone number may be used to connect you to people you may know, improve ads, and more depending on your settings.';
+  String get phoneLoginUsageNote => 'Your phone number may be used to connect you to people you may know, improve ads, and more depending on your settings.';
 
   @override
-  String get emailLoginUsageNote =>
-      'Your email may be used to connect you to people you may know, improve ads, and more depending on your settings.';
+  String get emailLoginUsageNote => 'Your email may be used to connect you to people you may know, improve ads, and more depending on your settings.';
 
   @override
   String get phoneHint => '+20 123 456 7890';
@@ -158,35 +155,28 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get emailVerificationContinue =>
-      'Open your email and verify your account before continuing.';
+  String get emailVerificationContinue => 'Open your email and verify your account before continuing.';
 
   @override
   String get emailVerificationButton => 'I have verified my email';
 
   @override
-  String get emailVerificationResendError =>
-      'Unable to resend verification email. Please sign in again.';
+  String get emailVerificationResendError => 'Unable to resend verification email. Please sign in again.';
 
   @override
-  String get emailVerificationResendSuccess =>
-      'Verification email resent. Check your inbox and spam folder.';
+  String get emailVerificationResendSuccess => 'Verification email resent. Check your inbox and spam folder.';
 
   @override
-  String get emailVerificationResendFailed =>
-      'Failed to resend verification email. Please try again.';
+  String get emailVerificationResendFailed => 'Failed to resend verification email. Please try again.';
 
   @override
-  String get emailVerificationStatusError =>
-      'Unable to verify email status. Please sign in again.';
+  String get emailVerificationStatusError => 'Unable to verify email status. Please sign in again.';
 
   @override
-  String get emailVerificationNotVerified =>
-      'Email not verified yet. Please open your email and verify your account.';
+  String get emailVerificationNotVerified => 'Email not verified yet. Please open your email and verify your account.';
 
   @override
-  String get emailVerificationCheckFailed =>
-      'Could not check verification status. Please try again.';
+  String get emailVerificationCheckFailed => 'Could not check verification status. Please try again.';
 
   @override
   String get emailVerificationResendButton => 'Resend verification email';
@@ -248,23 +238,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get forgotPasswordTitle => 'Forgot Password';
 
   @override
-  String get forgotPasswordSubtitle =>
-      'Enter your email and we\'ll send a 6-digit code to reset your password.';
+  String get forgotPasswordSubtitle => 'Enter your email and we\'ll send a 6-digit code to reset your password.';
 
   @override
   String get forgotPasswordButton => 'Send Reset Code';
 
   @override
-  String get forgotPasswordSuccess =>
-      'If an account exists for that email, a reset code was sent.';
+  String get forgotPasswordSuccess => 'If an account exists for that email, a reset code was sent.';
 
   @override
-  String get forgotPasswordFailed =>
-      'Failed to send reset code. Please try again.';
+  String get forgotPasswordFailed => 'Failed to send reset code. Please try again.';
 
   @override
-  String get forgotPasswordUserNotFound =>
-      'No account found with this email address.';
+  String get forgotPasswordUserNotFound => 'No account found with this email address.';
 
   @override
   String get resetPasswordTitle => 'Reset Password';
@@ -276,8 +262,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get resetPasswordButton => 'Reset Password';
 
   @override
-  String get resetPasswordSuccess =>
-      'Password reset successfully. Please sign in.';
+  String get resetPasswordSuccess => 'Password reset successfully. Please sign in.';
 
   @override
   String get newPasswordLabel => 'New Password';
@@ -304,8 +289,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get googleLoginSheetTitle => 'Sign in with Google';
 
   @override
-  String get googleLoginSheetSubtitle =>
-      'Use your Google account to sign in quickly and securely.';
+  String get googleLoginSheetSubtitle => 'Use your Google account to sign in quickly and securely.';
 
   @override
   String get googleLoginContinue => 'Continue with Google';
@@ -335,8 +319,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get loginSuccess => 'Login successful!';
 
   @override
-  String get signupSuccess =>
-      'Signup successful! Please check your email to verify your account.';
+  String get signupSuccess => 'Signup successful! Please check your email to verify your account.';
 
   @override
   String get signUpWithEmailPassword => 'Sign up with Email and Password';
@@ -369,8 +352,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get passwordStrengthStrong => 'Strong';
 
   @override
-  String get passwordStrengthHint =>
-      'Your password must have 8 to 20 characters and include a mix of letters, numbers, and symbols.';
+  String get passwordStrengthHint => 'Your password must have 8 to 20 characters and include a mix of letters, numbers, and symbols.';
 
   @override
   String get passwordReqLength => '8 to 20 characters';
@@ -382,12 +364,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get passwordReqNumber => '1 number';
 
   @override
-  String get passwordReqSpecialChar =>
-      '1 special character (e.g. ! @ # \$ % & *)';
+  String get passwordReqSpecialChar => '1 special character (e.g. ! @ # \$ % & *)';
 
   @override
-  String get passwordRequirementsNotMet =>
-      'Password must meet all requirements';
+  String get passwordRequirementsNotMet => 'Password must meet all requirements';
 
   @override
   String get following => 'Following';
@@ -1176,8 +1156,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get auctionsFiltersTimeRemaining => 'Time remaining';
 
   @override
-  String get auctionsFiltersInvalidPriceRange =>
-      'Min price cannot be greater than max price';
+  String get auctionsFiltersInvalidPriceRange => 'Min price cannot be greater than max price';
 
   @override
   String get auctionsTimeRemainingAny => 'Any time';
@@ -1240,8 +1219,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get auctionCancelTitle => 'Cancel this auction?';
 
   @override
-  String get auctionCancelMessage =>
-      'Gift contributions may be refunded if escrow is enabled. This cannot be undone.';
+  String get auctionCancelMessage => 'Gift contributions may be refunded if escrow is enabled. This cannot be undone.';
 
   @override
   String get auctionCancelSuccess => 'Auction cancelled';
@@ -1250,16 +1228,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get auctionSellerRequiredTitle => 'Seller verification required';
 
   @override
-  String get auctionSellerRequiredMessage =>
-      'Complete seller verification before hosting auctions.';
+  String get auctionSellerRequiredMessage => 'Complete seller verification before hosting auctions.';
 
   @override
-  String get auctionSellerPendingMessage =>
-      'Your seller verification is still under review.';
+  String get auctionSellerPendingMessage => 'Your seller verification is still under review.';
 
   @override
-  String get auctionSellerRejectedMessage =>
-      'Your seller verification was rejected. Please resubmit.';
+  String get auctionSellerRejectedMessage => 'Your seller verification was rejected. Please resubmit.';
 
   @override
   String get auctionSellerCompleteAction => 'Complete verification';
@@ -1268,12 +1243,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sellerVerificationTitle => 'Seller verification';
 
   @override
-  String get sellerVerificationSubtitle =>
-      'Upload your passport and address details to host auctions.';
+  String get sellerVerificationSubtitle => 'Upload your passport and address details to host auctions.';
 
   @override
-  String get sellerVerificationSubtitleSimple =>
-      'Enter your ID number and upload a passport photo.';
+  String get sellerVerificationSubtitleSimple => 'Enter your ID number and upload a passport photo.';
 
   @override
   String get sellerVerificationIdentitySection => 'Identity';
@@ -1318,8 +1291,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sellerVerificationPassportPhoto => 'Passport photo';
 
   @override
-  String get sellerVerificationPassportBackOptional =>
-      'Passport back (optional)';
+  String get sellerVerificationPassportBackOptional => 'Passport back (optional)';
 
   @override
   String get sellerVerificationSelfieOptional => 'Selfie (optional)';
@@ -1331,8 +1303,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sellerVerificationAddressLine1 => 'Address line 1';
 
   @override
-  String get sellerVerificationAddressLine2Optional =>
-      'Address line 2 (optional)';
+  String get sellerVerificationAddressLine2Optional => 'Address line 2 (optional)';
 
   @override
   String get sellerVerificationCity => 'City';
@@ -1362,22 +1333,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sellerVerificationSubmit => 'Submit for review';
 
   @override
-  String get sellerVerificationSubmitted =>
-      'Verification submitted. We\'ll review it soon.';
+  String get sellerVerificationSubmitted => 'Verification submitted. We\'ll review it soon.';
 
   @override
   String get sellerVerificationDobRequired => 'Date of birth is required';
 
   @override
-  String get sellerVerificationExpiryRequired =>
-      'Passport expiry date is required';
+  String get sellerVerificationExpiryRequired => 'Passport expiry date is required';
 
   @override
   String get sellerVerificationExpiryFuture => 'Passport must not be expired';
 
   @override
-  String get sellerVerificationPassportFrontRequired =>
-      'Passport photo is required';
+  String get sellerVerificationPassportFrontRequired => 'Passport photo is required';
 
   @override
   String get auctionTimeLeft => 'Time left';
@@ -1410,8 +1378,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get auctionTargetReachedMessage =>
-      'Target price reached. Auction ended.';
+  String get auctionTargetReachedMessage => 'Target price reached. Auction ended.';
 
   @override
   String get auctionBiddingClosed => 'Bidding closed';
@@ -1589,12 +1556,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get liveGiftLoginRequired => 'Sign in to buy or send gifts';
 
   @override
-  String get liveGiftNoRecipient =>
-      'Open a live or auction post to send a gift';
+  String get liveGiftNoRecipient => 'Open a live or auction post to send a gift';
 
   @override
-  String get liveGiftCannotSendToSelf =>
-      'You cannot send a gift to your own auction';
+  String get liveGiftCannotSendToSelf => 'You cannot send a gift to your own auction';
 
   @override
   String get liveGiftCatalogEmpty => 'No gifts available';
@@ -1608,8 +1573,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get liveGiftLevelBanner =>
-      'Send a Gift to activate your gifter level and rewards';
+  String get liveGiftLevelBanner => 'Send a Gift to activate your gifter level and rewards';
 
   @override
   String get liveGiftPinHint => 'Pin Gifts you like to the top';
@@ -1650,26 +1614,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get firstRechargeRoseTitle => 'Get Rose x3 in your Backpack';
 
   @override
-  String get firstRechargeRoseBody =>
-      'Get 1 now and the rest after 24 hours, each available for 7 days';
+  String get firstRechargeRoseBody => 'Get 1 now and the rest after 24 hours, each available for 7 days';
 
   @override
   String get firstRechargeBonusTitle => 'Get bonus Coins';
 
   @override
-  String get firstRechargeBonusBody =>
-      'Use Coins on virtual items such as Gifts';
+  String get firstRechargeBonusBody => 'Use Coins on virtual items such as Gifts';
 
   @override
   String get firstRechargeGetCoins => 'Get Coins';
 
   @override
-  String get firstRechargeGetCoinsHint =>
-      'Recharge to get Gifts and bonus Coins.';
+  String get firstRechargeGetCoinsHint => 'Recharge to get Gifts and bonus Coins.';
 
   @override
-  String get firstRechargePolicy =>
-      'By continuing, you agree to the Virtual Items Policy. You will also lose the extra bonus if you withdraw from this purchase.';
+  String get firstRechargePolicy => 'By continuing, you agree to the Virtual Items Policy. You will also lose the extra bonus if you withdraw from this purchase.';
 
   @override
   String firstRechargeCta(String coins, String price) {
@@ -1839,8 +1799,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get loginRequired => 'Login Required';
 
   @override
-  String get loginRequiredMessage =>
-      'Please login to like, comment or save posts';
+  String get loginRequiredMessage => 'Please login to like, comment or save posts';
 
   @override
   String get cancel => 'Cancel';
@@ -1926,8 +1885,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get deleteCommentTitle => 'Delete comment?';
 
   @override
-  String get deleteCommentMessage =>
-      'This comment will be permanently removed.';
+  String get deleteCommentMessage => 'This comment will be permanently removed.';
 
   @override
   String get deleteAction => 'Delete';
@@ -1942,8 +1900,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get deletePostTitle => 'Delete post?';
 
   @override
-  String get deletePostMessage =>
-      'This post will be permanently removed. Only you can delete your own posts.';
+  String get deletePostMessage => 'This post will be permanently removed. Only you can delete your own posts.';
 
   @override
   String get postOptionShare => 'Share';
@@ -1955,8 +1912,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get postOptionNotInterested => 'Not interested';
 
   @override
-  String get feedInterestPromptQuestion =>
-      'Are you interested in this kind of content?';
+  String get feedInterestPromptQuestion => 'Are you interested in this kind of content?';
 
   @override
   String get feedInterestPromptYes => 'Yes';
@@ -1986,12 +1942,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get postReportTitle => 'Report post?';
 
   @override
-  String get postReportMessage =>
-      'Tell us if this post breaks our community guidelines.';
+  String get postReportMessage => 'Tell us if this post breaks our community guidelines.';
 
   @override
-  String get postReportSubmitted =>
-      'Thanks for reporting. We\'ll review this post.';
+  String get postReportSubmitted => 'Thanks for reporting. We\'ll review this post.';
 
   @override
   String get postReportReasonSpam => 'Spam';
@@ -2033,8 +1987,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get postDownloadFailed => 'Could not download media';
 
   @override
-  String get postShareAsGifUnavailable =>
-      'GIF share is only available for videos';
+  String get postShareAsGifUnavailable => 'GIF share is only available for videos';
 
   @override
   String get postShareSheetTitle => 'Share post';
@@ -2121,12 +2074,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get postQuickShareTitle => 'Recent friends';
 
   @override
-  String get postQuickShareSubtitle =>
-      'Select friends, tap again to cancel, then send';
+  String get postQuickShareSubtitle => 'Select friends, tap again to cancel, then send';
 
   @override
-  String get postAddToStoryHint =>
-      'Create your story — the post is ready to share';
+  String get postAddToStoryHint => 'Create your story — the post is ready to share';
 
   @override
   String get postCreateGroupHint => 'Pick contacts to start a group chat';
@@ -2171,8 +2122,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get privacyPrivateAccount => 'Private account';
 
   @override
-  String get privacyPrivateAccountSubtitle =>
-      'Only approved followers can see your posts and stories.';
+  String get privacyPrivateAccountSubtitle => 'Only approved followers can see your posts and stories.';
 
   @override
   String get privacyWhoCanMessage => 'Who can message you';
@@ -2193,8 +2143,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get privacyAllowComments => 'Allow comments';
 
   @override
-  String get privacyAllowCommentsSubtitle =>
-      'People can comment on your posts.';
+  String get privacyAllowCommentsSubtitle => 'People can comment on your posts.';
 
   @override
   String get privacyUpdated => 'Privacy settings updated';
@@ -2257,8 +2206,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsLogoutTitle => 'Log out?';
 
   @override
-  String get settingsLogoutMessage =>
-      'You will need to sign in again to use your account.';
+  String get settingsLogoutMessage => 'You will need to sign in again to use your account.';
 
   @override
   String get settingsComingSoon => 'Coming soon';
@@ -2305,8 +2253,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatWallpaperTitle => 'Chat wallpaper';
 
   @override
-  String get chatWallpaperSubtitle =>
-      'Choose a background pattern for your chats. Colors follow your app theme.';
+  String get chatWallpaperSubtitle => 'Choose a background pattern for your chats. Colors follow your app theme.';
 
   @override
   String get chatWallpaperPlus => 'Plus';
@@ -2321,8 +2268,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatWallpaperChooseFromPhotos => 'Choose from Photos';
 
   @override
-  String get chatWallpaperUploadDeviceSubtitle =>
-      'Upload personal photo from device';
+  String get chatWallpaperUploadDeviceSubtitle => 'Upload personal photo from device';
 
   @override
   String get chatWallpaperDefault => 'Default (No Wallpaper)';
@@ -2372,8 +2318,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get unblock => 'Unblock';
 
   @override
-  String get chatYouBlockedUser =>
-      'You blocked this user. Unblock to send a message.';
+  String get chatYouBlockedUser => 'You blocked this user. Unblock to send a message.';
 
   @override
   String get userNotFound => 'User not found';
@@ -2414,15 +2359,13 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get chatSettingsBlockMessage =>
-      'They won\'t be able to message you or view your profile.';
+  String get chatSettingsBlockMessage => 'They won\'t be able to message you or view your profile.';
 
   @override
   String get chatSettingsDeleteTitle => 'Delete chat history?';
 
   @override
-  String get chatSettingsDeleteMessage =>
-      'This will remove the chat history for you. This action cannot be undone.';
+  String get chatSettingsDeleteMessage => 'This will remove the chat history for you. This action cannot be undone.';
 
   @override
   String get messagesTitle => 'Messages';
@@ -2500,8 +2443,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get activityAllCaughtUp => 'You\'re all caught up';
 
   @override
-  String get activityClearNotificationsMessage =>
-      'Remove all read notifications from your activity feed?';
+  String get activityClearNotificationsMessage => 'Remove all read notifications from your activity feed?';
 
   @override
   String get activityOpenCommentsSubtitle => 'See comments on your posts';
@@ -2658,8 +2600,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatDeleteMessageTitle => 'Delete message?';
 
   @override
-  String get chatDeleteMessageMessage =>
-      'This message will be hidden for everyone in the chat.';
+  String get chatDeleteMessageMessage => 'This message will be hidden for everyone in the chat.';
 
   @override
   String get chatActiveNow => 'Active now';
@@ -2674,15 +2615,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatSlideUpToCancel => 'Slide up to cancel';
 
   @override
-  String get chatRecordingPermissionDenied =>
-      'Allow microphone access to record voice messages.';
+  String get chatRecordingPermissionDenied => 'Allow microphone access to record voice messages.';
 
   @override
   String get chatRecordingPermissionTitle => 'Microphone access';
 
   @override
-  String get chatRecordingPermissionSettingsMessage =>
-      'Voice messages need the microphone. Open Settings, tap Permissions, and allow Microphone for Bimo Bond.';
+  String get chatRecordingPermissionSettingsMessage => 'Voice messages need the microphone. Open Settings, tap Permissions, and allow Microphone for Bimo Bond.';
 
   @override
   String get chatRecordingOpenSettings => 'Open Settings';
@@ -2691,8 +2630,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatRecordingAllowMicrophone => 'Allow';
 
   @override
-  String get chatRecordingPluginUnavailable =>
-      'Voice recording is not ready. Stop the app completely, then run it again (not hot reload).';
+  String get chatRecordingPluginUnavailable => 'Voice recording is not ready. Stop the app completely, then run it again (not hot reload).';
 
   @override
   String get chatVoiceTooShort => 'Hold longer to record a voice message.';
@@ -2701,16 +2639,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatVoicePlaybackFailed => 'Could not play this voice message.';
 
   @override
-  String get chatAttachmentSendFailed =>
-      'Could not send attachment. Please try again.';
+  String get chatAttachmentSendFailed => 'Could not send attachment. Please try again.';
 
   @override
-  String get chatLocationPermissionDenied =>
-      'Location permission is required to share your position.';
+  String get chatLocationPermissionDenied => 'Location permission is required to share your position.';
 
   @override
-  String get chatContactsPermissionDenied =>
-      'Contacts permission is required to share a contact.';
+  String get chatContactsPermissionDenied => 'Contacts permission is required to share a contact.';
 
   @override
   String get chatFeatureComingSoon => 'Coming soon.';
@@ -2737,8 +2672,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatSeedFinalPrice => 'Can I know the final price?';
 
   @override
-  String get chatSeedAutoReply =>
-      'Thanks for reaching out! We will get back to you soon with more details.';
+  String get chatSeedAutoReply => 'Thanks for reaching out! We will get back to you soon with more details.';
 
   @override
   String get chatUserBio => 'Interested in real estate and design.';
@@ -2774,8 +2708,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatGiftSheetSubtitle => 'Choose a gift from your inventory';
 
   @override
-  String get chatGiftInventoryEmpty =>
-      'You don\'t own any gifts yet. Buy gifts in your wallet first.';
+  String get chatGiftInventoryEmpty => 'You don\'t own any gifts yet. Buy gifts in your wallet first.';
 
   @override
   String get chatGiftSentLabel => 'Gift sent';
@@ -2873,8 +2806,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get auctionEndBeforeStart => 'End date must be after start date';
 
   @override
-  String get auctionTargetBelowStart =>
-      'Target price must be greater than starting price';
+  String get auctionTargetBelowStart => 'Target price must be greater than starting price';
 
   @override
   String get auctionInvalidPrice => 'Enter a valid price';
@@ -2910,12 +2842,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get notificationsEmpty => 'No notifications yet';
 
   @override
-  String get notificationsEmptySubtitle =>
-      'When someone interacts with you, you\'ll see it here.';
+  String get notificationsEmptySubtitle => 'When someone interacts with you, you\'ll see it here.';
 
   @override
-  String get notificationsEmptyUnread =>
-      'You\'re all caught up — no unread notifications.';
+  String get notificationsEmptyUnread => 'You\'re all caught up — no unread notifications.';
 
   @override
   String get notificationsEmptyRead => 'No read notifications yet.';
@@ -3123,8 +3053,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get notificationBodyAuctionUpdate =>
-      'An auction you follow was updated';
+  String get notificationBodyAuctionUpdate => 'An auction you follow was updated';
 
   @override
   String get notificationBodyAuctionWon => 'You won an auction';
@@ -3242,15 +3171,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get coinsMarketSuccess => 'Gift added to your vault!';
 
   @override
-  String get coinsVaultEmpty =>
-      'No gifts in your vault yet. Visit the market to buy gifts with coins.';
+  String get coinsVaultEmpty => 'No gifts in your vault yet. Visit the market to buy gifts with coins.';
 
   @override
   String get coinsVaultOwned => 'In vault';
 
   @override
-  String get coinsInsufficientBalance =>
-      'Not enough coins. Buy more in the Buy tab.';
+  String get coinsInsufficientBalance => 'Not enough coins. Buy more in the Buy tab.';
 
   @override
   String get walletAccountingPurchase => 'Bought coins';
@@ -3294,8 +3221,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get balanceViewFullSchedule => 'View full schedule >';
 
   @override
-  String get balanceSetupPaymentsBanner =>
-      'To receive payouts from Creator Rewards Program, set up payments.';
+  String get balanceSetupPaymentsBanner => 'To receive payouts from Creator Rewards Program, set up payments.';
 
   @override
   String get balanceSetup => 'Set up';
@@ -3318,8 +3244,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get balanceFirstCoinOfferTitle => 'First Coin purchase offer';
 
   @override
-  String get balanceFirstCoinOfferSubtitle =>
-      'Get bonus Coins and a 99% off animated Gift from your first purchase';
+  String get balanceFirstCoinOfferSubtitle => 'Get bonus Coins and a 99% off animated Gift from your first purchase';
 
   @override
   String get balanceGetNow => 'Get now →';
@@ -3370,8 +3295,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get balanceSetupPaymentsTitle => 'Set up payments';
 
   @override
-  String get balanceSetupPaymentsMessage =>
-      'Ensure your information is accurate to receive payouts on time. You can change this at any time.';
+  String get balanceSetupPaymentsMessage => 'Ensure your information is accurate to receive payouts on time. You can change this at any time.';
 
   @override
   String get balancePayoutMethodTitle => 'Payout method';
@@ -3398,8 +3322,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get balanceCountryRegion => 'Country / region';
 
   @override
-  String get balanceCountryRegionNote =>
-      'You can only register for one country or region. Make sure your selection is correct.';
+  String get balanceCountryRegionNote => 'You can only register for one country or region. Make sure your selection is correct.';
 
   @override
   String get balanceChoosePayoutMethod => 'Choose payout method';
@@ -3408,22 +3331,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get balancePayoutZaloPay => 'ZaloPay (VND)';
 
   @override
-  String get balancePayoutZaloPayDetails =>
-      'Service fee 1.5% | Min. withdrawal 2 USD | Arrives in 1 business day';
+  String get balancePayoutZaloPayDetails => 'Service fee 1.5% | Min. withdrawal 2 USD | Arrives in 1 business day';
 
   @override
   String get balancePayoutBank => 'Bank transfer (VND)';
 
   @override
-  String get balancePayoutBankDetails =>
-      'Service fee 2.9 USD | Min. withdrawal 8 USD | Arrives in 3-5 business days';
+  String get balancePayoutBankDetails => 'Service fee 2.9 USD | Min. withdrawal 8 USD | Arrives in 3-5 business days';
 
   @override
   String get balancePayoutPayPal => 'PayPal (USD)';
 
   @override
-  String get balancePayoutPayPalDetails =>
-      'Service fee 1.5% + 0.1 USD | Min. withdrawal 1 USD | Arrives in 1 business day';
+  String get balancePayoutPayPalDetails => 'Service fee 1.5% + 0.1 USD | Min. withdrawal 1 USD | Arrives in 1 business day';
 
   @override
   String get balanceTransactionHistory => 'Transaction history';
@@ -3486,8 +3406,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get deleteChatTitle => 'Delete chat';
 
   @override
-  String get deleteChatMessage =>
-      'Are you sure you want to delete this conversation? This action cannot be undone.';
+  String get deleteChatMessage => 'Are you sure you want to delete this conversation? This action cannot be undone.';
 
   @override
   String get deleteChatConfirm => 'Delete';
@@ -3547,8 +3466,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cameraMusicComingSoon => 'Music selection is coming soon.';
 
   @override
-  String get cameraPermissionDenied =>
-      'Camera and microphone permissions are required to record.';
+  String get cameraPermissionDenied => 'Camera and microphone permissions are required to record.';
 
   @override
   String get cameraStarting => 'Starting camera...';
@@ -3885,12 +3803,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get promoteGeoTarget => 'Target people nearby';
 
   @override
-  String get promoteGeoTargetHint =>
-      'Use your current location for local reach';
+  String get promoteGeoTargetHint => 'Use your current location for local reach';
 
   @override
-  String get promoteGeoMapHint =>
-      'Tap the map to choose your target area. Default is your location.';
+  String get promoteGeoMapHint => 'Tap the map to choose your target area. Default is your location.';
 
   @override
   String get promoteGeoUseMyLocation => 'Use my location';
@@ -3976,19 +3892,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get promoteStepGoalHeading => 'What is your goal?';
 
   @override
-  String get promoteStepGoalSubtitle =>
-      'Choose a goal for promoting this video.';
+  String get promoteStepGoalSubtitle => 'Choose a goal for promoting this video.';
 
   @override
-  String get promoteStepAudienceSubtitle =>
-      'Select how you want to reach your audience for your promotion.';
+  String get promoteStepAudienceSubtitle => 'Select how you want to reach your audience for your promotion.';
 
   @override
   String get promoteAudienceDefault => 'Default audience';
 
   @override
-  String get promoteAudienceDefaultHint =>
-      'We\'ll choose the best audience for you';
+  String get promoteAudienceDefaultHint => 'We\'ll choose the best audience for you';
 
   @override
   String get promoteAudienceCreateOwn => 'Create your own';
@@ -3997,12 +3910,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get promoteStepLocationHeading => 'Choose your target area';
 
   @override
-  String get promoteStepLocationSubtitle =>
-      'Detect your location and set a radius to reach people nearby.';
+  String get promoteStepLocationSubtitle => 'Detect your location and set a radius to reach people nearby.';
 
   @override
-  String get promoteStepBudgetSubtitle =>
-      'Choose a promotion package for your campaign.';
+  String get promoteStepBudgetSubtitle => 'Choose a promotion package for your campaign.';
 
   @override
   String promoteBudgetTotal(String price) {
@@ -4047,15 +3958,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get promoteLocationModeRegional => 'Regionally';
 
   @override
-  String get promoteLocationModeRegionalHint =>
-      'Choose country, region, and town';
+  String get promoteLocationModeRegionalHint => 'Choose country, region, and town';
 
   @override
   String get promoteLocationModeMap => 'On map';
 
   @override
-  String get promoteLocationModeMapHint =>
-      'Detect GPS and pick a radius on the map';
+  String get promoteLocationModeMapHint => 'Detect GPS and pick a radius on the map';
 
   @override
   String get promoteSelectCountry => 'Country';
@@ -4076,11 +3985,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get promoteSelectTownHint => 'Select town';
 
   @override
-  String promoteLocationRegionalSummary(
-    String town,
-    String region,
-    String country,
-  ) {
+  String promoteLocationRegionalSummary(String town, String region, String country) {
     return '$town · $region · $country';
   }
 
@@ -4094,12 +3999,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get promoteLocationTownRequired => 'Please select a town.';
 
   @override
-  String get promoteLocationTownCoordinatesRequired =>
-      'This town has no coordinates. Please choose another town.';
+  String get promoteLocationTownCoordinatesRequired => 'This town has no coordinates. Please choose another town.';
 
   @override
-  String get promoteLocationMapRequired =>
-      'Please allow location or pick a point on the map.';
+  String get promoteLocationMapRequired => 'Please allow location or pick a point on the map.';
 
   @override
   String get promoteOverviewSubtotal => 'Subtotal';
@@ -4131,8 +4034,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get promoteInsightsEmptyTitle => 'No promoted posts yet';
 
   @override
-  String get promoteInsightsEmptyHint =>
-      'Promote a video from your feed to see performance here.';
+  String get promoteInsightsEmptyHint => 'Promote a video from your feed to see performance here.';
 
   @override
   String get promoteInsightsPerformanceTitle => 'Performance';
@@ -4186,8 +4088,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get promoteInsightsCampaignHistory => 'Campaign history';
 
   @override
-  String get promoteInsightsCampaignHistoryHint =>
-      'Tap a campaign to filter stats';
+  String get promoteInsightsCampaignHistoryHint => 'Tap a campaign to filter stats';
 
   @override
   String get promoteInsightsAllCampaigns => 'All campaigns';
@@ -4370,8 +4271,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get interestSelectionTitle => 'Choose your interests';
 
   @override
-  String get interestSelectionSubtitle =>
-      'Pick a few categories so we can personalize your experience.';
+  String get interestSelectionSubtitle => 'Pick a few categories so we can personalize your experience.';
 
   @override
   String get interestSelectionSkip => 'Skip';
@@ -4390,8 +4290,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get interestSelectionNotInterestedHint =>
-      'Tap again to mark as not interested (optional).';
+  String get interestSelectionNotInterestedHint => 'Tap again to mark as not interested (optional).';
 
   @override
   String get interestSelectionNotInterestedLegend => 'Not interested';
@@ -4544,8 +4443,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get addCloseFriendsTitle => 'Add Close Friends';
 
   @override
-  String get addCloseFriendsSubtitle =>
-      'Choose friends to add to your close friends list';
+  String get addCloseFriendsSubtitle => 'Choose friends to add to your close friends list';
 
   @override
   String get searchCloseFriendsHint => 'Search close friends...';
@@ -4659,8 +4557,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get marketplaceHeroTitle => 'Buy. Own. Resell.';
 
   @override
-  String get marketplaceHeroSubtitle =>
-      'Purchase products and resell eligible purchases through Bimo-Bond auctions.';
+  String get marketplaceHeroSubtitle => 'Purchase products and resell eligible purchases through Bimo-Bond auctions.';
 
   @override
   String get marketplaceExploreCta => 'Explore Marketplace';
@@ -4920,8 +4817,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get templateEditorServerPreview => 'Server preview';
 
   @override
-  String get templateEditorContinueWithRender =>
-      'Tap → to continue with this render';
+  String get templateEditorContinueWithRender => 'Tap → to continue with this render';
 
   @override
   String get templateEditorTypeBelow => 'Type below…';
@@ -4933,8 +4829,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get templateEditorDragPinchResize => 'Drag to move · Pinch to resize';
 
   @override
-  String get templateEditorTapMediaToPlace =>
-      'Tap media to place · Drag to move';
+  String get templateEditorTapMediaToPlace => 'Tap media to place · Drag to move';
 
   @override
   String get templateEditorPickStickerBelow => 'Pick a sticker below';
@@ -4943,8 +4838,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get templateEditorTapStickerBelow => 'Tap a sticker below';
 
   @override
-  String get templateEditorDragResizeSticker =>
-      'Drag to move · Pinch or ± to resize';
+  String get templateEditorDragResizeSticker => 'Drag to move · Pinch or ± to resize';
 
   @override
   String templateEditorMaxFiltersPerClip(int count) {
@@ -4957,12 +4851,10 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get templateEditorTransitionsNeedClips =>
-      'Transitions need at least 2 clips';
+  String get templateEditorTransitionsNeedClips => 'Transitions need at least 2 clips';
 
   @override
-  String get templateEditorAddMediaAllSlots =>
-      'Add media to all slots before rendering.';
+  String get templateEditorAddMediaAllSlots => 'Add media to all slots before rendering.';
 
   @override
   String get templateEditorCouldNotRender => 'Could not render on server';
@@ -5091,16 +4983,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get lpMine => 'My LIVE promotions';
 
   @override
-  String get lpPreLive =>
-      'Start your public LIVE first, then open Share → Promote. This camera preview has no saved LIVE to promote.';
+  String get lpPreLive => 'Start your public LIVE first, then open Share → Promote. This camera preview has no saved LIVE to promote.';
 
   @override
-  String get lpUnavailable =>
-      'LIVE promotions are temporarily unavailable. Please try again later.';
+  String get lpUnavailable => 'LIVE promotions are temporarily unavailable. Please try again later.';
 
   @override
-  String get lpEligibility =>
-      'Only the host of a public planned or active LIVE can promote it, using an account that is neither private nor banned. Eligibility must be confirmed.';
+  String get lpEligibility => 'Only the host of a public planned or active LIVE can promote it, using an account that is neither private nor banned. Eligibility must be confirmed.';
 
   @override
   String get lpDisabled => 'LIVE promotions are currently disabled.';
@@ -5124,8 +5013,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get lpCustomAudience => 'Custom audience';
 
   @override
-  String get lpAutomaticHint =>
-      'Let the service select people likely to watch your LIVE.';
+  String get lpAutomaticHint => 'Let the service select people likely to watch your LIVE.';
 
   @override
   String get lpGenders => 'Genders';
@@ -5146,8 +5034,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get lpCategories => 'Interests';
 
   @override
-  String get lpOptionsUnavailable =>
-      'Audience options are unavailable. Retry to load them.';
+  String get lpOptionsUnavailable => 'Audience options are unavailable. Retry to load them.';
 
   @override
   String get lpGeo => 'Geographic targeting (optional)';
@@ -5177,8 +5064,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get lpPackage => 'Package';
 
   @override
-  String get lpPackagesUnavailable =>
-      'Packages are unavailable. You can prepare a custom budget.';
+  String get lpPackagesUnavailable => 'Packages are unavailable. You can prepare a custom budget.';
 
   @override
   String get lpCoins => 'Coins';
@@ -5190,8 +5076,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get lpEstimates => 'Estimated results';
 
   @override
-  String get lpEstimateHint =>
-      'Estimates are not guaranteed. Actual delivery depends on your LIVE and audience.';
+  String get lpEstimateHint => 'Estimates are not guaranteed. Actual delivery depends on your LIVE and audience.';
 
   @override
   String get lpNoEstimates => 'Estimates are unavailable.';
@@ -5200,8 +5085,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get lpCreate => 'Create campaign';
 
   @override
-  String get lpCreateHint =>
-      'Creating a campaign does not pay for it. You will review and confirm payment separately.';
+  String get lpCreateHint => 'Creating a campaign does not pay for it. You will review and confirm payment separately.';
 
   @override
   String get lpSave => 'Save changes';
@@ -5234,8 +5118,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get lpCancel => 'Cancel campaign';
 
   @override
-  String get lpCancelHint =>
-      'Cancel this campaign? The server refunds unused prepaid coins. The updated balance may take a moment to appear.';
+  String get lpCancelHint => 'Cancel this campaign? The server refunds unused prepaid coins. The updated balance may take a moment to appear.';
 
   @override
   String get lpBack => 'Back';
@@ -5283,23 +5166,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get lpRemaining => 'Coins remaining';
 
   @override
-  String get lpPaymentUnknown =>
-      'Payment is being verified. Refresh campaign and balance before taking further action. Do not pay again while the outcome is unknown.';
+  String get lpPaymentUnknown => 'Payment is being verified. Refresh campaign and balance before taking further action. Do not pay again while the outcome is unknown.';
 
   @override
-  String get lpCleanup =>
-      'LIVE has ended. Campaign status and any unused balance refund are being updated.';
+  String get lpCleanup => 'LIVE has ended. Campaign status and any unused balance refund are being updated.';
 
   @override
-  String get lpInsufficient =>
-      'Your coin balance is insufficient. Top up, then refresh before confirming payment.';
+  String get lpInsufficient => 'Your coin balance is insufficient. Top up, then refresh before confirming payment.';
 
   @override
   String get lpTopUp => 'Top up coins';
 
   @override
-  String get lpValidation =>
-      'Check the budget mode, minimum 5 coins, duration (1, 3, 7 or 14 days), age order, and complete valid geographic coordinates with a positive radius.';
+  String get lpValidation => 'Check the budget mode, minimum 5 coins, duration (1, 3, 7 or 14 days), age order, and complete valid geographic coordinates with a positive radius.';
 
   @override
   String get lpInteger => 'Enter a whole number.';
@@ -5368,8 +5247,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get liveGiftGoalLabel => 'Gift goal';
 
   @override
-  String get liveFanClubPriceUnavailable =>
-      'Subscription prices are not verified yet. Joining is unavailable.';
+  String get liveFanClubPriceUnavailable => 'Subscription prices are not verified yet. Joining is unavailable.';
 
   @override
   String get liveDiscoveryForYou => 'For You';
@@ -5393,8 +5271,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get liveDiscoveryCategory => 'Category ID';
 
   @override
-  String get liveLocationUnavailable =>
-      'Enable location services and allow location access to see nearby LIVE streams.';
+  String get liveLocationUnavailable => 'Enable location services and allow location access to see nearby LIVE streams.';
 
   @override
   String get liveGalleryReorder => 'Drag to reorder';
@@ -5415,8 +5292,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get liveReplayStatus => 'Replay status';
 
   @override
-  String get liveReplayUnavailable =>
-      'Playback needs a verified response from the replay service.';
+  String get liveReplayUnavailable => 'Playback needs a verified response from the replay service.';
 
   @override
   String get liveCouponCode => 'Coupon code';
@@ -5450,4 +5326,42 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get liveTicketPrice => 'Ticket price (coins)';
+
+  @override
+  String liveTicketBuy(int coins) {
+    return 'Buy ticket for $coins coins';
+  }
+
+  @override
+  String get liveTicketRequiredDetail => 'This LIVE requires a ticket before entry.';
+
+  @override
+  String get liveTicketUnavailable => 'Could not check entry access. Please refresh.';
+
+  @override
+  String get livePaymentUnresolved => 'Your payment is awaiting confirmation. Check its status before paying again.';
+
+  @override
+  String get liveTicketChecking => 'Checking entry access…';
+
+  @override
+  String get liveTicketTitle => 'LIVE entry';
+
+  @override
+  String get liveTicketRefresh => 'Check ticket status';
+
+  @override
+  String get liveEntryBack => 'Back';
+
+  @override
+  String get shopCouponLabel => 'LIVE coupon';
+
+  @override
+  String get shopCouponHint => 'Enter a coupon code';
+
+  @override
+  String get shopCouponApply => 'Apply';
+
+  @override
+  String get shopPreviewChanged => 'Your checkout details changed. Review the updated total before paying.';
 }

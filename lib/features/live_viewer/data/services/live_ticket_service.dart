@@ -13,10 +13,12 @@ class LiveTicketAccess {
   const LiveTicketAccess({
     required this.priceCoins,
     required this.hasTicket,
+    this.awaitingConfirmation = false,
   });
 
   final int priceCoins;
   final bool hasTicket;
+  final bool awaitingConfirmation;
 
   factory LiveTicketAccess.fromPayload(Map<String, dynamic> payload) {
     final hasTicket = payload['hasTicket'];
@@ -37,7 +39,8 @@ class LiveTicketService {
     String Function()? userId,
     LiveOperationGuard? operationGuard,
   }) : _api = apiClient,
-       _userId = userId ?? (() => fb.FirebaseAuth.instance.currentUser?.uid ?? ''),
+       _userId =
+           userId ?? (() => fb.FirebaseAuth.instance.currentUser?.uid ?? ''),
        _operations = operationGuard ?? LiveOperationGuard.shared;
 
   final LiveApiClient _api;
@@ -48,8 +51,33 @@ class LiveTicketService {
     if (liveId.trim().isEmpty) {
       throw const LiveOperationNotSent('Select a valid LIVE first.');
     }
+    final account = _userId();
     final payload = await _api.get(ApiEndpoints.liveTicket(liveId));
-    return LiveTicketAccess.fromPayload(payload);
+    final access = LiveTicketAccess.fromPayload(payload);
+    if (account != _userId())
+      throw const LiveOperationNotSent('The signed-in account changed.');
+    if (access.hasTicket) {
+      await _operations.confirm(
+        userId: account,
+        liveId: liveId,
+        operation: 'ticket',
+        entityId: 'entry',
+      );
+      return access;
+    }
+    final record = await _operations.read(
+      userId: account,
+      liveId: liveId,
+      operation: 'ticket',
+      entityId: 'entry',
+    );
+    return LiveTicketAccess(
+      priceCoins: access.priceCoins,
+      hasTicket: false,
+      awaitingConfirmation:
+          record.outcome == LiveOperationOutcome.unknown ||
+          record.outcome == LiveOperationOutcome.confirmed,
+    );
   }
 
   Future<LiveTicketAccess> purchase(String liveId) {

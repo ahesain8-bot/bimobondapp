@@ -51,6 +51,10 @@ class LiveViewerRetryRequested extends LiveViewerEvent {
   const LiveViewerRetryRequested();
 }
 
+class LiveViewerTicketPurchaseRequested extends LiveViewerEvent {
+  const LiveViewerTicketPurchaseRequested();
+}
+
 class LiveViewerCommentSent extends LiveViewerEvent {
   final String content;
 

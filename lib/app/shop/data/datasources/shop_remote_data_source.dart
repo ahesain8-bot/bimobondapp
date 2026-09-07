@@ -11,6 +11,9 @@ import 'package:bimobondapp/core/network/api_client.dart';
 import 'package:bimobondapp/core/utils/api_constants.dart';
 import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:math';
+import '../services/checkout_payment_guard.dart';
+import '../../../../core/services/live_operation_guard.dart';
 
 abstract class ShopRemoteDataSource {
   Future<ShopPageEntity> browseProducts(BrowseProductsParams params);
@@ -508,6 +511,15 @@ class ShopRemoteDataSourceImpl implements ShopRemoteDataSource {
     String? idempotencyKey,
   }) async {
     try {
+      final account = FirebaseAuth.instance.currentUser?.uid;
+      final headers = await _authHeaders(required: true);
+      if (account == null ||
+          account != FirebaseAuth.instance.currentUser?.uid) {
+        throw const LiveOperationNotSent('The signed-in account changed.');
+      }
+      final paymentKey = idempotencyKey?.isNotEmpty == true
+          ? idempotencyKey!
+          : 'chk_${DateTime.now().microsecondsSinceEpoch}_${Random.secure().nextInt(1 << 32)}';
       final body = <String, dynamic>{
         'items': items.map((e) => e.toJson()).toList(),
         'paymentMethod': shopPaymentMethodToApi(paymentMethod),
@@ -519,27 +531,39 @@ class ShopRemoteDataSourceImpl implements ShopRemoteDataSource {
           'couponCode': couponCode,
         if (liveId != null && liveId.isNotEmpty) 'liveId': liveId,
         if (postId != null && postId.isNotEmpty) 'postId': postId,
-        if (idempotencyKey != null && idempotencyKey.isNotEmpty)
-          'idempotencyKey': idempotencyKey,
+        'idempotencyKey': paymentKey,
       };
-      final response = await apiClient.dio.post(
-        ApiConstants.productsCheckout,
-        data: body,
-        // A checkout can charge coins or create a paid order. Auth refresh
-        // must not replay it; the caller's idempotency key remains the one
-        // reconciliation path for an interrupted request.
-        options: Options(
-          headers: await _authHeaders(required: true),
-          extra: const {ApiClient.noAutomaticRetry: true},
-        ),
-      );
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        return ProductOrderModel.fromJson(_asMap(response.data));
-      }
-      throw ServerException(
-        message: _extractErrorMessage(response.data) ?? 'Checkout failed',
+      return await CheckoutPaymentGuard.shared.run(
+        userId: () => FirebaseAuth.instance.currentUser?.uid ?? '',
+        body: body,
+        send: () async {
+          final response = await apiClient.dio.post(
+            ApiConstants.productsCheckout,
+            data: body,
+            // A checkout can charge coins or create a paid order. Auth refresh
+            // must not replay it. The journal retains the original key and body;
+            // the supplied contract does not promise replay or lookup semantics.
+            options: Options(
+              headers: headers,
+              extra: const {ApiClient.noAutomaticRetry: true},
+            ),
+          );
+          if (response.statusCode == 200 || response.statusCode == 201) {
+            final order = ProductOrderModel.fromJson(_asMap(response.data));
+            if (order.id.isEmpty)
+              throw const FormatException('CHECKOUT_ORDER_NOT_CONFIRMED');
+            return order;
+          }
+          throw ServerException(
+            message: _extractErrorMessage(response.data) ?? 'Checkout failed',
+          );
+        },
       );
     } catch (e) {
+      if (e is LiveOperationUnresolved ||
+          e is LiveOperationNotSent ||
+          e is LiveOperationRejected)
+        rethrow;
       throw DioHandler.handle(e);
     }
   }

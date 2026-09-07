@@ -4,6 +4,7 @@ import 'package:bimobondapp/core/error/failures.dart';
 import 'package:dartz/dartz.dart';
 
 abstract class PaymentService {
+  Future<bool> hasUnresolvedPayment();
   Future<Either<Failure, ProductOrderEntity>> pay({
     required List<CheckoutItemInput> items,
     required ProductPaymentMethod method,

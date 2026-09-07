@@ -117,12 +117,10 @@ class AppLocalizationsAr extends AppLocalizations {
   String get phoneLoginSubtitle => 'أدخل رقم جوالك لتلقي رمز التحقق';
 
   @override
-  String get phoneLoginUsageNote =>
-      'قد يُستخدم رقم جوالك للتواصل مع أشخاص قد تعرفهم وتحسين الإعلانات والمزيد حسب إعداداتك.';
+  String get phoneLoginUsageNote => 'قد يُستخدم رقم جوالك للتواصل مع أشخاص قد تعرفهم وتحسين الإعلانات والمزيد حسب إعداداتك.';
 
   @override
-  String get emailLoginUsageNote =>
-      'قد يُستخدم بريدك الإلكتروني للتواصل مع أشخاص قد تعرفهم وتحسين الإعلانات والمزيد حسب إعداداتك.';
+  String get emailLoginUsageNote => 'قد يُستخدم بريدك الإلكتروني للتواصل مع أشخاص قد تعرفهم وتحسين الإعلانات والمزيد حسب إعداداتك.';
 
   @override
   String get phoneHint => '+20 123 456 7890';
@@ -157,35 +155,28 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get emailVerificationContinue =>
-      'افتح بريدك الإلكتروني وتحقق من حسابك قبل المتابعة.';
+  String get emailVerificationContinue => 'افتح بريدك الإلكتروني وتحقق من حسابك قبل المتابعة.';
 
   @override
   String get emailVerificationButton => 'لقد قمت بالتحقق من بريدي الإلكتروني';
 
   @override
-  String get emailVerificationResendError =>
-      'يتعذر إعادة إرسال بريد التحقق. يرجى تسجيل الدخول مرة أخرى.';
+  String get emailVerificationResendError => 'يتعذر إعادة إرسال بريد التحقق. يرجى تسجيل الدخول مرة أخرى.';
 
   @override
-  String get emailVerificationResendSuccess =>
-      'تمت إعادة إرسال بريد التحقق. تحقق من صندوق الوارد ومجلد البريد العشوائي.';
+  String get emailVerificationResendSuccess => 'تمت إعادة إرسال بريد التحقق. تحقق من صندوق الوارد ومجلد البريد العشوائي.';
 
   @override
-  String get emailVerificationResendFailed =>
-      'فشل إعادة إرسال بريد التحقق. يرجى المحاولة مرة أخرى.';
+  String get emailVerificationResendFailed => 'فشل إعادة إرسال بريد التحقق. يرجى المحاولة مرة أخرى.';
 
   @override
-  String get emailVerificationStatusError =>
-      'يتعذر التحقق من حالة البريد الإلكتروني. يرجى تسجيل الدخول مرة أخرى.';
+  String get emailVerificationStatusError => 'يتعذر التحقق من حالة البريد الإلكتروني. يرجى تسجيل الدخول مرة أخرى.';
 
   @override
-  String get emailVerificationNotVerified =>
-      'لم يتم التحقق من البريد الإلكتروني بعد. يرجى فتح بريدك الإلكتروني والتحقق من حسابك.';
+  String get emailVerificationNotVerified => 'لم يتم التحقق من البريد الإلكتروني بعد. يرجى فتح بريدك الإلكتروني والتحقق من حسابك.';
 
   @override
-  String get emailVerificationCheckFailed =>
-      'تعذّر التحقق من حالة البريد الإلكتروني. يرجى المحاولة مرة أخرى.';
+  String get emailVerificationCheckFailed => 'تعذّر التحقق من حالة البريد الإلكتروني. يرجى المحاولة مرة أخرى.';
 
   @override
   String get emailVerificationResendButton => 'إعادة إرسال بريد التحقق';
@@ -232,8 +223,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get passwordTooShort => 'يجب أن تكون كلمة المرور 6 أحرف على الأقل';
 
   @override
-  String get passwordSignUpTooShort =>
-      'يجب أن تكون كلمة المرور 8 أحرف على الأقل';
+  String get passwordSignUpTooShort => 'يجب أن تكون كلمة المرور 8 أحرف على الأقل';
 
   @override
   String get passwordTooLong => 'يجب ألا تتجاوز كلمة المرور 20 حرفاً';
@@ -248,23 +238,19 @@ class AppLocalizationsAr extends AppLocalizations {
   String get forgotPasswordTitle => 'نسيت كلمة المرور';
 
   @override
-  String get forgotPasswordSubtitle =>
-      'أدخل بريدك الإلكتروني وسنرسل لك رمزًا مكونًا من 6 أرقام لإعادة تعيين كلمة المرور.';
+  String get forgotPasswordSubtitle => 'أدخل بريدك الإلكتروني وسنرسل لك رمزًا مكونًا من 6 أرقام لإعادة تعيين كلمة المرور.';
 
   @override
   String get forgotPasswordButton => 'إرسال رمز إعادة التعيين';
 
   @override
-  String get forgotPasswordSuccess =>
-      'إذا كان هناك حساب بهذا البريد، تم إرسال رمز إعادة التعيين.';
+  String get forgotPasswordSuccess => 'إذا كان هناك حساب بهذا البريد، تم إرسال رمز إعادة التعيين.';
 
   @override
-  String get forgotPasswordFailed =>
-      'فشل إرسال رمز إعادة التعيين. يرجى المحاولة مرة أخرى.';
+  String get forgotPasswordFailed => 'فشل إرسال رمز إعادة التعيين. يرجى المحاولة مرة أخرى.';
 
   @override
-  String get forgotPasswordUserNotFound =>
-      'لا يوجد حساب مرتبط بهذا البريد الإلكتروني.';
+  String get forgotPasswordUserNotFound => 'لا يوجد حساب مرتبط بهذا البريد الإلكتروني.';
 
   @override
   String get resetPasswordTitle => 'إعادة تعيين كلمة المرور';
@@ -276,8 +262,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get resetPasswordButton => 'إعادة تعيين كلمة المرور';
 
   @override
-  String get resetPasswordSuccess =>
-      'تمت إعادة تعيين كلمة المرور بنجاح. يرجى تسجيل الدخول.';
+  String get resetPasswordSuccess => 'تمت إعادة تعيين كلمة المرور بنجاح. يرجى تسجيل الدخول.';
 
   @override
   String get newPasswordLabel => 'كلمة المرور الجديدة';
@@ -304,8 +289,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get googleLoginSheetTitle => 'تسجيل الدخول عبر جوجل';
 
   @override
-  String get googleLoginSheetSubtitle =>
-      'استخدم حساب جوجل لتسجيل الدخول بسرعة وأمان.';
+  String get googleLoginSheetSubtitle => 'استخدم حساب جوجل لتسجيل الدخول بسرعة وأمان.';
 
   @override
   String get googleLoginContinue => 'المتابعة عبر جوجل';
@@ -335,12 +319,10 @@ class AppLocalizationsAr extends AppLocalizations {
   String get loginSuccess => 'تم تسجيل الدخول بنجاح!';
 
   @override
-  String get signupSuccess =>
-      'تم التسجيل بنجاح! يرجى التحقق من بريدك الإلكتروني لتفعيل حسابك.';
+  String get signupSuccess => 'تم التسجيل بنجاح! يرجى التحقق من بريدك الإلكتروني لتفعيل حسابك.';
 
   @override
-  String get signUpWithEmailPassword =>
-      'إنشاء حساب بالبريد الإلكتروني وكلمة المرور';
+  String get signUpWithEmailPassword => 'إنشاء حساب بالبريد الإلكتروني وكلمة المرور';
 
   @override
   String get signUpEmailStepTitle => 'ما هو بريدك الإلكتروني؟';
@@ -370,8 +352,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get passwordStrengthStrong => 'قوية';
 
   @override
-  String get passwordStrengthHint =>
-      'يجب أن تتكون كلمة المرور من 8 إلى 20 حرفاً وتتضمن مزيجاً من الأحرف والأرقام والرموز.';
+  String get passwordStrengthHint => 'يجب أن تتكون كلمة المرور من 8 إلى 20 حرفاً وتتضمن مزيجاً من الأحرف والأرقام والرموز.';
 
   @override
   String get passwordReqLength => 'من 8 إلى 20 حرفاً';
@@ -386,8 +367,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get passwordReqSpecialChar => 'رمز خاص واحد (مثل ! @ # \$ % & *)';
 
   @override
-  String get passwordRequirementsNotMet =>
-      'يجب أن تستوفي كلمة المرور جميع المتطلبات';
+  String get passwordRequirementsNotMet => 'يجب أن تستوفي كلمة المرور جميع المتطلبات';
 
   @override
   String get following => 'متابعة';
@@ -885,8 +865,7 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get shopNotEnoughCoins =>
-      'رصيد العملات غير كافٍ. اشترِ المزيد للمتابعة.';
+  String get shopNotEnoughCoins => 'رصيد العملات غير كافٍ. اشترِ المزيد للمتابعة.';
 
   @override
   String shopCoinsLabel(int count) {
@@ -1177,8 +1156,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get auctionsFiltersTimeRemaining => 'الوقت المتبقي';
 
   @override
-  String get auctionsFiltersInvalidPriceRange =>
-      'لا يمكن أن يكون أقل سعر أكبر من أعلى سعر';
+  String get auctionsFiltersInvalidPriceRange => 'لا يمكن أن يكون أقل سعر أكبر من أعلى سعر';
 
   @override
   String get auctionsTimeRemainingAny => 'أي وقت';
@@ -1241,8 +1219,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get auctionCancelTitle => 'إلغاء هذا المزاد؟';
 
   @override
-  String get auctionCancelMessage =>
-      'قد يتم استرداد مساهمات الهدايا إذا كان الضمان مفعّلاً. لا يمكن التراجع عن هذا الإجراء.';
+  String get auctionCancelMessage => 'قد يتم استرداد مساهمات الهدايا إذا كان الضمان مفعّلاً. لا يمكن التراجع عن هذا الإجراء.';
 
   @override
   String get auctionCancelSuccess => 'تم إلغاء المزاد';
@@ -1251,15 +1228,13 @@ class AppLocalizationsAr extends AppLocalizations {
   String get auctionSellerRequiredTitle => 'يلزم توثيق البائع';
 
   @override
-  String get auctionSellerRequiredMessage =>
-      'أكمل توثيق البائع قبل استضافة المزادات.';
+  String get auctionSellerRequiredMessage => 'أكمل توثيق البائع قبل استضافة المزادات.';
 
   @override
   String get auctionSellerPendingMessage => 'توثيق البائع قيد المراجعة.';
 
   @override
-  String get auctionSellerRejectedMessage =>
-      'تم رفض توثيق البائع. يرجى إعادة الإرسال.';
+  String get auctionSellerRejectedMessage => 'تم رفض توثيق البائع. يرجى إعادة الإرسال.';
 
   @override
   String get auctionSellerCompleteAction => 'إكمال التوثيق';
@@ -1268,12 +1243,10 @@ class AppLocalizationsAr extends AppLocalizations {
   String get sellerVerificationTitle => 'توثيق البائع';
 
   @override
-  String get sellerVerificationSubtitle =>
-      'ارفع جواز سفرك وبيانات العنوان لاستضافة المزادات.';
+  String get sellerVerificationSubtitle => 'ارفع جواز سفرك وبيانات العنوان لاستضافة المزادات.';
 
   @override
-  String get sellerVerificationSubtitleSimple =>
-      'أدخل رقم الهوية وارفع صورة جواز السفر.';
+  String get sellerVerificationSubtitleSimple => 'أدخل رقم الهوية وارفع صورة جواز السفر.';
 
   @override
   String get sellerVerificationIdentitySection => 'الهوية';
@@ -1330,8 +1303,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get sellerVerificationAddressLine1 => 'العنوان سطر 1';
 
   @override
-  String get sellerVerificationAddressLine2Optional =>
-      'العنوان سطر 2 (اختياري)';
+  String get sellerVerificationAddressLine2Optional => 'العنوان سطر 2 (اختياري)';
 
   @override
   String get sellerVerificationCity => 'المدينة';
@@ -1370,12 +1342,10 @@ class AppLocalizationsAr extends AppLocalizations {
   String get sellerVerificationExpiryRequired => 'تاريخ انتهاء الجواز مطلوب';
 
   @override
-  String get sellerVerificationExpiryFuture =>
-      'يجب ألا يكون جواز السفر منتهيًا';
+  String get sellerVerificationExpiryFuture => 'يجب ألا يكون جواز السفر منتهيًا';
 
   @override
-  String get sellerVerificationPassportFrontRequired =>
-      'صورة جواز السفر مطلوبة';
+  String get sellerVerificationPassportFrontRequired => 'صورة جواز السفر مطلوبة';
 
   @override
   String get auctionTimeLeft => 'الوقت المتبقي';
@@ -1408,8 +1378,7 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get auctionTargetReachedMessage =>
-      'تم الوصول للسعر المستهدف. انتهى المزاد.';
+  String get auctionTargetReachedMessage => 'تم الوصول للسعر المستهدف. انتهى المزاد.';
 
   @override
   String get auctionBiddingClosed => 'المزايدة مغلقة';
@@ -1645,15 +1614,13 @@ class AppLocalizationsAr extends AppLocalizations {
   String get firstRechargeRoseTitle => 'احصل على 3 ورود في حقيبتك';
 
   @override
-  String get firstRechargeRoseBody =>
-      'احصل على واحدة الآن والباقي بعد 24 ساعة، كل منها متاح لمدة 7 أيام';
+  String get firstRechargeRoseBody => 'احصل على واحدة الآن والباقي بعد 24 ساعة، كل منها متاح لمدة 7 أيام';
 
   @override
   String get firstRechargeBonusTitle => 'احصل على عملات إضافية';
 
   @override
-  String get firstRechargeBonusBody =>
-      'استخدم العملات على عناصر افتراضية مثل الهدايا';
+  String get firstRechargeBonusBody => 'استخدم العملات على عناصر افتراضية مثل الهدايا';
 
   @override
   String get firstRechargeGetCoins => 'احصل على عملات';
@@ -1662,8 +1629,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get firstRechargeGetCoinsHint => 'اشحن لتحصل على هدايا وعملات إضافية.';
 
   @override
-  String get firstRechargePolicy =>
-      'بالمتابعة، فإنك توافق على سياسة العناصر الافتراضية. ستفقد أيضاً المكافأة الإضافية إذا انسحبت من هذا الشراء.';
+  String get firstRechargePolicy => 'بالمتابعة، فإنك توافق على سياسة العناصر الافتراضية. ستفقد أيضاً المكافأة الإضافية إذا انسحبت من هذا الشراء.';
 
   @override
   String firstRechargeCta(String coins, String price) {
@@ -1833,8 +1799,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get loginRequired => 'تسجيل الدخول مطلوب';
 
   @override
-  String get loginRequiredMessage =>
-      'يرجى تسجيل الدخول للإعجاب أو التعليق أو حفظ المنشورات';
+  String get loginRequiredMessage => 'يرجى تسجيل الدخول للإعجاب أو التعليق أو حفظ المنشورات';
 
   @override
   String get cancel => 'إلغاء';
@@ -1935,8 +1900,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get deletePostTitle => 'حذف المنشور؟';
 
   @override
-  String get deletePostMessage =>
-      'سيتم حذف هذا المنشور نهائيًا. يمكنك حذف منشوراتك فقط.';
+  String get deletePostMessage => 'سيتم حذف هذا المنشور نهائيًا. يمكنك حذف منشوراتك فقط.';
 
   @override
   String get postOptionShare => 'مشاركة';
@@ -1978,8 +1942,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get postReportTitle => 'الإبلاغ عن المنشور؟';
 
   @override
-  String get postReportMessage =>
-      'أخبرنا إذا كان هذا المنشور يخالف إرشادات المجتمع.';
+  String get postReportMessage => 'أخبرنا إذا كان هذا المنشور يخالف إرشادات المجتمع.';
 
   @override
   String get postReportSubmitted => 'شكرًا على الإبلاغ. سنراجع هذا المنشور.';
@@ -2111,8 +2074,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get postQuickShareTitle => 'الأصدقاء الأخيرون';
 
   @override
-  String get postQuickShareSubtitle =>
-      'اختر الأصدقاء، اضغط مرة أخرى للإلغاء، ثم أرسل';
+  String get postQuickShareSubtitle => 'اختر الأصدقاء، اضغط مرة أخرى للإلغاء، ثم أرسل';
 
   @override
   String get postAddToStoryHint => 'أنشئ قصتك — المنشور جاهز للمشاركة';
@@ -2160,8 +2122,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get privacyPrivateAccount => 'حساب خاص';
 
   @override
-  String get privacyPrivateAccountSubtitle =>
-      'المتابعون المقبولون فقط يمكنهم رؤية منشوراتك وقصصك.';
+  String get privacyPrivateAccountSubtitle => 'المتابعون المقبولون فقط يمكنهم رؤية منشوراتك وقصصك.';
 
   @override
   String get privacyWhoCanMessage => 'من يمكنه مراسلتك';
@@ -2182,8 +2143,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get privacyAllowComments => 'السماح بالتعليقات';
 
   @override
-  String get privacyAllowCommentsSubtitle =>
-      'يمكن للآخرين التعليق على منشوراتك.';
+  String get privacyAllowCommentsSubtitle => 'يمكن للآخرين التعليق على منشوراتك.';
 
   @override
   String get privacyUpdated => 'تم تحديث إعدادات الخصوصية';
@@ -2246,8 +2206,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get settingsLogoutTitle => 'تسجيل الخروج؟';
 
   @override
-  String get settingsLogoutMessage =>
-      'ستحتاج إلى تسجيل الدخول مرة أخرى لاستخدام حسابك.';
+  String get settingsLogoutMessage => 'ستحتاج إلى تسجيل الدخول مرة أخرى لاستخدام حسابك.';
 
   @override
   String get settingsComingSoon => 'قريباً';
@@ -2294,8 +2253,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get chatWallpaperTitle => 'خلفية المحادثة';
 
   @override
-  String get chatWallpaperSubtitle =>
-      'اختر نمط الخلفية للمحادثات. الألوان تتبع سمة التطبيق.';
+  String get chatWallpaperSubtitle => 'اختر نمط الخلفية للمحادثات. الألوان تتبع سمة التطبيق.';
 
   @override
   String get chatWallpaperPlus => 'علامات زائد';
@@ -2360,8 +2318,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get unblock => 'إلغاء الحظر';
 
   @override
-  String get chatYouBlockedUser =>
-      'لقد قمت بحظر هذا المستخدم. قم بإلغاء الحظر لتتمكن من مراسلته.';
+  String get chatYouBlockedUser => 'لقد قمت بحظر هذا المستخدم. قم بإلغاء الحظر لتتمكن من مراسلته.';
 
   @override
   String get userNotFound => 'المستخدم غير موجود';
@@ -2402,15 +2359,13 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get chatSettingsBlockMessage =>
-      'لن يتمكن من مراسلتك أو رؤية ملفك الشخصي.';
+  String get chatSettingsBlockMessage => 'لن يتمكن من مراسلتك أو رؤية ملفك الشخصي.';
 
   @override
   String get chatSettingsDeleteTitle => 'مسح سجل المحادثة؟';
 
   @override
-  String get chatSettingsDeleteMessage =>
-      'سيؤدي هذا إلى إزالة سجل المحادثة بالنسبة لك. لا يمكن التراجع عن هذا الإجراء.';
+  String get chatSettingsDeleteMessage => 'سيؤدي هذا إلى إزالة سجل المحادثة بالنسبة لك. لا يمكن التراجع عن هذا الإجراء.';
 
   @override
   String get messagesTitle => 'الرسائل';
@@ -2488,8 +2443,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get activityAllCaughtUp => 'أنت على اطلاع بكل شيء';
 
   @override
-  String get activityClearNotificationsMessage =>
-      'هل تريد إزالة جميع الإشعارات المقروءة من نشاطك؟';
+  String get activityClearNotificationsMessage => 'هل تريد إزالة جميع الإشعارات المقروءة من نشاطك؟';
 
   @override
   String get activityOpenCommentsSubtitle => 'عرض التعليقات على منشوراتك';
@@ -2646,8 +2600,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get chatDeleteMessageTitle => 'حذف الرسالة؟';
 
   @override
-  String get chatDeleteMessageMessage =>
-      'سيتم إخفاء هذه الرسالة عن الجميع في المحادثة.';
+  String get chatDeleteMessageMessage => 'سيتم إخفاء هذه الرسالة عن الجميع في المحادثة.';
 
   @override
   String get chatActiveNow => 'نشط الآن';
@@ -2662,15 +2615,13 @@ class AppLocalizationsAr extends AppLocalizations {
   String get chatSlideUpToCancel => 'اسحب للأعلى للإلغاء';
 
   @override
-  String get chatRecordingPermissionDenied =>
-      'اسمح بالوصول إلى الميكروفون لتسجيل الرسائل الصوتية.';
+  String get chatRecordingPermissionDenied => 'اسمح بالوصول إلى الميكروفون لتسجيل الرسائل الصوتية.';
 
   @override
   String get chatRecordingPermissionTitle => 'الوصول إلى الميكروفون';
 
   @override
-  String get chatRecordingPermissionSettingsMessage =>
-      'الرسائل الصوتية تحتاج الميكروفون. افتح الإعدادات، ثم الأذونات، واسمح بالميكروفون لتطبيق Bimo Bond.';
+  String get chatRecordingPermissionSettingsMessage => 'الرسائل الصوتية تحتاج الميكروفون. افتح الإعدادات، ثم الأذونات، واسمح بالميكروفون لتطبيق Bimo Bond.';
 
   @override
   String get chatRecordingOpenSettings => 'فتح الإعدادات';
@@ -2679,8 +2630,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get chatRecordingAllowMicrophone => 'سماح';
 
   @override
-  String get chatRecordingPluginUnavailable =>
-      'التسجيل الصوتي غير جاهز. أغلق التطبيق بالكامل ثم شغّله من جديد (وليس إعادة التحميل السريع).';
+  String get chatRecordingPluginUnavailable => 'التسجيل الصوتي غير جاهز. أغلق التطبيق بالكامل ثم شغّله من جديد (وليس إعادة التحميل السريع).';
 
   @override
   String get chatVoiceTooShort => 'اضغط مطولاً لتسجيل رسالة صوتية.';
@@ -2695,8 +2645,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get chatLocationPermissionDenied => 'يلزم إذن الموقع لمشاركة موقعك.';
 
   @override
-  String get chatContactsPermissionDenied =>
-      'يلزم إذن جهات الاتصال لمشاركة جهة اتصال.';
+  String get chatContactsPermissionDenied => 'يلزم إذن جهات الاتصال لمشاركة جهة اتصال.';
 
   @override
   String get chatFeatureComingSoon => 'قريباً.';
@@ -2723,8 +2672,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get chatSeedFinalPrice => 'هل يمكنني معرفة السعر النهائي؟';
 
   @override
-  String get chatSeedAutoReply =>
-      'شكراً لتواصلك معنا، سنرد عليك في أقرب وقت بمزيد من التفاصيل.';
+  String get chatSeedAutoReply => 'شكراً لتواصلك معنا، سنرد عليك في أقرب وقت بمزيد من التفاصيل.';
 
   @override
   String get chatUserBio => 'مهتم بالعقارات والتصميم.';
@@ -2760,8 +2708,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get chatGiftSheetSubtitle => 'اختر هدية من مخزونك';
 
   @override
-  String get chatGiftInventoryEmpty =>
-      'لا تملك أي هدايا بعد. اشترِ هدايا من المحفظة أولاً.';
+  String get chatGiftInventoryEmpty => 'لا تملك أي هدايا بعد. اشترِ هدايا من المحفظة أولاً.';
 
   @override
   String get chatGiftSentLabel => 'تم إرسال الهدية';
@@ -2856,12 +2803,10 @@ class AppLocalizationsAr extends AppLocalizations {
   String get auctionEndDate => 'نهاية المزاد';
 
   @override
-  String get auctionEndBeforeStart =>
-      'يجب أن يكون تاريخ النهاية بعد تاريخ البداية';
+  String get auctionEndBeforeStart => 'يجب أن يكون تاريخ النهاية بعد تاريخ البداية';
 
   @override
-  String get auctionTargetBelowStart =>
-      'يجب أن يكون السعر المستهدف أعلى من السعر الابتدائي';
+  String get auctionTargetBelowStart => 'يجب أن يكون السعر المستهدف أعلى من السعر الابتدائي';
 
   @override
   String get auctionInvalidPrice => 'أدخل سعراً صالحاً';
@@ -2897,8 +2842,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get notificationsEmpty => 'لا توجد إشعارات بعد';
 
   @override
-  String get notificationsEmptySubtitle =>
-      'عندما يتفاعل شخص معك، ستظهر الإشعارات هنا.';
+  String get notificationsEmptySubtitle => 'عندما يتفاعل شخص معك، ستظهر الإشعارات هنا.';
 
   @override
   String get notificationsEmptyUnread => 'لا توجد إشعارات غير مقروءة.';
@@ -3227,15 +3171,13 @@ class AppLocalizationsAr extends AppLocalizations {
   String get coinsMarketSuccess => 'تمت إضافة الهدية إلى مخزنك!';
 
   @override
-  String get coinsVaultEmpty =>
-      'لا توجد هدايا في مخزنك بعد. زُر السوق لشراء هدايا بالعملات.';
+  String get coinsVaultEmpty => 'لا توجد هدايا في مخزنك بعد. زُر السوق لشراء هدايا بالعملات.';
 
   @override
   String get coinsVaultOwned => 'في المخزن';
 
   @override
-  String get coinsInsufficientBalance =>
-      'رصيد العملات غير كافٍ. اشترِ المزيد من تبويب الشراء.';
+  String get coinsInsufficientBalance => 'رصيد العملات غير كافٍ. اشترِ المزيد من تبويب الشراء.';
 
   @override
   String get walletAccountingPurchase => 'شراء عملات';
@@ -3279,8 +3221,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get balanceViewFullSchedule => 'عرض الجدول الكامل >';
 
   @override
-  String get balanceSetupPaymentsBanner =>
-      'لاستلام المدفوعات من برنامج مكافآت المبدعين، قم بإعداد المدفوعات.';
+  String get balanceSetupPaymentsBanner => 'لاستلام المدفوعات من برنامج مكافآت المبدعين، قم بإعداد المدفوعات.';
 
   @override
   String get balanceSetup => 'إعداد';
@@ -3303,8 +3244,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get balanceFirstCoinOfferTitle => 'عرض أول شراء للعملات';
 
   @override
-  String get balanceFirstCoinOfferSubtitle =>
-      'احصل على عملات إضافية وهدية متحركة بخصم 99% من أول عملية شراء';
+  String get balanceFirstCoinOfferSubtitle => 'احصل على عملات إضافية وهدية متحركة بخصم 99% من أول عملية شراء';
 
   @override
   String get balanceGetNow => 'احصل الآن ←';
@@ -3355,8 +3295,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get balanceSetupPaymentsTitle => 'إعداد المدفوعات';
 
   @override
-  String get balanceSetupPaymentsMessage =>
-      'تأكد من دقة معلوماتك لاستلام المدفوعات في الوقت المحدد. يمكنك تغييرها في أي وقت.';
+  String get balanceSetupPaymentsMessage => 'تأكد من دقة معلوماتك لاستلام المدفوعات في الوقت المحدد. يمكنك تغييرها في أي وقت.';
 
   @override
   String get balancePayoutMethodTitle => 'طريقة الدفع';
@@ -3383,8 +3322,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get balanceCountryRegion => 'البلد / المنطقة';
 
   @override
-  String get balanceCountryRegionNote =>
-      'يمكنك التسجيل في بلد أو منطقة واحدة فقط. تأكد من اختيارك.';
+  String get balanceCountryRegionNote => 'يمكنك التسجيل في بلد أو منطقة واحدة فقط. تأكد من اختيارك.';
 
   @override
   String get balanceChoosePayoutMethod => 'اختر طريقة الدفع';
@@ -3393,22 +3331,19 @@ class AppLocalizationsAr extends AppLocalizations {
   String get balancePayoutZaloPay => 'ZaloPay (VND)';
 
   @override
-  String get balancePayoutZaloPayDetails =>
-      'رسوم الخدمة 1.5% | الحد الأدنى للسحب 2 USD | يصل خلال يوم عمل واحد';
+  String get balancePayoutZaloPayDetails => 'رسوم الخدمة 1.5% | الحد الأدنى للسحب 2 USD | يصل خلال يوم عمل واحد';
 
   @override
   String get balancePayoutBank => 'تحويل بنكي (VND)';
 
   @override
-  String get balancePayoutBankDetails =>
-      'رسوم الخدمة 2.9 USD | الحد الأدنى للسحب 8 USD | يصل خلال 3-5 أيام عمل';
+  String get balancePayoutBankDetails => 'رسوم الخدمة 2.9 USD | الحد الأدنى للسحب 8 USD | يصل خلال 3-5 أيام عمل';
 
   @override
   String get balancePayoutPayPal => 'PayPal (USD)';
 
   @override
-  String get balancePayoutPayPalDetails =>
-      'رسوم الخدمة 1.5% + 0.1 USD | الحد الأدنى للسحب 1 USD | يصل خلال يوم عمل واحد';
+  String get balancePayoutPayPalDetails => 'رسوم الخدمة 1.5% + 0.1 USD | الحد الأدنى للسحب 1 USD | يصل خلال يوم عمل واحد';
 
   @override
   String get balanceTransactionHistory => 'سجل المعاملات';
@@ -3471,8 +3406,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get deleteChatTitle => 'حذف المحادثة';
 
   @override
-  String get deleteChatMessage =>
-      'هل أنت متأكد من رغبتك في حذف هذه المحادثة؟ لا يمكن التراجع عن هذا الإجراء.';
+  String get deleteChatMessage => 'هل أنت متأكد من رغبتك في حذف هذه المحادثة؟ لا يمكن التراجع عن هذا الإجراء.';
 
   @override
   String get deleteChatConfirm => 'حذف';
@@ -3532,8 +3466,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get cameraMusicComingSoon => 'اختيار الموسيقى قريباً.';
 
   @override
-  String get cameraPermissionDenied =>
-      'يلزم السماح بالكاميرا والميكروفون للتسجيل.';
+  String get cameraPermissionDenied => 'يلزم السماح بالكاميرا والميكروفون للتسجيل.';
 
   @override
   String get cameraStarting => 'جاري تشغيل الكاميرا...';
@@ -3873,8 +3806,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get promoteGeoTargetHint => 'استخدم موقعك الحالي للوصول المحلي';
 
   @override
-  String get promoteGeoMapHint =>
-      'اضغط على الخريطة لاختيار منطقة الاستهداف. الافتراضي هو موقعك.';
+  String get promoteGeoMapHint => 'اضغط على الخريطة لاختيار منطقة الاستهداف. الافتراضي هو موقعك.';
 
   @override
   String get promoteGeoUseMyLocation => 'استخدم موقعي';
@@ -3978,8 +3910,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get promoteStepLocationHeading => 'اختر منطقة الاستهداف';
 
   @override
-  String get promoteStepLocationSubtitle =>
-      'حدّد موقعك واضبط نطاق الوصول للأشخاص القريبين.';
+  String get promoteStepLocationSubtitle => 'حدّد موقعك واضبط نطاق الوصول للأشخاص القريبين.';
 
   @override
   String get promoteStepBudgetSubtitle => 'اختر باقة الترويج لحملتك.';
@@ -4033,8 +3964,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get promoteLocationModeMap => 'على الخريطة';
 
   @override
-  String get promoteLocationModeMapHint =>
-      'حدّد موقعك GPS واختر النطاق على الخريطة';
+  String get promoteLocationModeMapHint => 'حدّد موقعك GPS واختر النطاق على الخريطة';
 
   @override
   String get promoteSelectCountry => 'الدولة';
@@ -4055,11 +3985,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get promoteSelectTownHint => 'اختر المدينة';
 
   @override
-  String promoteLocationRegionalSummary(
-    String town,
-    String region,
-    String country,
-  ) {
+  String promoteLocationRegionalSummary(String town, String region, String country) {
     return '$town · $region · $country';
   }
 
@@ -4073,12 +3999,10 @@ class AppLocalizationsAr extends AppLocalizations {
   String get promoteLocationTownRequired => 'يرجى اختيار المدينة.';
 
   @override
-  String get promoteLocationTownCoordinatesRequired =>
-      'لا توجد إحداثيات لهذه المدينة. يرجى اختيار مدينة أخرى.';
+  String get promoteLocationTownCoordinatesRequired => 'لا توجد إحداثيات لهذه المدينة. يرجى اختيار مدينة أخرى.';
 
   @override
-  String get promoteLocationMapRequired =>
-      'يرجى السماح بالموقع أو اختيار نقطة على الخريطة.';
+  String get promoteLocationMapRequired => 'يرجى السماح بالموقع أو اختيار نقطة على الخريطة.';
 
   @override
   String get promoteOverviewSubtotal => 'المجموع الفرعي';
@@ -4110,8 +4034,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get promoteInsightsEmptyTitle => 'لا توجد منشورات مروّجة بعد';
 
   @override
-  String get promoteInsightsEmptyHint =>
-      'روّج فيديو من خلاصتك لمشاهدة الأداء هنا.';
+  String get promoteInsightsEmptyHint => 'روّج فيديو من خلاصتك لمشاهدة الأداء هنا.';
 
   @override
   String get promoteInsightsPerformanceTitle => 'الأداء';
@@ -4165,8 +4088,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get promoteInsightsCampaignHistory => 'سجل الحملات';
 
   @override
-  String get promoteInsightsCampaignHistoryHint =>
-      'اضغط على حملة لتصفية الإحصائيات';
+  String get promoteInsightsCampaignHistoryHint => 'اضغط على حملة لتصفية الإحصائيات';
 
   @override
   String get promoteInsightsAllCampaigns => 'جميع الحملات';
@@ -4368,8 +4290,7 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get interestSelectionNotInterestedHint =>
-      'اضغط مرة أخرى لتحديد غير مهتم (اختياري).';
+  String get interestSelectionNotInterestedHint => 'اضغط مرة أخرى لتحديد غير مهتم (اختياري).';
 
   @override
   String get interestSelectionNotInterestedLegend => 'غير مهتم';
@@ -4522,8 +4443,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get addCloseFriendsTitle => 'إضافة أصدقاء مقربين';
 
   @override
-  String get addCloseFriendsSubtitle =>
-      'اختر أصدقاء لإضافتهم إلى قائمة الأصدقاء المقربين';
+  String get addCloseFriendsSubtitle => 'اختر أصدقاء لإضافتهم إلى قائمة الأصدقاء المقربين';
 
   @override
   String get searchCloseFriendsHint => 'البحث عن أصدقاء مقربين...';
@@ -4637,8 +4557,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get marketplaceHeroTitle => 'اشترِ. امتلك. أعد البيع.';
 
   @override
-  String get marketplaceHeroSubtitle =>
-      'اشترِ المنتجات وأعد بيع المشتريات المؤهلة عبر مزادات Bimo-Bond.';
+  String get marketplaceHeroSubtitle => 'اشترِ المنتجات وأعد بيع المشتريات المؤهلة عبر مزادات Bimo-Bond.';
 
   @override
   String get marketplaceExploreCta => 'استكشف السوق';
@@ -4907,12 +4826,10 @@ class AppLocalizationsAr extends AppLocalizations {
   String get templateEditorTypeCaption => 'اكتب التعليق…';
 
   @override
-  String get templateEditorDragPinchResize =>
-      'اسحب للتحريك · اضغط للتصغير/التكبير';
+  String get templateEditorDragPinchResize => 'اسحب للتحريك · اضغط للتصغير/التكبير';
 
   @override
-  String get templateEditorTapMediaToPlace =>
-      'اضغط على الوسائط للوضع · اسحب للتحريك';
+  String get templateEditorTapMediaToPlace => 'اضغط على الوسائط للوضع · اسحب للتحريك';
 
   @override
   String get templateEditorPickStickerBelow => 'اختر ملصقاً من الأسفل';
@@ -4921,8 +4838,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get templateEditorTapStickerBelow => 'اضغط على ملصق بالأسفل';
 
   @override
-  String get templateEditorDragResizeSticker =>
-      'اسحب للتحريك · اضغط أو ± للتحجيم';
+  String get templateEditorDragResizeSticker => 'اسحب للتحريك · اضغط أو ± للتحجيم';
 
   @override
   String templateEditorMaxFiltersPerClip(int count) {
@@ -4935,12 +4851,10 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get templateEditorTransitionsNeedClips =>
-      'الانتقالات تحتاج مقطعين على الأقل';
+  String get templateEditorTransitionsNeedClips => 'الانتقالات تحتاج مقطعين على الأقل';
 
   @override
-  String get templateEditorAddMediaAllSlots =>
-      'أضف وسائط لجميع الخانات قبل التصيير.';
+  String get templateEditorAddMediaAllSlots => 'أضف وسائط لجميع الخانات قبل التصيير.';
 
   @override
   String get templateEditorCouldNotRender => 'تعذر التصيير على السيرفر';
@@ -5069,16 +4983,13 @@ class AppLocalizationsAr extends AppLocalizations {
   String get lpMine => 'ترويجات البث المباشر';
 
   @override
-  String get lpPreLive =>
-      'ابدأ بثك العام أولاً، ثم افتح المشاركة ← الترويج. معاينة الكاميرا هذه لا تحتوي على بث محفوظ يمكن ترويجه.';
+  String get lpPreLive => 'ابدأ بثك العام أولاً، ثم افتح المشاركة ← الترويج. معاينة الكاميرا هذه لا تحتوي على بث محفوظ يمكن ترويجه.';
 
   @override
-  String get lpUnavailable =>
-      'ترويج البث غير متاح مؤقتاً. يُرجى المحاولة لاحقاً.';
+  String get lpUnavailable => 'ترويج البث غير متاح مؤقتاً. يُرجى المحاولة لاحقاً.';
 
   @override
-  String get lpEligibility =>
-      'يمكن لمضيف بث عام مخطّط أو جارٍ ترويجه بحساب غير خاص وغير محظور. يجب تأكيد أهلية البث أولاً.';
+  String get lpEligibility => 'يمكن لمضيف بث عام مخطّط أو جارٍ ترويجه بحساب غير خاص وغير محظور. يجب تأكيد أهلية البث أولاً.';
 
   @override
   String get lpDisabled => 'ترويج البث معطّل حالياً.';
@@ -5102,8 +5013,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get lpCustomAudience => 'جمهور مخصّص';
 
   @override
-  String get lpAutomaticHint =>
-      'دع الخدمة تختار الأشخاص المرجّح أن يشاهدوا بثك.';
+  String get lpAutomaticHint => 'دع الخدمة تختار الأشخاص المرجّح أن يشاهدوا بثك.';
 
   @override
   String get lpGenders => 'الجنس';
@@ -5124,8 +5034,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get lpCategories => 'الاهتمامات';
 
   @override
-  String get lpOptionsUnavailable =>
-      'خيارات الجمهور غير متاحة. أعد المحاولة لتحميلها.';
+  String get lpOptionsUnavailable => 'خيارات الجمهور غير متاحة. أعد المحاولة لتحميلها.';
 
   @override
   String get lpGeo => 'الاستهداف الجغرافي (اختياري)';
@@ -5155,8 +5064,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get lpPackage => 'باقة';
 
   @override
-  String get lpPackagesUnavailable =>
-      'الباقات غير متاحة. يمكنك إعداد ميزانية مخصّصة.';
+  String get lpPackagesUnavailable => 'الباقات غير متاحة. يمكنك إعداد ميزانية مخصّصة.';
 
   @override
   String get lpCoins => 'عملات';
@@ -5168,8 +5076,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get lpEstimates => 'النتائج التقديرية';
 
   @override
-  String get lpEstimateHint =>
-      'التقديرات غير مضمونة. يعتمد الوصول الفعلي على بثك والجمهور.';
+  String get lpEstimateHint => 'التقديرات غير مضمونة. يعتمد الوصول الفعلي على بثك والجمهور.';
 
   @override
   String get lpNoEstimates => 'التقديرات غير متاحة.';
@@ -5178,8 +5085,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get lpCreate => 'إنشاء حملة';
 
   @override
-  String get lpCreateHint =>
-      'إنشاء الحملة لا يدفع تكلفتها. ستراجع الدفع وتؤكده في خطوة منفصلة.';
+  String get lpCreateHint => 'إنشاء الحملة لا يدفع تكلفتها. ستراجع الدفع وتؤكده في خطوة منفصلة.';
 
   @override
   String get lpSave => 'حفظ التغييرات';
@@ -5212,8 +5118,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get lpCancel => 'إلغاء الحملة';
 
   @override
-  String get lpCancelHint =>
-      'هل تريد إلغاء الحملة؟ يعيد الخادم العملات المدفوعة غير المستخدمة. قد يستغرق ظهور الرصيد المحدّث بعض الوقت.';
+  String get lpCancelHint => 'هل تريد إلغاء الحملة؟ يعيد الخادم العملات المدفوعة غير المستخدمة. قد يستغرق ظهور الرصيد المحدّث بعض الوقت.';
 
   @override
   String get lpBack => 'رجوع';
@@ -5261,23 +5166,19 @@ class AppLocalizationsAr extends AppLocalizations {
   String get lpRemaining => 'العملات المتبقية';
 
   @override
-  String get lpPaymentUnknown =>
-      'جارٍ التحقق من الدفع. حدّث الحملة والرصيد قبل أي إجراء آخر. لا تدفع مجدداً ما دامت النتيجة غير مؤكدة.';
+  String get lpPaymentUnknown => 'جارٍ التحقق من الدفع. حدّث الحملة والرصيد قبل أي إجراء آخر. لا تدفع مجدداً ما دامت النتيجة غير مؤكدة.';
 
   @override
-  String get lpCleanup =>
-      'انتهى البث. يجري تحديث حالة الحملة وردّ الرصيد غير المستخدم إن وُجد.';
+  String get lpCleanup => 'انتهى البث. يجري تحديث حالة الحملة وردّ الرصيد غير المستخدم إن وُجد.';
 
   @override
-  String get lpInsufficient =>
-      'رصيد العملات غير كافٍ. اشحن رصيدك ثم حدّثه قبل تأكيد الدفع.';
+  String get lpInsufficient => 'رصيد العملات غير كافٍ. اشحن رصيدك ثم حدّثه قبل تأكيد الدفع.';
 
   @override
   String get lpTopUp => 'شحن العملات';
 
   @override
-  String get lpValidation =>
-      'تحقّق من اختيار ميزانية واحدة بحد أدنى ٥ عملات، والمدة (١ أو ٣ أو ٧ أو ١٤ يوماً)، وترتيب الأعمار، وإدخال إحداثيات صحيحة كاملة مع نصف قطر موجب.';
+  String get lpValidation => 'تحقّق من اختيار ميزانية واحدة بحد أدنى ٥ عملات، والمدة (١ أو ٣ أو ٧ أو ١٤ يوماً)، وترتيب الأعمار، وإدخال إحداثيات صحيحة كاملة مع نصف قطر موجب.';
 
   @override
   String get lpInteger => 'أدخل عدداً صحيحاً.';
@@ -5346,8 +5247,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get liveGiftGoalLabel => 'هدف الهدايا';
 
   @override
-  String get liveFanClubPriceUnavailable =>
-      'أسعار شرائح الاشتراك غير مؤكدة حاليًا. الانضمام غير متاح.';
+  String get liveFanClubPriceUnavailable => 'أسعار شرائح الاشتراك غير مؤكدة حاليًا. الانضمام غير متاح.';
 
   @override
   String get liveDiscoveryForYou => 'لك';
@@ -5371,8 +5271,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get liveDiscoveryCategory => 'معرّف التصنيف';
 
   @override
-  String get liveLocationUnavailable =>
-      'فعّل خدمة الموقع واسمح بالوصول إليه لعرض البثوث القريبة.';
+  String get liveLocationUnavailable => 'فعّل خدمة الموقع واسمح بالوصول إليه لعرض البثوث القريبة.';
 
   @override
   String get liveGalleryReorder => 'اسحب لتغيير الترتيب';
@@ -5393,8 +5292,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get liveReplayStatus => 'حالة الإعادة';
 
   @override
-  String get liveReplayUnavailable =>
-      'يتطلب التشغيل استجابة مؤكدة من خدمة الإعادة.';
+  String get liveReplayUnavailable => 'يتطلب التشغيل استجابة مؤكدة من خدمة الإعادة.';
 
   @override
   String get liveCouponCode => 'رمز الكوبون';
@@ -5428,4 +5326,42 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get liveTicketPrice => 'سعر التذكرة (عملات)';
+
+  @override
+  String liveTicketBuy(int coins) {
+    return 'شراء التذكرة مقابل $coins عملة';
+  }
+
+  @override
+  String get liveTicketRequiredDetail => 'يتطلب هذا البث تذكرة للدخول.';
+
+  @override
+  String get liveTicketUnavailable => 'تعذر التحقق من إمكانية الدخول. حدّث الحالة.';
+
+  @override
+  String get livePaymentUnresolved => 'دفعتك بانتظار التأكيد. تحقق من حالتها قبل الدفع مرة أخرى.';
+
+  @override
+  String get liveTicketChecking => 'جارٍ التحقق من إمكانية الدخول…';
+
+  @override
+  String get liveTicketTitle => 'الدخول إلى البث';
+
+  @override
+  String get liveTicketRefresh => 'التحقق من حالة التذكرة';
+
+  @override
+  String get liveEntryBack => 'رجوع';
+
+  @override
+  String get shopCouponLabel => 'كوبون البث';
+
+  @override
+  String get shopCouponHint => 'أدخل رمز الكوبون';
+
+  @override
+  String get shopCouponApply => 'تطبيق';
+
+  @override
+  String get shopPreviewChanged => 'تغيرت تفاصيل الطلب. راجع المجموع المحدّث قبل الدفع.';
 }

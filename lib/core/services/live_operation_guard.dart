@@ -18,6 +18,23 @@ class LiveOperationUnresolved implements Exception {
       'The previous operation needs confirmation. It has not been sent again.';
 }
 
+/// Use only for a contract-defined rejection that proves no mutation occurred.
+/// An HTTP status alone (including 4xx) is insufficient evidence.
+class LiveOperationRejected implements Exception {
+  const LiveOperationRejected(this.message);
+  final String message;
+  @override
+  String toString() => message;
+}
+
+enum LiveOperationOutcome { notSent, rejected, confirmed, unknown }
+
+class LiveOperationRecord {
+  const LiveOperationRecord(this.outcome, {this.context = const {}});
+  final LiveOperationOutcome outcome;
+  final Map<String, dynamic> context;
+}
+
 abstract interface class LiveOperationStore {
   Future<String?> read(String key);
   Future<void> write(String key, String value);
@@ -64,6 +81,58 @@ class LiveOperationGuard {
   }) =>
       'live.operation.v1.${jsonEncode([userId, liveId, operation, entityId])}';
 
+  Future<LiveOperationRecord> read({
+    required String userId,
+    required String liveId,
+    required String operation,
+    required String entityId,
+  }) async {
+    final value = await store.read(
+      keyFor(
+        userId: userId,
+        liveId: liveId,
+        operation: operation,
+        entityId: entityId,
+      ),
+    );
+    if (value == null)
+      return const LiveOperationRecord(LiveOperationOutcome.notSent);
+    if (value == 'confirmed')
+      return const LiveOperationRecord(LiveOperationOutcome.confirmed);
+    if (value == 'rejected')
+      return const LiveOperationRecord(LiveOperationOutcome.rejected);
+    try {
+      final data = jsonDecode(value);
+      if (data is Map && data['context'] is Map) {
+        return LiveOperationRecord(
+          LiveOperationOutcome.unknown,
+          context: Map<String, dynamic>.from(data['context'] as Map),
+        );
+      }
+    } catch (_) {
+      /* Legacy pending records remain unresolved. */
+    }
+    return const LiveOperationRecord(LiveOperationOutcome.unknown);
+  }
+
+  /// Caller must first obtain personal, operation-specific server evidence.
+  /// This records confirmation, and never authorizes another charge.
+  Future<void> confirm({
+    required String userId,
+    required String liveId,
+    required String operation,
+    required String entityId,
+  }) async {
+    final key = keyFor(
+      userId: userId,
+      liveId: liveId,
+      operation: operation,
+      entityId: entityId,
+    );
+    if (userId.isEmpty || _running.contains(key)) return;
+    if (await store.read(key) != null) await store.write(key, 'confirmed');
+  }
+
   Future<T> run<T>({
     required String Function() userId,
     required String liveId,
@@ -71,6 +140,7 @@ class LiveOperationGuard {
     required String entityId,
     required Future<T> Function() send,
     bool retainSuccess = true,
+    Map<String, dynamic> context = const {},
   }) async {
     final account = userId();
     if (account.isEmpty || liveId.isEmpty || entityId.isEmpty) {
@@ -86,10 +156,16 @@ class LiveOperationGuard {
     var dispatched = false;
     var reserved = false;
     try {
-      if (await store.read(key) != null) {
+      final previous = await store.read(key);
+      if (previous != null && previous != 'rejected') {
         throw const LiveOperationUnresolved();
       }
-      await store.write(key, 'pending');
+      await store.write(
+        key,
+        context.isEmpty
+            ? 'pending'
+            : jsonEncode({'state': 'pending', 'context': context}),
+      );
       reserved = true;
       if (account != userId()) {
         throw const LiveOperationNotSent('The signed-in account changed.');
@@ -111,6 +187,8 @@ class LiveOperationGuard {
     } catch (error) {
       if (reserved && (!dispatched || error is LiveOperationNotSent)) {
         await store.remove(key);
+      } else if (reserved && error is LiveOperationRejected) {
+        await store.write(key, 'rejected');
       }
       rethrow;
     } finally {
