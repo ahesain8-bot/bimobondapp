@@ -195,7 +195,9 @@ void main() {
       final state = await h.bloc.stream.first;
 
       expect(starts, 0);
-      expect(state.message, isNotNull);
+      // The refusal is the client's own, so it travels as a typed notice the
+      // UI localizes rather than as a message built in the BLoC.
+      expect(state.notice, LiveGamesNotice.alreadyRunning);
       await h.bloc.close();
     });
 

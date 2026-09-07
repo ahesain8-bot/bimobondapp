@@ -30,11 +30,14 @@ class LiveGamesSheet extends StatelessWidget {
     final l = AppLocalizations.of(context)!;
     return BlocConsumer<LiveGamesBloc, LiveGamesState>(
       listener: (context, state) {
-        final message = state.message;
-        if (message != null && message.isNotEmpty) {
+        final text = switch (state.notice) {
+          LiveGamesNotice.alreadyRunning => l.liveGamesActiveOne,
+          null => state.message,
+        };
+        if (text != null && text.isNotEmpty) {
           ScaffoldMessenger.of(context)
             ..hideCurrentSnackBar()
-            ..showSnackBar(SnackBar(content: Text(message)));
+            ..showSnackBar(SnackBar(content: Text(text)));
           context.read<LiveGamesBloc>().add(const LiveGameMessageShown());
         }
       },

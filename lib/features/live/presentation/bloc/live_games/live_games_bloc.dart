@@ -59,6 +59,13 @@ class LiveGameMessageShown extends LiveGamesEvent {
   const LiveGameMessageShown();
 }
 
+/// A refusal the client itself decided, so the UI can localize it instead of
+/// showing a message built in the BLoC.
+enum LiveGamesNotice {
+  /// One ACTIVE game per live; a second start is not sent.
+  alreadyRunning,
+}
+
 class LiveGamesState {
   const LiveGamesState({
     this.loading = false,
@@ -66,6 +73,7 @@ class LiveGamesState {
     this.catalog = const [],
     this.game,
     this.message,
+    this.notice,
   });
 
   final bool loading;
@@ -74,7 +82,12 @@ class LiveGamesState {
 
   /// Null when no game is running.
   final LiveGame? game;
+
+  /// A server-provided error, shown as it arrived.
   final String? message;
+
+  /// A refusal this client made; the UI turns it into localized text.
+  final LiveGamesNotice? notice;
 
   /// One ACTIVE game per live: the host cannot start another while this runs.
   bool get hasActiveGame => game?.isActive == true;
@@ -85,6 +98,7 @@ class LiveGamesState {
     List<LiveGameCatalogEntry>? catalog,
     LiveGame? game,
     String? message,
+    LiveGamesNotice? notice,
     bool clearGame = false,
     bool clearMessage = false,
   }) {
@@ -94,6 +108,8 @@ class LiveGamesState {
       catalog: catalog ?? this.catalog,
       game: clearGame ? null : (game ?? this.game),
       message: clearMessage ? null : (message ?? this.message),
+      // A notice is transient: it clears with the message it accompanies.
+      notice: clearMessage ? null : (notice ?? this.notice),
     );
   }
 }
@@ -182,7 +198,7 @@ class LiveGamesBloc extends Bloc<LiveGamesEvent, LiveGamesState> {
     final liveId = _liveId;
     if (liveId == null || state.busy) return;
     if (state.hasActiveGame) {
-      emit(state.copyWith(message: 'A game is already running.'));
+      emit(state.copyWith(notice: LiveGamesNotice.alreadyRunning));
       return;
     }
     emit(state.copyWith(busy: true, clearMessage: true));
