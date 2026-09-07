@@ -1,5 +1,4 @@
-import 'package:bimobondapp/app/live_promotions/presentation/di/live_promotions_injector.dart'
-    as live_promotions_di;
+import 'package:bimobondapp/app/live_promotions/presentation/di/live_promotions_injector.dart' as live_promotions_di;
 import 'package:bimobondapp/core/routes/app_router.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
