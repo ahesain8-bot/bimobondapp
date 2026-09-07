@@ -495,7 +495,12 @@ class MainActivity : FlutterActivity() {
                     }
                     "setLiveStartChrome" -> {
                         val visible = call.argument<Boolean>("visible") ?: false
-                        ArLiveStartPopup.setVisible(this@MainActivity, visible)
+                        val audioMode = call.argument<Boolean>("audioMode")
+                        ArLiveStartPopup.setVisible(
+                            this@MainActivity,
+                            visible,
+                            audioMode,
+                        )
                         result.success(null)
                     }
                     "setRetouchAdjustments" -> {

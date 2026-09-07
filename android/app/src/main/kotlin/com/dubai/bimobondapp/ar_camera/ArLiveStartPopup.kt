@@ -5,10 +5,12 @@ import android.app.Dialog
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.os.Build
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowInsets
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.EditText
@@ -24,7 +26,7 @@ import android.widget.TextView
  *
  * Layout matches the TikTok pre-LIVE screen:
  *  - top: close + cover/title card (Change · Add topic · LIVE goal)
- *  - bottom: Flip/Enhance/Effects/Settings/More · Go LIVE · modes · tabs
+ *  - bottom: tools · Video/Voice Chat · Go LIVE · tabs
  */
 object ArLiveStartPopup {
     private const val TIKTOK_RED = "#FE2C55"
@@ -33,13 +35,18 @@ object ArLiveStartPopup {
     private var dialog: Dialog? = null
     private var titleField: EditText? = null
     private var pendingShow = false
+    /// Voice Chat (`AUDIO`). Survives chrome hide/show (Settings panels).
+    private var audioMode = false
 
-    fun setVisible(activity: Activity?, visible: Boolean) {
+    fun setVisible(activity: Activity?, visible: Boolean, audioMode: Boolean? = null) {
         if (activity == null || activity.isFinishing) {
             android.util.Log.w("ArLiveStartPopup", "setVisible($visible) skipped")
             return
         }
         activity.runOnUiThread {
+            if (audioMode != null) {
+                this.audioMode = audioMode
+            }
             if (!visible) {
                 pendingShow = false
                 dismiss()
@@ -59,6 +66,16 @@ object ArLiveStartPopup {
         }
         dialog = null
         titleField = null
+    }
+
+    private fun navigationBarBottom(insets: WindowInsets?): Int {
+        if (insets == null) return 0
+        return if (Build.VERSION.SDK_INT >= 30) {
+            insets.getInsets(WindowInsets.Type.navigationBars()).bottom
+        } else {
+            @Suppress("DEPRECATION")
+            insets.systemWindowInsetBottom
+        }
     }
 
     private fun show(activity: Activity) {
@@ -239,7 +256,7 @@ object ArLiveStartPopup {
             ).apply { gravity = Gravity.TOP },
         )
 
-        // ── Bottom: tools + Go LIVE + mode + tabs ───────────────────────
+        // ── Bottom: tools · source · Video/Voice Chat · Go LIVE · tabs ──
         val panel = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(10), dp(10), dp(10), dp(16))
@@ -251,6 +268,11 @@ object ArLiveStartPopup {
                     Color.TRANSPARENT,
                 ),
             )
+            setOnApplyWindowInsetsListener { v, insets ->
+                val bottom = navigationBarBottom(insets)
+                v.setPadding(dp(10), dp(10), dp(10), dp(12) + bottom)
+                insets
+            }
         }
 
         fun toolCell(
@@ -440,8 +462,140 @@ object ArLiveStartPopup {
             LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { bottomMargin = dp(12) },
+            ).apply { bottomMargin = dp(8) },
         )
+
+        // Camera source stays above the mode selector; Video | Voice Chat sits
+        // directly above Go LIVE as a single segmented control.
+        val modesHost = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(dp(18), dp(4), dp(18), dp(10))
+        }
+
+        fun sourceLabel(text: String, glyph: String, active: Boolean): LinearLayout {
+            return LinearLayout(activity).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER_HORIZONTAL
+                setPadding(dp(14), 0, dp(14), 0)
+                addView(
+                    TextView(activity).apply {
+                        this.text = "$glyph  $text"
+                        setTextColor(
+                            if (active) Color.WHITE else Color.parseColor("#73FFFFFF"),
+                        )
+                        setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+                        setTypeface(if (active) Typeface.DEFAULT_BOLD else Typeface.DEFAULT)
+                        gravity = Gravity.CENTER
+                    },
+                )
+                addView(
+                    View(activity).apply {
+                        background = GradientDrawable().apply {
+                            setColor(
+                                if (active) Color.parseColor(CYAN_DOT) else Color.TRANSPARENT,
+                            )
+                            shape = GradientDrawable.OVAL
+                        }
+                    },
+                    LinearLayout.LayoutParams(dp(5), dp(5)).apply {
+                        topMargin = dp(4)
+                        gravity = Gravity.CENTER_HORIZONTAL
+                    },
+                )
+            }
+        }
+
+        fun modeSegment(label: String, selected: Boolean, onTap: () -> Unit): TextView {
+            return TextView(activity).apply {
+                text = label
+                gravity = Gravity.CENTER
+                minHeight = dp(42)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+                setTypeface(Typeface.DEFAULT_BOLD)
+                setTextColor(
+                    if (selected) Color.parseColor("#111111") else Color.parseColor("#CCFFFFFF"),
+                )
+                background = if (selected) {
+                    GradientDrawable().apply {
+                        setColor(Color.WHITE)
+                        cornerRadius = dpF(21f)
+                    }
+                } else {
+                    null
+                }
+                setOnClickListener { onTap() }
+            }
+        }
+
+        fun rebuildModes() {
+            modesHost.removeAllViews()
+            if (!audioMode) {
+                val sources = LinearLayout(activity).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER
+                    setPadding(0, 0, 0, dp(10))
+                }
+                sources.addView(sourceLabel("Device camera", "📹", true))
+                sources.addView(sourceLabel("Mobile gaming", "📱", false))
+                modesHost.addView(sources)
+            }
+
+            val segment = LinearLayout(activity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                weightSum = 2f
+                setPadding(dp(3), dp(3), dp(3), dp(3))
+                background = GradientDrawable().apply {
+                    setColor(Color.parseColor("#33FFFFFF"))
+                    cornerRadius = dpF(24f)
+                }
+            }
+            segment.addView(
+                modeSegment("Video", !audioMode) {
+                    if (audioMode) {
+                        audioMode = false
+                        ArCameraBridge.liveStartEventSink?.invoke(
+                            "onLiveStartMediaMode",
+                            false,
+                        )
+                        rebuildModes()
+                    }
+                },
+                LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f),
+            )
+            segment.addView(
+                modeSegment("Voice Chat", audioMode) {
+                    if (!audioMode) {
+                        audioMode = true
+                        ArCameraBridge.liveStartEventSink?.invoke(
+                            "onLiveStartMediaMode",
+                            true,
+                        )
+                        rebuildModes()
+                    }
+                },
+                LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f),
+            )
+            modesHost.addView(
+                segment,
+                LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                ),
+            )
+            modesHost.addView(
+                TextView(activity).apply {
+                    text = if (audioMode) "Microphone only" else "Camera + microphone"
+                    setTextColor(Color.parseColor("#88FFFFFF"))
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+                    gravity = Gravity.CENTER
+                    setPadding(0, dp(6), 0, 0)
+                },
+            )
+        }
+        rebuildModes()
+        panel.addView(modesHost)
 
         val goLive = Button(activity).apply {
             text = "Go LIVE"
@@ -468,50 +622,9 @@ object ArLiveStartPopup {
             ).apply {
                 marginStart = dp(18)
                 marginEnd = dp(18)
+                bottomMargin = dp(8)
             },
         )
-
-        // Mode selector with cyan selected dot.
-        val modes = LinearLayout(activity).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
-            setPadding(0, dp(12), 0, dp(6))
-        }
-        fun modeCol(text: String, glyph: String, active: Boolean): LinearLayout {
-            return LinearLayout(activity).apply {
-                orientation = LinearLayout.VERTICAL
-                gravity = Gravity.CENTER_HORIZONTAL
-                setPadding(dp(12), 0, dp(12), 0)
-                addView(
-                    TextView(activity).apply {
-                        this.text = "$glyph  $text"
-                        setTextColor(
-                            if (active) Color.WHITE else Color.parseColor("#73FFFFFF"),
-                        )
-                        setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
-                        setTypeface(if (active) Typeface.DEFAULT_BOLD else Typeface.DEFAULT)
-                        gravity = Gravity.CENTER
-                    },
-                )
-                addView(
-                    View(activity).apply {
-                        background = GradientDrawable().apply {
-                            setColor(
-                                if (active) Color.parseColor(CYAN_DOT) else Color.TRANSPARENT,
-                            )
-                            shape = GradientDrawable.OVAL
-                        }
-                    },
-                    LinearLayout.LayoutParams(dp(6), dp(6)).apply {
-                        topMargin = dp(5)
-                        gravity = Gravity.CENTER_HORIZONTAL
-                    },
-                )
-            }
-        }
-        modes.addView(modeCol("Device camera", "📹", true))
-        modes.addView(modeCol("Mobile gaming", "📱", false))
-        panel.addView(modes)
 
         // Bottom tabs: POST · TEMPLATES · LIVE
         val tabs = LinearLayout(activity).apply {
@@ -581,6 +694,7 @@ object ArLiveStartPopup {
         try {
             d.show()
             dialog = d
+            panel.requestApplyInsets()
             android.util.Log.i("ArLiveStartPopup", "TikTok Go LIVE chrome shown")
         } catch (t: Throwable) {
             android.util.Log.e("ArLiveStartPopup", "show failed", t)

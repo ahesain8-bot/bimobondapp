@@ -27,6 +27,7 @@ class ArCameraBridge {
   static void Function(String label)? onLiveStartComingSoon;
   static void Function()? onLiveStartAddTopic;
   static void Function()? onLiveStartSchedule;
+  static void Function(bool isAudioMode)? onLiveStartMediaMode;
 
   /// Registers platform → Dart callbacks (e.g. layout max-duration auto-stop).
   static void installPlatformCallbacks() {
@@ -64,6 +65,8 @@ class ArCameraBridge {
         onLiveStartAddTopic?.call();
       } else if (call.method == 'onLiveStartSchedule') {
         onLiveStartSchedule?.call();
+      } else if (call.method == 'onLiveStartMediaMode') {
+        onLiveStartMediaMode?.call(call.arguments == true);
       }
     });
   }
@@ -84,6 +87,7 @@ class ArCameraBridge {
     onLiveStartComingSoon = null;
     onLiveStartAddTopic = null;
     onLiveStartSchedule = null;
+    onLiveStartMediaMode = null;
     _channel.setMethodCallHandler(null);
   }
 
@@ -312,9 +316,13 @@ class ArCameraBridge {
   }
 
   /// Shows/hides native live-start chrome drawn above the beauty GLSurfaceView.
-  static Future<void> setLiveStartChrome({required bool visible}) async {
+  static Future<void> setLiveStartChrome({
+    required bool visible,
+    bool? audioMode,
+  }) async {
     await _channel.invokeMethod<void>('setLiveStartChrome', {
       'visible': visible,
+      if (audioMode != null) 'audioMode': audioMode,
     });
   }
 

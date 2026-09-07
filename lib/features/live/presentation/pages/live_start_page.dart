@@ -18,6 +18,7 @@ import 'service_plus_page.dart';
 import 'fans_community_page.dart';
 import 'start_live_share_page.dart';
 import 'start_live_interaction_sheet.dart';
+import '../widgets/room/live_audio_room_stage.dart';
 import '../widgets/start_live/ar_live_camera_preview.dart';
 import '../widgets/start_live/bottom_tabs.dart';
 import '../widgets/start_live/camera_preview_layer.dart';
@@ -114,6 +115,7 @@ class _LiveStartPageState extends State<LiveStartPage>
           _openFromNative(() => showLiveTopicDialog(context));
       ArCameraBridge.onLiveStartSchedule = () =>
           _openFromNative(() => showLiveSchedulePicker(context));
+      ArCameraBridge.onLiveStartMediaMode = _onNativeMediaMode;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _enableNativeChrome();
       });
@@ -123,14 +125,28 @@ class _LiveStartPageState extends State<LiveStartPage>
     }
   }
 
+  bool get _isAudioMode {
+    final state = _liveBloc.state;
+    return state is LiveReady && state.isAudioMode;
+  }
+
   Future<void> _enableNativeChrome() async {
     if (!mounted || !_useNativeChrome) return;
-    await ArCameraBridge.setLiveStartChrome(visible: true);
+    final audio = _isAudioMode;
+    await ArCameraBridge.setLiveStartChrome(visible: true, audioMode: audio);
+    await ArCameraBridge.setLocalPreviewHidden(audio);
   }
 
   Future<void> _hideNativeChrome() async {
     if (!_useNativeChrome) return;
     await ArCameraBridge.setLiveStartChrome(visible: false);
+  }
+
+  Future<void> _onNativeMediaMode(bool isAudioMode) async {
+    _liveBloc.add(LiveMediaModeChanged(isAudioMode));
+    // Hide FaceWarp above Flutter so Voice Chat stage is visible. Do not
+    // stopCamera — toggling VIDEO back must reuse the same CameraX session.
+    await ArCameraBridge.setLocalPreviewHidden(isAudioMode);
   }
 
   Future<void> _onNativeGoLive(String title) async {
@@ -149,9 +165,9 @@ class _LiveStartPageState extends State<LiveStartPage>
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not start live: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Could not start live: $e')));
       }
       if (mounted && _useNativeChrome) {
         await _enableNativeChrome();
@@ -251,7 +267,9 @@ class _LiveStartPageState extends State<LiveStartPage>
       ArCameraBridge.onLiveStartComingSoon = null;
       ArCameraBridge.onLiveStartAddTopic = null;
       ArCameraBridge.onLiveStartSchedule = null;
+      ArCameraBridge.onLiveStartMediaMode = null;
       ArCameraBridge.setLiveStartChrome(visible: false);
+      ArCameraBridge.setLocalPreviewHidden(false);
     }
     WidgetsBinding.instance.removeObserver(this);
     _liveBloc.close();
@@ -370,6 +388,22 @@ class _LiveStartPageState extends State<LiveStartPage>
             fit: StackFit.expand,
             children: [
               if (!_reuseAr) const Positioned.fill(child: CameraPreviewLayer()),
+              Positioned.fill(
+                child: BlocBuilder<LiveBloc, LiveState>(
+                  buildWhen: (previous, current) {
+                    final a = previous is LiveReady && previous.isAudioMode;
+                    final b = current is LiveReady && current.isAudioMode;
+                    return a != b;
+                  },
+                  builder: (context, state) {
+                    final audio = state is LiveReady && state.isAudioMode;
+                    if (!audio || !_reuseAr) {
+                      return const SizedBox.shrink();
+                    }
+                    return const LiveAudioRoomStage(hostName: 'Voice Chat');
+                  },
+                ),
+              ),
               if (_isBeautifyPanelVisible ||
                   _isEffectsPanelVisible ||
                   _isSettingsPanelVisible)
