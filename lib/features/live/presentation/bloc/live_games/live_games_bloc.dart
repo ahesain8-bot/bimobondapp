@@ -157,6 +157,7 @@ class LiveGamesBloc extends Bloc<LiveGamesEvent, LiveGamesState> {
   final LiveGamesRepository _repository;
   StreamSubscription<Object>? _socketSubscription;
   String? _liveId;
+  int _generation = 0;
 
   @override
   Future<void> close() async {
@@ -169,7 +170,8 @@ class LiveGamesBloc extends Bloc<LiveGamesEvent, LiveGamesState> {
     Emitter<LiveGamesState> emit,
   ) async {
     _liveId = event.liveId;
-    emit(state.copyWith(loading: true, clearGame: true, clearMessage: true));
+    final generation = ++_generation;
+    emit(LiveGamesState(loading: true, catalog: state.catalog));
     List<LiveGameCatalogEntry> catalog = state.catalog;
     try {
       catalog = await _repository.catalog();
@@ -181,13 +183,13 @@ class LiveGamesBloc extends Bloc<LiveGamesEvent, LiveGamesState> {
     try {
       game = await _repository.activeGame(event.liveId);
     } catch (e) {
-      if (isClosed) return;
+      if (isClosed || generation != _generation) return;
       emit(
         state.copyWith(loading: false, catalog: catalog, message: e.toString()),
       );
       return;
     }
-    if (isClosed || _liveId != event.liveId) return;
+    if (isClosed || generation != _generation) return;
     emit(LiveGamesState(catalog: catalog, game: game));
   }
 
@@ -196,7 +198,8 @@ class LiveGamesBloc extends Bloc<LiveGamesEvent, LiveGamesState> {
     Emitter<LiveGamesState> emit,
   ) async {
     final liveId = _liveId;
-    if (liveId == null || state.busy) return;
+    final generation = _generation;
+    if (liveId == null || state.loading || state.busy) return;
     if (state.hasActiveGame) {
       emit(state.copyWith(notice: LiveGamesNotice.alreadyRunning));
       return;
@@ -211,10 +214,10 @@ class LiveGamesBloc extends Bloc<LiveGamesEvent, LiveGamesState> {
         correctIndex: event.correctIndex,
         prizes: event.prizes,
       );
-      if (isClosed || _liveId != liveId) return;
+      if (isClosed || generation != _generation) return;
       emit(state.copyWith(busy: false, game: game));
     } catch (e) {
-      if (isClosed) return;
+      if (isClosed || generation != _generation) return;
       emit(state.copyWith(busy: false, message: e.toString()));
     }
   }
@@ -225,7 +228,8 @@ class LiveGamesBloc extends Bloc<LiveGamesEvent, LiveGamesState> {
   ) async {
     final liveId = _liveId;
     final game = state.game;
-    if (liveId == null || game == null || state.busy) return;
+    final generation = _generation;
+    if (liveId == null || game == null || state.loading || state.busy) return;
     // One play per viewer, and only while the game is running.
     if (!game.canPlay) return;
     if (game.type == LiveGameType.quiz &&
@@ -241,19 +245,28 @@ class LiveGamesBloc extends Bloc<LiveGamesEvent, LiveGamesState> {
         gameId: game.id,
         optionIndex: game.type == LiveGameType.quiz ? event.optionIndex : null,
       );
-      if (isClosed || _liveId != liveId) return;
+      if (isClosed || generation != _generation) return;
+      if (state.game?.id != game.id) {
+        emit(state.copyWith(busy: false));
+        return;
+      }
+      // A successful play is personal evidence even when the response is a
+      // public game snapshot. Keep a newer socket end result if it arrived
+      // while this request was in flight.
+      final result = state.game?.isEnded == true
+          ? state.game!
+          : (updated?.id == game.id ? updated! : game);
       emit(
         state.copyWith(
           busy: false,
-          // The server's own view wins; the local flag only covers a response
-          // that carried no game body.
-          game:
-              updated ??
-              game.copyWith(myPlayed: true, myOptionIndex: event.optionIndex),
+          game: result.copyWith(
+            myPlayed: true,
+            myOptionIndex: result.myOptionIndex ?? event.optionIndex,
+          ),
         ),
       );
     } catch (e) {
-      if (isClosed) return;
+      if (isClosed || generation != _generation) return;
       emit(state.copyWith(busy: false, message: e.toString()));
     }
   }
@@ -264,14 +277,24 @@ class LiveGamesBloc extends Bloc<LiveGamesEvent, LiveGamesState> {
   ) async {
     final liveId = _liveId;
     final game = state.game;
-    if (liveId == null || game == null || state.busy || !game.isActive) return;
+    final generation = _generation;
+    if (liveId == null ||
+        game == null ||
+        state.loading ||
+        state.busy ||
+        !game.isActive)
+      return;
     emit(state.copyWith(busy: true, clearMessage: true));
     try {
       final updated = await _repository.endGame(liveId, gameId: game.id);
-      if (isClosed || _liveId != liveId) return;
+      if (isClosed || generation != _generation) return;
+      if (state.game?.id != game.id) {
+        emit(state.copyWith(busy: false));
+        return;
+      }
       emit(state.copyWith(busy: false, game: updated ?? game));
     } catch (e) {
-      if (isClosed) return;
+      if (isClosed || generation != _generation) return;
       emit(state.copyWith(busy: false, message: e.toString()));
     }
   }
@@ -295,7 +318,7 @@ class LiveGamesBloc extends Bloc<LiveGamesEvent, LiveGamesState> {
       state.copyWith(
         // A push is broadcast to the room, so it carries no viewer-scoped
         // play. Keep what this viewer already knows about their own play.
-        game: current == null
+        game: current == null || current.id != incoming.id
             ? incoming
             : incoming.copyWith(
                 myPlayed: incoming.myPlayed || current.myPlayed,

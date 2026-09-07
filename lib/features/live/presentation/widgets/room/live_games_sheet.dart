@@ -50,25 +50,30 @@ class LiveGamesSheet extends StatelessWidget {
               16,
               16 + MediaQuery.viewInsetsOf(context).bottom,
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  l.liveGamesTitle,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    l.liveGamesTitle,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                if (state.loading)
-                  const Center(child: CircularProgressIndicator())
-                else if (state.game != null)
-                  _GameView(game: state.game!, isHost: isHost, busy: state.busy)
-                else ...[
-                  Text(l.liveGamesNone),
-                  if (isHost) ...[
+                  const SizedBox(height: 12),
+                  if (state.loading)
+                    const Center(child: CircularProgressIndicator())
+                  else if (state.game != null)
+                    _GameView(
+                      game: state.game!,
+                      isHost: isHost,
+                      busy: state.busy,
+                    )
+                  else
+                    Text(l.liveGamesNone),
+                  if (!state.loading && isHost && !state.hasActiveGame) ...[
                     const SizedBox(height: 12),
                     for (final entry in state.catalog)
                       ListTile(
@@ -90,7 +95,7 @@ class LiveGamesSheet extends StatelessWidget {
                       ),
                   ],
                 ],
-              ],
+              ),
             ),
           ),
         );

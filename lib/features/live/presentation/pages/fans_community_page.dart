@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:firebase_auth/firebase_auth.dart' as fb;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -44,7 +45,10 @@ class _FansCommunityPageState extends State<FansCommunityPage> {
     super.didChangeDependencies();
     if (_bloc != null) return;
 
-    final apiClient = LiveApiClient();
+    final apiClient = LiveApiClient(
+      idTokenProvider: () async =>
+          fb.FirebaseAuth.instance.currentUser?.getIdToken(),
+    );
     final remote = FanClubRemoteDataSource(apiClient: apiClient);
     final repository = FanClubRepositoryImpl(remote: remote);
     _bloc = FanClubBloc(

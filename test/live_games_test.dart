@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 
 import 'package:bimobondapp/core/network/live_api_client.dart';
 import 'package:bimobondapp/features/live/data/datasources/live_games_remote_datasource.dart';
@@ -269,6 +270,127 @@ void main() {
 
       expect(plays, 0);
       await h.bloc.close();
+    });
+
+    test(
+      'a new game does not inherit the previous game participation',
+      () async {
+        final h = harness(
+          (r) => _catalogOr(r, {
+            'id': 'old',
+            'type': 'QUIZ',
+            'status': 'ENDED',
+            'options': ['A', 'B'],
+            'hasPlayed': true,
+            'myPlay': {'optionIndex': 1},
+          }),
+        );
+        addTearDown(h.bloc.close);
+        h.bloc.add(const LiveGamesStarted('live-1'));
+        await h.bloc.stream.firstWhere((s) => !s.loading && s.game != null);
+        h.bloc.add(
+          const LiveGameSocketReceived({
+            'id': 'new',
+            'type': 'QUIZ',
+            'status': 'ACTIVE',
+            'options': ['C', 'D'],
+          }),
+        );
+        final next = await h.bloc.stream.firstWhere((s) => s.game?.id == 'new');
+        expect(next.game!.canPlay, isTrue);
+        expect(next.game!.myOptionIndex, isNull);
+      },
+    );
+
+    test(
+      'a successful play with a public snapshot still prevents duplicates',
+      () async {
+        var plays = 0;
+        final h = harness((r) async {
+          if (r.method == 'POST') plays++;
+          return _catalogOr(r, {
+            'id': 'g1',
+            'type': 'QUIZ',
+            'status': 'ACTIVE',
+            'options': ['A', 'B'],
+          });
+        });
+        addTearDown(h.bloc.close);
+        h.bloc.add(const LiveGamesStarted('live-1'));
+        await h.bloc.stream.firstWhere((s) => !s.loading && s.game != null);
+        h.bloc.add(const LiveGamePlayRequested(optionIndex: 1));
+        final played = await h.bloc.stream.firstWhere((s) => !s.busy);
+        expect(played.game!.canPlay, isFalse);
+        expect(played.game!.myOptionIndex, 1);
+        h.bloc.add(const LiveGamePlayRequested(optionIndex: 0));
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+        expect(plays, 1);
+      },
+    );
+
+    test('an old room failure cannot overwrite a newly opened game', () async {
+      final pending = Completer<http.Response>();
+      final requested = Completer<void>();
+      final h = harness((r) async {
+        if (r.method == 'POST') {
+          requested.complete();
+          return pending.future;
+        }
+        return _catalogOr(r, {
+          'id': r.url.path.contains('live-2') ? 'g2' : 'g1',
+          'type': 'QUIZ',
+          'status': 'ACTIVE',
+          'options': ['A', 'B'],
+        });
+      });
+      addTearDown(h.bloc.close);
+      h.bloc.add(const LiveGamesStarted('live-1'));
+      await h.bloc.stream.firstWhere((s) => !s.loading && s.game != null);
+      h.bloc.add(const LiveGamePlayRequested(optionIndex: 1));
+      await requested.future;
+      h.bloc.add(const LiveGamesStarted('live-2'));
+      await h.bloc.stream.firstWhere((s) => !s.loading && s.game?.id == 'g2');
+      pending.complete(http.Response('{"message":"old room failed"}', 500));
+      await Future<void>.delayed(const Duration(milliseconds: 40));
+      expect(h.bloc.state.game!.id, 'g2');
+      expect(h.bloc.state.message, isNull);
+      expect(h.bloc.state.busy, isFalse);
+    });
+
+    test('a late play response does not reopen an ended game', () async {
+      final pending = Completer<http.Response>();
+      final requested = Completer<void>();
+      final active = {
+        'id': 'g1',
+        'type': 'QUIZ',
+        'status': 'ACTIVE',
+        'options': ['A', 'B'],
+      };
+      final h = harness((r) async {
+        if (r.method == 'POST') {
+          requested.complete();
+          return pending.future;
+        }
+        return _catalogOr(r, active);
+      });
+      addTearDown(h.bloc.close);
+      h.bloc.add(const LiveGamesStarted('live-1'));
+      await h.bloc.stream.firstWhere((s) => !s.loading && s.game != null);
+      h.bloc.add(const LiveGamePlayRequested(optionIndex: 1));
+      await requested.future;
+      h.bloc.add(
+        LiveGameSocketReceived({
+          ...active,
+          'status': 'ENDED',
+          'correctIndex': 1,
+        }),
+      );
+      await h.bloc.stream.firstWhere((s) => s.game?.isEnded == true);
+      pending.complete(http.Response(jsonEncode(active), 200));
+      final result = await h.bloc.stream.firstWhere((s) => !s.busy);
+      expect(result.game!.isEnded, isTrue);
+      expect(result.game!.correctIndex, 1);
+      expect(result.game!.myPlayed, isTrue);
     });
 
     test('ending reveals the server result, not a local one', () async {

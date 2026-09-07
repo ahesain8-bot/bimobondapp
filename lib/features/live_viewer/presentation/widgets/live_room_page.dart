@@ -4,6 +4,8 @@ import 'dart:math' as math;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
+import '../../../../core/network/live_api_client.dart';
+import '../../../live/presentation/pages/fans_community_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -88,7 +90,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
 
   /// Official games share the viewer's existing room socket for `liveGame`.
   late final LiveGamesBloc _gamesBloc = LiveGamesBloc(
-    repository: LiveGamesRepositoryImpl(remote: LiveGamesRemoteDataSource()),
+    repository: LiveGamesRepositoryImpl(
+      remote: LiveGamesRemoteDataSource(apiClient: di.sl<LiveApiClient>()),
+    ),
     socketEvents: di.sl<SocketService>().events,
   );
 
@@ -230,7 +234,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     // Replay reads are plain REST; the socket datasource is only constructed
     // because the repository owns one, and this screen never connects it.
     final repository = LiveSessionRepositoryImpl(
-      remote: LivesRemoteDataSource(),
+      remote: LivesRemoteDataSource(apiClient: di.sl<LiveApiClient>()),
       socket: LivesSocketDataSource(
         idTokenProvider: () async =>
             fb.FirebaseAuth.instance.currentUser?.getIdToken(),
@@ -282,15 +286,16 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       liveId: live.id,
       hostName: live.hostName,
       hostAvatar: live.hostAvatar,
-      onJoinFanClub: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Subscription prices are not verified yet.'),
-            backgroundColor: AppColors.surface,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      },
+      onJoinFanClub: () => _openFanClub(live),
+    );
+  }
+
+  void _openFanClub(LiveEntity live) {
+    if (!widget.isActive || live.hostId.isEmpty) return;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => FansCommunityPage(creatorId: live.hostId),
+      ),
     );
   }
 
@@ -1098,17 +1103,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                     top: MediaQuery.paddingOf(context).top + 78,
                     left: TikTokLiveTokens.topInsetH,
                     child: FanClubJoinButton(
-                      onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Subscription prices are not verified yet.',
-                            ),
-                            backgroundColor: AppColors.surface,
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
-                      },
+                      onTap: () => _openFanClub(live),
                     ),
                   ),
                 if (isMultiGuest && !isPk && !isMultiGrid)
