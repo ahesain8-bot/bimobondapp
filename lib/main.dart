@@ -66,26 +66,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Google Maps and the camera/beauty stack are deliberately lazy. Native
-  // warm-up work still competes for the Android platform thread even when its
-  // Dart Future is not awaited, which previously kept the native splash on
-  // screen for ~30 seconds on a cold start. The map screen and camera screen
-  // initialise their own dependencies immediately before first use.
+  
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await PushNotificationService.instance.initializeEarly();
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-  // Auth first and on its own: the rest read the SharedPreferences instance
-  // and the API client it registers.
+
   await auth_di.initAuth();
 
-  // Everything below only registers into GetIt and touches already-cached
-  // async singletons, so there is no ordering between them — but they used to
-  // be twenty-one sequential awaits in front of `runApp`, which is what the
-  // platform log reported as "Skipped 160 frames! The application may be doing
-  // too much work on its main thread" and the long run of `onPreDraw return
-  // false` while Flutter waited for a first frame that could not be produced.
-  // Awaited as one batch they cost roughly the slowest of the group instead of
-  // the sum of all of them.
   await Future.wait<void>([
     social_di.initSocial(),
     posts_di.initPosts(),
