@@ -88,7 +88,8 @@ dependencies:
   cached_network_image: ^3.4.1
   flutter_cache_manager: ^3.4.1
   sqflite: ^2.4.2
-  google_mlkit_face_detection: ^0.13.2
+  # 0.14.0 adds Apple Silicon iOS 26+ simulator support.
+  google_mlkit_face_detection: ^0.14.0
   crop_your_image: ^2.0.0
   google_fonts: ^8.2.0
   just_audio: ^0.10.6
