@@ -4,60 +4,39 @@ import 'package:bimobondapp/core/routes/app_router.dart';
 import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:bimobondapp/app/auth/presentation/di/auth_injector.dart'
-    as auth_di;
-import 'package:bimobondapp/app/posts/presentation/di/posts_injector.dart'
-    as posts_di;
-import 'package:bimobondapp/app/categories/presentation/di/categories_injector.dart'
-    as categories_di;
-import 'package:bimobondapp/app/countries/presentation/di/countries_injector.dart'
-    as countries_di;
-import 'package:bimobondapp/app/interests/presentation/di/interests_injector.dart'
-    as interests_di;
-import 'package:bimobondapp/app/gifts/presentation/di/gifts_injector.dart'
-    as gifts_di;
-import 'package:bimobondapp/app/wallets/presentation/di/wallets_injector.dart'
-    as wallets_di;
-import 'package:bimobondapp/app/auctions/presentation/di/auctions_injector.dart'
-    as auctions_di;
+import 'package:bimobondapp/app/auth/presentation/di/auth_injector.dart' as auth_di;
+import 'package:bimobondapp/app/posts/presentation/di/posts_injector.dart' as posts_di;
+import 'package:bimobondapp/app/categories/presentation/di/categories_injector.dart' as categories_di;
+import 'package:bimobondapp/app/countries/presentation/di/countries_injector.dart' as countries_di;
+import 'package:bimobondapp/app/interests/presentation/di/interests_injector.dart' as interests_di;
+import 'package:bimobondapp/app/gifts/presentation/di/gifts_injector.dart' as gifts_di;
+import 'package:bimobondapp/app/wallets/presentation/di/wallets_injector.dart' as wallets_di;
+import 'package:bimobondapp/app/auctions/presentation/di/auctions_injector.dart' as auctions_di;
 import 'package:bimobondapp/app/shop/presentation/cubit/shop_cart_cubit.dart';
-import 'package:bimobondapp/app/shop/presentation/di/shop_injector.dart'
-    as shop_di;
-import 'package:bimobondapp/app/seller_verification/presentation/di/seller_verification_injector.dart'
-    as seller_verification_di;
-import 'package:bimobondapp/app/stories/presentation/di/stories_injector.dart'
-    as stories_di;
-import 'package:bimobondapp/app/chats/presentation/di/chats_injector.dart'
-    as chats_di;
-import 'package:bimobondapp/app/social/presentation/di/social_injector.dart'
-    as social_di;
+import 'package:bimobondapp/app/shop/presentation/di/shop_injector.dart' as shop_di;
+import 'package:bimobondapp/app/seller_verification/presentation/di/seller_verification_injector.dart' as seller_verification_di;
+import 'package:bimobondapp/app/stories/presentation/di/stories_injector.dart' as stories_di;
+import 'package:bimobondapp/app/chats/presentation/di/chats_injector.dart' as chats_di;
+import 'package:bimobondapp/app/social/presentation/di/social_injector.dart' as social_di;
 import 'package:bimobondapp/app/auth/presentation/bloc/auth_bloc.dart';
 import 'package:bimobondapp/app/posts/presentation/bloc/posts_bloc.dart';
 import 'package:bimobondapp/core/theme/app_theme.dart';
 import 'package:bimobondapp/core/theme/cubit/theme_cubit.dart';
 import 'package:bimobondapp/core/theme/cubit/chat_wallpaper_cubit.dart';
 import 'package:bimobondapp/core/theme/cubit/locale_cubit.dart';
-import 'package:bimobondapp/app/promotions/presentation/di/promotions_injector.dart'
-    as promotions_di;
-import 'package:bimobondapp/app/sounds/presentation/di/sounds_injector.dart'
-    as sounds_di;
-import 'package:bimobondapp/app/search/presentation/di/search_injector.dart'
-    as search_di;
-import 'package:bimobondapp/app/notifications/presentation/di/notifications_injector.dart'
-    as notifications_di;
-import 'package:bimobondapp/app/camera_studio/presentation/di/camera_studio_injector.dart'
-    as camera_studio_di;
-import 'package:bimobondapp/app/video_templates/presentation/di/video_templates_injector.dart'
-    as video_templates_di;
-import 'package:bimobondapp/app/calls/presentation/di/calls_injector.dart'
-    as calls_di;
+import 'package:bimobondapp/app/promotions/presentation/di/promotions_injector.dart' as promotions_di;
+import 'package:bimobondapp/app/sounds/presentation/di/sounds_injector.dart' as sounds_di;
+import 'package:bimobondapp/app/search/presentation/di/search_injector.dart' as search_di;
+import 'package:bimobondapp/app/notifications/presentation/di/notifications_injector.dart' as notifications_di;
+import 'package:bimobondapp/app/camera_studio/presentation/di/camera_studio_injector.dart' as camera_studio_di;
+import 'package:bimobondapp/app/video_templates/presentation/di/video_templates_injector.dart' as video_templates_di;
+import 'package:bimobondapp/app/calls/presentation/di/calls_injector.dart' as calls_di;
 import 'package:bimobondapp/app/calls/presentation/bloc/call_bloc.dart';
 import 'package:bimobondapp/app/calls/presentation/widgets/global_call_listener.dart';
 import 'package:bimobondapp/app/camera_studio/presentation/services/camera_studio_catalog_loader.dart';
 import 'package:bimobondapp/app/notifications/presentation/services/push_notification_service.dart';
 import 'package:bimobondapp/app/notifications/presentation/widgets/notification_auth_listener.dart';
-import 'package:bimobondapp/features/live_viewer/presentation/di/live_viewer_injector.dart'
-    as live_viewer_di;
+import 'package:bimobondapp/features/live_viewer/presentation/di/live_viewer_injector.dart' as live_viewer_di;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:bimobondapp/firebase_options.dart';
@@ -66,7 +45,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await PushNotificationService.instance.initializeEarly();
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
