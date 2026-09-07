@@ -133,6 +133,32 @@ class LiveOperationGuard {
     if (await store.read(key) != null) await store.write(key, 'confirmed');
   }
 
+  /// Clears the journal entry for an operation that may legitimately run
+  /// again later — a renewable subscription, not a one-off entry ticket.
+  ///
+  /// Call this only with personal, operation-specific server evidence that the
+  /// earlier attempt is settled (the caller's own membership, ticket or claim
+  /// as the server reports it). A wallet balance change, a public list, the
+  /// passage of time, or a Refresh tap is not evidence and must not reach here.
+  Future<void> settle({
+    required String userId,
+    required String liveId,
+    required String operation,
+    required String entityId,
+  }) async {
+    final key = keyFor(
+      userId: userId,
+      liveId: liveId,
+      operation: operation,
+      entityId: entityId,
+    );
+    // An in-flight attempt owns the record; releasing it here would let a
+    // second send start while the first is still open.
+    if (userId.isEmpty || _running.contains(key)) return;
+    if (await store.read(key) == null) return;
+    await store.remove(key);
+  }
+
   Future<T> run<T>({
     required String Function() userId,
     required String liveId,

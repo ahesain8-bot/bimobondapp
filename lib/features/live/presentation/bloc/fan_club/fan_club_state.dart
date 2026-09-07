@@ -24,6 +24,7 @@ class FanClubReady extends FanClubState {
     this.creatorId,
     this.busy = false,
     this.message,
+    this.unresolvedTierSlug,
   });
 
   final FanClub club;
@@ -37,6 +38,11 @@ class FanClubReady extends FanClubState {
   /// Short snack-bar message after an action.
   final String? message;
 
+  /// Tier whose purchase was sent but never confirmed. The app shows it as
+  /// awaiting confirmation and refuses to send it again until the server's own
+  /// membership answers for it.
+  final String? unresolvedTierSlug;
+
   FanClubReady copyWith({
     FanClub? club,
     List<FanClubMember>? members,
@@ -45,6 +51,8 @@ class FanClubReady extends FanClubState {
     bool? busy,
     String? message,
     bool clearMessage = false,
+    String? unresolvedTierSlug,
+    bool clearUnresolvedTier = false,
   }) {
     return FanClubReady(
       club: club ?? this.club,
@@ -53,6 +61,9 @@ class FanClubReady extends FanClubState {
       creatorId: creatorId ?? this.creatorId,
       busy: busy ?? this.busy,
       message: clearMessage ? null : (message ?? this.message),
+      unresolvedTierSlug: clearUnresolvedTier
+          ? null
+          : (unresolvedTierSlug ?? this.unresolvedTierSlug),
     );
   }
 }

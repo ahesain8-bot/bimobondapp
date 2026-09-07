@@ -1,4 +1,3 @@
-import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -14,9 +13,12 @@ import '../../domain/usecases/get_my_fan_clubs.dart';
 import '../../domain/usecases/subscribe_fan_club.dart';
 import '../../domain/usecases/unsubscribe_fan_club.dart';
 import '../../domain/usecases/update_fan_club.dart';
+import '../../domain/usecases/add_fan_club_emote.dart';
 import '../bloc/fan_club/fan_club_bloc.dart';
 import '../bloc/fan_club/fan_club_event.dart';
 import '../bloc/fan_club/fan_club_state.dart';
+import '../widgets/fan_club_host_panel.dart';
+import '../widgets/fan_club_membership_section.dart';
 import 'discord_page.dart';
 
 /// Fans community page opened from the start-live tools.
@@ -52,6 +54,7 @@ class _FansCommunityPageState extends State<FansCommunityPage> {
       subscribeFanClub: SubscribeFanClub(repository),
       unsubscribeFanClub: UnsubscribeFanClub(repository),
       updateFanClub: UpdateFanClub(repository),
+      addFanClubEmote: AddFanClubEmote(repository),
       apiClient: apiClient,
     )..add(FanClubLoaded(creatorId: widget.creatorId));
   }
@@ -235,50 +238,68 @@ class _FansCommunityPageState extends State<FansCommunityPage> {
                         ),
                       ),
                     ),
-                    // Join/leave button only makes sense when viewing
-                    // *someone else's* club. When the page is opened from
-                    // the start-live tools (`creatorId` is null) it shows
-                    // the signed-in user's own club — subscribing to your
-                    // own club returns 400 from the server.
-                    if (ready != null && widget.creatorId != null)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(8, 8, 8, 12),
-                        child: SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed: ready.busy || !ready.club.isMember
-                                ? null
-                                : () => bloc.add(
-                                    ready.club.isMember
-                                        ? const FanClubUnsubscribed()
-                                        : const FanClubSubscribed(),
-                                  ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: ready.club.isMember
-                                  ? const Color(0xFFE5E5E5)
-                                  : Colors.black,
-                              foregroundColor: ready.club.isMember
-                                  ? Colors.black
-                                  : Colors.white,
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(22),
-                              ),
-                            ),
-                            child: Text(
-                              ready.busy
-                                  ? '...جارٍ التنفيذ'
-                                  : (ready.club.isMember
-                                        ? 'مغادرة المجتمع'
-                                        : AppLocalizations.of(
-                                            context,
-                                          )!.liveFanClubPriceUnavailable),
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
+                    // Someone else's club: tiers, membership and emotes.
+                    // Own club (opened from the start-live tools): host
+                    // settings, because subscribing to your own club is a
+                    // 400 from the server.
+                    if (ready != null)
+                      Flexible(
+                        child: SingleChildScrollView(
+                          child: widget.creatorId == null
+                              ? FanClubHostPanel(
+                                  club: ready.club,
+                                  busy: ready.busy,
+                                  onSave: ({enabled, name, priceCoins}) =>
+                                      bloc.add(
+                                        FanClubUpdated(
+                                          enabled: enabled,
+                                          name: name,
+                                          priceCoins: priceCoins,
+                                        ),
+                                      ),
+                                  onAddEmote:
+                                      ({
+                                        required code,
+                                        required imageUrl,
+                                        minTier,
+                                      }) => bloc.add(
+                                        FanClubEmoteAdded(
+                                          code: code,
+                                          imageUrl: imageUrl,
+                                          minTier: minTier,
+                                        ),
+                                      ),
+                                )
+                              : Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    FanClubMembershipSection(
+                                      ready: ready,
+                                      onSubscribe: (slug) =>
+                                          bloc.add(FanClubSubscribed(slug)),
+                                    ),
+                                    if (ready.club.isMember)
+                                      Padding(
+                                        padding: const EdgeInsets.fromLTRB(
+                                          12,
+                                          12,
+                                          12,
+                                          12,
+                                        ),
+                                        child: SizedBox(
+                                          width: double.infinity,
+                                          child: OutlinedButton(
+                                            onPressed: ready.busy
+                                                ? null
+                                                : () => bloc.add(
+                                                    const FanClubUnsubscribed(),
+                                                  ),
+                                            child: const Text('مغادرة المجتمع'),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
                         ),
                       ),
                   ],

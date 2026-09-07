@@ -2480,5 +2480,63 @@
         "type": "int"
       }
     }
-  }
+  },
+  "liveFanClubTiers": "Membership tiers",
+  "liveFanClubJoinTier": "Join {tier}",
+  "@liveFanClubJoinTier": {
+    "placeholders": {
+      "tier": {
+        "type": "String"
+      }
+    }
+  },
+  "liveFanClubPriceCoins": "{coins} coins for 30 days",
+  "@liveFanClubPriceCoins": {
+    "placeholders": {
+      "coins": {
+        "type": "int"
+      }
+    }
+  },
+  "liveFanClubCurrentTier": "Your current membership",
+  "liveFanClubLoyalty": "Loyalty: {badge}",
+  "@liveFanClubLoyalty": {
+    "placeholders": {
+      "badge": {
+        "type": "String"
+      }
+    }
+  },
+  "liveFanClubEmotes": "Club emotes",
+  "liveFanClubEmoteLocked": "Unlocks with {tier}",
+  "@liveFanClubEmoteLocked": {
+    "placeholders": {
+      "tier": {
+        "type": "String"
+      }
+    }
+  },
+  "liveFanClubConfirmTitle": "Confirm membership",
+  "liveFanClubConfirmBody": "{coins} coins will be taken from your wallet for {tier} membership for 30 days.",
+  "@liveFanClubConfirmBody": {
+    "placeholders": {
+      "coins": {
+        "type": "int"
+      },
+      "tier": {
+        "type": "String"
+      }
+    }
+  },
+  "liveFanClubConfirmAction": "Pay and continue",
+  "liveFanClubAwaitingConfirmation": "An earlier membership payment is not confirmed yet. Check your membership before trying again.",
+  "liveFanClubHostSettings": "Club settings",
+  "liveFanClubHostPrice": "Basic membership price (coins)",
+  "liveFanClubHostName": "Club name",
+  "liveFanClubHostEnabled": "Enable fan club",
+  "liveFanClubAddEmote": "Add emote",
+  "liveFanClubEmoteCode": "Emote code",
+  "liveFanClubEmoteImage": "Image URL",
+  "liveFanClubEmoteMinTier": "Minimum tier",
+  "liveFanClubSave": "Save"
 }

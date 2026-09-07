@@ -2389,5 +2389,63 @@
         "type": "int"
       }
     }
-  }
+  },
+  "liveFanClubTiers": "شرائح العضوية",
+  "liveFanClubJoinTier": "اشترك في {tier}",
+  "@liveFanClubJoinTier": {
+    "placeholders": {
+      "tier": {
+        "type": "String"
+      }
+    }
+  },
+  "liveFanClubPriceCoins": "{coins} عملة لكل 30 يومًا",
+  "@liveFanClubPriceCoins": {
+    "placeholders": {
+      "coins": {
+        "type": "int"
+      }
+    }
+  },
+  "liveFanClubCurrentTier": "عضويتك الحالية",
+  "liveFanClubLoyalty": "الولاء: {badge}",
+  "@liveFanClubLoyalty": {
+    "placeholders": {
+      "badge": {
+        "type": "String"
+      }
+    }
+  },
+  "liveFanClubEmotes": "ملصقات النادي",
+  "liveFanClubEmoteLocked": "يفتح مع {tier}",
+  "@liveFanClubEmoteLocked": {
+    "placeholders": {
+      "tier": {
+        "type": "String"
+      }
+    }
+  },
+  "liveFanClubConfirmTitle": "تأكيد الاشتراك",
+  "liveFanClubConfirmBody": "سيتم خصم {coins} عملة من محفظتك مقابل عضوية {tier} لمدة 30 يومًا.",
+  "@liveFanClubConfirmBody": {
+    "placeholders": {
+      "coins": {
+        "type": "int"
+      },
+      "tier": {
+        "type": "String"
+      }
+    }
+  },
+  "liveFanClubConfirmAction": "خصم ومتابعة",
+  "liveFanClubAwaitingConfirmation": "اشتراك سابق لم يتأكد بعد. تحقق من عضويتك قبل محاولة جديدة.",
+  "liveFanClubHostSettings": "إعدادات النادي",
+  "liveFanClubHostPrice": "سعر العضوية الأساسية (عملات)",
+  "liveFanClubHostName": "اسم النادي",
+  "liveFanClubHostEnabled": "تفعيل نادي المعجبين",
+  "liveFanClubAddEmote": "إضافة ملصق",
+  "liveFanClubEmoteCode": "رمز الملصق",
+  "liveFanClubEmoteImage": "رابط الصورة",
+  "liveFanClubEmoteMinTier": "أقل شريحة",
+  "liveFanClubSave": "حفظ"
 }

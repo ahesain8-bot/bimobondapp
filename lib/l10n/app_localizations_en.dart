@@ -5364,4 +5364,74 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get shopPreviewChanged => 'Your checkout details changed. Review the updated total before paying.';
+
+  @override
+  String get liveFanClubTiers => 'Membership tiers';
+
+  @override
+  String liveFanClubJoinTier(String tier) {
+    return 'Join $tier';
+  }
+
+  @override
+  String liveFanClubPriceCoins(int coins) {
+    return '$coins coins for 30 days';
+  }
+
+  @override
+  String get liveFanClubCurrentTier => 'Your current membership';
+
+  @override
+  String liveFanClubLoyalty(String badge) {
+    return 'Loyalty: $badge';
+  }
+
+  @override
+  String get liveFanClubEmotes => 'Club emotes';
+
+  @override
+  String liveFanClubEmoteLocked(String tier) {
+    return 'Unlocks with $tier';
+  }
+
+  @override
+  String get liveFanClubConfirmTitle => 'Confirm membership';
+
+  @override
+  String liveFanClubConfirmBody(int coins, String tier) {
+    return '$coins coins will be taken from your wallet for $tier membership for 30 days.';
+  }
+
+  @override
+  String get liveFanClubConfirmAction => 'Pay and continue';
+
+  @override
+  String get liveFanClubAwaitingConfirmation => 'An earlier membership payment is not confirmed yet. Check your membership before trying again.';
+
+  @override
+  String get liveFanClubHostSettings => 'Club settings';
+
+  @override
+  String get liveFanClubHostPrice => 'Basic membership price (coins)';
+
+  @override
+  String get liveFanClubHostName => 'Club name';
+
+  @override
+  String get liveFanClubHostEnabled => 'Enable fan club';
+
+  @override
+  String get liveFanClubAddEmote => 'Add emote';
+
+  @override
+  String get liveFanClubEmoteCode => 'Emote code';
+
+  @override
+  String get liveFanClubEmoteImage => 'Image URL';
+
+  @override
+  String get liveFanClubEmoteMinTier => 'Minimum tier';
+
+  @override
+  String get liveFanClubSave => 'Save';
 }

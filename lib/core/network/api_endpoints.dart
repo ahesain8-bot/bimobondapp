@@ -146,6 +146,9 @@ class ApiEndpoints {
       '/creators/$creatorId/fan-club/subscribe';
   static String creatorsFanClubMembers(String creatorId) =>
       '/creators/$creatorId/fan-club/members';
+  /// `POST /creators/:id/fan-club/emotes` (endpoints2.md §fan club, host only).
+  static String creatorsFanClubEmotes(String creatorId) =>
+      '/creators/$creatorId/fan-club/emotes';
   static const String usersMeFanClubs = '/users/me/fan-clubs';
 
   /// Builds a full URI for the given [path].

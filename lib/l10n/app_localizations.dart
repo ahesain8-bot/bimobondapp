@@ -10324,6 +10324,126 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Your checkout details changed. Review the updated total before paying.'**
   String get shopPreviewChanged;
+
+  /// No description provided for @liveFanClubTiers.
+  ///
+  /// In en, this message translates to:
+  /// **'Membership tiers'**
+  String get liveFanClubTiers;
+
+  /// No description provided for @liveFanClubJoinTier.
+  ///
+  /// In en, this message translates to:
+  /// **'Join {tier}'**
+  String liveFanClubJoinTier(String tier);
+
+  /// No description provided for @liveFanClubPriceCoins.
+  ///
+  /// In en, this message translates to:
+  /// **'{coins} coins for 30 days'**
+  String liveFanClubPriceCoins(int coins);
+
+  /// No description provided for @liveFanClubCurrentTier.
+  ///
+  /// In en, this message translates to:
+  /// **'Your current membership'**
+  String get liveFanClubCurrentTier;
+
+  /// No description provided for @liveFanClubLoyalty.
+  ///
+  /// In en, this message translates to:
+  /// **'Loyalty: {badge}'**
+  String liveFanClubLoyalty(String badge);
+
+  /// No description provided for @liveFanClubEmotes.
+  ///
+  /// In en, this message translates to:
+  /// **'Club emotes'**
+  String get liveFanClubEmotes;
+
+  /// No description provided for @liveFanClubEmoteLocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlocks with {tier}'**
+  String liveFanClubEmoteLocked(String tier);
+
+  /// No description provided for @liveFanClubConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm membership'**
+  String get liveFanClubConfirmTitle;
+
+  /// No description provided for @liveFanClubConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'{coins} coins will be taken from your wallet for {tier} membership for 30 days.'**
+  String liveFanClubConfirmBody(int coins, String tier);
+
+  /// No description provided for @liveFanClubConfirmAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay and continue'**
+  String get liveFanClubConfirmAction;
+
+  /// No description provided for @liveFanClubAwaitingConfirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'An earlier membership payment is not confirmed yet. Check your membership before trying again.'**
+  String get liveFanClubAwaitingConfirmation;
+
+  /// No description provided for @liveFanClubHostSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Club settings'**
+  String get liveFanClubHostSettings;
+
+  /// No description provided for @liveFanClubHostPrice.
+  ///
+  /// In en, this message translates to:
+  /// **'Basic membership price (coins)'**
+  String get liveFanClubHostPrice;
+
+  /// No description provided for @liveFanClubHostName.
+  ///
+  /// In en, this message translates to:
+  /// **'Club name'**
+  String get liveFanClubHostName;
+
+  /// No description provided for @liveFanClubHostEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable fan club'**
+  String get liveFanClubHostEnabled;
+
+  /// No description provided for @liveFanClubAddEmote.
+  ///
+  /// In en, this message translates to:
+  /// **'Add emote'**
+  String get liveFanClubAddEmote;
+
+  /// No description provided for @liveFanClubEmoteCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Emote code'**
+  String get liveFanClubEmoteCode;
+
+  /// No description provided for @liveFanClubEmoteImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Image URL'**
+  String get liveFanClubEmoteImage;
+
+  /// No description provided for @liveFanClubEmoteMinTier.
+  ///
+  /// In en, this message translates to:
+  /// **'Minimum tier'**
+  String get liveFanClubEmoteMinTier;
+
+  /// No description provided for @liveFanClubSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get liveFanClubSave;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

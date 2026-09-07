@@ -5364,4 +5364,74 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get shopPreviewChanged => 'تغيرت تفاصيل الطلب. راجع المجموع المحدّث قبل الدفع.';
+
+  @override
+  String get liveFanClubTiers => 'شرائح العضوية';
+
+  @override
+  String liveFanClubJoinTier(String tier) {
+    return 'اشترك في $tier';
+  }
+
+  @override
+  String liveFanClubPriceCoins(int coins) {
+    return '$coins عملة لكل 30 يومًا';
+  }
+
+  @override
+  String get liveFanClubCurrentTier => 'عضويتك الحالية';
+
+  @override
+  String liveFanClubLoyalty(String badge) {
+    return 'الولاء: $badge';
+  }
+
+  @override
+  String get liveFanClubEmotes => 'ملصقات النادي';
+
+  @override
+  String liveFanClubEmoteLocked(String tier) {
+    return 'يفتح مع $tier';
+  }
+
+  @override
+  String get liveFanClubConfirmTitle => 'تأكيد الاشتراك';
+
+  @override
+  String liveFanClubConfirmBody(int coins, String tier) {
+    return 'سيتم خصم $coins عملة من محفظتك مقابل عضوية $tier لمدة 30 يومًا.';
+  }
+
+  @override
+  String get liveFanClubConfirmAction => 'خصم ومتابعة';
+
+  @override
+  String get liveFanClubAwaitingConfirmation => 'اشتراك سابق لم يتأكد بعد. تحقق من عضويتك قبل محاولة جديدة.';
+
+  @override
+  String get liveFanClubHostSettings => 'إعدادات النادي';
+
+  @override
+  String get liveFanClubHostPrice => 'سعر العضوية الأساسية (عملات)';
+
+  @override
+  String get liveFanClubHostName => 'اسم النادي';
+
+  @override
+  String get liveFanClubHostEnabled => 'تفعيل نادي المعجبين';
+
+  @override
+  String get liveFanClubAddEmote => 'إضافة ملصق';
+
+  @override
+  String get liveFanClubEmoteCode => 'رمز الملصق';
+
+  @override
+  String get liveFanClubEmoteImage => 'رابط الصورة';
+
+  @override
+  String get liveFanClubEmoteMinTier => 'أقل شريحة';
+
+  @override
+  String get liveFanClubSave => 'حفظ';
 }

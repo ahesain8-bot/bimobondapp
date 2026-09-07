@@ -1,7 +1,7 @@
 import '../entities/fan_club.dart';
 import '../repositories/fan_club_repository.dart';
 
-/// Host action: enables / renames the fan club.
+/// Host action: enables / renames / prices the fan club.
 class UpdateFanClub {
   const UpdateFanClub(this._repository);
 
@@ -11,11 +11,13 @@ class UpdateFanClub {
     String creatorId, {
     bool? enabled,
     String? name,
+    int? priceCoins,
   }) {
     return _repository.updateClub(
       creatorId,
       enabled: enabled,
       name: name,
+      priceCoins: priceCoins,
     );
   }
 }
