@@ -78,7 +78,7 @@ class ShopRepositoryImpl implements ShopRepository {
 
   @override
   Future<Either<Failure, List<ProductCategoryEntity>>>
-      getProductCategories() async {
+  getProductCategories() async {
     try {
       return Right(await remoteDataSource.getProductCategories());
     } catch (e) {
@@ -165,6 +165,8 @@ class ShopRepositoryImpl implements ShopRepository {
     required List<CheckoutItemInput> items,
     ProductPaymentMethod? paymentMethod,
     List<CheckoutGiftPaymentInput> giftPayments = const [],
+    String? couponCode,
+    String? liveId,
   }) async {
     try {
       return Right(
@@ -172,6 +174,8 @@ class ShopRepositoryImpl implements ShopRepository {
           items: items,
           paymentMethod: paymentMethod,
           giftPayments: giftPayments,
+          couponCode: couponCode,
+          liveId: liveId,
         ),
       );
     } catch (e) {
@@ -214,8 +218,10 @@ class ShopRepositoryImpl implements ShopRepository {
     int limit = 20,
   }) async {
     try {
-      final result =
-          await remoteDataSource.getMyOrders(page: page, limit: limit);
+      final result = await remoteDataSource.getMyOrders(
+        page: page,
+        limit: limit,
+      );
       return Right(
         OrdersPageEntity(
           items: result.items,
@@ -256,8 +262,10 @@ class ShopRepositoryImpl implements ShopRepository {
     int limit = 20,
   }) async {
     try {
-      final result =
-          await remoteDataSource.getSalesOrders(page: page, limit: limit);
+      final result = await remoteDataSource.getSalesOrders(
+        page: page,
+        limit: limit,
+      );
       return Right(
         OrdersPageEntity(
           items: result.items,
@@ -398,5 +406,4 @@ class ShopRepositoryImpl implements ShopRepository {
       return Left(_map(e));
     }
   }
-
 }

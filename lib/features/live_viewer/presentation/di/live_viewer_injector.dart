@@ -17,6 +17,7 @@ import '../../data/repositories/real_like_repository.dart';
 import '../../data/repositories/real_ranking_repository.dart';
 import '../../data/services/fake_livekit_service.dart';
 import '../../data/services/fake_socket_service.dart';
+import '../../data/services/live_ticket_service.dart';
 import '../../data/services/real_livekit_service.dart';
 import '../../data/services/real_socket_service.dart';
 import '../../domain/repositories/comment_repository.dart';
@@ -74,7 +75,19 @@ Future<void> initLiveViewer() async {
 
   sl.registerLazySingleton<LiveKitService>(() => RealLiveKitService());
 
-  sl.registerLazySingleton<LiveRepository>(() => FakeLiveRepository(sl()));
+  sl.registerLazySingleton<LiveTicketService>(
+    () => LiveTicketService(
+      apiClient: sl(),
+      userId: () => fb.FirebaseAuth.instance.currentUser?.uid ?? '',
+    ),
+  );
+
+  sl.registerLazySingleton<LiveRepository>(
+    () => FakeLiveRepository(
+      sl(),
+      accountId: () => fb.FirebaseAuth.instance.currentUser?.uid ?? '',
+    ),
+  );
 
   sl.registerLazySingleton<GuestRepository>(
     () => RealGuestRepository(apiClient: sl()),
@@ -98,6 +111,7 @@ Future<void> initLiveViewer() async {
 
   sl.registerLazySingleton<LiveInteractiveRepository>(
     () => LiveInteractiveRepositoryImpl(
+      userIdProvider: () => fb.FirebaseAuth.instance.currentUser?.uid ?? '',
       remote: LiveInteractiveRemoteDataSource(apiClient: sl()),
     ),
   );

@@ -4,7 +4,7 @@ import '../../../../core/network/live_api_client.dart';
 /// HTTP access to the Fan Club endpoints (lives/mobile-api.md §20).
 class FanClubRemoteDataSource {
   FanClubRemoteDataSource({LiveApiClient? apiClient})
-      : _api = apiClient ?? LiveApiClient();
+    : _api = apiClient ?? LiveApiClient();
 
   final LiveApiClient _api;
 
@@ -30,12 +30,10 @@ class FanClubRemoteDataSource {
 
   /// `POST /creators/:creatorId/fan-club/subscribe` — join the club.
   Future<Map<String, dynamic>> subscribe(String creatorId) {
-    // Send an empty JSON body `{}` — the server rejects requests that carry
-    // `Content-Type: application/json` with no body (400).
-    return _api.post(
-      ApiEndpoints.creatorsFanClubSubscribe(creatorId),
-      body: <String, dynamic>{},
-    );
+    // P0 makes this a paid mutation with tierSlug. The available contract does
+    // not specify the full tier-price/membership response; never charge the
+    // old implicit/default tier without a verified price and confirmation.
+    throw StateError('FAN_CLUB_PRICE_UNVERIFIED');
   }
 
   /// `DELETE /creators/:creatorId/fan-club/subscribe` — leave the club.

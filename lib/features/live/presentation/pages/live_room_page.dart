@@ -138,6 +138,7 @@ class _LiveRoomPageState extends State<LiveRoomPage>
       media: media,
     );
     _interactiveRepository = LiveInteractiveRepositoryImpl(
+      userIdProvider: () => fb.FirebaseAuth.instance.currentUser?.uid ?? '',
       remote: LiveInteractiveRemoteDataSource(apiClient: apiClient),
     );
     // The room's own HUD socket already carries the interactive pushes, so the
@@ -261,8 +262,12 @@ class _LiveRoomPageState extends State<LiveRoomPage>
                       (previous is! LiveRoomReady ||
                           previous.session.id != current.session.id),
                   listener: (context, state) {
+                    final session = (state as LiveRoomReady).session;
                     context.read<LiveInteractiveBloc>().add(
-                      LiveInteractiveStarted((state as LiveRoomReady).session.id),
+                      LiveInteractiveStarted(
+                        session.id,
+                        giftGoal: session.giftGoal,
+                      ),
                     );
                   },
                 ),

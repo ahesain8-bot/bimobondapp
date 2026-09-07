@@ -1,3 +1,4 @@
+import 'package:bimobondapp/core/services/live_operation_guard.dart';
 import 'package:bimobondapp/app/gifts/data/models/gift_model.dart';
 import 'package:bimobondapp/app/gifts/domain/entities/gift_entity.dart';
 import 'package:bimobondapp/app/gifts/domain/entities/gift_group_entity.dart';
@@ -322,19 +323,33 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
   }
 
   Future<bool> _purchaseGiftInternal(GiftEntity gift) async {
-    final result = await _purchaseGift(PurchaseGiftParams(giftId: gift.id));
-    if (!mounted) return false;
+    final liveId = widget.liveId;
+    Future<dynamic> purchase() async {
+      final result = await _purchaseGift(PurchaseGiftParams(giftId: gift.id));
+      return result.fold(
+        (failure) => throw StateError(failure.message),
+        (value) => value,
+      );
+    }
 
-    return result.fold(
-      (failure) {
-        PopupDialogs.showErrorDialog(context, failure.message);
-        return false;
-      },
-      (inventory) {
-        _applyInventoryUpdate(inventory);
-        return true;
-      },
-    );
+    try {
+      final inventory = liveId != null && liveId.isNotEmpty
+          ? await LiveOperationGuard.shared.run(
+              userId: () => FirebaseAuth.instance.currentUser?.uid ?? '',
+              liveId: liveId,
+              operation: 'gift-purchase',
+              entityId: gift.id,
+              retainSuccess: false,
+              send: purchase,
+            )
+          : await purchase();
+      if (!mounted) return false;
+      _applyInventoryUpdate(inventory as GiftInventoryEntity);
+      return true;
+    } catch (error) {
+      if (mounted) PopupDialogs.showErrorDialog(context, error.toString());
+      return false;
+    }
   }
 
   Future<void> _giftSendTaskChain = Future.value();
@@ -369,8 +384,7 @@ class _LiveGiftSheetBodyState extends State<_LiveGiftSheetBody> {
 
     // Small gifts: keep sheet open, no loading spinner — same as suggested shelf.
     if (isSmallGift) {
-      // Instant combo card — do not wait for socket.
-      widget.onSmallGiftOptimistic?.call(gift);
+      // Realtime combo events confirm the gift; a tap is not a receipt.
       _giftSendTaskChain = _giftSendTaskChain
           .then((_) async {
             if (!mounted) return;

@@ -1,3 +1,5 @@
+import 'live_host_league_sheet.dart';
+import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -25,6 +27,7 @@ class LiveRoomRankingSheet {
           value: repo,
           child: _LiveRoomRankingSheetBody(
             liveId: state.session.id,
+            hostId: state.session.host.id,
             currentRank: state.session.hourlyRank,
             currentLabel: state.session.hourlyRankingLabel,
           ),
@@ -37,11 +40,13 @@ class LiveRoomRankingSheet {
 class _LiveRoomRankingSheetBody extends StatefulWidget {
   const _LiveRoomRankingSheetBody({
     required this.liveId,
+    required this.hostId,
     required this.currentRank,
     required this.currentLabel,
   });
 
   final String liveId;
+  final String hostId;
   final int? currentRank;
   final String currentLabel;
 
@@ -109,6 +114,11 @@ class _LiveRoomRankingSheetBodyState extends State<_LiveRoomRankingSheetBody>
     return LiveRoomHostSheetChrome(
       title: 'ترتيب كل ساعة',
       actions: [
+        IconButton(tooltip: AppLocalizations.of(context)!.liveLeagueTitle,
+          onPressed: () => LiveHostLeagueSheet.show(context,
+            loadLeague: () => repository.loadHostLeague(widget.hostId),
+            loadTiers: repository.loadLeagueTiers),
+          icon: const Icon(Icons.emoji_events_outlined, color: Colors.white70)),
         IconButton(
           onPressed: _loading ? null : _load,
           icon: const Icon(Icons.refresh, color: Colors.white70),

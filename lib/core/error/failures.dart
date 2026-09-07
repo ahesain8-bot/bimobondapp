@@ -27,3 +27,7 @@ class UnauthorizedFailure extends Failure {
 class UnknownFailure extends Failure {
   UnknownFailure(super.message);
 }
+
+class UnresolvedPaymentFailure extends Failure {
+  UnresolvedPaymentFailure() : super('Payment awaiting confirmation');
+}

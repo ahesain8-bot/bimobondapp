@@ -11,7 +11,12 @@ class JoinLiveUseCase {
   Future<Either<Failure, JoinLiveResult>> call(
     String liveId, {
     String? campaignId,
+    String? trafficSource,
   }) {
-    return repository.joinLive(liveId, campaignId: campaignId);
+    return repository.joinLive(
+      liveId,
+      campaignId: campaignId,
+      trafficSource: trafficSource,
+    );
   }
 }

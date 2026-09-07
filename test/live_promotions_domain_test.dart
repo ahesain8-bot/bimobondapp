@@ -99,6 +99,12 @@ class Repo extends LivePromotionsRepository {
   int creates = 0, pays = 0, cancels = 0, reads = 0;
   Completer<LivePromotionCampaign>? createGate;
   Completer<void>? payGate;
+  // Opt-in gates: default false keeps every pre-existing test unchanged.
+  Completer<LivePromotionCampaign>? readGate;
+  bool gateStats = false, gateMine = false;
+  final statsGates = <Completer<LivePromotionStats>>[];
+  final mineGates = <Completer<LivePromotionPage>>[];
+  final minePages = <int>[];
   bool settlePay = true;
   final previews = <Completer<LivePromotionPreview>>[];
   @override
@@ -117,18 +123,37 @@ class Repo extends LivePromotionsRepository {
   @override
   Future<LivePromotionCampaign> getCampaign(String id) async {
     reads++;
+    if (readGate != null) await readGate!.future;
     return current;
   }
 
   @override
-  Future<LivePromotionStats> stats(String id) async => const LivePromotionStats(
-    impressions: 4,
-    spendCoins: 1,
-    remainingCoins: 19,
-  );
+  Future<LivePromotionStats> stats(String id) async {
+    // Only the first call is held open; later calls resolve normally so a test
+    // can let a newer campaign finish while an older read is still pending.
+    if (!gateStats || statsGates.isNotEmpty) {
+      return const LivePromotionStats(
+        impressions: 4,
+        spendCoins: 1,
+        remainingCoins: 19,
+      );
+    }
+    final gate = Completer<LivePromotionStats>();
+    statsGates.add(gate);
+    return gate.future;
+  }
+
   @override
-  Future<LivePromotionPage> mine({int page = 1, int limit = 20}) async =>
-      LivePromotionPage(items: [current], hasMore: page == 1);
+  Future<LivePromotionPage> mine({int page = 1, int limit = 20}) async {
+    minePages.add(page);
+    if (!gateMine) {
+      return LivePromotionPage(items: [current], hasMore: page == 1);
+    }
+    final gate = Completer<LivePromotionPage>();
+    mineGates.add(gate);
+    return gate.future;
+  }
+
   @override
   Future<void> pay(String id) async {
     pays++;
@@ -643,4 +668,186 @@ void main() {
       await c.close();
     },
   );
+
+  // --- Regression tests for defects proven in the current controller. ---
+
+  LivePromotionCampaign listed(String id) => LivePromotionCampaign(
+    id: id,
+    liveId: 'live-1',
+    status: LivePromotionStatus.active,
+    rawStatus: 'ACTIVE',
+    budgetCoins: 20,
+    durationDays: 1,
+    objective: LivePromotionObjective.views,
+    automaticAudience: true,
+    draft: draft,
+  );
+
+  test('a stored package campaign is comparable without request validation', () {
+    // A package create request omits durationDays, but the campaign the server
+    // stores has one. Re-validating stored data as a request is a category
+    // error: it makes a legitimate campaign unquotable.
+    const stored = LivePromotionDraft(
+      packageId: 'package-1',
+      durationDays: 7,
+      automaticAudience: false,
+      targetCountryCodes: ['EG'],
+    );
+    expect(
+      stored.validate(),
+      contains(LivePromotionValidation.budgetMode),
+      reason: 'still invalid as a create request',
+    );
+    expect(
+      () => stored.toJson(),
+      throwsA(isA<LivePromotionValidationException>()),
+    );
+    final comparable = stored.toComparableJson();
+    expect(comparable['packageId'], 'package-1');
+    expect(comparable['targetCountryCodes'], ['EG']);
+  });
+
+  test('a package campaign with a custom audience can still be paid', () async {
+    final packageCampaign = LivePromotionCampaign(
+      id: 'campaign-1',
+      liveId: 'live-1',
+      status: LivePromotionStatus.pendingPayment,
+      rawStatus: 'PENDING_PAYMENT',
+      budgetCoins: 20,
+      durationDays: 7,
+      objective: LivePromotionObjective.views,
+      automaticAudience: false,
+      draft: const LivePromotionDraft(
+        packageId: 'package-1',
+        durationDays: 7,
+        automaticAudience: false,
+        targetCountryCodes: ['EG'],
+      ),
+    );
+    final repo = Repo()..current = packageCampaign;
+    final c = LivePromotionsController(
+      repository: repo,
+      refreshWallet: () async => 100,
+    );
+    await c.openCampaign('campaign-1');
+    await c.pay();
+    expect(c.state.error, isNull);
+    expect(repo.pays, 1);
+    await c.close();
+  });
+
+  test(
+    'late stats never land on a campaign the user has switched away from',
+    () async {
+      final repo = Repo();
+      final c = LivePromotionsController(
+        repository: repo,
+        refreshWallet: () async => 100,
+      );
+      await c.openCampaign('campaign-1');
+      repo.gateStats = true;
+      // Background cleanup reads campaign-1 without taking the loading flag.
+      c.onLiveEnded();
+      await Future.delayed(Duration.zero);
+      expect(repo.statsGates.length, 1);
+      // Meanwhile the user opens a different campaign, which completes first.
+      repo.current = listed('campaign-2');
+      await c.openCampaign('campaign-2');
+      expect(c.state.campaign!.id, 'campaign-2');
+      expect(c.state.stats!.impressions, 4);
+      // campaign-1's stats resolve last; they must be discarded, not displayed.
+      repo.statsGates[0].complete(const LivePromotionStats(impressions: 7));
+      await Future.delayed(Duration.zero);
+      expect(c.state.campaign!.id, 'campaign-2');
+      expect(c.state.stats!.impressions, 4);
+      await c.close();
+    },
+  );
+
+  test('a stale loadMore page never lands on a refreshed list', () async {
+    final repo = Repo()..gateMine = true;
+    final c = LivePromotionsController(
+      repository: repo,
+      refreshWallet: () async => 100,
+    );
+    final first = c.refresh();
+    await Future.delayed(Duration.zero);
+    repo.mineGates[0].complete(
+      LivePromotionPage(items: [listed('c1')], hasMore: true),
+    );
+    await first;
+    expect(c.state.items.map((e) => e.id).toList(), ['c1']);
+
+    final second = c.loadMore();
+    await Future.delayed(Duration.zero);
+    repo.mineGates[1].complete(
+      LivePromotionPage(items: [listed('c2')], hasMore: true),
+    );
+    await second;
+    expect(c.state.items.map((e) => e.id).toList(), ['c1', 'c2']);
+
+    // Page 3 is in flight when the list is reloaded from page 1.
+    final stale = c.loadMore();
+    await Future.delayed(Duration.zero);
+    final reload = c.refresh();
+    await Future.delayed(Duration.zero);
+    repo.mineGates[3].complete(
+      LivePromotionPage(items: [listed('c1')], hasMore: true),
+    );
+    await reload;
+    repo.mineGates[2].complete(
+      LivePromotionPage(items: [listed('c3')], hasMore: true),
+    );
+    await stale;
+    expect(c.state.items.map((e) => e.id).toList(), ['c1']);
+
+    // The cursor must still be at page 1, so the next fetch is page 2 - not 3.
+    final next = c.loadMore();
+    await Future.delayed(Duration.zero);
+    repo.mineGates[4].complete(
+      const LivePromotionPage(items: [], hasMore: false),
+    );
+    await next;
+    expect(repo.minePages, [1, 2, 3, 1, 2]);
+    await c.close();
+  });
+
+  test('closing the screen mid-flight never sends the payment POST', () async {
+    final repo = Repo();
+    final c = LivePromotionsController(
+      repository: repo,
+      refreshWallet: () async => 100,
+    );
+    await c.refresh();
+    expect(c.state.balanceCoins, 100);
+    repo.readGate = Completer<LivePromotionCampaign>();
+    final paying = c.pay(confirmedCampaign: campaign());
+    await Future.delayed(Duration.zero);
+    await c.close();
+    repo.readGate!.complete(campaign());
+    await paying;
+    expect(repo.pays, 0);
+    // Nothing was sent, so no uncertainty may be recorded either.
+    expect(repo.uncertainPayments, isEmpty);
+  });
+
+  test('a failed eligibility re-check clears the previous verdict', () async {
+    final repo = Repo();
+    var failing = false;
+    final c = LivePromotionsController(
+      repository: repo,
+      refreshWallet: () async => 100,
+      refreshEligibility: (id) async {
+        if (failing) throw const LivePromotionUnavailable();
+        return eligible;
+      },
+    );
+    await c.initialize(liveId: 'live-1');
+    expect(c.state.eligibility?.canCreate, true);
+    failing = true;
+    await c.refresh();
+    expect(c.state.eligibility, isNull);
+    expect(c.state.error, isA<LivePromotionUnavailable>());
+    await c.close();
+  });
 }

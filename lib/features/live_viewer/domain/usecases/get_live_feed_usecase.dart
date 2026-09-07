@@ -13,20 +13,42 @@ class GetLiveFeedUseCase {
     int limit = 10,
     String? category,
     bool followingOnly = false,
+    bool forceRefresh = false,
+    String surface = 'feed',
+    String? topic,
     double? latitude,
     double? longitude,
-    bool forceRefresh = false,
     bool audioOnly = false,
   }) {
+    if (surface == 'nearby') {
+      if (latitude == null || longitude == null) {
+        return Future.value(
+          const Left(ValidationFailure('Location is required.')),
+        );
+      }
+      return repository.getNearbyFeed(
+        page: page,
+        limit: limit,
+        latitude: latitude,
+        longitude: longitude,
+        forceRefresh: forceRefresh,
+      );
+    }
+    if (surface == 'audio' || audioOnly) {
+      return repository.getAudioFeed(
+        page: page,
+        limit: limit,
+        topic: topic,
+        forceRefresh: forceRefresh,
+      );
+    }
     return repository.getLiveFeed(
       page: page,
       limit: limit,
       category: category,
       followingOnly: followingOnly,
-      latitude: latitude,
-      longitude: longitude,
+      topic: topic,
       forceRefresh: forceRefresh,
-      audioOnly: audioOnly,
     );
   }
 }

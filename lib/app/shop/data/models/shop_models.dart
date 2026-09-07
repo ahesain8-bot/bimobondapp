@@ -76,10 +76,11 @@ class CartItemModel extends CartItemEntity {
     final variantRaw = json['variant'];
     return CartItemModel(
       id: (json['id'] ?? '').toString(),
-      productId: (json['productId'] ??
-              (productRaw is Map ? productRaw['id'] : null) ??
-              '')
-          .toString(),
+      productId:
+          (json['productId'] ??
+                  (productRaw is Map ? productRaw['id'] : null) ??
+                  '')
+              .toString(),
       variantId: json['variantId']?.toString(),
       quantity: shopReadInt(json['quantity'], 1),
       product: productRaw is Map
@@ -108,10 +109,12 @@ class CartModel extends CartEntity {
       updatedAt: shopReadDate(json['updatedAt']),
       items: itemsRaw is List
           ? itemsRaw
-              .whereType<Map>()
-              .map((e) => CartItemModel.fromJson(Map<String, dynamic>.from(e)))
-              .where((i) => i.id.isNotEmpty)
-              .toList()
+                .whereType<Map>()
+                .map(
+                  (e) => CartItemModel.fromJson(Map<String, dynamic>.from(e)),
+                )
+                .where((i) => i.id.isNotEmpty)
+                .toList()
           : const [],
     );
   }
@@ -225,8 +228,7 @@ class ProductOrderModel extends ProductOrderEntity {
       subtotalCoins: shopReadInt(json['subtotalCoins']),
       commissionCoins: shopReadInt(json['commissionCoins']),
       totalCoins: shopReadInt(json['totalCoins']),
-      fulfillmentStatus:
-          shopParseFulfillmentStatus(json['fulfillmentStatus']),
+      fulfillmentStatus: shopParseFulfillmentStatus(json['fulfillmentStatus']),
       trackingNumber: json['trackingNumber']?.toString(),
       shippingNote: json['shippingNote']?.toString(),
       liveId: json['liveId']?.toString(),
@@ -243,9 +245,11 @@ class ProductOrderModel extends ProductOrderEntity {
       createdAt: shopReadDate(json['createdAt']),
       items: itemsRaw is List
           ? itemsRaw
-              .whereType<Map>()
-              .map((e) => OrderItemModel.fromJson(Map<String, dynamic>.from(e)))
-              .toList()
+                .whereType<Map>()
+                .map(
+                  (e) => OrderItemModel.fromJson(Map<String, dynamic>.from(e)),
+                )
+                .toList()
           : const [],
       giftPayments: giftsRaw is List
           ? giftsRaw.whereType<Map>().map((e) {
@@ -272,26 +276,58 @@ class LiveProductPinModel extends LiveProductPinEntity {
     super.pinOrder,
     super.isPinned,
     super.pinnedAt,
+    super.bag,
   });
 
   factory LiveProductPinModel.fromJson(Map<String, dynamic> json) {
     final productRaw = json['product'];
-    final product = productRaw is Map
-        ? ProductModel.fromJson(Map<String, dynamic>.from(productRaw))
-        : ProductModel(
-            id: (json['productId'] ?? '').toString(),
-            sellerId: '',
-            title: '',
-            priceCoins: 0,
-          );
+    if (productRaw is! Map) {
+      throw const FormatException('LIVE bag item is missing its product.');
+    }
+    final product = ProductModel.fromJson(
+      Map<String, dynamic>.from(productRaw),
+    );
+    final productId = (json['productId'] ?? product.id).toString();
+    if (product.id.isEmpty || productId.isEmpty) {
+      throw const FormatException('LIVE bag item has no product id.');
+    }
     return LiveProductPinModel(
       id: (json['id'] ?? '').toString(),
       liveId: (json['liveId'] ?? '').toString(),
-      productId: (json['productId'] ?? product.id).toString(),
+      productId: productId,
       product: product.copyWith(isLive: true),
       pinOrder: shopReadInt(json['pinOrder']),
       isPinned: shopReadBool(json['isPinned']),
       pinnedAt: shopReadDate(json['pinnedAt']),
+      bag: _bagFrom(json['bag']),
+    );
+  }
+
+  static LiveProductBagEntity? _bagFrom(dynamic value) {
+    if (value is! Map) return null;
+    final bag = Map<String, dynamic>.from(value);
+    final base = bag['basePriceCoins'];
+    final live = bag['livePriceCoins'];
+    final flash = bag['flashActive'];
+    final coupon = bag['hasCoupon'];
+    final sold = bag['soldCount'];
+    if (base is! int ||
+        live is! int ||
+        flash is! bool ||
+        coupon is! bool ||
+        sold is! int ||
+        base < 0 ||
+        live < 0 ||
+        sold < 0) {
+      return null;
+    }
+    return LiveProductBagEntity(
+      basePriceCoins: base,
+      livePriceCoins: live,
+      flashActive: flash,
+      hasCoupon: coupon,
+      dealApplied: bag['dealApplied']?.toString(),
+      soldCount: sold,
     );
   }
 }
@@ -320,21 +356,24 @@ class PurchasedProductModel extends PurchasedProductEntity {
 
     // Prefer explicit / nested product ids. Do not parse the whole purchased
     // DTO as a Product — row `id` can differ from catalog `productId`.
-    final productId = (json['productId'] ??
-            json['product_id'] ??
-            product?.id ??
-            json['id'] ??
-            '')
-        .toString()
-        .trim();
+    final productId =
+        (json['productId'] ??
+                json['product_id'] ??
+                product?.id ??
+                json['id'] ??
+                '')
+            .toString()
+            .trim();
     final rowId = (json['id'] ?? productId).toString().trim();
-    final title = (json['title'] ??
-            json['name'] ??
-            json['productTitle'] ??
-            product?.title ??
-            '')
-        .toString();
-    final imageUrl = shopResolveUrl(
+    final title =
+        (json['title'] ??
+                json['name'] ??
+                json['productTitle'] ??
+                product?.title ??
+                '')
+            .toString();
+    final imageUrl =
+        shopResolveUrl(
           json['imageUrl'] ??
               json['thumbnailUrl'] ??
               json['coverUrl'] ??
@@ -345,11 +384,12 @@ class PurchasedProductModel extends PurchasedProductEntity {
     final fulfillmentRaw =
         json['fulfillmentStatus'] ?? json['lastFulfillmentStatus'];
     final orderRaw = json['lastOrder'] ?? json['order'];
-    String? orderId = (json['orderId'] ??
-            json['productOrderId'] ??
-            json['lastOrderId'] ??
-            json['lastPaidOrderId'])
-        ?.toString();
+    String? orderId =
+        (json['orderId'] ??
+                json['productOrderId'] ??
+                json['lastOrderId'] ??
+                json['lastPaidOrderId'])
+            ?.toString();
     if ((orderId == null || orderId.isEmpty) && orderRaw is Map) {
       orderId = (orderRaw['id'] ?? orderRaw['orderId'])?.toString();
     }

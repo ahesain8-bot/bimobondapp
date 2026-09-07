@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'package:bimobondapp/core/services/live_operation_guard.dart';
 import 'package:bimobondapp/app/gifts/data/models/gift_group_model.dart';
 import 'package:bimobondapp/app/gifts/data/models/gift_model.dart';
 import 'package:bimobondapp/core/error/dio_handler.dart';
@@ -87,7 +89,10 @@ class GiftsRemoteDataSourceImpl implements GiftsRemoteDataSource {
       if (response.statusCode == 200) {
         return _extractList(response.data)
             .whereType<Map>()
-            .map((json) => GiftGroupModel.fromJson(Map<String, dynamic>.from(json)))
+            .map(
+              (json) =>
+                  GiftGroupModel.fromJson(Map<String, dynamic>.from(json)),
+            )
             .where((group) => group.id.isNotEmpty)
             .toList()
           ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
@@ -178,7 +183,10 @@ class GiftsRemoteDataSourceImpl implements GiftsRemoteDataSource {
       final response = await apiClient.dio.post(
         ApiConstants.giftsPurchase,
         data: purchaseData,
-        options: Options(headers: await _authHeaders()),
+        options: Options(
+          headers: await _authHeaders(),
+          extra: {ApiClient.noAutomaticRetry: true},
+        ),
       );
       if (response.statusCode == 200 || response.statusCode == 201) {
         final body = response.data;
@@ -210,6 +218,40 @@ class GiftsRemoteDataSourceImpl implements GiftsRemoteDataSource {
     String? auctionId,
     String? liveId,
     String? message,
+  }) {
+    if (giftId.isEmpty || receiverId.trim().isEmpty || quantity < 1) {
+      throw const LiveOperationNotSent(
+        'A valid gift and recipient are required.',
+      );
+    }
+    Future<GiftInventoryModel?> send() => _sendGiftOnce(
+      giftId: giftId,
+      receiverId: receiverId,
+      quantity: quantity,
+      postId: postId,
+      auctionId: auctionId,
+      liveId: liveId,
+      message: message,
+    );
+    if (liveId == null || liveId.isEmpty) return send();
+    return LiveOperationGuard.shared.run(
+      userId: () => FirebaseAuth.instance.currentUser?.uid ?? '',
+      liveId: liveId,
+      operation: 'gift-send',
+      entityId: jsonEncode([receiverId, giftId, auctionId, quantity]),
+      retainSuccess: false,
+      send: send,
+    );
+  }
+
+  Future<GiftInventoryModel?> _sendGiftOnce({
+    required String giftId,
+    required String receiverId,
+    int quantity = 1,
+    String? postId,
+    String? auctionId,
+    String? liveId,
+    String? message,
   }) async {
     try {
       final data = <String, dynamic>{
@@ -233,7 +275,10 @@ class GiftsRemoteDataSourceImpl implements GiftsRemoteDataSource {
       final response = await apiClient.dio.post(
         ApiConstants.giftsSend,
         data: data,
-        options: Options(headers: await _authHeaders()),
+        options: Options(
+          headers: await _authHeaders(),
+          extra: {ApiClient.noAutomaticRetry: true},
+        ),
       );
       if (response.statusCode == 200 || response.statusCode == 201) {
         final body = response.data;

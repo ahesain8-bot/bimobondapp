@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'package:bimobondapp/core/services/live_operation_guard.dart';
 import 'dart:async';
 import 'dart:developer' as developer;
 
@@ -444,10 +446,28 @@ class AuctionSocketService {
     };
 
     try {
-      final raw = await socket
-          .emitWithAckAsync(AuctionSocketEvent.sendGift, payload)
-          .timeout(const Duration(seconds: 12));
-      return _parseSendGiftAck(raw);
+      Future<GiftSocketSendResult> send() async {
+        final raw = await socket
+            .emitWithAckAsync(AuctionSocketEvent.sendGift, payload)
+            .timeout(const Duration(seconds: 12));
+        final result = _parseSendGiftAck(raw);
+        if (!result.isSuccess)
+          throw StateError(result.errorMessage ?? 'Unconfirmed gift');
+        return result;
+      }
+
+      if (liveId == null || liveId.isEmpty) return await send();
+      if (receiverId == null || receiverId.trim().isEmpty || quantity < 1) {
+        throw const LiveOperationNotSent('A valid gift recipient is required.');
+      }
+      return await LiveOperationGuard.shared.run(
+        userId: () => FirebaseAuth.instance.currentUser?.uid ?? '',
+        liveId: liveId,
+        operation: 'gift-send',
+        entityId: jsonEncode([receiverId, giftId, auctionId, quantity]),
+        retainSuccess: false,
+        send: send,
+      );
     } catch (e) {
       developer.log('AuctionSocket sendGift failed: $e', name: 'AuctionSocket');
       return GiftSocketSendResult.error(e.toString());

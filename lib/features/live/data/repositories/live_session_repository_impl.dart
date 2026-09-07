@@ -9,7 +9,9 @@ import '../../../../core/models/live_media_hints.dart';
 import '../../domain/entities/live_chat_message.dart';
 import '../../domain/entities/live_gallery_item.dart';
 import '../../domain/entities/live_guest.dart';
+import '../../domain/entities/live_host_league.dart';
 import '../../domain/entities/live_house.dart';
+import '../../domain/entities/live_replay.dart';
 import '../../domain/entities/live_leaderboard_entry.dart';
 import '../../domain/entities/live_moderator.dart';
 import '../../domain/entities/live_scene.dart';
@@ -506,7 +508,20 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
     bool? moderatorsCanManageGuests,
     String? topic,
     bool? ageRestricted,
+    bool? ticketEnabled,
+    int? ticketPriceCoins,
   }) async {
+    if (ticketPriceCoins != null && ticketPriceCoins < 0) {
+      throw ArgumentError.value(
+        ticketPriceCoins,
+        'ticketPriceCoins',
+        'Ticket price cannot be negative.',
+      );
+    }
+    if (ticketEnabled == true &&
+        (ticketPriceCoins == null || ticketPriceCoins <= 0)) {
+      throw ArgumentError('A paid-entry LIVE needs a positive ticket price.');
+    }
     final live = await _remote.updateSettings(
       liveId,
       guestsEnabled: guestsEnabled,
@@ -517,6 +532,8 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
       moderatorsCanManageGuests: moderatorsCanManageGuests,
       topic: topic,
       ageRestricted: ageRestricted,
+      ticketEnabled: ticketEnabled,
+      ticketPriceCoins: ticketPriceCoins,
     );
     final map = (live['id'] != null)
         ? live
@@ -537,8 +554,10 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
   @override
   Future<List<LiveGalleryItem>> loadGalleryItems(String liveId) async {
     final json = await _remote.gallery(liveId);
-    final raw = json['data'] ?? json['items'] ?? json['gallery'];
-    if (raw is! List) return const [];
+    final raw = json['data'];
+    if (raw is! List || raw.any((item) => item is! Map)) {
+      throw const FormatException('Invalid gallery list.');
+    }
     return raw
         .whereType<Map>()
         .map(
@@ -548,6 +567,16 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
         )
         .where((e) => e.id.isNotEmpty)
         .toList(growable: false);
+  }
+
+  @override
+  Future<void> reorderGalleryItems({
+    required String liveId,
+    required List<String> auctionIds,
+  }) async {
+    // An empty list would be a no-op request; the server owns the final order.
+    if (liveId.isEmpty || auctionIds.isEmpty) return;
+    await _remote.reorderAuctions(liveId: liveId, auctionIds: auctionIds);
   }
 
   @override
@@ -989,6 +1018,105 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
           );
         })
         .toList(growable: false);
+  }
+
+  @override
+  Future<LiveReplay> loadReplay(String liveId) async {
+    if (liveId.isEmpty) return LiveReplay.none;
+    return LiveHostExtrasMapper.replayFromJson(await _remote.replay(liveId));
+  }
+
+  @override
+  Future<LiveReplay> publishReplay({
+    required String liveId,
+    required String replayUrl,
+  }) async {
+    final url = replayUrl.trim();
+    // A blank or non-http value is never sent; the host publishes a real file.
+    final parsed = Uri.tryParse(url);
+    if (liveId.isEmpty ||
+        parsed == null ||
+        !parsed.isAbsolute ||
+        parsed.host.isEmpty ||
+        parsed.userInfo.isNotEmpty ||
+        parsed.host.contains(RegExp(r'\s')) ||
+        !(parsed.isScheme('https') || parsed.isScheme('http'))) {
+      throw ArgumentError('A replay URL must be an absolute http(s) address');
+    }
+    return LiveHostExtrasMapper.replayFromJson(
+      await _remote.publishReplay(liveId: liveId, replayUrl: url),
+    );
+  }
+
+  @override
+  Future<void> removeReplay(String liveId) async {
+    if (liveId.isEmpty) return;
+    await _remote.deleteReplay(liveId);
+  }
+
+  @override
+  Future<List<LiveClip>> loadClips(String liveId) async {
+    if (liveId.isEmpty) return const [];
+    return LiveHostExtrasMapper.clipsFromJson(await _remote.clips(liveId));
+  }
+
+  @override
+  Future<LiveClip> createClip({
+    required String liveId,
+    required num startSeconds,
+    required num endSeconds,
+    String? title,
+    String? clipUrl,
+  }) async {
+    // Bounds are checked before spending a request; the server is still the
+    // authority on any documented minimum or maximum clip length.
+    if (liveId.isEmpty ||
+        !startSeconds.isFinite ||
+        !endSeconds.isFinite ||
+        startSeconds < 0 ||
+        endSeconds <= startSeconds) {
+      throw ArgumentError('Clip bounds must be 0 <= start < end');
+    }
+    return LiveHostExtrasMapper.clipFromJson(
+      await _remote.createClip(
+        liveId: liveId,
+        startSeconds: startSeconds,
+        endSeconds: endSeconds,
+        title: title,
+        clipUrl: clipUrl,
+      ),
+    );
+  }
+
+  @override
+  Future<LiveClip> postClip({
+    required String liveId,
+    required String clipId,
+    String? description,
+  }) async {
+    if (liveId.isEmpty || clipId.isEmpty) {
+      throw ArgumentError('A clip id is required to publish');
+    }
+    return LiveHostExtrasMapper.clipFromJson(
+      await _remote.postClip(
+        liveId: liveId,
+        clipId: clipId,
+        description: description,
+      ),
+    );
+  }
+
+  @override
+  Future<List<LiveLeagueTier>> loadLeagueTiers() async {
+    return LiveHostExtrasMapper.leagueTiersFromJson(await _remote.leagues());
+  }
+
+  @override
+  Future<LiveHostLeague?> loadHostLeague(String userId) async {
+    if (userId.isEmpty) return null;
+    return LiveHostExtrasMapper.hostLeagueFromJson(
+      await _remote.hostLeague(userId),
+    );
   }
 
   @override

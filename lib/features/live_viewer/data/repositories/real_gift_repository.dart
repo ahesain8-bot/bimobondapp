@@ -71,56 +71,12 @@ class RealGiftRepository implements GiftRepository {
     int quantity = 1,
     String? receiverId,
   }) async {
-    try {
-      final gift = MockGiftCatalog.byId(giftId);
-      if (gift == null) {
-        return const Left(NotFoundFailure('Gift not found'));
-      }
-
-      final payload = await _api.post(
-        ApiEndpoints.giftsSend,
-        body: {
-          'giftId': giftId,
-          'receiverId': receiverId ?? liveId,
-          'liveId': liveId,
-          if (quantity > 1) 'quantity': quantity,
-        },
-      );
-
-      final total = gift.coinCost * quantity;
-      final senderMap = payload['sender'] is Map
-          ? Map<String, dynamic>.from(payload['sender'] as Map)
-          : null;
-      final fullName = senderMap?['fullName']?.toString().trim();
-      final resolvedSenderName = (fullName != null && fullName.isNotEmpty)
-          ? fullName
-          : (payload['senderName']?.toString() ??
-                senderMap?['username']?.toString() ??
-                'You');
-      final sent = GiftSentEntity(
-        id:
-            payload['id']?.toString() ??
-            'sent_${DateTime.now().microsecondsSinceEpoch}',
-        giftId: giftId,
-        liveId: liveId,
-        senderId: payload['senderId']?.toString() ?? '',
-        senderName: resolvedSenderName,
-        senderAvatar: payload['senderAvatar']?.toString() ??
-            senderMap?['avatarUrl']?.toString(),
-        quantity: quantity,
-        totalCost: _asInt(payload['totalCost']) ?? total,
-        sentAt: DateTime.now(),
-        giftDetails: gift,
-        senderGifterLevel: _asInt(
-          senderMap?['gifterLevel'] ?? payload['gifterLevel'],
-        ),
-      );
-
-      _incoming[liveId]?.add(sent);
-      return Right(sent);
-    } catch (e) {
-      return Left(ServerFailure('Failed to send gift: $e'));
+    if (receiverId == null || receiverId.trim().isEmpty) {
+      return const Left(ValidationFailure('A verified recipient is required.'));
     }
+    // Production sending is owned by lib/app/gifts and LiveGiftSheet. This
+    // legacy picker must not send local catalog IDs or infer transaction IDs.
+    return const Left(ServerFailure('Use the LIVE gift sheet to send gifts.'));
   }
 
   @override
@@ -181,25 +137,19 @@ class RealGiftRepository implements GiftRepository {
   @override
   Future<Either<Failure, int>> purchaseCoins(int amount) async {
     // No purchase endpoint in the current backend scope — no-op.
-    return const Right(0);
+    return const Left(ServerFailure('Open the wallet to purchase coins.'));
   }
 
   @override
   Stream<Either<Failure, GiftSentEntity>> watchIncomingGifts(String liveId) {
-    _incoming.putIfAbsent(
-      liveId,
-      () => StreamController<GiftSentEntity>.broadcast(),
-    );
-
-    final controller = _incoming[liveId]!;
-    _socket.events.listen((event) {
-      if (event.liveId != liveId) return;
-      if (event is LiveGiftEvent) {
-        controller.add(event.gift);
-      }
-    });
-
-    return controller.stream.map(Right.new);
+    // Ownership follows the returned subscription: cancellation detaches from
+    // the shared socket automatically, including repeated room entry.
+    return _socket.events
+        .where((event) => event is LiveGiftEvent && event.liveId == liveId)
+        .map(
+          (event) =>
+              Right<Failure, GiftSentEntity>((event as LiveGiftEvent).gift),
+        );
   }
 
   int? _asInt(dynamic value) {

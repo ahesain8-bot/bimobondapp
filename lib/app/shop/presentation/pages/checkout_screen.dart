@@ -1,4 +1,6 @@
 import 'dart:math';
+import 'package:bimobondapp/app/shop/domain/entities/checkout_snapshot.dart';
+import 'package:bimobondapp/core/error/failures.dart';
 
 import 'package:bimobondapp/app/shop/domain/entities/checkout_entity.dart';
 import 'package:bimobondapp/app/shop/domain/services/payment_service.dart';
@@ -25,6 +27,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({
     this.liveId,
+    this.couponCode,
     this.postId,
     this.items,
     super.key,
@@ -33,6 +36,7 @@ class CheckoutScreen extends StatefulWidget {
   static const routeName = 'shop_checkout';
 
   final String? liveId;
+  final String? couponCode;
   final String? postId;
 
   /// When set (Buy Now), checkout these items instead of the cart.
@@ -49,12 +53,21 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final PaymentService _paymentService = shop_di.sl();
   final GetMyWalletUseCase _getWallet = wallets_di.sl();
 
-  CheckoutPreviewEntity? _preview;
+  final _quote = CheckoutQuoteState();
+  CheckoutPreviewEntity? get _preview => _quote.preview;
   int _balanceCoins = 0;
   bool _loading = true;
   bool _placingOrder = false;
+  bool _previewLoading = false;
+  bool _paymentUnresolved = false;
   String? _error;
   String? _idempotencyKey;
+  late final TextEditingController _couponController;
+
+  String? get _couponCode {
+    final value = _couponController.text.trim();
+    return value.isEmpty ? null : value;
+  }
 
   bool get _hasEnoughCoins {
     final due = _preview?.coinDueCoins ?? 0;
@@ -64,7 +77,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   @override
   void initState() {
     super.initState();
+    _couponController = TextEditingController(text: widget.couponCode ?? '');
+    _couponController.addListener(_invalidateQuote);
     _load();
+  }
+
+  @override
+  void dispose() {
+    _couponController.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -73,6 +94,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       _error = null;
     });
 
+    try {
+      _paymentUnresolved = await _paymentService.hasUnresolvedPayment();
+    } catch (_) {
+      _paymentUnresolved = true;
+    }
+    if (!mounted) return;
+    if (_paymentUnresolved) {
+      setState(() {
+        _loading = false;
+        _error = AppLocalizations.of(context)!.livePaymentUnresolved;
+      });
+      return;
+    }
     await Future.wait([_loadPreview(), _loadBalance()]);
 
     if (mounted) {
@@ -82,14 +116,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Future<void> _loadBalance() async {
     final result = await _getWallet(NoParams());
-    result.fold(
-      (_) {},
-      (wallet) {
-        if (mounted) {
-          setState(() => _balanceCoins = wallet.balanceCoins);
-        }
-      },
-    );
+    result.fold((_) {}, (wallet) {
+      if (mounted) {
+        setState(() => _balanceCoins = wallet.balanceCoins);
+      }
+    });
   }
 
   List<CheckoutItemInput>? get _directItems {
@@ -132,40 +163,74 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
-  Future<void> _loadPreview() async {
-    final items = await _resolveCheckoutItems();
-    if (items == null || items.isEmpty) return;
-
-    final previewResult = await _previewCheckout(
-      items: items,
-      paymentMethod: ProductPaymentMethod.coins,
-    );
-
-    previewResult.fold(
-      (failure) {
-        if (mounted) {
-          setState(() => _error = ErrorMessageResolver.resolve(failure));
-        }
-      },
-      (preview) {
-        if (mounted) {
-          setState(() => _preview = preview);
-        }
-      },
-    );
+  void _invalidateQuote() {
+    if (!mounted) return;
+    setState(() {
+      _quote.invalidate();
+      _previewLoading = false;
+      _error = null;
+    });
   }
 
-  Future<void> _goBuyCoins() async {
-    await context.pushNamed(
-      'wallet',
-      queryParameters: const {'tab': '0'},
+  @override
+  void didUpdateWidget(covariant CheckoutScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.liveId != widget.liveId ||
+        oldWidget.postId != widget.postId ||
+        oldWidget.items != widget.items ||
+        oldWidget.couponCode != widget.couponCode) {
+      _invalidateQuote();
+      if (!_placingOrder) _loadPreview();
+    }
+  }
+
+  Future<void> _loadPreview() async {
+    if (_placingOrder || _paymentUnresolved) return;
+    final generation = _quote.invalidate();
+    final coupon = _couponCode;
+    setState(() {
+      _previewLoading = true;
+      _error = null;
+    });
+    final items = await _resolveCheckoutItems();
+    if (!mounted || !_quote.isCurrent(generation)) return;
+    if (items == null || items.isEmpty) {
+      setState(() => _previewLoading = false);
+      return;
+    }
+    final snapshot = CheckoutSnapshot(
+      items: items,
+      couponCode: coupon,
+      liveId: widget.liveId,
+      postId: widget.postId,
     );
+    final result = await _previewCheckout(
+      items: snapshot.items,
+      paymentMethod: snapshot.method,
+      liveId: snapshot.liveId,
+      couponCode: snapshot.couponCode,
+    );
+    if (!mounted || !_quote.isCurrent(generation)) return;
+    setState(() {
+      _previewLoading = false;
+      result.fold(
+        (failure) => _error = ErrorMessageResolver.resolve(failure),
+        (preview) => _quote.accept(generation, snapshot, preview),
+      );
+    });
+  }
+
+  Future<void> _applyCoupon() => _loadPreview();
+
+  Future<void> _goBuyCoins() async {
+    await context.pushNamed('wallet', queryParameters: const {'tab': '0'});
     if (!mounted) return;
     await _loadBalance();
   }
 
   Future<void> _onPrimaryAction() async {
-    if (_preview == null) return;
+    if (_placingOrder || _paymentUnresolved || !_quote.canPay) return;
+    final snapshot = _quote.snapshot!;
 
     if (!_hasEnoughCoins) {
       await _goBuyCoins();
@@ -182,11 +247,24 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       return;
     }
 
-    final result = await _paymentService.pay(
+    final current = CheckoutSnapshot(
       items: items,
-      method: ProductPaymentMethod.coins,
+      couponCode: _couponCode,
       liveId: widget.liveId,
       postId: widget.postId,
+    );
+    if (current != snapshot || !_quote.canPay) {
+      if (!mounted) return;
+      setState(() => _placingOrder = false);
+      await _loadPreview();
+      return;
+    }
+    final result = await _paymentService.pay(
+      items: snapshot.items,
+      method: snapshot.method,
+      couponCode: snapshot.couponCode,
+      liveId: snapshot.liveId,
+      postId: snapshot.postId,
       idempotencyKey: _idempotencyKey,
     );
 
@@ -195,31 +273,44 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     await result.fold(
       (failure) async {
         setState(() => _placingOrder = false);
-        final message = ErrorMessageResolver.resolve(failure);
-        final insufficient = message.toLowerCase().contains('insufficient') &&
+        final message = failure is UnresolvedPaymentFailure
+            ? AppLocalizations.of(context)!.livePaymentUnresolved
+            : ErrorMessageResolver.resolve(failure);
+        if (failure is UnresolvedPaymentFailure) {
+          setState(() {
+            _paymentUnresolved = true;
+            _error = message;
+          });
+        }
+        final insufficient =
+            message.toLowerCase().contains('insufficient') &&
             message.toLowerCase().contains('wallet');
         if (insufficient) {
           final l10n = AppLocalizations.of(context)!;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.shopNotEnoughCoins)),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(l10n.shopNotEnoughCoins)));
           await _goBuyCoins();
           return;
         }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(message)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(message)));
       },
       (order) async {
-        // Cart checkout clears the cart; Buy Now leaves cart untouched.
+        // An acknowledged order is final even if a later cart refresh fails.
+        _idempotencyKey = null;
         if (_directItems == null) {
-          await _clearCart();
-          if (!mounted) return;
-          context.read<ShopCartCubit>().clear();
+          try {
+            final cleared = await _clearCart();
+            if (mounted && cleared.isRight())
+              context.read<ShopCartCubit>().clear();
+          } catch (_) {
+            /* Order navigation must survive cache/refresh failures. */
+          }
         }
         if (!mounted) return;
         setState(() => _placingOrder = false);
-        if (!mounted) return;
         context.pushReplacementNamed(
           OrderDetailsScreen.routeName,
           pathParameters: {'orderId': order.id},
@@ -245,55 +336,22 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ),
             body: _loading
                 ? const CheckoutSkeleton()
-                : _error != null && _preview == null
-                    ? _ErrorBody(message: _error!, onRetry: _load)
-                    : _CheckoutBody(
-                        preview: _preview!,
-                        balanceCoins: _balanceCoins,
-                        hasEnoughCoins: _hasEnoughCoins,
-                        placingOrder: _placingOrder,
-                        onPrimaryAction: _onPrimaryAction,
-                        onBuyCoins: _goBuyCoins,
-                      ),
+                : _CheckoutBody(
+                    preview: _preview,
+                    previewLoading: _previewLoading,
+                    error: _error,
+                    paymentUnresolved: _paymentUnresolved,
+                    balanceCoins: _balanceCoins,
+                    hasEnoughCoins: _hasEnoughCoins,
+                    placingOrder: _placingOrder,
+                    onPrimaryAction: _onPrimaryAction,
+                    onBuyCoins: _goBuyCoins,
+                    liveId: widget.liveId,
+                    couponController: _couponController,
+                    onCouponApplied: _applyCoupon,
+                  ),
           );
         },
-      ),
-    );
-  }
-}
-
-class _ErrorBody extends StatelessWidget {
-  const _ErrorBody({required this.message, required this.onRetry});
-
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = ShopTheme.of(context);
-
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSizes.p32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: TextStyle(color: theme.onSurface),
-            ),
-            const SizedBox(height: AppSizes.p16),
-            FilledButton(
-              onPressed: onRetry,
-              style: FilledButton.styleFrom(
-                backgroundColor: theme.primary,
-                foregroundColor: theme.onAccent,
-              ),
-              child: Text(AppLocalizations.of(context)!.shopRetry),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -302,19 +360,31 @@ class _ErrorBody extends StatelessWidget {
 class _CheckoutBody extends StatelessWidget {
   const _CheckoutBody({
     required this.preview,
+    required this.previewLoading,
+    required this.error,
+    required this.paymentUnresolved,
     required this.balanceCoins,
     required this.hasEnoughCoins,
     required this.placingOrder,
     required this.onPrimaryAction,
     required this.onBuyCoins,
+    required this.liveId,
+    required this.couponController,
+    required this.onCouponApplied,
   });
 
-  final CheckoutPreviewEntity preview;
+  final CheckoutPreviewEntity? preview;
+  final bool previewLoading;
+  final String? error;
+  final bool paymentUnresolved;
   final int balanceCoins;
   final bool hasEnoughCoins;
   final bool placingOrder;
   final VoidCallback onPrimaryAction;
   final VoidCallback onBuyCoins;
+  final String? liveId;
+  final TextEditingController couponController;
+  final Future<void> Function() onCouponApplied;
 
   @override
   Widget build(BuildContext context) {
@@ -337,14 +407,34 @@ class _CheckoutBody extends StatelessWidget {
               children: [
                 _SectionTitle(title: l10n.shopPayWithCoins),
                 const SizedBox(height: AppSizes.p16),
-                _CoinsPaymentCard(
-                  preview: preview,
-                  balanceCoins: balanceCoins,
-                  hasEnoughCoins: hasEnoughCoins,
-                  onBuyCoins: onBuyCoins,
-                  fillColor: fieldFill,
-                  l10n: l10n,
-                ),
+                if (liveId != null && liveId!.isNotEmpty) ...[
+                  _LiveCouponField(
+                    controller: couponController,
+                    enabled: !placingOrder && !paymentUnresolved,
+                    onApply: onCouponApplied,
+                  ),
+                  const SizedBox(height: AppSizes.p16),
+                ],
+                if (previewLoading) const LinearProgressIndicator(),
+                if (error != null || preview == null)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Text(error ?? l10n.shopPreviewChanged),
+                  ),
+                if (preview == null && !previewLoading && !paymentUnresolved)
+                  TextButton(
+                    onPressed: onCouponApplied,
+                    child: Text(l10n.shopCouponApply),
+                  ),
+                if (preview != null)
+                  _CoinsPaymentCard(
+                    preview: preview!,
+                    balanceCoins: balanceCoins,
+                    hasEnoughCoins: hasEnoughCoins,
+                    onBuyCoins: onBuyCoins,
+                    fillColor: fieldFill,
+                    l10n: l10n,
+                  ),
               ],
             ),
           ),
@@ -360,7 +450,13 @@ class _CheckoutBody extends StatelessWidget {
           child: SizedBox(
             width: double.infinity,
             child: FilledButton(
-              onPressed: placingOrder ? null : onPrimaryAction,
+              onPressed:
+                  placingOrder ||
+                      paymentUnresolved ||
+                      preview == null ||
+                      previewLoading
+                  ? null
+                  : onPrimaryAction,
               style: FilledButton.styleFrom(
                 backgroundColor: theme.primary,
                 foregroundColor: theme.onAccent,
@@ -381,8 +477,10 @@ class _CheckoutBody extends StatelessWidget {
                       ),
                     )
                   : Text(
-                      hasEnoughCoins
-                          ? l10n.shopPayCoinsAmount(preview.coinDueCoins)
+                      preview == null
+                          ? l10n.shopPayWithCoins
+                          : hasEnoughCoins
+                          ? l10n.shopPayCoinsAmount(preview!.coinDueCoins)
                           : l10n.shopBuyCoins,
                       style: const TextStyle(
                         fontWeight: FontWeight.w700,
@@ -391,6 +489,48 @@ class _CheckoutBody extends StatelessWidget {
                     ),
             ),
           ),
+        ),
+      ],
+    );
+  }
+}
+
+class _LiveCouponField extends StatelessWidget {
+  const _LiveCouponField({
+    required this.controller,
+    required this.onApply,
+    required this.enabled,
+  });
+
+  final bool enabled;
+
+  final TextEditingController controller;
+  final Future<void> Function() onApply;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = ShopTheme.of(context);
+    return Row(
+      children: [
+        Expanded(
+          child: TextField(
+            controller: controller,
+            enabled: enabled,
+            textCapitalization: TextCapitalization.characters,
+            decoration: InputDecoration(
+              labelText: AppLocalizations.of(context)!.shopCouponLabel,
+              hintText: AppLocalizations.of(context)!.shopCouponHint,
+            ),
+          ),
+        ),
+        const SizedBox(width: AppSizes.p8),
+        FilledButton(
+          onPressed: enabled ? () => onApply() : null,
+          style: FilledButton.styleFrom(
+            backgroundColor: theme.primary,
+            foregroundColor: theme.onAccent,
+          ),
+          child: Text(AppLocalizations.of(context)!.shopCouponApply),
         ),
       ],
     );
@@ -499,10 +639,7 @@ class _CoinsPaymentCard extends StatelessWidget {
                       '${line.title} × ${line.quantity}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: theme.mutedText,
-                        fontSize: 13,
-                      ),
+                      style: TextStyle(color: theme.mutedText, fontSize: 13),
                     ),
                   ),
                   Text(
@@ -519,7 +656,11 @@ class _CoinsPaymentCard extends StatelessWidget {
           ),
           Divider(height: AppSizes.p20, color: theme.border),
           _PayRow(label: l10n.shopSubtotal, value: preview.subtotalCoins),
-          _PayRow(label: l10n.shopDueNow, value: preview.coinDueCoins, bold: true),
+          _PayRow(
+            label: l10n.shopDueNow,
+            value: preview.coinDueCoins,
+            bold: true,
+          ),
           if (!hasEnoughCoins) ...[
             const SizedBox(height: AppSizes.p12),
             Text(
@@ -551,11 +692,7 @@ class _CoinsPaymentCard extends StatelessWidget {
 }
 
 class _PayRow extends StatelessWidget {
-  const _PayRow({
-    required this.label,
-    required this.value,
-    this.bold = false,
-  });
+  const _PayRow({required this.label, required this.value, this.bold = false});
 
   final String label;
   final int value;

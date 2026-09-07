@@ -1,3 +1,4 @@
+import '../../../live/domain/entities/live_host_league.dart';
 import 'package:dartz/dartz.dart';
 
 import 'package:bimobondapp/features/live_viewer/core/errors/failures.dart';
@@ -5,6 +6,9 @@ import '../entities/hourly_ranking_entity.dart';
 
 /// Hourly ranking contract (lives/mobile-api.md §19).
 abstract class RankingRepository {
+  Future<List<LiveLeagueTier>> loadLeagueTiers();
+  Future<LiveHostLeague?> loadHostLeague(String userId);
+
   /// `GET /lives/leaderboard/hourly?limit=` — global host ranking for the
   /// current UTC hour. [limit] is the only paging control the backend offers;
   /// there is no page or cursor parameter.

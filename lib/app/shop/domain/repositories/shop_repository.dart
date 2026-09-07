@@ -33,15 +33,15 @@ class BrowseProductsParams extends Equatable {
 
   @override
   List<Object?> get props => [
-        page,
-        limit,
-        sellerId,
-        productCategoryId,
-        mediaType,
-        search,
-        sortBy,
-        sortOrder,
-      ];
+    page,
+    limit,
+    sellerId,
+    productCategoryId,
+    mediaType,
+    search,
+    sortBy,
+    sortOrder,
+  ];
 }
 
 abstract class ShopRepository {
@@ -76,6 +76,8 @@ abstract class ShopRepository {
     required List<CheckoutItemInput> items,
     ProductPaymentMethod? paymentMethod,
     List<CheckoutGiftPaymentInput> giftPayments = const [],
+    String? couponCode,
+    String? liveId,
   });
   Future<Either<Failure, ProductOrderEntity>> checkout({
     required List<CheckoutItemInput> items,

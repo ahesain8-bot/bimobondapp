@@ -5188,4 +5188,180 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get lpClose => 'إغلاق الترويج';
+
+  @override
+  String get liveMetricUnavailable => 'غير متاح';
+
+  @override
+  String get liveSummaryTitle => 'تقرير البث';
+
+  @override
+  String get liveSummaryEmpty => 'تقرير البث غير متاح.';
+
+  @override
+  String get liveSummaryDuration => 'المدة (ثانية)';
+
+  @override
+  String get liveSummaryPeak => 'أعلى عدد مشاهدين';
+
+  @override
+  String get liveSummarySessions => 'جلسات المشاهدة';
+
+  @override
+  String get liveSummaryLikes => 'الإعجابات';
+
+  @override
+  String get liveSummaryComments => 'التعليقات';
+
+  @override
+  String get liveSummaryCoins => 'العملات المكتسبة';
+
+  @override
+  String get liveSummaryGifters => 'أبرز مرسلي الهدايا';
+
+  @override
+  String get liveSummaryUnique => 'المشاهدون الفريدون';
+
+  @override
+  String get liveSummaryWatch => 'وقت المشاهدة (ثانية)';
+
+  @override
+  String get liveSummaryAverage => 'متوسط المشاهدة (ثانية)';
+
+  @override
+  String get liveSummaryFollowers => 'المتابعون الجدد';
+
+  @override
+  String get liveSummaryShares => 'المشاركات';
+
+  @override
+  String get liveSummaryOrders => 'طلبات المتجر';
+
+  @override
+  String get liveSummaryRevenue => 'إيرادات المتجر (عملات)';
+
+  @override
+  String get liveSummaryTraffic => 'مصادر الزيارات';
+
+  @override
+  String get liveGiftGoalLabel => 'هدف الهدايا';
+
+  @override
+  String get liveFanClubPriceUnavailable => 'أسعار شرائح الاشتراك غير مؤكدة حاليًا. الانضمام غير متاح.';
+
+  @override
+  String get liveDiscoveryForYou => 'لك';
+
+  @override
+  String get liveDiscoveryFollowing => 'المتابَعون';
+
+  @override
+  String get liveDiscoveryNearby => 'بالقرب منك';
+
+  @override
+  String get liveDiscoveryAudio => 'الصوت';
+
+  @override
+  String get liveDiscoveryFilter => 'تصفية البثوث';
+
+  @override
+  String get liveDiscoveryTopic => 'الموضوع';
+
+  @override
+  String get liveDiscoveryCategory => 'معرّف التصنيف';
+
+  @override
+  String get liveLocationUnavailable => 'فعّل خدمة الموقع واسمح بالوصول إليه لعرض البثوث القريبة.';
+
+  @override
+  String get liveGalleryReorder => 'اسحب لتغيير الترتيب';
+
+  @override
+  String get liveLeagueTitle => 'دوري المضيف';
+
+  @override
+  String get liveLeagueProgress => 'التقدم نحو الدوري التالي';
+
+  @override
+  String get liveReplayTitle => 'الإعادة والقصاصات';
+
+  @override
+  String get liveRecordingStatus => 'حالة التسجيل';
+
+  @override
+  String get liveReplayStatus => 'حالة الإعادة';
+
+  @override
+  String get liveReplayUnavailable => 'يتطلب التشغيل استجابة مؤكدة من خدمة الإعادة.';
+
+  @override
+  String get liveCouponCode => 'رمز الكوبون';
+
+  @override
+  String get liveApplyCoupon => 'تطبيق الكوبون';
+
+  @override
+  String get liveDeal => 'عرض البث';
+
+  @override
+  String get liveDealPrice => 'سعر الفلاش (عملات)';
+
+  @override
+  String get liveDealEnd => 'وقت انتهاء الفلاش (ISO)';
+
+  @override
+  String get liveDealDiscount => 'خصم الكوبون (عملات)';
+
+  @override
+  String get liveDealSave => 'حفظ العرض';
+
+  @override
+  String get liveDealSold => 'المباع';
+
+  @override
+  String get liveCouponAvailable => 'يتوفر كوبون';
+
+  @override
+  String get liveTicketEnabled => 'دخول بتذكرة';
+
+  @override
+  String get liveTicketPrice => 'سعر التذكرة (عملات)';
+
+  @override
+  String liveTicketBuy(int coins) {
+    return 'شراء التذكرة مقابل $coins عملة';
+  }
+
+  @override
+  String get liveTicketRequiredDetail => 'يتطلب هذا البث تذكرة للدخول.';
+
+  @override
+  String get liveTicketUnavailable => 'تعذر التحقق من إمكانية الدخول. حدّث الحالة.';
+
+  @override
+  String get livePaymentUnresolved => 'دفعتك بانتظار التأكيد. تحقق من حالتها قبل الدفع مرة أخرى.';
+
+  @override
+  String get liveTicketChecking => 'جارٍ التحقق من إمكانية الدخول…';
+
+  @override
+  String get liveTicketTitle => 'الدخول إلى البث';
+
+  @override
+  String get liveTicketRefresh => 'التحقق من حالة التذكرة';
+
+  @override
+  String get liveEntryBack => 'رجوع';
+
+  @override
+  String get shopCouponLabel => 'كوبون البث';
+
+  @override
+  String get shopCouponHint => 'أدخل رمز الكوبون';
+
+  @override
+  String get shopCouponApply => 'تطبيق';
+
+  @override
+  String get shopPreviewChanged => 'تغيرت تفاصيل الطلب. راجع المجموع المحدّث قبل الدفع.';
 }

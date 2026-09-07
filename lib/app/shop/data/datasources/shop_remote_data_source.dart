@@ -11,6 +11,9 @@ import 'package:bimobondapp/core/network/api_client.dart';
 import 'package:bimobondapp/core/utils/api_constants.dart';
 import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:math';
+import '../services/checkout_payment_guard.dart';
+import '../../../../core/services/live_operation_guard.dart';
 
 abstract class ShopRemoteDataSource {
   Future<ShopPageEntity> browseProducts(BrowseProductsParams params);
@@ -35,6 +38,8 @@ abstract class ShopRemoteDataSource {
     required List<CheckoutItemInput> items,
     ProductPaymentMethod? paymentMethod,
     List<CheckoutGiftPaymentInput> giftPayments = const [],
+    String? couponCode,
+    String? liveId,
   });
   Future<ProductOrderModel> checkout({
     required List<CheckoutItemInput> items,
@@ -312,12 +317,12 @@ class ShopRemoteDataSourceImpl implements ShopRemoteDataSource {
         final list = body is List
             ? body
             : body is Map
-                ? (body['data'] is List
-                    ? body['data'] as List
-                    : body['items'] is List
-                        ? body['items'] as List
-                        : const [])
-                : const [];
+            ? (body['data'] is List
+                  ? body['data'] as List
+                  : body['items'] is List
+                  ? body['items'] as List
+                  : const [])
+            : const [];
         final categories = list
             .whereType<Map>()
             .map(
@@ -463,6 +468,8 @@ class ShopRemoteDataSourceImpl implements ShopRemoteDataSource {
     required List<CheckoutItemInput> items,
     ProductPaymentMethod? paymentMethod,
     List<CheckoutGiftPaymentInput> giftPayments = const [],
+    String? couponCode,
+    String? liveId,
   }) async {
     try {
       final body = <String, dynamic>{
@@ -471,6 +478,9 @@ class ShopRemoteDataSourceImpl implements ShopRemoteDataSource {
           'paymentMethod': shopPaymentMethodToApi(paymentMethod),
         if (giftPayments.isNotEmpty)
           'giftPayments': giftPayments.map((e) => e.toJson()).toList(),
+        if (couponCode != null && couponCode.trim().isNotEmpty)
+          'couponCode': couponCode.trim(),
+        if (liveId != null && liveId.trim().isNotEmpty) 'liveId': liveId.trim(),
       };
       final response = await apiClient.dio.post(
         ApiConstants.productsCheckoutPreview,
@@ -501,6 +511,15 @@ class ShopRemoteDataSourceImpl implements ShopRemoteDataSource {
     String? idempotencyKey,
   }) async {
     try {
+      final account = FirebaseAuth.instance.currentUser?.uid;
+      final headers = await _authHeaders(required: true);
+      if (account == null ||
+          account != FirebaseAuth.instance.currentUser?.uid) {
+        throw const LiveOperationNotSent('The signed-in account changed.');
+      }
+      final paymentKey = idempotencyKey?.isNotEmpty == true
+          ? idempotencyKey!
+          : 'chk_${DateTime.now().microsecondsSinceEpoch}_${Random.secure().nextInt(1 << 32)}';
       final body = <String, dynamic>{
         'items': items.map((e) => e.toJson()).toList(),
         'paymentMethod': shopPaymentMethodToApi(paymentMethod),
@@ -512,21 +531,39 @@ class ShopRemoteDataSourceImpl implements ShopRemoteDataSource {
           'couponCode': couponCode,
         if (liveId != null && liveId.isNotEmpty) 'liveId': liveId,
         if (postId != null && postId.isNotEmpty) 'postId': postId,
-        if (idempotencyKey != null && idempotencyKey.isNotEmpty)
-          'idempotencyKey': idempotencyKey,
+        'idempotencyKey': paymentKey,
       };
-      final response = await apiClient.dio.post(
-        ApiConstants.productsCheckout,
-        data: body,
-        options: Options(headers: await _authHeaders(required: true)),
-      );
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        return ProductOrderModel.fromJson(_asMap(response.data));
-      }
-      throw ServerException(
-        message: _extractErrorMessage(response.data) ?? 'Checkout failed',
+      return await CheckoutPaymentGuard.shared.run(
+        userId: () => FirebaseAuth.instance.currentUser?.uid ?? '',
+        body: body,
+        send: () async {
+          final response = await apiClient.dio.post(
+            ApiConstants.productsCheckout,
+            data: body,
+            // A checkout can charge coins or create a paid order. Auth refresh
+            // must not replay it. The journal retains the original key and body;
+            // the supplied contract does not promise replay or lookup semantics.
+            options: Options(
+              headers: headers,
+              extra: const {ApiClient.noAutomaticRetry: true},
+            ),
+          );
+          if (response.statusCode == 200 || response.statusCode == 201) {
+            final order = ProductOrderModel.fromJson(_asMap(response.data));
+            if (order.id.isEmpty)
+              throw const FormatException('CHECKOUT_ORDER_NOT_CONFIRMED');
+            return order;
+          }
+          throw ServerException(
+            message: _extractErrorMessage(response.data) ?? 'Checkout failed',
+          );
+        },
       );
     } catch (e) {
+      if (e is LiveOperationUnresolved ||
+          e is LiveOperationNotSent ||
+          e is LiveOperationRejected)
+        rethrow;
       throw DioHandler.handle(e);
     }
   }
@@ -821,13 +858,18 @@ class ShopRemoteDataSourceImpl implements ShopRemoteDataSource {
         final map = _asMap(response.data);
         final data = map['data'] ?? response.data;
         final list = data is List ? data : const [];
-        return list
-            .whereType<Map>()
-            .map(
-              (e) => LiveProductPinModel.fromJson(Map<String, dynamic>.from(e)),
-            )
-            .where((p) => p.productId.isNotEmpty)
-            .toList();
+        final products = <LiveProductPinModel>[];
+        for (final item in list.whereType<Map>()) {
+          try {
+            products.add(
+              LiveProductPinModel.fromJson(Map<String, dynamic>.from(item)),
+            );
+          } on FormatException {
+            // Do not manufacture a purchasable product from an incomplete
+            // bag record. Other valid bag entries can still be displayed.
+          }
+        }
+        return products;
       }
       throw ServerException(
         message:

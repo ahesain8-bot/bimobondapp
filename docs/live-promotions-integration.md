@@ -37,6 +37,11 @@ Please provide one success and one relevant failure fixture for each endpoint:
 | `POST /promotions/lives/:id/pay` | authoritative post-payment campaign status and wallet/reconciliation meaning; errors that identify insufficient coins versus retryable faults |
 | `PATCH /promotions/lives/:id`, `.../pause`, `.../resume`, `.../cancel` | authoritative returned status, conflict behavior, cancellation/refund fields, and permission failures |
 
+For the campaign envelope specifically, state whether a campaign created from a
+`packageId` also returns `durationDays`. A create request may carry only one of
+the two, so the client keeps a separate non-validating representation for stored
+campaign data; confirm that this is the real shape rather than an assumption.
+
 The parser must accept only the reviewed envelope and exact enum values. An
 unknown status remains read-only. Once fixtures arrive, replace
 `UnverifiedLivePromotionContract` with the reviewed parser and enable the
@@ -44,6 +49,19 @@ repository through that adapter; do not enable requests by treating arbitrary
 JSON as a campaign.
 
 ## Additional LIVE schema needed for creator eligibility
+
+Checked against the canonical **Live object reference** in
+`lives/mobile-api.md` (§5, "Returned by create / update / end / feed /
+detail") and the examples in `lives/endpoints.md`:
+
+- `userId` **is** present at the top level of the live object and carries the
+  host's internal user id — the same uuid the nested `user.id` repeats. The
+  client's `live['userId']` read is therefore correct; `user.id` is a duplicate,
+  not an alternative, and neither is a Firebase UID.
+- `user.isPrivate` **is** present, describing the host account.
+- `visibility` is **absent** from that reference and from every other lives
+  document in this repository. Its absence is not proof that a stream is
+  public, so eligibility still fails closed.
 
 `GET /lives/:id` must expose a canonical `visibility` field with a documented
 `PUBLIC` value. The client already verifies authenticated user id, host user
@@ -75,3 +93,19 @@ campaign id is safe to expose:
 
 Organic cards and host opens omit `campaignId`. A billing failure must not make
 the join itself fail.
+
+## Open conflict: coordinates on the LIVE feed
+
+`lives/live-promotions.md` says to pass optional `latitude` / `longitude` on
+`GET /lives/feed` so custom-audience geo targeting can match. The deployed API
+rejects them: the request returns HTTP 400 with
+`["property latitude should not exist", "property longitude should not exist"]`,
+which empties the Discover screen for any account that has granted location.
+
+The client therefore sends only the documented feed query
+(`page`, `limit`, `categoryId`, `followingOnly`), and
+`test/live_promotion_attribution_test.dart` asserts that no coordinates are
+sent. Backend must decide which side is authoritative before any geo-targeted
+delivery can be relied on: either the feed DTO accepts the two properties, or
+the promotions document should drop them. The client will not add coordinates,
+a location permission, or a geo fallback on assumption.

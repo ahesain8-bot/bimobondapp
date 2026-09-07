@@ -14,11 +14,12 @@ abstract class LiveViewerEvent extends Equatable {
 class LiveViewerActivated extends LiveViewerEvent {
   final LiveEntity live;
   final LiveFeedActivation? activation;
+  final String? trafficSource;
 
-  const LiveViewerActivated(this.live, {this.activation});
+  const LiveViewerActivated(this.live, {this.activation, this.trafficSource});
 
   @override
-  List<Object?> get props => [live, activation];
+  List<Object?> get props => [live, activation, trafficSource];
 }
 
 class LiveViewerDeactivated extends LiveViewerEvent {
@@ -48,6 +49,10 @@ class LiveViewerHudEnrichRequested extends LiveViewerEvent {
 
 class LiveViewerRetryRequested extends LiveViewerEvent {
   const LiveViewerRetryRequested();
+}
+
+class LiveViewerTicketPurchaseRequested extends LiveViewerEvent {
+  const LiveViewerTicketPurchaseRequested();
 }
 
 class LiveViewerCommentSent extends LiveViewerEvent {

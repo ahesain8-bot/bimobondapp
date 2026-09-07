@@ -1,3 +1,4 @@
+import 'package:bimobondapp/l10n/app_localizations.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -175,7 +176,9 @@ class _FansCommunityPageState extends State<FansCommunityPage> {
     if (bloc == null) {
       return Scaffold(
         backgroundColor: isDark ? const Color(0xFF121212) : Colors.white,
-        body: const Center(child: CircularProgressIndicator(color: Colors.black)),
+        body: const Center(
+          child: CircularProgressIndicator(color: Colors.black),
+        ),
       );
     }
 
@@ -242,9 +245,8 @@ class _FansCommunityPageState extends State<FansCommunityPage> {
                         padding: const EdgeInsets.fromLTRB(8, 8, 8, 12),
                         child: SizedBox(
                           width: double.infinity,
-                          height: 44,
                           child: ElevatedButton(
-                            onPressed: ready.busy
+                            onPressed: ready.busy || !ready.club.isMember
                                 ? null
                                 : () => bloc.add(
                                     ready.club.isMember
@@ -268,7 +270,9 @@ class _FansCommunityPageState extends State<FansCommunityPage> {
                                   ? '...جارٍ التنفيذ'
                                   : (ready.club.isMember
                                         ? 'مغادرة المجتمع'
-                                        : 'انضمام إلى المجتمع'),
+                                        : AppLocalizations.of(
+                                            context,
+                                          )!.liveFanClubPriceUnavailable),
                               style: const TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,

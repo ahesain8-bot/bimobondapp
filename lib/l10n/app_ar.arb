@@ -315,7 +315,9 @@
   "shopNoResultsFor": "لا نتائج لـ \"{query}\"",
   "@shopNoResultsFor": {
     "placeholders": {
-      "query": { "type": "String" }
+      "query": {
+        "type": "String"
+      }
     }
   },
   "shopSort": "الترتيب",
@@ -356,20 +358,26 @@
   "shopPayCoinsAmount": "ادفع {count} عملة",
   "@shopPayCoinsAmount": {
     "placeholders": {
-      "count": { "type": "int" }
+      "count": {
+        "type": "int"
+      }
     }
   },
   "shopNeedMoreCoins": "تحتاج إلى {count} عملة إضافية.",
   "@shopNeedMoreCoins": {
     "placeholders": {
-      "count": { "type": "int" }
+      "count": {
+        "type": "int"
+      }
     }
   },
   "shopNotEnoughCoins": "رصيد العملات غير كافٍ. اشترِ المزيد للمتابعة.",
   "shopCoinsLabel": "{count} عملة",
   "@shopCoinsLabel": {
     "placeholders": {
-      "count": { "type": "int" }
+      "count": {
+        "type": "int"
+      }
     }
   },
   "shopProductNotFound": "المنتج غير موجود",
@@ -407,7 +415,9 @@
   "shopQty": "الكمية: {count}",
   "@shopQty": {
     "placeholders": {
-      "count": { "type": "int" }
+      "count": {
+        "type": "int"
+      }
     }
   },
   "shopTotalPaid": "الإجمالي المدفوع",
@@ -434,7 +444,9 @@
   "shopItemsCount": "{count, plural, =1{عنصر واحد} other{{count} عناصر}}",
   "@shopItemsCount": {
     "placeholders": {
-      "count": { "type": "int" }
+      "count": {
+        "type": "int"
+      }
     }
   },
   "noPostsFound": "لا توجد منشورات",
@@ -1083,7 +1095,9 @@
   "chatSettingsBlock": "حظر @{username}",
   "@chatSettingsBlock": {
     "placeholders": {
-      "username": { "type": "String" }
+      "username": {
+        "type": "String"
+      }
     }
   },
   "chatSettingsBlocked": "محظور",
@@ -1095,13 +1109,17 @@
   "chatSettingsSearching": "جاري البحث عن \"{query}\"...",
   "@chatSettingsSearching": {
     "placeholders": {
-      "query": { "type": "String" }
+      "query": {
+        "type": "String"
+      }
     }
   },
   "chatSettingsReportTitle": "الإبلاغ عن @{username}",
   "@chatSettingsReportTitle": {
     "placeholders": {
-      "username": { "type": "String" }
+      "username": {
+        "type": "String"
+      }
     }
   },
   "chatSettingsReportSpam": "احتيال أو إزعاج",
@@ -1110,13 +1128,17 @@
   "chatSettingsReportSubmitted": "تم إرسال البلاغ: {reason}",
   "@chatSettingsReportSubmitted": {
     "placeholders": {
-      "reason": { "type": "String" }
+      "reason": {
+        "type": "String"
+      }
     }
   },
   "chatSettingsBlockTitle": "حظر @{username}؟",
   "@chatSettingsBlockTitle": {
     "placeholders": {
-      "username": { "type": "String" }
+      "username": {
+        "type": "String"
+      }
     }
   },
   "chatSettingsBlockMessage": "لن يتمكن من مراسلتك أو رؤية ملفك الشخصي.",
@@ -1248,7 +1270,9 @@
   "chatPollOptionHint": "خيار {index}",
   "@chatPollOptionHint": {
     "placeholders": {
-      "index": { "type": "int" }
+      "index": {
+        "type": "int"
+      }
     }
   },
   "chatPollAddOption": "إضافة خيار",
@@ -1260,7 +1284,9 @@
   "chatPollVotesCount": "{count, plural, =0{لا أصوات بعد} =1{صوت واحد} other{{count} أصوات}}",
   "@chatPollVotesCount": {
     "placeholders": {
-      "count": { "type": "int" }
+      "count": {
+        "type": "int"
+      }
     }
   },
   "messagesInboxLastPoll": "تصويت",
@@ -1441,7 +1467,9 @@
   "balanceUserTitle": "رصيد {name}",
   "@balanceUserTitle": {
     "placeholders": {
-      "name": { "type": "String" }
+      "name": {
+        "type": "String"
+      }
     }
   },
   "balanceEstimatedBalance": "الرصيد التقديري",
@@ -1457,8 +1485,12 @@
   "balanceTransactionPreview": "{title}: {amount} >",
   "@balanceTransactionPreview": {
     "placeholders": {
-      "title": { "type": "String" },
-      "amount": { "type": "String" }
+      "title": {
+        "type": "String"
+      },
+      "amount": {
+        "type": "String"
+      }
     }
   },
   "balanceFirstCoinOfferTitle": "عرض أول شراء للعملات",
@@ -1543,13 +1575,17 @@
   "cameraInitError": "تعذر تشغيل الكاميرا: {error}",
   "@cameraInitError": {
     "placeholders": {
-      "error": { "type": "String" }
+      "error": {
+        "type": "String"
+      }
     }
   },
   "cameraCaptureError": "فشل الالتقاط: {error}",
   "@cameraCaptureError": {
     "placeholders": {
-      "error": { "type": "String" }
+      "error": {
+        "type": "String"
+      }
     }
   },
   "cameraCategoryTrending": "رائج",
@@ -1671,13 +1707,17 @@
   "promotePostCta": "ترويج مقابل {price}",
   "@promotePostCta": {
     "placeholders": {
-      "price": { "type": "String" }
+      "price": {
+        "type": "String"
+      }
     }
   },
   "promotePostSuccess": "بدأ الترويج! رصيد المحفظة: {balance}",
   "@promotePostSuccess": {
     "placeholders": {
-      "balance": { "type": "String" }
+      "balance": {
+        "type": "String"
+      }
     }
   },
   "promotedBadge": "مروّج",
@@ -1686,7 +1726,9 @@
   "promoteRadiusKm": "نطاق: {km} كم",
   "@promoteRadiusKm": {
     "placeholders": {
-      "km": { "type": "int" }
+      "km": {
+        "type": "int"
+      }
     }
   },
   "promotePayFailedTitle": "فشل الدفع",
@@ -1700,7 +1742,9 @@
   "promoteImpressions": "{count} مشاهدة",
   "@promoteImpressions": {
     "placeholders": {
-      "count": { "type": "int" }
+      "count": {
+        "type": "int"
+      }
     }
   },
   "promoteStepGoalHeading": "ما هو هدفك؟",
@@ -1715,14 +1759,20 @@
   "promoteBudgetTotal": "{price} الإجمالي",
   "@promoteBudgetTotal": {
     "placeholders": {
-      "price": { "type": "String" }
+      "price": {
+        "type": "String"
+      }
     }
   },
   "promoteEstimatedViews": "{min} – {max}",
   "@promoteEstimatedViews": {
     "placeholders": {
-      "min": { "type": "String" },
-      "max": { "type": "String" }
+      "min": {
+        "type": "String"
+      },
+      "max": {
+        "type": "String"
+      }
     }
   },
   "promoteEstimatedViewsLabel": "مشاهدات الفيديو المتوقعة",
@@ -1736,7 +1786,9 @@
   "promoteAudienceNearbyWithRadius": "قريب · {km} كم",
   "@promoteAudienceNearbyWithRadius": {
     "placeholders": {
-      "km": { "type": "int" }
+      "km": {
+        "type": "int"
+      }
     }
   },
   "promoteLocationModeRegional": "إقليمياً",
@@ -1752,9 +1804,15 @@
   "promoteLocationRegionalSummary": "{town} · {region} · {country}",
   "@promoteLocationRegionalSummary": {
     "placeholders": {
-      "town": { "type": "String" },
-      "region": { "type": "String" },
-      "country": { "type": "String" }
+      "town": {
+        "type": "String"
+      },
+      "region": {
+        "type": "String"
+      },
+      "country": {
+        "type": "String"
+      }
     }
   },
   "promoteLocationCountryRequired": "يرجى اختيار الدولة.",
@@ -1770,8 +1828,12 @@
   "promoteStepOf": "الخطوة {current} من {total}",
   "@promoteStepOf": {
     "placeholders": {
-      "current": { "type": "int" },
-      "total": { "type": "int" }
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
     }
   },
   "promoteInsightsDashboardTitle": "المنشورات المروّجة",
@@ -1813,8 +1875,12 @@
   "promoteInsightsCampaignProgressSummary": "{percent} · {spent} مُنفَق",
   "@promoteInsightsCampaignProgressSummary": {
     "placeholders": {
-      "percent": { "type": "String" },
-      "spent": { "type": "String" }
+      "percent": {
+        "type": "String"
+      },
+      "spent": {
+        "type": "String"
+      }
     }
   },
   "settingsPromotedPosts": "المنشورات المروّجة",
@@ -1837,7 +1903,9 @@
   "soundSecondsSelected": "{count} ث محددة",
   "@soundSecondsSelected": {
     "placeholders": {
-      "count": { "type": "int" }
+      "count": {
+        "type": "int"
+      }
     }
   },
   "soundUseThis": "استخدام",
@@ -1856,43 +1924,57 @@
   "soundOriginalLink": "الأصل: {name}",
   "@soundOriginalLink": {
     "placeholders": {
-      "name": { "type": "String" }
+      "name": {
+        "type": "String"
+      }
     }
   },
   "soundUseCount": "{count} فيديو",
   "@soundUseCount": {
     "placeholders": {
-      "count": { "type": "int" }
+      "count": {
+        "type": "int"
+      }
     }
   },
   "soundUseCountThousands": "{count} ألف فيديو",
   "@soundUseCountThousands": {
     "placeholders": {
-      "count": { "type": "String" }
+      "count": {
+        "type": "String"
+      }
     }
   },
   "soundUseCountMillions": "{count} مليون فيديو",
   "@soundUseCountMillions": {
     "placeholders": {
-      "count": { "type": "String" }
+      "count": {
+        "type": "String"
+      }
     }
   },
   "soundPostsCount": "{count} منشور",
   "@soundPostsCount": {
     "placeholders": {
-      "count": { "type": "int" }
+      "count": {
+        "type": "int"
+      }
     }
   },
   "soundPostsCountThousands": "{count} ألف منشور",
   "@soundPostsCountThousands": {
     "placeholders": {
-      "count": { "type": "String" }
+      "count": {
+        "type": "String"
+      }
     }
   },
   "soundPostsCountMillions": "{count} مليون منشور",
   "@soundPostsCountMillions": {
     "placeholders": {
-      "count": { "type": "String" }
+      "count": {
+        "type": "String"
+      }
     }
   },
   "interestSelectionTitle": "اختر اهتماماتك",
@@ -1902,14 +1984,20 @@
   "interestSelectionMinHint": "اختر {count} اهتمامات على الأقل",
   "@interestSelectionMinHint": {
     "placeholders": {
-      "count": { "type": "int" }
+      "count": {
+        "type": "int"
+      }
     }
   },
   "interestSelectionCountHint": "{selected}/{min} مهتم",
   "@interestSelectionCountHint": {
     "placeholders": {
-      "selected": { "type": "int" },
-      "min": { "type": "int" }
+      "selected": {
+        "type": "int"
+      },
+      "min": {
+        "type": "int"
+      }
     }
   },
   "interestSelectionNotInterestedHint": "اضغط مرة أخرى لتحديد غير مهتم (اختياري).",
@@ -1982,7 +2070,6 @@
   "highlightCreated": "تم إنشاء الهايلايت",
   "highlightUpdated": "تم تحديث الهايلايت",
   "chooseFromGallery": "اختيار من المعرض",
-  "takePhoto": "التقاط صورة",
   "pasteImageUrl": "لصق رابط الصورة",
   "newHighlightButton": "جديد",
   "aboutThisStory": "عن هذه القصة",
@@ -2237,5 +2324,70 @@
   "lpInteger": "أدخل عدداً صحيحاً.",
   "lpNumber": "أدخل رقماً صالحاً ومحدوداً.",
   "lpClose": "إغلاق الترويج",
-  "notificationBodyGift": "أرسل لك {name} هدية"
+  "notificationBodyGift": "أرسل لك {name} هدية",
+  "liveMetricUnavailable": "غير متاح",
+  "liveSummaryTitle": "تقرير البث",
+  "liveSummaryEmpty": "تقرير البث غير متاح.",
+  "liveSummaryDuration": "المدة (ثانية)",
+  "liveSummaryPeak": "أعلى عدد مشاهدين",
+  "liveSummarySessions": "جلسات المشاهدة",
+  "liveSummaryLikes": "الإعجابات",
+  "liveSummaryComments": "التعليقات",
+  "liveSummaryCoins": "العملات المكتسبة",
+  "liveSummaryGifters": "أبرز مرسلي الهدايا",
+  "liveSummaryUnique": "المشاهدون الفريدون",
+  "liveSummaryWatch": "وقت المشاهدة (ثانية)",
+  "liveSummaryAverage": "متوسط المشاهدة (ثانية)",
+  "liveSummaryFollowers": "المتابعون الجدد",
+  "liveSummaryShares": "المشاركات",
+  "liveSummaryOrders": "طلبات المتجر",
+  "liveSummaryRevenue": "إيرادات المتجر (عملات)",
+  "liveSummaryTraffic": "مصادر الزيارات",
+  "liveGiftGoalLabel": "هدف الهدايا",
+  "liveFanClubPriceUnavailable": "أسعار شرائح الاشتراك غير مؤكدة حاليًا. الانضمام غير متاح.",
+  "liveDiscoveryForYou": "لك",
+  "liveDiscoveryFollowing": "المتابَعون",
+  "liveDiscoveryNearby": "بالقرب منك",
+  "liveDiscoveryAudio": "الصوت",
+  "liveDiscoveryFilter": "تصفية البثوث",
+  "liveDiscoveryTopic": "الموضوع",
+  "liveDiscoveryCategory": "معرّف التصنيف",
+  "liveLocationUnavailable": "فعّل خدمة الموقع واسمح بالوصول إليه لعرض البثوث القريبة.",
+  "liveGalleryReorder": "اسحب لتغيير الترتيب",
+  "liveLeagueTitle": "دوري المضيف",
+  "liveLeagueProgress": "التقدم نحو الدوري التالي",
+  "liveReplayTitle": "الإعادة والقصاصات",
+  "liveRecordingStatus": "حالة التسجيل",
+  "liveReplayStatus": "حالة الإعادة",
+  "liveReplayUnavailable": "يتطلب التشغيل استجابة مؤكدة من خدمة الإعادة.",
+  "liveCouponCode": "رمز الكوبون",
+  "liveApplyCoupon": "تطبيق الكوبون",
+  "liveDeal": "عرض البث",
+  "liveDealPrice": "سعر الفلاش (عملات)",
+  "liveDealEnd": "وقت انتهاء الفلاش (ISO)",
+  "liveDealDiscount": "خصم الكوبون (عملات)",
+  "liveDealSave": "حفظ العرض",
+  "liveDealSold": "المباع",
+  "liveCouponAvailable": "يتوفر كوبون",
+  "liveTicketEnabled": "دخول بتذكرة",
+  "liveTicketPrice": "سعر التذكرة (عملات)",
+  "liveTicketBuy": "شراء التذكرة مقابل {coins} عملة",
+  "liveTicketRequiredDetail": "يتطلب هذا البث تذكرة للدخول.",
+  "liveTicketUnavailable": "تعذر التحقق من إمكانية الدخول. حدّث الحالة.",
+  "livePaymentUnresolved": "دفعتك بانتظار التأكيد. تحقق من حالتها قبل الدفع مرة أخرى.",
+  "liveTicketChecking": "جارٍ التحقق من إمكانية الدخول…",
+  "liveTicketTitle": "الدخول إلى البث",
+  "liveTicketRefresh": "التحقق من حالة التذكرة",
+  "liveEntryBack": "رجوع",
+  "shopCouponLabel": "كوبون البث",
+  "shopCouponHint": "أدخل رمز الكوبون",
+  "shopCouponApply": "تطبيق",
+  "shopPreviewChanged": "تغيرت تفاصيل الطلب. راجع المجموع المحدّث قبل الدفع.",
+  "@liveTicketBuy": {
+    "placeholders": {
+      "coins": {
+        "type": "int"
+      }
+    }
+  }
 }

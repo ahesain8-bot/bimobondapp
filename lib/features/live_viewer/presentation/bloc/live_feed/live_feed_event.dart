@@ -11,6 +11,8 @@ class LiveFeedLoadRequested extends LiveFeedEvent {
   final String? category;
   final bool refresh;
   final bool followingOnly;
+  final String surface;
+  final String? topic;
   final double? latitude, longitude;
   final bool audioOnly;
 
@@ -18,6 +20,8 @@ class LiveFeedLoadRequested extends LiveFeedEvent {
     this.category,
     this.refresh = false,
     this.followingOnly = false,
+    this.surface = 'feed',
+    this.topic,
     this.latitude,
     this.longitude,
     this.audioOnly = false,
@@ -28,6 +32,8 @@ class LiveFeedLoadRequested extends LiveFeedEvent {
     category,
     refresh,
     followingOnly,
+    surface,
+    topic,
     latitude,
     longitude,
     audioOnly,

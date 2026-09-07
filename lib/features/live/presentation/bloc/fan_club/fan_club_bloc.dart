@@ -91,21 +91,34 @@ class FanClubBloc extends Bloc<FanClubEvent, FanClubState> {
     try {
       await _subscribeFanClub(ready.creatorId!);
       if (isClosed) return;
+      // Membership is what grants SUBSCRIBERS chat, so it is re-read from the
+      // server rather than assumed, and the member count is never guessed.
+      final club = await _refreshClub(ready.creatorId!);
+      if (isClosed) return;
       emit(
         ready.copyWith(
           busy: false,
-          club: FanClub(
-            enabled: ready.club.enabled,
-            name: ready.club.name,
-            memberCount: ready.club.memberCount + 1,
-            isMember: true,
-          ),
-          message: 'تم الانضمام إلى مجتمع المعجبين',
+          club: club ?? ready.club,
+          // A failed re-read does not undo a completed subscription and is
+          // never retried as another POST.
+          message: club == null
+              ? 'تم الانضمام، وجارٍ تأكيد العضوية'
+              : 'تم الانضمام إلى مجتمع المعجبين',
         ),
       );
     } catch (e) {
       if (isClosed) return;
       emit(ready.copyWith(busy: false, message: 'تعذر الانضمام: $e'));
+    }
+  }
+
+  /// Re-reads the club after a membership change. Returns null when the read
+  /// fails, so the caller keeps the previous, conservative membership.
+  Future<FanClub?> _refreshClub(String creatorId) async {
+    try {
+      return await _getFanClub(creatorId);
+    } catch (_) {
+      return null;
     }
   }
 

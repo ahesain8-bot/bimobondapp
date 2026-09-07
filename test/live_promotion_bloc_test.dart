@@ -11,6 +11,7 @@ import 'package:bimobondapp/features/live_viewer/data/services/fake_livekit_serv
 import 'package:bimobondapp/features/live_viewer/data/services/fake_socket_service.dart';
 import 'package:bimobondapp/features/live_viewer/data/mappers/live_mapper.dart';
 import 'package:bimobondapp/features/live_viewer/domain/entities/live_feed_activation.dart';
+import 'package:bimobondapp/features/live_viewer/domain/entities/live_entity.dart';
 import 'package:bimobondapp/features/live_viewer/domain/entities/live_session_entity.dart';
 import 'package:bimobondapp/features/live_viewer/domain/repositories/live_repository.dart';
 import 'package:bimobondapp/features/live_viewer/domain/repositories/comment_repository.dart';
@@ -30,12 +31,16 @@ import 'package:bimobondapp/features/live_viewer/presentation/bloc/live_viewer/l
 import 'live_promotion_attribution_test.dart' show live;
 
 class _Repo implements LiveRepository {
+  @override
+  Future<Either<Failure, LiveEntity>> getLiveById(String id) async =>
+      Right(LiveMapper.fromJson({...live(), 'id': id}));
   final calls = <({String liveId, String? campaignId})>[];
   Completer<void>? gate;
   @override
   Future<Either<Failure, JoinLiveResult>> joinLive(
     String liveId, {
     String? campaignId,
+    String? trafficSource,
   }) async {
     calls.add((liveId: liveId, campaignId: campaignId));
     if (gate != null) await gate!.future;

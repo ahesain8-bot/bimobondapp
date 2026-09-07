@@ -173,7 +173,7 @@ void main() {
     },
   );
   test(
-    'main/filtered/location feeds have separate cache keys and paired coordinates',
+    'main/filtered feeds have separate cache keys and send no coordinates',
     () async {
       final requests = <http.Request>[];
       final repo = FakeLiveRepository(
@@ -197,13 +197,19 @@ void main() {
       );
       await repo.getLiveFeed(followingOnly: true);
       await repo.getLiveFeed(category: 'category-1');
-      await repo.getLiveFeed(latitude: 31, longitude: 35);
-      await repo.getLiveFeed(latitude: 31);
-      expect(requests.length, 5);
+      expect(requests.length, 3);
       expect(requests[1].url.queryParameters['followingOnly'], 'true');
       expect(requests[2].url.queryParameters['categoryId'], 'category-1');
-      expect(requests[3].url.queryParameters['longitude'], '35.0');
-      expect(requests[4].url.queryParameters.containsKey('latitude'), false);
+      // /lives/feed rejects any param outside page/limit/categoryId/
+      // followingOnly — sending coordinates 400s the whole Discover screen.
+      expect(
+        requests.every(
+          (r) =>
+              !r.url.queryParameters.containsKey('latitude') &&
+              !r.url.queryParameters.containsKey('longitude'),
+        ),
+        true,
+      );
       expect(requests.every((r) => r.method == 'GET'), true);
     },
   );
@@ -225,13 +231,14 @@ void main() {
       );
       final bloc = LiveFeedBloc(getLiveFeedUseCase: GetLiveFeedUseCase(repo));
       final loaded = bloc.stream.firstWhere((s) => s.lives.length == 2);
-      bloc.add(
-        const LiveFeedLoadRequested(refresh: true, latitude: 31, longitude: 35),
-      );
+      bloc.add(const LiveFeedLoadRequested(refresh: true));
       await loaded;
       expect(bloc.state.lives.map((e) => e.feedEntryKey).toSet().length, 2);
       expect(requests.every((r) => r.method == 'GET'), true);
-      expect(requests.single.url.queryParameters['latitude'], '31.0');
+      expect(
+        requests.single.url.queryParameters.keys.toSet(),
+        {'page', 'limit'},
+      );
       await bloc.close();
     },
   );

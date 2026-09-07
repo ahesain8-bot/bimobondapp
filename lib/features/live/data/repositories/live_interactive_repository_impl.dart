@@ -1,3 +1,5 @@
+import 'dart:convert';
+import '../../../../core/services/live_operation_guard.dart';
 import '../../domain/entities/live_interactive.dart';
 import '../../domain/repositories/live_interactive_repository.dart';
 import '../datasources/live_interactive_remote_datasource.dart';
@@ -7,9 +9,15 @@ import '../mappers/live_interactive_mapper.dart';
 class LiveInteractiveRepositoryImpl implements LiveInteractiveRepository {
   LiveInteractiveRepositoryImpl({
     required LiveInteractiveRemoteDataSource remote,
-  }) : _remote = remote;
+    String Function()? userIdProvider,
+    LiveOperationGuard? operationGuard,
+  }) : _remote = remote,
+       _userId = userIdProvider ?? (() => ''),
+       _operations = operationGuard ?? LiveOperationGuard.shared;
 
   final LiveInteractiveRemoteDataSource _remote;
+  final String Function() _userId;
+  final LiveOperationGuard _operations;
 
   @override
   Future<LiveGiftGoal> createGiftGoal({
@@ -63,10 +71,7 @@ class LiveInteractiveRepositoryImpl implements LiveInteractiveRepository {
   }
 
   @override
-  Future<void> endPoll({
-    required String liveId,
-    required String pollId,
-  }) async {
+  Future<void> endPoll({required String liveId, required String pollId}) async {
     await _remote.endPoll(liveId, pollId);
   }
 
@@ -82,9 +87,9 @@ class LiveInteractiveRepositoryImpl implements LiveInteractiveRepository {
   @override
   Future<List<LiveQA>> listQuestions(String liveId) async {
     final json = await _remote.questions(liveId);
-    return LiveInteractiveMapper.listOf(json)
-        .map(LiveInteractiveMapper.qa)
-        .toList(growable: false);
+    return LiveInteractiveMapper.listOf(
+      json,
+    ).map(LiveInteractiveMapper.qa).toList(growable: false);
   }
 
   @override
@@ -112,21 +117,34 @@ class LiveInteractiveRepositoryImpl implements LiveInteractiveRepository {
     required int maxClaims,
     required int delaySeconds,
   }) async {
-    final json = await _remote.createTreasureBox(
-      liveId,
-      totalCoins: totalCoins,
-      maxClaims: maxClaims,
-      delaySeconds: delaySeconds,
+    return _operations.run(
+      userId: _userId,
+      liveId: liveId,
+      operation: 'treasure-create',
+      entityId: jsonEncode([totalCoins, maxClaims, delaySeconds]),
+      retainSuccess: false,
+      send: () async {
+        final json = await _remote.createTreasureBox(
+          liveId,
+          totalCoins: totalCoins,
+          maxClaims: maxClaims,
+          delaySeconds: delaySeconds,
+        );
+        final box = LiveInteractiveMapper.treasureBox(json);
+        if (box.id.isEmpty || box.liveId != liveId) {
+          throw const FormatException('Unrecognized treasure box response.');
+        }
+        return box;
+      },
     );
-    return LiveInteractiveMapper.treasureBox(json);
   }
 
   @override
   Future<List<LiveTreasureBox>> listTreasureBoxes(String liveId) async {
     final json = await _remote.treasureBoxes(liveId);
-    return LiveInteractiveMapper.listOf(json)
-        .map(LiveInteractiveMapper.treasureBox)
-        .toList(growable: false);
+    return LiveInteractiveMapper.listOf(
+      json,
+    ).map(LiveInteractiveMapper.treasureBox).toList(growable: false);
   }
 
   @override
@@ -134,18 +152,31 @@ class LiveInteractiveRepositoryImpl implements LiveInteractiveRepository {
     required String liveId,
     required String boxId,
   }) async {
-    final json = await _remote.claimTreasureBox(liveId, boxId);
-    final claim = LiveInteractiveMapper.treasureClaim(json);
-    // A bare claim response omits `boxId`; the caller still needs to know
-    // which box it belongs to in order to update the list.
-    return claim.boxId.isNotEmpty
-        ? claim
-        : LiveTreasureClaim(
-            boxId: boxId,
-            coinsWon: claim.coinsWon,
-            claimedCount: claim.claimedCount,
-            remainingCoins: claim.remainingCoins,
-          );
+    return _operations.run(
+      userId: _userId,
+      liveId: liveId,
+      operation: 'treasure-claim',
+      entityId: boxId,
+      send: () async {
+        final json = await _remote.claimTreasureBox(liveId, boxId);
+        if (json['boxId'] != boxId ||
+            json['coinsWon'] is! int ||
+            (json['coinsWon'] as int) < 0) {
+          throw const FormatException('Unrecognized treasure claim response.');
+        }
+        final claim = LiveInteractiveMapper.treasureClaim(json);
+        // A bare claim response omits `boxId`; the caller still needs to know
+        // which box it belongs to in order to update the list.
+        return claim.boxId.isNotEmpty
+            ? claim
+            : LiveTreasureClaim(
+                boxId: boxId,
+                coinsWon: claim.coinsWon,
+                claimedCount: claim.claimedCount,
+                remainingCoins: claim.remainingCoins,
+              );
+      },
+    );
   }
 
   @override
@@ -167,9 +198,9 @@ class LiveInteractiveRepositoryImpl implements LiveInteractiveRepository {
   @override
   Future<List<LiveAuction>> listActiveAuctions(String liveId) async {
     final json = await _remote.activeAuctions(liveId);
-    return LiveInteractiveMapper.listOf(json)
-        .map(LiveInteractiveMapper.auction)
-        .toList(growable: false);
+    return LiveInteractiveMapper.listOf(
+      json,
+    ).map(LiveInteractiveMapper.auction).toList(growable: false);
   }
 
   @override

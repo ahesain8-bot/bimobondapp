@@ -11,6 +11,8 @@ import '../../../../../core/models/live_battle.dart';
 import '../../../../../core/models/live_competition_request.dart';
 import '../../../data/services/fake_livekit_service.dart';
 import '../../../data/services/fake_socket_service.dart';
+import '../../../data/services/live_ticket_service.dart';
+import '../../../domain/entities/live_feed_activation.dart';
 import '../../../domain/entities/comment_entity.dart';
 import '../../../domain/entities/live_entity.dart';
 import '../../../domain/entities/live_session_entity.dart';
@@ -51,11 +53,14 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     required this.liveKitService,
     required this.apiClient,
     required this.guestRepository,
-  }) : super(const LiveViewerState()) {
+    LiveTicketService? ticketService,
+  }) : ticketService = ticketService ?? LiveTicketService(apiClient: apiClient),
+       super(const LiveViewerState()) {
     on<LiveViewerActivated>(_onActivated);
     on<LiveViewerDeactivated>(_onDeactivated);
     on<LiveViewerHudEnrichRequested>(_onHudEnrichRequested);
     on<LiveViewerRetryRequested>(_onRetryRequested);
+    on<LiveViewerTicketPurchaseRequested>(_onTicketPurchaseRequested);
     on<LiveViewerCommentSent>(_onCommentSent);
     on<LiveViewerLiked>(_onLiked);
     on<LiveViewerGiftBalanceRefreshRequested>(_onGiftBalanceRefreshRequested);
@@ -107,6 +112,9 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
   final UnmuteViewerChatUseCase unmuteViewerChatUseCase;
   final DeleteCommentUseCase deleteCommentUseCase;
   final GuestRepository guestRepository;
+  final LiveTicketService ticketService;
+  LiveViewerActivated? _entryEvent;
+  bool _ticketPurchaseBusy = false;
   final LiveRepository liveRepository;
   final CommentRepository commentRepository;
   final GiftRepository giftRepository;
@@ -190,16 +198,23 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     LiveViewerActivated event,
     Emitter<LiveViewerState> emit,
   ) async {
-    if (_feedExitRequested || _deactivateRequested) {
+    if (_feedExitRequested) {
+      return;
+    }
+    // A page switch may arrive while the previous room is being torn down.
+    // Keep the latest intended entry and let teardown finish first; dropping
+    // it leaves the new visible page permanently disconnected.
+    if (_deactivateRequested) {
+      _pendingActivate = event;
       return;
     }
     if (_busy) {
-      // A leave/close is already pending — do not queue another join that
-      // would revive LiveKit after the feed route is gone.
-      if (_deactivateRequested) {
-        return;
+      if (_activeLiveId != event.live.id ||
+          (event.activation != null &&
+              !identical(event.activation, _activeActivation))) {
+        _sessionGeneration++;
+        _pendingActivate = event;
       }
-      _pendingActivate = event;
       return;
     }
     // Rebuilds of one entry do not retry a failed, possibly billed join.
@@ -225,7 +240,17 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
       await _teardown(silent: true, emit: emit);
       if (isClosed || _sessionGeneration != sessionGen) return;
       _activeLiveId = event.live.id;
-      _activeActivation = event.activation;
+      final activation =
+          event.activation ??
+          LiveFeedActivation.fromEntry(
+            event.live.copyWith(clearPromotion: true),
+          );
+      _activeActivation = activation;
+      _entryEvent = LiveViewerActivated(
+        event.live,
+        activation: activation,
+        trafficSource: event.trafficSource,
+      );
       final live = event.live;
 
       final isPk = live.metadata?['isPk'] == true;
@@ -247,12 +272,14 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
               ? ((live.metadata?['scoreRight'] as num?)?.toInt() ?? 0)
               : 0,
           currentUserId: _currentUserId,
+          ticketGate: LiveTicketGateState.checking,
         ),
       );
 
       if (live.status == LiveStatus.ended) {
         emit(
           state.copyWith(
+            ticketGate: LiveTicketGateState.open,
             session: state.session!.copyWith(
               connectionState: LiveConnectionState.liveEnded,
             ),
@@ -263,6 +290,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
       if (live.status == LiveStatus.banned) {
         emit(
           state.copyWith(
+            ticketGate: LiveTicketGateState.open,
             session: state.session!.copyWith(
               connectionState: LiveConnectionState.banned,
             ),
@@ -271,19 +299,44 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
         return;
       }
 
-      if (live.ageRestricted) {
-        final me = await _loadViewerProfile();
-        if (!_isCurrentSession(live.id, sessionGen)) {
-          await _abandonStaleSession();
-          return;
-        }
-        final myId = me?['id']?.toString();
-        if (myId != null && myId.isNotEmpty) _currentUserId = myId;
-        final isHost = myId != null && myId == live.hostId;
+      // Every entry path checks fresh room permissions BEFORE a join can bill
+      // attribution. Feed metadata is only a card, never an access decision.
+      // One profile read serves both the account ID and the age check.
+      final me = await _loadViewerProfile();
+      if (!_isCurrentSession(live.id, sessionGen)) {
+        await _abandonStaleSession();
+        return;
+      }
+      final myId = me?['id']?.toString();
+      _currentUserId = (myId != null && myId.isNotEmpty) ? myId : null;
+      final detailResult = await liveRepository.getLiveById(live.id);
+      if (!_isCurrentSession(live.id, sessionGen)) return;
+      final detail = detailResult.fold((_) => null, (value) => value);
+      if (detail == null) {
+        // Privacy, age restrictions and bans are not ticket purchase prompts.
+        emit(
+          state.copyWith(
+            ticketGate: LiveTicketGateState.open,
+            session: state.session!.copyWith(
+              connectionState: LiveConnectionState.error,
+              errorMessage: detailResult.fold(
+                (failure) => failure.message,
+                (_) => '',
+              ),
+            ),
+          ),
+        );
+        return;
+      }
+
+      // Age-restricted rooms need a stored date of birth. The flag comes from
+      // the fresh room response, not from a feed card that may be stale.
+      if (detail.ageRestricted && _currentUserId != detail.hostId) {
         final dob = me?['dateOfBirth']?.toString().trim();
-        if (!isHost && (dob == null || dob.isEmpty)) {
+        if (dob == null || dob.isEmpty) {
           emit(
             state.copyWith(
+              ticketGate: LiveTicketGateState.open,
               currentUserId: _currentUserId,
               needsDateOfBirth: true,
             ),
@@ -291,18 +344,46 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
           return;
         }
       }
-
-      // Resolve the account ID before attributing a promoted activation; host
-      // joins and reconnect/PK events (which have no activation) stay organic.
-      if (event.activation != null) {
-        _currentUserId = await _loadCurrentUserId(allowFirebaseFallback: false);
-        if (!_isCurrentSession(live.id, sessionGen)) return;
+      if (detail.ticketEnabled && _currentUserId != detail.hostId) {
+        try {
+          final access = await ticketService.status(live.id);
+          if (!_isCurrentSession(live.id, sessionGen)) return;
+          if (!access.hasTicket) {
+            emit(
+              state.copyWith(
+                ticketGate: access.awaitingConfirmation
+                    ? LiveTicketGateState.paymentUnresolved
+                    : LiveTicketGateState.required,
+                ticketPriceCoins: access.priceCoins,
+              ),
+            );
+            return;
+          }
+        } catch (_) {
+          if (_isCurrentSession(live.id, sessionGen)) {
+            emit(state.copyWith(ticketGate: LiveTicketGateState.unavailable));
+          }
+          return;
+        }
       }
-      final campaignId = event.activation?.consume(
+      emit(
+        state.copyWith(
+          ticketGate: LiveTicketGateState.open,
+          currentUserId: _currentUserId,
+        ),
+      );
+      final sourceConsumed = activation.isConsumed;
+      final campaignId = activation.consume(
         joiningLiveId: live.id,
         viewerId: _currentUserId,
       );
-      final joinResult = await joinLiveUseCase(live.id, campaignId: campaignId);
+      final joinResult = await joinLiveUseCase(
+        live.id,
+        campaignId: campaignId,
+        trafficSource: campaignId != null || sourceConsumed
+            ? null
+            : event.trafficSource,
+      );
       if (!_isCurrentSession(live.id, sessionGen)) {
         await _abandonStaleSession();
         return;
@@ -454,13 +535,18 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
       );
     } finally {
       final shouldDeactivate = _deactivateRequested;
-      _deactivateRequested = false;
+      final pendingAfterDeactivate = _pendingActivate;
       if (shouldDeactivate) {
-        _pendingActivate = null;
         await _teardown(silent: false, emit: emit);
       }
       _busy = false;
-      if (!shouldDeactivate) {
+      _deactivateRequested = false;
+      if (shouldDeactivate) {
+        _pendingActivate = null;
+        if (!_feedExitRequested && pendingAfterDeactivate != null) {
+          add(pendingAfterDeactivate);
+        }
+      } else {
         final pending = _pendingActivate;
         _pendingActivate = null;
         if (pending != null &&
@@ -564,6 +650,11 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
       _busy = false;
       if (!event.leavingFeed) {
         _deactivateRequested = false;
+        final pending = _pendingActivate;
+        _pendingActivate = null;
+        if (pending != null && !_feedExitRequested) {
+          add(pending);
+        }
       }
     }
   }
@@ -573,9 +664,37 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     Emitter<LiveViewerState> emit,
   ) async {
     final live = state.live;
-    if (live == null) return;
+    if (live == null || _ticketPurchaseBusy) return;
+    final entry = _entryEvent;
     _activeLiveId = null;
-    add(LiveViewerActivated(live));
+    add(entry ?? LiveViewerActivated(live));
+  }
+
+  Future<void> _onTicketPurchaseRequested(
+    LiveViewerTicketPurchaseRequested event,
+    Emitter<LiveViewerState> emit,
+  ) async {
+    final liveId = _activeLiveId;
+    if (liveId == null ||
+        _ticketPurchaseBusy ||
+        state.ticketGate != LiveTicketGateState.required)
+      return;
+    final generation = _sessionGeneration;
+    _ticketPurchaseBusy = true;
+    emit(state.copyWith(ticketGate: LiveTicketGateState.purchasing));
+    try {
+      await ticketService.purchase(liveId);
+      if (_isCurrentSession(liveId, generation)) {
+        _ticketPurchaseBusy = false;
+        add(const LiveViewerRetryRequested());
+      }
+    } catch (_) {
+      if (_isCurrentSession(liveId, generation)) {
+        emit(state.copyWith(ticketGate: LiveTicketGateState.paymentUnresolved));
+      }
+    } finally {
+      _ticketPurchaseBusy = false;
+    }
   }
 
   Future<void> _onCommentSent(

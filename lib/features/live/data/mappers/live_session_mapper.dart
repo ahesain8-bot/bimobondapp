@@ -1,5 +1,6 @@
 import '../../domain/entities/live_chat_message.dart';
 import '../../domain/entities/live_host.dart';
+import '../../domain/entities/live_interactive.dart';
 import '../../domain/entities/live_scene.dart';
 import '../../domain/entities/live_session.dart';
 import '../../domain/entities/live_studio.dart';
@@ -81,12 +82,15 @@ class LiveSessionMapper {
       layout: live['layout']?.toString(),
       allowGuestCamera: live['allowGuestCamera'] as bool?,
       moderatorsCanManageGuests: live['moderatorsCanManageGuests'] as bool?,
+      ticketEnabled: live['ticketEnabled'] as bool?,
+      ticketPriceCoins: _nonNegativeInt(live['ticketPriceCoins']),
       liveKitToken: liveKitToken,
       liveKitUrl: liveKitUrl,
       liveKitRole: liveKitRole,
       mediaHints: mediaHints,
       hourlyRank: hourlyRank,
       totalEarnedCoins: _asInt(live['totalEarnedCoins']) ?? 0,
+      giftGoal: _giftGoalFrom(live),
       isPopular: live['isPopular'] as bool?,
       popularReason: live['popularReason']?.toString(),
       paused: live['paused'] == true,
@@ -105,6 +109,18 @@ class LiveSessionMapper {
       blockedKeywords: _stringList(live['blockedKeywords']),
       houseId: live['houseId']?.toString(),
       ageRestricted: live['ageRestricted'] == true,
+    );
+  }
+
+  /// `giftGoalTarget` is nullable in the schema: no target means no goal.
+  static LiveGiftGoal? _giftGoalFrom(Map<String, dynamic> live) {
+    final target = _asInt(live['giftGoalTarget']);
+    if (target == null || target <= 0) return null;
+    return LiveGiftGoal(
+      id: live['id']?.toString() ?? '',
+      title: live['giftGoalTitle']?.toString(),
+      target: target,
+      current: _asInt(live['giftGoalCurrent']) ?? 0,
     );
   }
 
@@ -168,5 +184,10 @@ class LiveSessionMapper {
         .map((e) => e.toString().trim())
         .where((s) => s.isNotEmpty)
         .toList(growable: false);
+  }
+
+  static int? _nonNegativeInt(dynamic value) {
+    final parsed = _asInt(value);
+    return parsed != null && parsed >= 0 ? parsed : null;
   }
 }

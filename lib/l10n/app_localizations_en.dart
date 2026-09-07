@@ -5188,4 +5188,180 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get lpClose => 'Close promotions';
+
+  @override
+  String get liveMetricUnavailable => 'Not available';
+
+  @override
+  String get liveSummaryTitle => 'LIVE summary';
+
+  @override
+  String get liveSummaryEmpty => 'No summary available.';
+
+  @override
+  String get liveSummaryDuration => 'Duration (seconds)';
+
+  @override
+  String get liveSummaryPeak => 'Peak viewers';
+
+  @override
+  String get liveSummarySessions => 'Viewer sessions';
+
+  @override
+  String get liveSummaryLikes => 'Likes';
+
+  @override
+  String get liveSummaryComments => 'Comments';
+
+  @override
+  String get liveSummaryCoins => 'Earned coins';
+
+  @override
+  String get liveSummaryGifters => 'Top gifters';
+
+  @override
+  String get liveSummaryUnique => 'Unique viewers';
+
+  @override
+  String get liveSummaryWatch => 'Watch time (seconds)';
+
+  @override
+  String get liveSummaryAverage => 'Average watch time (seconds)';
+
+  @override
+  String get liveSummaryFollowers => 'New followers';
+
+  @override
+  String get liveSummaryShares => 'Shares';
+
+  @override
+  String get liveSummaryOrders => 'Shop orders';
+
+  @override
+  String get liveSummaryRevenue => 'Shop revenue (coins)';
+
+  @override
+  String get liveSummaryTraffic => 'Traffic sources';
+
+  @override
+  String get liveGiftGoalLabel => 'Gift goal';
+
+  @override
+  String get liveFanClubPriceUnavailable => 'Subscription prices are not verified yet. Joining is unavailable.';
+
+  @override
+  String get liveDiscoveryForYou => 'For You';
+
+  @override
+  String get liveDiscoveryFollowing => 'Following';
+
+  @override
+  String get liveDiscoveryNearby => 'Nearby';
+
+  @override
+  String get liveDiscoveryAudio => 'Audio';
+
+  @override
+  String get liveDiscoveryFilter => 'Filter LIVE';
+
+  @override
+  String get liveDiscoveryTopic => 'Topic';
+
+  @override
+  String get liveDiscoveryCategory => 'Category ID';
+
+  @override
+  String get liveLocationUnavailable => 'Enable location services and allow location access to see nearby LIVE streams.';
+
+  @override
+  String get liveGalleryReorder => 'Drag to reorder';
+
+  @override
+  String get liveLeagueTitle => 'Host league';
+
+  @override
+  String get liveLeagueProgress => 'Progress to next tier';
+
+  @override
+  String get liveReplayTitle => 'Replay and clips';
+
+  @override
+  String get liveRecordingStatus => 'Recording status';
+
+  @override
+  String get liveReplayStatus => 'Replay status';
+
+  @override
+  String get liveReplayUnavailable => 'Playback needs a verified response from the replay service.';
+
+  @override
+  String get liveCouponCode => 'Coupon code';
+
+  @override
+  String get liveApplyCoupon => 'Apply coupon';
+
+  @override
+  String get liveDeal => 'LIVE deal';
+
+  @override
+  String get liveDealPrice => 'Flash price (coins)';
+
+  @override
+  String get liveDealEnd => 'Flash ends at (ISO time)';
+
+  @override
+  String get liveDealDiscount => 'Coupon discount (coins)';
+
+  @override
+  String get liveDealSave => 'Save deal';
+
+  @override
+  String get liveDealSold => 'Sold';
+
+  @override
+  String get liveCouponAvailable => 'Coupon available';
+
+  @override
+  String get liveTicketEnabled => 'Paid entry';
+
+  @override
+  String get liveTicketPrice => 'Ticket price (coins)';
+
+  @override
+  String liveTicketBuy(int coins) {
+    return 'Buy ticket for $coins coins';
+  }
+
+  @override
+  String get liveTicketRequiredDetail => 'This LIVE requires a ticket before entry.';
+
+  @override
+  String get liveTicketUnavailable => 'Could not check entry access. Please refresh.';
+
+  @override
+  String get livePaymentUnresolved => 'Your payment is awaiting confirmation. Check its status before paying again.';
+
+  @override
+  String get liveTicketChecking => 'Checking entry access…';
+
+  @override
+  String get liveTicketTitle => 'LIVE entry';
+
+  @override
+  String get liveTicketRefresh => 'Check ticket status';
+
+  @override
+  String get liveEntryBack => 'Back';
+
+  @override
+  String get shopCouponLabel => 'LIVE coupon';
+
+  @override
+  String get shopCouponHint => 'Enter a coupon code';
+
+  @override
+  String get shopCouponApply => 'Apply';
+
+  @override
+  String get shopPreviewChanged => 'Your checkout details changed. Review the updated total before paying.';
 }

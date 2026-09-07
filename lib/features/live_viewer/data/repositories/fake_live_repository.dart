@@ -16,7 +16,9 @@ import '../datasources/live_remote_datasource.dart';
 class FakeLiveRepository implements LiveRepository {
   final LiveRemoteDataSource _remote;
 
-  FakeLiveRepository(this._remote);
+  FakeLiveRepository(this._remote, {String Function()? accountId})
+    : _accountId = accountId ?? (() => '');
+  final String Function() _accountId;
 
   /// Short TTL so reopening the Lives screen does not stampede `/lives/feed`.
   static const _feedCacheTtl = Duration(seconds: 25);
@@ -27,16 +29,21 @@ class FakeLiveRepository implements LiveRepository {
   Future<Either<Failure, LiveFeedPageResult>>? _feedInFlight;
   String? _feedInFlightKey;
 
+  /// The surface is part of the key: For You, Following, a category, Nearby
+  /// and Audio are different lists and must never share a cached page.
   String _feedKey({
     required int page,
     required int limit,
     String? category,
     bool followingOnly = false,
+    String surface = 'feed',
+    String? topic,
     double? latitude,
     double? longitude,
-    bool audioOnly = false,
+    int? radiusKm,
   }) =>
-      '$page|$limit|${category ?? ''}|$followingOnly|$latitude|$longitude|audio=$audioOnly';
+      '${_accountId()}|$surface|$page|$limit|${category ?? ''}|$followingOnly|${topic ?? ''}'
+      '|${latitude ?? ''}|${longitude ?? ''}|${radiusKm ?? ''}';
 
   @override
   Future<Either<Failure, LiveFeedPageResult>> getLiveFeed({
@@ -44,19 +51,15 @@ class FakeLiveRepository implements LiveRepository {
     int limit = 10,
     String? category,
     bool followingOnly = false,
-    double? latitude,
-    double? longitude,
+    String? topic,
     bool forceRefresh = false,
-    bool audioOnly = false,
   }) async {
     final key = _feedKey(
       page: page,
       limit: limit,
       category: category,
       followingOnly: followingOnly,
-      latitude: latitude,
-      longitude: longitude,
-      audioOnly: audioOnly,
+      topic: topic,
     );
 
     if (!forceRefresh &&
@@ -76,12 +79,14 @@ class FakeLiveRepository implements LiveRepository {
     final future = _fetchLiveFeed(
       page: page,
       limit: limit,
-      category: category,
-      followingOnly: followingOnly,
-      latitude: latitude,
-      longitude: longitude,
-      audioOnly: audioOnly,
       cacheKey: key,
+      request: () => _remote.getLiveFeed(
+        page: page,
+        limit: limit,
+        category: category,
+        followingOnly: followingOnly,
+        topic: topic,
+      ),
     );
     _feedInFlight = future;
     _feedInFlightKey = key;
@@ -98,23 +103,11 @@ class FakeLiveRepository implements LiveRepository {
   Future<Either<Failure, LiveFeedPageResult>> _fetchLiveFeed({
     required int page,
     required int limit,
-    String? category,
-    bool followingOnly = false,
-    double? latitude,
-    double? longitude,
-    required bool audioOnly,
     required String cacheKey,
+    required Future<LiveFeedPageResult> Function() request,
   }) async {
     try {
-      final pageResult = await _remote.getLiveFeed(
-        page: page,
-        limit: limit,
-        category: category,
-        followingOnly: followingOnly,
-        latitude: latitude,
-        longitude: longitude,
-        audioOnly: audioOnly,
-      );
+      final pageResult = await request();
       final activeLives = pageResult.lives
           .where((l) => l.status == LiveStatus.live)
           .toList();
@@ -188,6 +181,78 @@ class FakeLiveRepository implements LiveRepository {
   }
 
   @override
+  Future<Either<Failure, LiveFeedPageResult>> getNearbyFeed({
+    int page = 1,
+    int limit = 10,
+    required double latitude,
+    required double longitude,
+    int? radiusKm,
+    bool forceRefresh = false,
+  }) => _surfaceFeed(
+    key: _feedKey(
+      page: page,
+      limit: limit,
+      surface: 'nearby',
+      latitude: latitude,
+      longitude: longitude,
+      radiusKm: radiusKm,
+    ),
+    page: page,
+    limit: limit,
+    forceRefresh: forceRefresh,
+    request: () => _remote.getNearbyFeed(
+      page: page,
+      limit: limit,
+      latitude: latitude,
+      longitude: longitude,
+      radiusKm: radiusKm,
+    ),
+  );
+
+  @override
+  Future<Either<Failure, LiveFeedPageResult>> getAudioFeed({
+    int page = 1,
+    int limit = 10,
+    String? topic,
+    bool forceRefresh = false,
+  }) => _surfaceFeed(
+    key: _feedKey(page: page, limit: limit, surface: 'audio', topic: topic),
+    page: page,
+    limit: limit,
+    forceRefresh: forceRefresh,
+    request: () => _remote.getAudioFeed(page: page, limit: limit, topic: topic),
+  );
+
+  /// Shares the in-flight guard with the main feed but never its cached page,
+  /// because the key carries the surface.
+  Future<Either<Failure, LiveFeedPageResult>> _surfaceFeed({
+    required String key,
+    required int page,
+    required int limit,
+    required bool forceRefresh,
+    required Future<LiveFeedPageResult> Function() request,
+  }) async {
+    final existing = _feedInFlight;
+    if (existing != null && _feedInFlightKey == key) return existing;
+    final future = _fetchLiveFeed(
+      page: page,
+      limit: limit,
+      cacheKey: key,
+      request: request,
+    );
+    _feedInFlight = future;
+    _feedInFlightKey = key;
+    try {
+      return await future;
+    } finally {
+      if (identical(_feedInFlight, future)) {
+        _feedInFlight = null;
+        _feedInFlightKey = null;
+      }
+    }
+  }
+
+  @override
   Future<Either<Failure, LiveEntity>> getLiveById(String liveId) async {
     try {
       final live = await _remote.getLiveById(liveId);
@@ -234,20 +299,24 @@ class FakeLiveRepository implements LiveRepository {
   final Map<String, Future<Either<Failure, JoinLiveResult>>> _joinInFlight = {};
 
   final Map<String, String?> _joinCampaigns = {};
+  final Map<String, String?> _joinSources = {};
 
   @override
   Future<Either<Failure, JoinLiveResult>> joinLive(
     String liveId, {
     String? campaignId,
+    String? trafficSource,
   }) async {
-    final existing = _joinInFlight[liveId];
+    final joinKey = '${_accountId()}|$liveId';
+    final existing = _joinInFlight[joinKey];
     final normalizedCampaignId = campaignId?.trim();
     final attribution =
         normalizedCampaignId == null || normalizedCampaignId.isEmpty
         ? null
         : normalizedCampaignId;
     if (existing != null) {
-      if (_joinCampaigns[liveId] != attribution) {
+      if (_joinCampaigns[joinKey] != attribution ||
+          _joinSources[joinKey] != trafficSource) {
         // One connection per room, with no silent attribution borrowing.
         // The caller can finish its current activation and explicitly retry.
         return const Left(
@@ -260,15 +329,21 @@ class FakeLiveRepository implements LiveRepository {
       return existing;
     }
 
-    _joinCampaigns[liveId] = attribution;
-    final future = _joinLiveOnce(liveId, campaignId: attribution);
-    _joinInFlight[liveId] = future;
+    _joinCampaigns[joinKey] = attribution;
+    _joinSources[joinKey] = trafficSource;
+    final future = _joinLiveOnce(
+      liveId,
+      campaignId: attribution,
+      trafficSource: trafficSource,
+    );
+    _joinInFlight[joinKey] = future;
     try {
       return await future;
     } finally {
-      if (identical(_joinInFlight[liveId], future)) {
-        _joinInFlight.remove(liveId);
-        _joinCampaigns.remove(liveId);
+      if (identical(_joinInFlight[joinKey], future)) {
+        _joinInFlight.remove(joinKey);
+        _joinCampaigns.remove(joinKey);
+        _joinSources.remove(joinKey);
       }
     }
   }
@@ -276,9 +351,14 @@ class FakeLiveRepository implements LiveRepository {
   Future<Either<Failure, JoinLiveResult>> _joinLiveOnce(
     String liveId, {
     String? campaignId,
+    String? trafficSource,
   }) async {
     try {
-      final result = await _remote.joinLive(liveId, campaignId: campaignId);
+      final result = await _remote.joinLive(
+        liveId,
+        campaignId: campaignId,
+        trafficSource: trafficSource,
+      );
       return Right(result);
     } on SocketException catch (e) {
       return Left(

@@ -3,12 +3,14 @@ import 'package:bimobondapp/core/error/error_message_resolver.dart';
 import 'package:bimobondapp/core/error/exceptions.dart';
 import 'package:bimobondapp/core/error/failures.dart';
 import 'package:dio/dio.dart';
+import '../services/live_operation_guard.dart';
 
 class FailureMapper {
   FailureMapper._();
 
   static Failure from(Object error) {
     if (error is Failure) return error;
+    if (error is LiveOperationUnresolved) return UnresolvedPaymentFailure();
 
     final resolved = _resolveSource(error);
     final message = ErrorMessageResolver.resolve(resolved);

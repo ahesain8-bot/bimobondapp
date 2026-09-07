@@ -16,10 +16,26 @@ abstract class LiveRepository {
     int limit = 10,
     String? category,
     bool followingOnly = false,
-    double? latitude,
-    double? longitude,
+    String? topic,
     bool forceRefresh = false,
-    bool audioOnly = false,
+  });
+
+  /// GET /lives/nearby — its own surface, never mixed into the main feed cache.
+  Future<Either<Failure, LiveFeedPageResult>> getNearbyFeed({
+    int page = 1,
+    int limit = 10,
+    required double latitude,
+    required double longitude,
+    int? radiusKm,
+    bool forceRefresh = false,
+  });
+
+  /// GET /lives/audio — Voice Chat listing, read-only.
+  Future<Either<Failure, LiveFeedPageResult>> getAudioFeed({
+    int page = 1,
+    int limit = 10,
+    String? topic,
+    bool forceRefresh = false,
   });
 
   /// GET /lives/{id}
@@ -41,6 +57,7 @@ abstract class LiveRepository {
   Future<Either<Failure, JoinLiveResult>> joinLive(
     String liveId, {
     String? campaignId,
+    String? trafficSource,
   });
 
   /// POST /lives/{id}/leave

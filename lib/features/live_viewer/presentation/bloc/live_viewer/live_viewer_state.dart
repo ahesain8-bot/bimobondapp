@@ -10,7 +10,18 @@ import '../../../../../core/models/live_battle.dart';
 
 const Object _unset = Object();
 
+enum LiveTicketGateState {
+  open,
+  checking,
+  required,
+  purchasing,
+  unavailable,
+  paymentUnresolved,
+}
+
 class LiveViewerState extends Equatable {
+  final LiveTicketGateState ticketGate;
+  final int? ticketPriceCoins;
   final LiveSessionEntity? session;
   final List<CommentEntity> comments;
   final List<GiftSentEntity> recentGifts;
@@ -75,6 +86,8 @@ class LiveViewerState extends Equatable {
   final bool needsDateOfBirth;
 
   const LiveViewerState({
+    this.ticketGate = LiveTicketGateState.open,
+    this.ticketPriceCoins,
     this.session,
     this.comments = const [],
     this.recentGifts = const [],
@@ -123,6 +136,8 @@ class LiveViewerState extends Equatable {
   bool get isPk => battle?.isActive == true && battleOpponentLive != null;
 
   LiveViewerState copyWith({
+    LiveTicketGateState? ticketGate,
+    int? ticketPriceCoins,
     LiveSessionEntity? session,
     List<CommentEntity>? comments,
     List<GiftSentEntity>? recentGifts,
@@ -164,6 +179,8 @@ class LiveViewerState extends Equatable {
     bool? needsDateOfBirth,
   }) {
     return LiveViewerState(
+      ticketGate: ticketGate ?? this.ticketGate,
+      ticketPriceCoins: ticketPriceCoins ?? this.ticketPriceCoins,
       session: session ?? this.session,
       comments: comments ?? this.comments,
       recentGifts: recentGifts ?? this.recentGifts,
@@ -222,6 +239,8 @@ class LiveViewerState extends Equatable {
 
   @override
   List<Object?> get props => [
+    ticketGate,
+    ticketPriceCoins,
     session,
     comments,
     recentGifts,

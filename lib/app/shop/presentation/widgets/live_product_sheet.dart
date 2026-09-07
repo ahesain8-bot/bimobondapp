@@ -38,10 +38,7 @@ class LiveProductSheet {
 }
 
 class _LiveProductSheetBody extends StatefulWidget {
-  const _LiveProductSheetBody({
-    required this.liveId,
-    required this.isHost,
-  });
+  const _LiveProductSheetBody({required this.liveId, required this.isHost});
 
   final String liveId;
   final bool isHost;
@@ -73,7 +70,8 @@ class _LiveProductSheetBodyState extends State<_LiveProductSheetBody> {
     try {
       final socket = auctions_di.sl<AuctionSocketService>();
       _liveProductSub = socket.onLiveProduct.listen((payload) {
-        final liveId = payload['liveId']?.toString() ??
+        final liveId =
+            payload['liveId']?.toString() ??
             payload['roomId']?.toString() ??
             '';
         if (liveId.isNotEmpty && liveId != widget.liveId) return;
@@ -127,9 +125,9 @@ class _LiveProductSheetBodyState extends State<_LiveProductSheetBody> {
     );
     if (!mounted) return;
     result.fold(
-      (failure) => ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(failure.message)),
-      ),
+      (failure) => ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(failure.message))),
       (_) => _load(),
     );
   }
@@ -141,9 +139,9 @@ class _LiveProductSheetBodyState extends State<_LiveProductSheetBody> {
     );
     if (!mounted) return;
     result.fold(
-      (failure) => ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(failure.message)),
-      ),
+      (failure) => ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(failure.message))),
       (_) => _load(),
     );
   }
@@ -158,17 +156,20 @@ class _LiveProductSheetBodyState extends State<_LiveProductSheetBody> {
     );
     if (!mounted) return;
 
-    final catalog =
-        catalogResult.fold((_) => <ProductEntity>[], (p) => p.items);
+    final catalog = catalogResult.fold(
+      (_) => <ProductEntity>[],
+      (p) => p.items,
+    );
     final existingIds = _items.map((e) => e.productId).toSet();
-    final available =
-        catalog.where((p) => !existingIds.contains(p.id)).toList();
+    final available = catalog
+        .where((p) => !existingIds.contains(p.id))
+        .toList();
 
     if (available.isEmpty) {
       final l10n = AppLocalizations.of(context)!;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.shopLiveNoProductsToAdd)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.shopLiveNoProductsToAdd)));
       return;
     }
 
@@ -177,7 +178,10 @@ class _LiveProductSheetBodyState extends State<_LiveProductSheetBody> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: theme.surface,
-        title: Text(l10n.shopLiveAddProduct, style: TextStyle(color: theme.onSurface)),
+        title: Text(
+          l10n.shopLiveAddProduct,
+          style: TextStyle(color: theme.onSurface),
+        ),
         content: SizedBox(
           width: double.maxFinite,
           child: ListView.builder(
@@ -186,7 +190,10 @@ class _LiveProductSheetBodyState extends State<_LiveProductSheetBody> {
             itemBuilder: (_, index) {
               final product = available[index];
               return ListTile(
-                title: Text(product.title, style: TextStyle(color: theme.onSurface)),
+                title: Text(
+                  product.title,
+                  style: TextStyle(color: theme.onSurface),
+                ),
                 subtitle: Text(
                   l10n.shopCoinsLabel(product.priceCoins),
                   style: TextStyle(color: theme.mutedText),
@@ -207,9 +214,9 @@ class _LiveProductSheetBodyState extends State<_LiveProductSheetBody> {
     );
     if (!mounted) return;
     result.fold(
-      (failure) => ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(failure.message)),
-      ),
+      (failure) => ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(failure.message))),
       (_) => _load(),
     );
   }
@@ -302,7 +309,10 @@ class _LiveProductSheetBodyState extends State<_LiveProductSheetBody> {
               const SizedBox(height: AppSizes.p12),
               TextButton(
                 onPressed: _load,
-                child: Text(l10n.shopRetry, style: TextStyle(color: theme.primary)),
+                child: Text(
+                  l10n.shopRetry,
+                  style: TextStyle(color: theme.primary),
+                ),
               ),
             ],
           ),
@@ -312,9 +322,7 @@ class _LiveProductSheetBodyState extends State<_LiveProductSheetBody> {
     if (_items.isEmpty) {
       return Center(
         child: Text(
-          widget.isHost
-              ? l10n.shopLiveEmptyHost
-              : l10n.shopLiveEmptyViewer,
+          widget.isHost ? l10n.shopLiveEmptyHost : l10n.shopLiveEmptyViewer,
           style: TextStyle(color: theme.mutedText),
         ),
       );
@@ -381,10 +389,7 @@ class _LiveProductSheetBodyState extends State<_LiveProductSheetBody> {
                           ),
                         ),
                         const SizedBox(height: 6),
-                        ProductPrice(
-                          priceCoins: product.priceCoins,
-                          compareAtCoins: product.compareAtCoins,
-                        ),
+                        _LiveBagPrice(pin: pin),
                       ],
                     ),
                   ),
@@ -428,4 +433,59 @@ class _LiveProductSheetBodyState extends State<_LiveProductSheetBody> {
       },
     );
   }
+}
+
+class _LiveBagPrice extends StatelessWidget {
+  const _LiveBagPrice({required this.pin});
+
+  final LiveProductPinEntity pin;
+
+  @override
+  Widget build(BuildContext context) {
+    final bag = pin.bag;
+    if (bag == null) {
+      return ProductPrice(
+        priceCoins: pin.product.priceCoins,
+        compareAtCoins: pin.product.compareAtCoins,
+      );
+    }
+    final theme = ShopTheme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ProductPrice(
+          priceCoins: bag.livePriceCoins,
+          compareAtCoins: bag.basePriceCoins > bag.livePriceCoins
+              ? bag.basePriceCoins
+              : null,
+        ),
+        const SizedBox(height: 3),
+        Wrap(
+          spacing: 6,
+          runSpacing: 3,
+          children: [
+            if (bag.flashActive)
+              _BagChip(label: 'Flash deal', color: theme.primary),
+            if (bag.hasCoupon)
+              _BagChip(label: 'Coupon available', color: theme.onSurface),
+            if (bag.soldCount > 0)
+              _BagChip(label: '${bag.soldCount} sold', color: theme.mutedText),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _BagChip extends StatelessWidget {
+  const _BagChip({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Text(
+    label,
+    style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 11),
+  );
 }

@@ -30,17 +30,23 @@ class LiveSummaryBloc extends Bloc<LiveSummaryEvent, LiveSummaryState> {
   }
 
   final LiveInteractiveRepository _repository;
+  int _generation = 0;
 
   Future<void> _onRequested(
     LiveSummaryRequested event,
     Emitter<LiveSummaryState> emit,
   ) async {
+    final generation = ++_generation;
     emit(const LiveSummaryState(isLoading: true));
     try {
       final summary = await _repository.getSummary(event.liveId);
-      if (!isClosed) emit(LiveSummaryState(summary: summary));
+      if (summary.liveId != event.liveId)
+        throw const FormatException('Summary belongs to another LIVE.');
+      if (!isClosed && generation == _generation && !emit.isDone)
+        emit(LiveSummaryState(summary: summary));
     } catch (e) {
-      if (!isClosed) emit(LiveSummaryState(error: e.toString()));
+      if (!isClosed && generation == _generation && !emit.isDone)
+        emit(LiveSummaryState(error: e.toString()));
     }
   }
 }

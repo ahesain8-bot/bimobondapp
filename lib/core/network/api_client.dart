@@ -12,6 +12,8 @@ class ApiClient {
   late final Dio _dio;
   final SharedPreferences sharedPreferences;
 
+  static const noAutomaticRetry = 'no_automatic_mutation_retry';
+
   static const _authTokenKey = 'AUTH_TOKEN';
   static const _deviceTokenKey = 'DEVICE_TOKEN';
   static const _retriedExtraKey = 'firebase_auth_retried';
@@ -104,6 +106,7 @@ class ApiClient {
   }
 
   bool _shouldRefreshAndRetry(DioException error) {
+    if (error.requestOptions.extra[noAutomaticRetry] == true) return false;
     if (error.response?.statusCode != 401) return false;
     if (error.requestOptions.extra[_retriedExtraKey] == true) return false;
     final message = '${error.response?.data ?? error.message}'.toLowerCase();
