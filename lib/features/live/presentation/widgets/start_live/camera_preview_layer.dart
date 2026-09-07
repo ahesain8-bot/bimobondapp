@@ -38,10 +38,13 @@ class CameraPreviewLayer extends StatelessWidget {
           // Mount as soon as we leave Initial — PlatformView.init starts CameraX.
           if (state is LiveReady || state is LiveCameraInitializing) {
             final audio = state is LiveReady && state.isAudioMode;
-            if (audio) {
-              return const LiveAudioRoomStage(hostName: 'Voice Chat');
-            }
-            return const ArLiveCameraPreview();
+            return Stack(
+              fit: StackFit.expand,
+              children: [
+                const ArLiveCameraPreview(),
+                if (audio) const LiveAudioRoomStage(hostName: 'Voice Chat'),
+              ],
+            );
           }
           return const ColoredBox(color: Colors.black);
         },
