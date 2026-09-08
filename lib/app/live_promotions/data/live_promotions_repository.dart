@@ -1,13 +1,16 @@
 import 'package:dio/dio.dart';
 import '../domain/live_promotion_models.dart';
+import 'live_promotion_api_contract.dart';
 
-/// Implement only against reviewed OpenAPI/response fixtures. The supplied API
-/// document specifies requests but NO campaign/options/financial envelopes.
-/// Keeping this seam explicit prevents post-model defaults from charging users
-/// based on guessed LIVE fields. See docs/live-promotions-integration.md.
+/// Response parsing lives behind this seam so LIVE campaigns are never read
+/// through post-promotion defaults. [LiveApiPromotionContract] is the shipped
+/// adapter; [UnverifiedLivePromotionContract] keeps the fail-closed behaviour
+/// available for an endpoint whose envelope has not been reviewed.
+/// See docs/live-promotions-integration.md.
 abstract class LivePromotionResponseContract {
   bool get verified;
   LivePromotionOptions options(Object? data);
+  List<LivePromotionOption> countries(Object? data);
   List<LivePromotionPackage> packages(Object? data);
   LivePromotionPreview preview(Object? data);
   LivePromotionCampaign? campaign(Object? data);
@@ -22,6 +25,9 @@ class UnverifiedLivePromotionContract implements LivePromotionResponseContract {
   @override
   LivePromotionOptions options(Object? data) =>
       throw const LivePromotionContractException('options');
+  @override
+  List<LivePromotionOption> countries(Object? data) =>
+      throw const LivePromotionContractException('countries');
   @override
   List<LivePromotionPackage> packages(Object? data) =>
       throw const LivePromotionContractException(
@@ -45,7 +51,7 @@ class LivePromotionsRepository {
   LivePromotionsRepository({
     required this.dio,
     required this.idTokenProvider,
-    this.contract = const UnverifiedLivePromotionContract(),
+    this.contract = const LiveApiPromotionContract(),
     Set<String> initialUncertainPayments = const {},
     this.persistUncertainPayments,
   }) : uncertainPayments = {...initialUncertainPayments};
@@ -53,6 +59,7 @@ class LivePromotionsRepository {
   final Future<String?> Function() idTokenProvider;
   final LivePromotionResponseContract contract;
   final Set<String> _mutations = {};
+  List<LivePromotionOption>? _countries;
   final Set<String> uncertainPayments;
   final Future<void> Function(Set<String>)? persistUncertainPayments;
 
@@ -108,8 +115,25 @@ class LivePromotionsRepository {
     }
   }
 
-  Future<LivePromotionOptions> getOptions() async =>
-      contract.options(await _request('GET', '$base/options'));
+  Future<LivePromotionOptions> getOptions() async {
+    final options = contract.options(await _request('GET', '$base/options'));
+    if (options.countries.isNotEmpty) return options;
+    // The LIVE options envelope carries no country list; the shared post
+    // promotions options endpoint does. Country targeting is one optional
+    // custom-audience filter, so a failure here must not fail the whole form.
+    // The catalog does not change within a session, so fetch it once.
+    if (_countries != null) return options.withCountries(_countries!);
+    try {
+      final countries = contract.countries(
+        await _request('GET', '/promotions/options'),
+      );
+      if (countries.isNotEmpty) _countries = countries;
+      return options.withCountries(countries);
+    } catch (_) {
+      return options;
+    }
+  }
+
   Future<List<LivePromotionPackage>> getPackages() async =>
       contract.packages(await _request('GET', '/promotions/packages'));
   Future<LivePromotionPreview> preview(LivePromotionDraft draft) async {

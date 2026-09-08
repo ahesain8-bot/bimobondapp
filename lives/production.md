@@ -11,6 +11,7 @@
 |------|------------|------------|
 | Postgres up + migrations | ✓ | ✓ |
 | LiveKit container | ✓ | ✓ |
+| Ingress + Egress workers (RTMP + record) | Recommended | **Required** for OBS + auto-replay |
 | Nest `LIVEKIT_*` env | ✓ | ✓ (`wss://` + strong keys) |
 | LiveKit → Nest webhooks | Recommended | **Required** |
 | UDP `50000–50100` open | Host firewall if remote | **Required** on VPS |
@@ -36,6 +37,13 @@ LIVEKIT_API_SECRET=secret_must_be_at_least_32_characters_long
 LIVEKIT_HTTP_URL=http://livekit:7880
 # Local (API on host, LiveKit in Docker):
 # LIVEKIT_HTTP_URL=http://localhost:7880
+
+# Optional P1 auto-record (separate livekit/egress worker). Go-live works without these.
+# LIVEKIT_EGRESS_S3_BUCKET=
+# LIVEKIT_EGRESS_S3_ACCESS_KEY=
+# LIVEKIT_EGRESS_S3_SECRET=
+# LIVEKIT_EGRESS_S3_REGION=
+# LIVEKIT_EGRESS_PUBLIC_BASE=https://cdn.example.com/lives
 ```
 
 **Generate production keys** (do not ship `devkey`):
@@ -58,8 +66,8 @@ They **must match**.
 ### 3.1 Infrastructure
 
 ```bash
-# Postgres + LiveKit
-docker compose up -d postgres livekit
+# Postgres + Redis + LiveKit + RTMP ingest + record worker
+docker compose up -d postgres redis livekit livekit-ingress livekit-egress
 
 # API (host)
 cp .env.production.example .env   # or your existing .env
@@ -72,7 +80,7 @@ npx prisma migrate deploy   # or db push
 npm run start:dev
 ```
 
-LiveKit listens on `7880` (WS), `7881` (TCP RTC), `50000–50100/udp` (media).
+LiveKit listens on `7880` (WS), `7881` (TCP RTC), `50000–50100/udp` (media). Ingress RTMP is `1935`. Egress needs Redis (now in `deploy/livekit.local.yaml`). Without the egress worker, go-live still works; `GET /lives/:id/studio` may return a null RTMP URL if Ingress is down.
 
 ### 3.2 Webhooks on local (recommended)
 
@@ -158,7 +166,7 @@ cp .env.production.example .env
 docker compose -f docker-compose.prod.yml up -d --build
 ```
 
-Services: `postgres`, `api`, `livekit`, `nginx`.
+Services: `postgres`, `redis`, `api`, `livekit`, `livekit-ingress`, `livekit-egress`, `nginx`.
 
 ### 4.2 DNS & TLS
 
@@ -185,6 +193,7 @@ Open inbound:
 | 80 / 443 | TCP | nginx |
 | 7881 | TCP | LiveKit RTC fallback |
 | 50000–50100 | UDP | LiveKit media |
+| 1935 | TCP | LiveKit Ingress RTMP (OBS / LIVE Studio) |
 
 `7880` can stay internal if nginx terminates WSS to `livekit:7880`.
 

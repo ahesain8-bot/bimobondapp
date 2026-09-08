@@ -3,7 +3,9 @@
 > **Audience:** Backend Engineers, Mobile App Engineers (Flutter/React Native/iOS/Android), Frontend Web Engineers, and Database Administrators.  
 > **Source of Truth:** [`prisma/schema.prisma`](../../prisma/schema.prisma)  
 > **Engine:** PostgreSQL  
-> **Related Docs:** [endpoints.md](./endpoints.md) · [logic.md](./logic.md) · [tasks.md](./tasks.md) · [mobile-api.md](./mobile-api.md) · [admin-api.md](./admin-api.md)
+> **Related Docs:** [README.md](./README.md) · [database.md](./database.md) (P1–P3 columns) · [endpoints2.md](./endpoints2.md) · [logic.md](./logic.md) · [mobile-api.md](./mobile-api.md)
+
+**P1–P3 / audio columns** (`mediaMode`, `topic`, tickets, scene, house, pause, look, Ingress/Egress) are documented in [database.md](./database.md). This file is the longer core-LIVE essay; Prisma `schema.prisma` is always the source of truth.
 
 ---
 

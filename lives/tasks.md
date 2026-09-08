@@ -2,7 +2,17 @@
 
 > **Audience:** Mobile App Engineers (Flutter/React Native/iOS/Android) & Admin Dashboard Frontend Engineers.  
 > **Purpose:** Step-by-step task breakdown with every endpoint, payload, function signature, WebSocket event, and UI implementation recipe.  
-> **Related:** [mobile-api.md](./mobile-api.md) · [admin-api.md](./admin-api.md) · [logic.md](./logic.md) · [production.md](./production.md)
+> **Related:** [README.md](./README.md) · [endpoints2.md](./endpoints2.md) · [mobile-api.md](./mobile-api.md) · [admin-api.md](./admin-api.md) · [logic.md](./logic.md) · [production.md](./production.md)
+
+**This file is the core LIVE recipe book** (go-live, feed, chat, guests, PK, shop, admin). Newer product is documented elsewhere — do not treat this file as the full API:
+
+| Newer | Doc |
+|-------|-----|
+| Replay, report, bag, fan club, summary | [live-p0-parity.md](./live-p0-parity.md) |
+| RTMP, Nearby, 18+, clips, co-host, 2v2 | [live-p1-parity.md](./live-p1-parity.md) |
+| Pause, 4-host, BO3, look | [live-p2-parity.md](./live-p2-parity.md) |
+| Tickets, games, House, scene, profile LIVE | [live-p3-parity.md](./live-p3-parity.md) |
+| Voice Chat / audio rooms | [live-audio-rooms.md](./live-audio-rooms.md) |
 
 ---
 

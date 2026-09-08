@@ -2,7 +2,7 @@
 
 > **Audience:** mobile & web app developers integrating TikTok-style LIVE.  
 > **Base path:** `/lives`  
-> Architecture: [logic.md](./logic.md) · Endpoints Ref: [endpoints.md](./endpoints.md) · Tasks: [tasks.md](./tasks.md) · Database: [database.md](./database.md) · Admin ops: [admin-api.md](./admin-api.md) · Production & testing: [production.md](./production.md) · Conventions: [../_shared/conventions.md](../_shared/conventions.md)
+> Architecture: [logic.md](./logic.md) · Endpoints Ref: [endpoints.md](./endpoints.md) · **All routes + why:** [endpoints2.md](./endpoints2.md) · **Voice Chat / audio rooms:** [live-audio-rooms.md](./live-audio-rooms.md) · Tasks: [tasks.md](./tasks.md) · Database: [database.md](./database.md) · Admin ops: [admin-api.md](./admin-api.md) · Production & testing: [production.md](./production.md) · **Enhanced performance:** [enhanced-live-performance.md](./enhanced-live-performance.md) · **Viewer count changes (27 Aug 2026):** [changes.md](./changes.md) · **Live camera (front/back):** [live-camera.md](./live-camera.md) · **Live promotions (TikTok promote):** [live-promotions.md](./live-promotions.md) · **P1 (RTMP / Nearby / clips / co-host / team PK):** [live-p1-parity.md](./live-p1-parity.md) · **P2 (pause / 4-host / BO3):** [live-p2-parity.md](./live-p2-parity.md) · **P3 (tickets / games / house / scene / profile LIVE):** [live-p3-parity.md](./live-p3-parity.md) · Conventions: [../_shared/conventions.md](../_shared/conventions.md)
 
 ---
 
@@ -64,8 +64,8 @@ Lives are **three systems**. Use the right one for each job:
 
 | Want to…                 | Do this                                                                |
 | ------------------------ | ---------------------------------------------------------------------- |
-| Start broadcasting       | `POST /lives` → LiveKit **publish** with returned `token`/`url`        |
-| Watch a stream           | `POST /lives/:id/join` → LiveKit **subscribe**                         |
+| Start broadcasting       | `POST /lives` → LiveKit **publish** with returned `token`/`url`/`mediaHints` |
+| Watch a stream           | `POST /lives/:id/join` → LiveKit **subscribe** using `mediaHints`            |
 | Show comments/gifts live | Socket `joinLive({ liveId })` after Firebase socket auth               |
 | Send a gift              | `POST /gifts/send` with `liveId` (not a custom live endpoint)          |
 | Leave cleanly            | `POST /lives/:id/leave` **and** disconnect LiveKit **and** `leaveLive` |
@@ -151,9 +151,45 @@ PLANNED → LIVE → ENDED
 | `viewer`            | no                              | Everyone else after join   |
 
 
+### Live connect bundle + `mediaHints`
 
+Returned by **`POST /lives/:id/start`**, **`POST /lives`** (with `startNow: true`), **`POST /lives/:id/join`**, and guest publish endpoints (accept / invite-accept / token refresh).
 
-### Who can manage what (in-app)
+```json
+{
+  "live": { "...LiveShape..." },
+  "token": "<livekit-jwt>",
+  "url": "wss://live.example.com",
+  "role": "host",
+  "mediaHints": {
+    "role": "host",
+    "canPublish": true,
+    "maxVideoResolution": "720p",
+    "maxSubscribeResolution": "720p",
+    "maxBitrateKbps": 3000,
+    "simulcast": true,
+    "adaptiveStream": true,
+    "dynacast": true,
+    "codecPreference": ["h264", "vp8"]
+  }
+}
+```
+
+| Field | Meaning |
+|-------|---------|
+| `role` | Token role: `host` · `guest` · `co_host` · `viewer` |
+| `canPublish` | Whether to publish camera/mic |
+| `maxVideoResolution` | Suggested **publish** resolution (`null` for viewers) |
+| `maxSubscribeResolution` | Suggested max quality when **subscribing** |
+| `maxBitrateKbps` | Suggested publish bitrate; `0` for viewers |
+| `simulcast` / `adaptiveStream` / `dynacast` | LiveKit client options |
+| `codecPreference` | Prefer H.264 first on iOS |
+
+**Presets by role:** host **1080p @ 4500 kbps** when solo on stage and &lt;200 viewers; otherwise 720p @ 3000 kbps · guest/co_host 480p @ 1200–1500 kbps (360p if &gt;4 on stage) · viewer subscribe-only up to 720p (480p if &gt;500 viewers).
+
+**Source:** `src/livekit/live-media-hints.ts` — read from each start/join/guest response; do not hard-code in the app.
+
+**Full mobile integration guide:** [enhanced-live-performance.md](./enhanced-live-performance.md)
 
 
 | Action                                     | Host   | Live moderator*                  | Viewer |
@@ -295,9 +331,21 @@ Returned by create / update / end / feed / detail (and nested as `live` on start
     "isVerified": true,
     "isPrivate": false
   },
-  "category": { "id": "…", "name": "…", "slug": "…", "iconUrl": "…" }
+  "category": { "id": "…", "name": "…", "slug": "…", "iconUrl": "…" },
+  "mediaMode": "VIDEO",
+  "audioOnly": false,
+  "paused": false,
+  "topic": null,
+  "ticketEnabled": false,
+  "ticketPriceCoins": 0,
+  "houseId": null,
+  "scene": { "scene": "CAMERA", "cameraFacing": "front", "dualCameraEnabled": false },
+  "look": { "beautyEnabled": false, "filterSlug": null, "effectSlug": null },
+  "replay": { "enabled": true, "status": "NONE", "available": false }
 }
 ```
+
+Voice Chat: `mediaMode: "AUDIO"`, `audioOnly: true` — [live-audio-rooms.md](./live-audio-rooms.md). Tickets / games / House / scene: [live-p3-parity.md](./live-p3-parity.md). Full path list: [endpoints2.md](./endpoints2.md).
 
 `GET /lives/:id` and join also include:
 
@@ -326,10 +374,14 @@ Returned by create / update / end / feed / detail (and nested as `live` on start
 | `coverUrl`   | no       | max 500                                            |
 | `categoryId` | no       | must be an active category                         |
 | `startNow`   | no       | if `true`, create then start → host token response |
+| `mediaMode`  | no       | `VIDEO` (default) or `AUDIO` (Voice Chat). Aliases `VOICE` / `SOUND` |
+| `topic`      | no       | Radio / room topic (max 80)                        |
+| `ticketEnabled` / `ticketPriceCoins` | no | Paid entry (P3)                          |
+| `ageRestricted` | no    | 18+                                                |
 
 
 **Success (planned):** live object  
-**Success (**`startNow`**):** `{ live, token, url, role: "host" }`
+**Success (**`startNow`**):** `{ live, token, url, role: "host", mediaHints }`
 
 
 | Error | When                                                 |
@@ -357,7 +409,7 @@ Returned by create / update / end / feed / detail (and nested as `live` on start
 
 
 
-### `PATCH /lives/:id/settings`
+### `GET /lives/:id/settings` · `PATCH /lives/:id/settings`
 
 **Auth:** host
 
@@ -368,7 +420,11 @@ Returned by create / update / end / feed / detail (and nested as `live` on start
   "maxGuests": 8,
   "layout": "GRID",
   "allowGuestCamera": true,
-  "moderatorsCanManageGuests": true
+  "moderatorsCanManageGuests": true,
+  "replayEnabled": true,
+  "ageRestricted": false,
+  "latitude": 30.0444,
+  "longitude": 31.2357
 }
 ```
 
@@ -378,9 +434,12 @@ Returned by create / update / end / feed / detail (and nested as `live` on start
 | `guestRequestMode` | `EVERYONE` | `FOLLOWERS` | `OFF`                      |
 | `layout`           | `GRID` | `PANEL` — **UI hint**; client applies layout |
 | `maxGuests`        | 1–8 (host does **not** consume a seat)                |
+| `replayEnabled`    | Auto-record on start; toggling while LIVE starts/stops Egress |
+| `ageRestricted`    | 18+ join/detail gate; hidden from feed unless viewer DOB ≥ 18 |
+| `latitude` / `longitude` | Both required for Nearby; send `null` to clear |
 
 
-Emits `liveGuestUpdate` `{ type: "settings", … }`.
+Emits `liveGuestUpdate` `{ type: "settings", … }`. See [live-p1-parity.md](./live-p1-parity.md).
 
 ---
 
@@ -397,11 +456,22 @@ Emits `liveGuestUpdate` `{ type: "settings", … }`.
   "live": { },
   "token": "<livekit-jwt>",
   "url": "wss://livekit.example",
-  "role": "host"
+  "role": "host",
+  "mediaHints": {
+    "role": "host",
+    "canPublish": true,
+    "maxVideoResolution": "720p",
+    "maxSubscribeResolution": "720p",
+    "maxBitrateKbps": 3000,
+    "simulcast": true,
+    "adaptiveStream": true,
+    "dynacast": true,
+    "codecPreference": ["h264", "vp8"]
+  }
 }
 ```
 
-Notifies followers (`LIVE_STARTED`, capped). Client must **publish** A/V with this token.
+Notifies followers (`LIVE_STARTED`, capped). Client must **publish** A/V with this token and apply **`mediaHints`** in the LiveKit SDK.
 
 ---
 
@@ -441,9 +511,16 @@ Idempotent if already ended/banned. **Response:** shaped live.
 | `limit`         | 20      | max 50                                    |
 | `categoryId`    | —       |                                           |
 | `followingOnly` | false   | prefers followed hosts when authenticated |
+| `latitude` / `longitude` | — | optional; used for custom-audience live ads and Nearby |
+| `nearby` | false | Nearby tab. Requires lat/lng. No promote inject |
+| `radiusKm` | 50 | Nearby only, max 150 |
 
 
 Returns `{ data: Live[], meta }` for `LIVE` only (blocks/private applied when authed).
+
+Main For You (no `followingOnly` / `categoryId` / `nearby`) may insert promoted lives every 8 organic slots with `isPromoted` + `promotion.id`. See [live-promotions.md](./live-promotions.md).
+
+`GET /lives/nearby` is the same as `feed?nearby=true`. See [live-p1-parity.md](./live-p1-parity.md).
 
 ---
 
@@ -474,6 +551,8 @@ Returns `{ data: Live[], meta }` for `LIVE` only (blocks/private applied when au
 
 **Auth:** required · Live must be `LIVE` · Rejects viewers banned from this live.
 
+Optional body `{ "campaignId": "<promotion.id>", "trafficSource": "FOR_YOU" }`. `campaignId` bills a promoted slot. `trafficSource` is stored on the viewer session for post-live stats. See [live-promotions.md](./live-promotions.md) and [live-p0-parity.md](./live-p0-parity.md).
+
 Issues LiveKit token:
 
 
@@ -492,13 +571,24 @@ Issues LiveKit token:
   "token": "…",
   "url": "…",
   "role": "viewer",
-  "guest": null
+  "guest": null,
+  "mediaHints": {
+    "role": "viewer",
+    "canPublish": false,
+    "maxVideoResolution": null,
+    "maxSubscribeResolution": "720p",
+    "maxBitrateKbps": 0,
+    "simulcast": false,
+    "adaptiveStream": true,
+    "dynacast": false,
+    "codecPreference": ["h264", "vp8"]
+  }
 }
 ```
 
 If on stage, `guest` includes `{ role, mutedByHost, cameraOffByHost, status }`.
 
-Non-hosts: upsert viewer session, bump viewers, emit `liveViewers`.
+Host and viewers: upsert a viewer session, recount open sessions, emit `liveViewers`. The host is included in `viewers`.
 
 ---
 
@@ -510,7 +600,8 @@ Non-hosts: upsert viewer session, bump viewers, emit `liveViewers`.
 
 - Closes viewer session, refreshes count, emits `liveViewers`
 - If user was an **ACTIVE** guest, also leaves the stage
-- Host leave is a **no-op** on count (host must `end`)
+- Host leave is a **no-op** on count (host stays counted until `end`)
+- Socket `leaveLive` also closes the viewer session (same as this endpoint)
 
 ```json
 { "success": true, "viewers": 41 }
@@ -823,7 +914,18 @@ Publish model matches guests; role is for UI / trust.
   },
   "token": "<livekit-jwt>",
   "url": "wss://…",
-  "role": "guest"
+  "role": "guest",
+  "mediaHints": {
+    "role": "guest",
+    "canPublish": true,
+    "maxVideoResolution": "480p",
+    "maxSubscribeResolution": "720p",
+    "maxBitrateKbps": 1200,
+    "simulcast": true,
+    "adaptiveStream": true,
+    "dynacast": true,
+    "codecPreference": ["h264", "vp8"]
+  }
 }
 ```
 
@@ -886,10 +988,10 @@ Returns other `LIVE` streams not in an ACTIVE battle (excludes self/blocked), ra
 **Auth:** host · One-tap auto match
 
 ```json
-{ "durationSeconds": 300 }
+{ "durationSeconds": 300, "mode": "TEAM" }
 ```
 
-Picks best eligible opponent (similar viewers, same category preferred).  
+Picks best eligible opponent (similar viewers, same category preferred). `mode: TEAM` opens a 2v2 lobby (teammates join after).  
 No opponent → **404** `No opponents available` (UI can retry / show searching).
 
 ### `GET /lives/:id/battle`
@@ -902,10 +1004,23 @@ If `endTime` passed, server finishes the battle before returning.
 **Auth:** host of `:id`
 
 ```json
-{ "opponentLiveId": "uuid", "durationSeconds": 300 }
+{ "opponentLiveId": "uuid", "durationSeconds": 300, "mode": "TEAM" }
 ```
 
 `durationSeconds`: 30–1800 (default **300**). Both lives `LIVE`, neither already in an ACTIVE battle.
+
+`mode: TEAM` starts a **2v2** (captains = live1 vs live2). Teammate slots (`live3` / `live4`) can stay empty.
+
+```http
+GET  /lives/:id/battle/open-teams
+POST /lives/:yourLiveId/battle/:battleId/join      { "team": 1 }
+POST /lives/:captainLiveId/battle/:battleId/invite { "teammateLiveId": "…" }
+POST /lives/:teammateLiveId/battle/:battleId/leave
+```
+
+`team` 1 sits with live1, `team` 2 with live2. Omit `team` to take the first open slot. Captains invite; teammates leave. Socket `liveBattle` `{ "type": "roster", "team": 1, "joinedLiveId": "…" }`.
+
+Battle payload extras: `teams.team1.captainLiveId` / `teammateLiveId`, `openSlots: [1, 2]`. See [live-p1-parity.md](./live-p1-parity.md).
 
 ### `POST /lives/:id/battle/multiplier`
 
@@ -1360,14 +1475,36 @@ Catalog / purchase / inventory: [../gifts/mobile-api.md](../gifts/mobile-api.md)
 
 ## 15. LiveKit checklist
 
-1. Use `url` + `token` from start / join / guest endpoints only.
-2. **Host / guest / co_host:** publish camera + mic (respect mute / camera-off).
-3. **Viewer:** subscribe only.
+1. Use `url` + `token` + **`mediaHints`** from start / join / guest endpoints only.
+2. **Host / guest / co_host:** publish camera + mic using `mediaHints.maxVideoResolution` and `maxBitrateKbps` (respect mute / camera-off).
+3. **Viewer:** subscribe only; enable `mediaHints.adaptiveStream` for network-aware quality.
 4. On mute/camera-off `liveGuestUpdate`: stop local tracks; refresh via `POST …/guests/token` or re-join if needed.
-5. On `liveEnded` or kick: disconnect LiveKit + leave Socket room.
-6. Token TTL ≈ **6h**; treat reconnect as re-join / refresh token.
+5. After flipping front ↔ back: emit socket `switchLiveCamera` so viewers can mirror the tile — [live-camera.md](./live-camera.md).
+6. On `liveEnded` or kick: disconnect LiveKit + leave Socket room.
+7. Token TTL ≈ **6h**; treat reconnect as re-join / refresh token.
+8. Production: `LIVEKIT_URL` must be **`wss://`**; enable **TURN** for cellular viewers ([production.md](./production.md), `deploy/livekit.yaml`).
 
 Ops env (backend): `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` — see [logic.md](./logic.md).
+
+### Apply `mediaHints` (Flutter example)
+
+```dart
+Future<void> connectLive(Map<String, dynamic> res) async {
+  final hints = res['mediaHints'] as Map<String, dynamic>;
+  await room.connect(
+    res['url'] as String,
+    res['token'] as String,
+    roomOptions: RoomOptions(
+      adaptiveStream: hints['adaptiveStream'] == true,
+      dynacast: hints['dynacast'] == true,
+    ),
+  );
+  if (hints['canPublish'] == true) {
+    await room.localParticipant?.setCameraEnabled(true);
+    // Map hints['maxVideoResolution'] + hints['maxBitrateKbps'] to VideoPublishOptions
+  }
+}
+```
 
 ---
 
@@ -1393,6 +1530,7 @@ Also: `joinUser({})` or `joinUser({ userId: me.id })` → room `user_{userId}` (
 | ----------- | ------------ | --------------------------------------------------------------------- |
 | `joinLive`  | `{ liveId }` | After HTTP join (or as host). `userId` comes from the socket session. |
 | `leaveLive` | `{ liveId }` | Leave HUD room. Still call HTTP `POST …/leave` when exiting the live. |
+| `switchLiveCamera` | `{ liveId, facing: "front" \| "back" }` | Host / on-stage guest after flipping the device camera. Full guide: [live-camera.md](./live-camera.md). |
 
 
 
@@ -1413,6 +1551,7 @@ Also: `joinUser({})` or `joinUser({ userId: me.id })` → room `user_{userId}` (
 | `liveEnded`           | `{ liveId, status, reason? }`          | Exit room; stop media                                         |
 | `liveAuction`         | `{ liveId, auction, action }`          | Update shopping HUD                                           |
 | `liveGuestUpdate`     | `{ type, liveId, guest? | settings? }` | Stage / settings UI — apply `layout` (GRID/PANEL) client-side |
+| `liveCameraChanged`   | `{ liveId, userId, facing, role, at }` | Mirror / badge the publisher tile (`front` \| `back`). See [live-camera.md](./live-camera.md). |
 | `liveBattle`          | `{ type, battle }`                     | PK scores / timer / winner                                    |
 
 
@@ -1441,10 +1580,21 @@ Also: `joinUser({})` or `joinUser({ userId: me.id })` → room `user_{userId}` (
 | -------- | ----------------------------------------- | ----------------- | --------------------------------------------------------------------- |
 | `POST`   | `/lives`                                  | required          | Create (+ optional start)                                             |
 | `PATCH`  | `/lives/:id`                              | host              | Metadata                                                              |
-| `PATCH`  | `/lives/:id/settings`                     | host              | Guest policy                                                          |
+| `GET`    | `/lives/:id/settings`                     | host              | Guest + P1 flags (18+, Nearby, replay)                                |
+| `PATCH`  | `/lives/:id/settings`                     | host              | Guest + P1 flags (18+, Nearby, replay)                                |
 | `POST`   | `/lives/:id/start`                        | host              | Go live + token                                                       |
 | `POST`   | `/lives/:id/end`                          | host              | End stream                                                            |
 | `GET`    | `/lives/feed`                             | optional          | Discover                                                              |
+| `GET`    | `/lives/nearby`                           | optional          | Nearby (`lat`/`lng` required)                                         |
+| `GET`    | `/lives/:id/studio`                       | host              | RTMP URL + stream key + recording                                     |
+| `GET`    | `/lives/:id/clips`                        | optional          | Highlight clips                                                       |
+| `POST`   | `/lives/:id/clips`                        | host              | Cut a clip from READY replay                                          |
+| `POST`   | `/lives/:id/clips/:clipId/post`           | host              | Publish clip as a video post                                          |
+| `GET`    | `/lives/:id/cohost/hosts`                 | host              | Other LIVE hosts to invite                                            |
+| `GET`    | `/lives/:id/cohost`                       | host              | Co-host sessions                                                      |
+| `POST`   | `/lives/:id/cohost/invite`                | host              | Invite `{ guestLiveId }`                                              |
+| `POST`   | `/lives/:id/cohost/:sessionId/accept`     | invited host      | Accept multi-room co-host                                             |
+| `POST`   | `/lives/:id/cohost/:sessionId/end`        | either host       | End / decline                                                         |
 | `GET`    | `/lives/mine`                             | required          | My lives                                                              |
 | `GET`    | `/lives/:id`                              | optional          | Detail                                                                |
 | `POST`   | `/lives/:id/join`                         | required          | Watch token                                                           |
@@ -1480,7 +1630,11 @@ Also: `joinUser({})` or `joinUser({ userId: me.id })` → room `user_{userId}` (
 | `GET`    | `/lives/:id/battle/opponents`             | host              | PK suggest list                                                       |
 | `POST`   | `/lives/:id/battle/match`                 | host              | Auto match PK                                                         |
 | `GET`    | `/lives/:id/battle`                       | optional          | Current PK state                                                      |
-| `POST`   | `/lives/:id/battle`                       | host              | Start PK `{ opponentLiveId, durationSeconds? }`                       |
+| `POST`   | `/lives/:id/battle`                       | host              | Start PK `{ opponentLiveId, durationSeconds?, mode? }`                |
+| `GET`    | `/lives/:id/battle/open-teams`            | host              | 2v2 lobbies with an empty teammate slot                               |
+| `POST`   | `/lives/:id/battle/:battleId/join`        | joining host      | Join a TEAM slot `{ team?: 1 \| 2 }`                                  |
+| `POST`   | `/lives/:id/battle/:battleId/invite`      | captain           | Pull a LIVE host onto your team                                       |
+| `POST`   | `/lives/:id/battle/:battleId/leave`       | teammate          | Leave a 2v2 slot                                                      |
 | `POST`   | `/lives/:id/battle/:battleId/end`         | host              | End PK                                                                |
 | `POST`   | `/lives/:id/gift-goal`                    | host              | Set gift target `{ title?, target }`                                  |
 | `PATCH`  | `/lives/:id/chat-rules`                   | host              | Update chat mode, slow mode & keywords                                |
@@ -1692,8 +1846,15 @@ All comment / chat payloads include the sender's `gifterLevel`:
 
 ## 22. Related docs
 
+- [enhanced-live-performance.md](./enhanced-live-performance.md) — **quality hints, share/remind, watch gates (mobile must-read)**  
 - [logic.md](./logic.md) — architecture & state machines  
 - [admin-api.md](./admin-api.md) — staff force end / ban / kick  
+- [live-camera.md](./live-camera.md) — flip camera front ↔ back (`switchLiveCamera` / `liveCameraChanged`)  
+- [live-promotions.md](./live-promotions.md) — TikTok-style LIVE promote (goal, audience, budget, duration)  
+- [live-p0-parity.md](./live-p0-parity.md) — replay, report LIVE, shop bag, paid fan club, post-live stats  
+- [live-p1-parity.md](./live-p1-parity.md) — RTMP studio, auto-record, Nearby, 18+, clips, host co-host, team PK  
+- [live-p2-parity.md](./live-p2-parity.md) — pause, 3–4 host rooms, BO3 / power-ups, live look  
+- [live-p3-parity.md](./live-p3-parity.md) — scene/dual cam, tickets, games, LIVE House, topic, profile `isLive`  
 - [../events/mobile-api.md](../events/mobile-api.md) — Socket connect  
 - [../gifts/mobile-api.md](../gifts/mobile-api.md) · [../auctions/mobile-api.md](../auctions/mobile-api.md)  
 - [../seller-verification/mobile-api.md](../seller-verification/mobile-api.md) · [../notifications/mobile-api.md](../notifications/mobile-api.md)

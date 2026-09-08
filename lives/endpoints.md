@@ -3,7 +3,9 @@
 > **Audience:** Frontend, Mobile (iOS/Android/Flutter/React Native), Backend Engineers & QA.  
 > **Base URL:** `http://localhost:3000` (or `https://api.yourdomain.com`)  
 > **Auth Header:** `Authorization: Bearer <Firebase_ID_Token>`  
-> **Related:** [mobile-api.md](./mobile-api.md) · [admin-api.md](./admin-api.md) · [tasks.md](./tasks.md) · [live-database.md](./live-database.md)
+> **Related:** [README.md](./README.md) · [mobile-api.md](./mobile-api.md) · [admin-api.md](./admin-api.md) · **[endpoints2.md](./endpoints2.md)** (every route + why, including **P0–P3 + audio**) · [live-p3-parity.md](./live-p3-parity.md) · [live-audio-rooms.md](./live-audio-rooms.md)
+
+This file is the **older sample-JSON catalog** (core LIVE). New routes (Voice Chat, tickets, games, House, scene, Nearby, clips, pause, …) are only listed in **endpoints2** and the parity files.
 
 ---
 
@@ -174,6 +176,7 @@ Retrieves live streams for the vertical swipe Discovery Feed.
   - `limit` (default 20, max 50)
   - `categoryId` (optional category filter)
   - `followingOnly` (`true` to show followed hosts only)
+  - `latitude` / `longitude` (optional; custom-audience live ads)
 - **Response (200 OK):**
 ```json
 {
@@ -298,6 +301,7 @@ Retrieves stream details, active auctions, pinned comment, and popular badges.
 Joins the stream as a viewer and receives LiveKit subscriber token.
 
 - **Auth:** Required
+- **Body (optional):** `{ "campaignId": "uuid" }` when opening a promoted For You card — see [live-promotions.md](./live-promotions.md)
 - **Response (200 OK):**
 ```json
 {
@@ -1791,11 +1795,18 @@ Host post-stream summary analytics recap.
 
 ## 13. Admin Management & Moderation
 
+### `GET /lives/admin/stats`
+Platform snapshot: live count, concurrent viewers, boosted streams, active battles.
+
+- **Auth:** `lives.admin.read`
+
+---
+
 ### `GET /lives/admin/all`
 Paginated stream management queue for ops dashboard.
 
 - **Auth:** `lives.admin.read`
-- **Query Parameters:** `page=1`, `limit=20`, `status=LIVE`, `search=sarah`, `userId=uuid`
+- **Query Parameters:** `page=1`, `limit=20`, `status=LIVE`, `search=sarah`, `userId=uuid`, `categoryId=uuid`, `boostedOnly=true`
 - **Response (200 OK):**
 ```json
 {
@@ -1822,6 +1833,27 @@ Paginated stream management queue for ops dashboard.
   }
 }
 ```
+
+---
+
+### `GET /lives/admin/:id`
+Admin live detail with moderation counters (includes **BANNED** lives).
+
+- **Auth:** `lives.admin.read`
+
+---
+
+### `GET /lives/admin/:id/summary`
+Post-live analytics for staff (top gifters, duration, earnings).
+
+- **Auth:** `lives.admin.read`
+
+---
+
+### `GET /lives/admin/:id/restrictions`
+Active chat mutes and live bans on this stream.
+
+- **Auth:** `lives.admin.read`
 
 ---
 
@@ -1882,20 +1914,69 @@ Boosts stream ranking in Discovery feed.
 
 ---
 
+```
+
+---
+
+### `POST /lives/admin/:id/unboost`
+Clears admin feed boost immediately.
+
+- **Auth:** `lives.admin.moderate`
+
+---
+
+### `PATCH /lives/admin/:id/settings`
+Force-update guest/access settings without host permission.
+
+- **Auth:** `lives.admin.moderate`
+
+---
+
+### `DELETE /lives/admin/:id/comments/:commentId`
+Soft-delete a chat message.
+
+- **Auth:** `lives.admin.moderate`
+
+---
+
+### `POST /lives/admin/:id/viewers/:userId/mute-chat`
+### `POST /lives/admin/:id/viewers/:userId/unmute-chat`
+### `POST /lives/admin/:id/viewers/:userId/ban`
+### `POST /lives/admin/:id/viewers/:userId/unban`
+
+Viewer moderation on a live (staff override — no host/mod role required).
+
+- **Auth:** `lives.admin.moderate`
+
+---
+
 ### `POST /lives/admin/:id/guests/:userId/kick`
 Admin force kick guest from stage.
 
 - **Auth:** `lives.admin.moderate`
-- **Response (200 OK):**
-```json
-{
-  "id": "g-2",
-  "liveId": "764be4ec-9e90-4828-98e9-4e78280fbe91",
-  "userId": "u-viewer-1",
-  "status": "KICKED",
-  "leftStageAt": "2026-08-15T12:30:00.000Z"
-}
-```
+
+---
+
+### `POST /lives/admin/:id/guests/:userId/mute`
+### `POST /lives/admin/:id/guests/:userId/unmute`
+
+Force mute/unmute guest microphone.
+
+- **Auth:** `lives.admin.moderate`
+
+---
+
+### `POST /lives/admin/:id/battle/:battleId/end`
+Force-end active PK battle.
+
+- **Auth:** `lives.admin.moderate`
+
+---
+
+### `POST /lives/admin/:id/polls/:pollId/end`
+Force-close active poll.
+
+- **Auth:** `lives.admin.moderate`
 
 ---
 

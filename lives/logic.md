@@ -2,7 +2,7 @@
 
 > TikTok-style LIVE: self-hosted **LiveKit** (A/V) + Socket.IO (chat / gifts / HUD) + Nest + Postgres (authority & money).
 
-Mobile API: [mobile-api.md](./mobile-api.md) · Endpoints Ref: [endpoints.md](./endpoints.md) · Tasks: [tasks.md](./tasks.md) · Database: [database.md](./database.md) · Admin: [admin-api.md](./admin-api.md) · Production & testing: [production.md](./production.md)
+Mobile API: [mobile-api.md](./mobile-api.md) · Endpoints Ref: [endpoints.md](./endpoints.md) · **[endpoints2.md](./endpoints2.md)** (full list + why) · Tasks: [tasks.md](./tasks.md) · Database: [database.md](./database.md) · Admin: [admin-api.md](./admin-api.md) · Production & testing: [production.md](./production.md) · Live promotions: [live-promotions.md](./live-promotions.md) · P0 parity: [live-p0-parity.md](./live-p0-parity.md) · P1 parity: [live-p1-parity.md](./live-p1-parity.md) · P2 parity: [live-p2-parity.md](./live-p2-parity.md) · P3 parity: [live-p3-parity.md](./live-p3-parity.md)
 
 ---
 
@@ -39,6 +39,11 @@ Mobile API: [mobile-api.md](./mobile-api.md) · Endpoints Ref: [endpoints.md](./
 | Host league rank (e.g. B2) | Yes — `hostLeagueTier` on `User` |
 | POPULAR badge on live | Yes — `isPopular` on feed/detail/join |
 | Host heart count on profile | Yes — `user.hostHeartCount` (= `totalLikes`) |
+| LIVE promote (goal / audience / budget) | Yes — [live-promotions.md](./live-promotions.md) (separate from admin `feedBoostUntil`) |
+| Replay / report / shop bag / paid subs / richer summary | Yes — [live-p0-parity.md](./live-p0-parity.md) |
+| RTMP studio, auto-record, Nearby, 18+, clips, host co-host, team PK | Yes — [live-p1-parity.md](./live-p1-parity.md) |
+| Pause, 3–4 host rooms, BO3 / PK power-ups, live look | Yes — [live-p2-parity.md](./live-p2-parity.md) |
+| Scene/dual cam, tickets, official games, LIVE House, topic, profile LIVE | Yes — [live-p3-parity.md](./live-p3-parity.md) |
 | LiveKit Cloud / Agora fees | No — self-hosted LiveKit only |
 
 ---
@@ -58,6 +63,9 @@ Nest mints short-lived LiveKit JWTs. Clients never hold API secrets.
 LIVEKIT_URL=ws://localhost:7880
 LIVEKIT_API_KEY=…
 LIVEKIT_API_SECRET=…
+# Optional — auto-record replay (P1). Needs a LiveKit Egress worker + webhook egress_ended.
+# LIVEKIT_EGRESS_S3_BUCKET=
+# LIVEKIT_EGRESS_PUBLIC_BASE=
 ```
 
 `docker compose up livekit` — config in `deploy/livekit.yaml`. Cost = your VPS bandwidth.
@@ -131,11 +139,13 @@ Only one active poll per live stream at a time.
 
 | Nest role | `canPublish` | Notes |
 |-----------|--------------|-------|
-| `host` | yes | camera + mic |
-| `guest` / `co_host` | yes unless muted / camera-off / `allowGuestCamera: false` | |
+| `host` | yes | VIDEO: camera + mic. AUDIO: **mic only** |
+| `guest` / `co_host` | yes unless muted / camera-off / `allowGuestCamera: false` | AUDIO: mic only (`seat: SPEAKER`) |
 | `viewer` | no | subscribe only |
 
 Mute/camera-off updates LiveKit participant permissions via Room Service and emits `liveGuestUpdate`. Join re-reads DB flags when minting tokens.
+
+Host camera **facing** (front ↔ back): socket `switchLiveCamera` → `liveCameraChanged`, and **P3** `PATCH /lives/:id/scene` persists `cameraFacing` / `DUAL` / `SCREEN`. Host socket flips also save `cameraFacing`. See [live-camera.md](./live-camera.md) · [live-p3-parity.md](./live-p3-parity.md). Voice Chat: [live-audio-rooms.md](./live-audio-rooms.md).
 
 Token TTL: `6h` (`LIVE_TOKEN_TTL`). Guests refresh with `POST /lives/:id/guests/token`.
 
@@ -229,9 +239,10 @@ Host/mod guest management is **not** RBAC — it uses live ownership + `LiveMode
 | `LivesInteractiveService` | gift goals, chat rules, polls, Q&A box, treasure boxes |
 | `LivesExtrasService` | hourly ranking, host leagues, fan clubs, popular badges, top gifters |
 | `LiveKitService` | JWT mint, room delete, media permissions |
+| `live-media-hints.ts` | `getLiveMediaHints()` → `mediaHints` on start/join/guest token |
 | `AuctionsService` | `createForLive`, list, gallery pin/reorder, `cancelActiveForLive` |
 | `GiftsService` | live gifts, earned coins, battle score hook, rapid socket `sendGift` |
-| `EventsGateway` | `joinLive` / emits |
+| `EventsGateway` | `joinLive` / `switchLiveCamera` / emits |
 
 Circular Nest deps with auctions and gifts use `forwardRef`.
 
@@ -240,6 +251,8 @@ Circular Nest deps with auctions and gifts use `forwardRef`.
 ## Feed ranking (summary)
 
 Live feed scores open streams using viewers, likes, following, freshness, **category interests** (`UserInterest`), log-scaled earnings, same country, and optional admin **`feedBoostUntil`**. Candidate pool capped at 200, then score-then-paginate. Optional `followingOnly` prefers followed hosts.
+
+Main For You also injects **creator-paid live promotions** every 8 organic slots (not on `followingOnly` / `categoryId`). Admin boost and paid promotions are separate. See [live-promotions.md](./live-promotions.md).
 
 ---
 
@@ -255,7 +268,21 @@ Live feed scores open streams using viewers, likes, following, freshness, **cate
 
 Configure `webhook.urls` in [`deploy/livekit.yaml`](../../deploy/livekit.yaml). Socket disconnect remains a fallback for viewer presence. End/ban uses an atomic `LIVE` → `ENDED` claim so concurrent host end + webhook is safe.
 
-See [production.md](./production.md) for deploy, firewall, and smoke tests.
+See [production.md](./production.md) for deploy, firewall, TURN, and smoke tests.
+
+---
+
+## Quality roadmap — Phase 1 & 3 (backend) ✅
+
+| Phase | Item | Status |
+|-------|------|--------|
+| **1 — Infra** | TURN documented in `deploy/livekit.yaml` | ✅ |
+| **1 — Infra** | WSS + UDP checklist ([production.md](./production.md)) | 📋 Ops (deploy) |
+| **1 — Infra** | LiveKit room deleted on end / ban / webhook / max-duration sweep | ✅ |
+| **3 — Backend** | `mediaHints` on start / join / guest token responses | ✅ |
+| **2 — Mobile** | Apply `mediaHints` in LiveKit SDK | 📋 Client app |
+
+Connect responses include `mediaHints` from `withLiveMediaHints()` in `LivesService` and `LivesGuestsService`.
 
 ---
 

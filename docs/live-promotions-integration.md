@@ -1,14 +1,21 @@
 # LIVE promotions integration contract
 
 The supplied [LIVE promotions API notes](../lives/live-promotions.md) define
-request paths and bodies, but they do not define response envelopes or the
-LIVE visibility field. The mobile client therefore uses an explicit
-`LivePromotionResponseContract` seam and ships with an unverified adapter.
-Reads fail closed and every promotion mutation, including payment, is blocked
-before a request is sent until the backend team provides fixtures or OpenAPI.
+request paths and bodies but no response envelopes. The mobile client keeps an
+explicit `LivePromotionResponseContract` seam so LIVE campaigns are never read
+through post-promotion defaults, and now ships `LiveApiPromotionContract`, an
+adapter written against captured responses from the deployed service.
+`UnverifiedLivePromotionContract` remains available and still fails closed.
 
-This is deliberate: post-promotion response formats, local wallet arithmetic,
-and guessed status fields must never be reused for paid LIVE campaigns.
+`test/live_promotion_api_contract_test.dart` holds the captured envelopes.
+When the API changes, update those fixtures — not the parser — first.
+
+Parsing is permissive for display and strict for money. A missing or renamed
+economic field leaves `LivePromotionCampaign.hasPaymentSummary` false, which
+disables Pay rather than guessing a price; `create` still refuses any campaign
+whose `id`, `liveId` or `PENDING_PAYMENT` status does not match the request;
+an unrecognised status stays `UNKNOWN` and read-only; and the wallet balance
+is always server-supplied, never computed locally.
 
 ## Required transport
 
@@ -22,17 +29,34 @@ own. A conclusive 4xx clears that marker.
 `true` as requested by the API notes. If the backend owns a rollout flag, add
 its endpoint and documented response to this contract.
 
-## Required response fixtures
+## Verified envelopes
 
-Please provide one success and one relevant failure fixture for each endpoint:
+`GET /promotions/lives/options` returns `objectives`, `audienceModes`,
+`genders`, `ageRange`, `languages`, `categories` (`{id,name,slug,iconUrl}`),
+`customBudget` (`durationPresetsDays`, `coinsPer1000Impressions`,
+`estimateVariance`, …) and `targetingNotes`. It carries **no country list**,
+so the client reads country chips from the shared `GET /promotions/options`
+envelope; that second request is best-effort and its failure only removes
+country targeting.
+
+`GET /promotions/packages` returns a flat array of `{id, name, durationHours,
+priceCoins, impressionCount, isActive, isDeleted}`. The catalog is priced in
+hours and the LIVE form quotes days, so `durationHours` is converted.
+Inactive and deleted rows are dropped.
+
+`GET /promotions/lives/mine` returns `{data, meta:{total,page,limit,
+totalPages}}`; `hasMore` is `page < totalPages`.
+
+## Fixtures still wanted
+
+Campaign, stats and preview envelopes are parsed from the same service's post
+promotion shape. Please confirm them, with one success and one relevant
+failure fixture for each endpoint:
 
 | Endpoint | Fields the client must verify |
 | --- | --- |
-| `GET /promotions/lives/options` | target gender, language, category and country `{ value, label }` lists; valid custom durations; the impression rate |
-| `GET /promotions/packages` | package `id`, display name, coin cost, included duration, and any estimated impressions |
 | `GET /promotions/lives/custom/preview` | estimated viewers, followers, and/or impressions, including which values may be omitted |
 | `POST /promotions/lives`, `GET /promotions/lives/:id`, and `GET /promotions/lives/by-live/:liveId` | campaign `id`, `liveId`, exact status enum, paid budget, duration, objective, audience mode, and all persisted targeting fields |
-| `GET /promotions/lives/mine` | campaign item envelope plus pagination cursor or `hasMore` semantics |
 | `GET /promotions/lives/:id/stats` and `.../by-live/:liveId/stats` | impressions, coins spent, and remaining prepaid coins, with units and numeric types |
 | `POST /promotions/lives/:id/pay` | authoritative post-payment campaign status and wallet/reconciliation meaning; errors that identify insufficient coins versus retryable faults |
 | `PATCH /promotions/lives/:id`, `.../pause`, `.../resume`, `.../cancel` | authoritative returned status, conflict behavior, cancellation/refund fields, and permission failures |
@@ -42,11 +66,9 @@ For the campaign envelope specifically, state whether a campaign created from a
 the two, so the client keeps a separate non-validating representation for stored
 campaign data; confirm that this is the real shape rather than an assumption.
 
-The parser must accept only the reviewed envelope and exact enum values. An
-unknown status remains read-only. Once fixtures arrive, replace
-`UnverifiedLivePromotionContract` with the reviewed parser and enable the
-repository through that adapter; do not enable requests by treating arbitrary
-JSON as a campaign.
+The parser accepts only exact enum values, and an unknown status remains
+read-only. Extend `LiveApiPromotionContract` against a captured fixture; do
+not widen it to treat arbitrary JSON as a campaign.
 
 ## Additional LIVE schema needed for creator eligibility
 
@@ -60,14 +82,17 @@ detail") and the examples in `lives/endpoints.md`:
   not an alternative, and neither is a Firebase UID.
 - `user.isPrivate` **is** present, describing the host account.
 - `visibility` is **absent** from that reference and from every other lives
-  document in this repository. Its absence is not proof that a stream is
-  public, so eligibility still fails closed.
+  document in this repository, and no lives document describes a per-stream
+  visibility concept at all.
 
-`GET /lives/:id` must expose a canonical `visibility` field with a documented
-`PUBLIC` value. The client already verifies authenticated user id, host user
-id, live status (`PLANNED` or `LIVE`), account privacy, and account ban state.
-It intentionally refuses to create a campaign while visibility is absent or
-unknown; it must never infer public visibility from another field.
+The client verifies authenticated user id, host user id, live status
+(`PLANNED` or `LIVE`), account privacy and account ban state. Because
+`visibility` does not exist on the live object and no lives document defines a
+per-stream visibility concept, its **absence** no longer blocks promotion:
+what makes a stream non-public in this system is a private account, which is
+checked directly. If `GET /lives/:id` ever returns a `visibility` field, the
+client reads it and refuses any value other than `PUBLIC`. The server stays
+authoritative and is expected to reject an ineligible host regardless.
 
 The endpoint should also document whether the request is allowed for a
 non-host, and return a stable authorization error for private, banned, ended,

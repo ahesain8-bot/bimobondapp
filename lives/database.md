@@ -3,7 +3,7 @@
 > **Audience:** Backend Engineers, Mobile App Engineers, Data Engineers, and DB Administrators.  
 > **Source of Truth:** [`prisma/schema.prisma`](../../prisma/schema.prisma)  
 > **Database:** PostgreSQL  
-> **Related:** [logic.md](./logic.md) · [endpoints.md](./endpoints.md) · [tasks.md](./tasks.md)
+> **Related:** [README.md](./README.md) · [logic.md](./logic.md) · [endpoints2.md](./endpoints2.md) · [live-p3-parity.md](./live-p3-parity.md) · [live-audio-rooms.md](./live-audio-rooms.md) · [P1](./live-p1-parity.md)
 
 ---
 
@@ -21,12 +21,15 @@
    - [`LiveViewerRestriction`](#33-liveviewerrestriction)
 4. [Interactive & Monetization Tables](#4-interactive--monetization-tables)
    - [`LiveBattle`](#41-livebattle)
+   - [`LiveClip`](#48-liveclip--livecohostsession-p1)
+   - [`LiveCohostSession`](#48-liveclip--livecohostsession-p1)
    - [`LivePoll`](#42-livepoll)
    - [`LivePollVote`](#43-livepollvote)
    - [`LiveQA`](#44-liveqa)
    - [`LiveTreasureBox`](#45-livetreasurebox)
    - [`LiveTreasureBoxClaim`](#46-livetreasureboxclaim)
    - [`LiveProductPin`](#47-liveproductpin)
+   - [`LiveTicket` / `LiveGame` / `LiveHouse`](#49-p3-tickets-games-house)
 5. [Cross-Module Related Tables](#5-cross-module-related-tables)
    - [`User` (Live Fields)](#51-user-live-fields)
    - [`GiftTransaction` (Live Fields)](#52-gifttransaction-live-fields)
@@ -101,11 +104,24 @@ The primary table storing the broadcast lifecycle, configuration, real-time coun
 | `layout` | `String` | NO | `'GRID'` | Stage layout UI presentation hint: `GRID`, `PANEL` |
 | `allowGuestCamera` | `Boolean` | NO | `true` | Whether guests are allowed to publish video tracks |
 | `moderatorsCanManageGuests` | `Boolean` | NO | `true` | Whether assigned moderators can invite/accept/mute/kick guests |
-| `feedBoostUntil` | `DateTime` | YES | `null` | Admin promotion expiration timestamp for For You feed |
+| `feedBoostUntil` | `DateTime` | YES | `null` | Admin-only rank bump (not creator-paid LIVE promote) |
 | `startedAt` | `DateTime` | YES | `null` | Timestamp when stream transitioned to `LIVE` |
 | `endedAt` | `DateTime` | YES | `null` | Timestamp when stream transitioned to `ENDED` or `BANNED` |
 | `createdAt` | `DateTime` | NO | `now()` | Record creation timestamp |
 | `updatedAt` | `DateTime` | NO | `now()` | Auto-updated on record changes |
+| `latitude` / `longitude` | `Float` | YES | `null` | Host location for Nearby (P1) |
+| `ageRestricted` | `Boolean` | NO | `false` | 18+ join gate (P1) |
+| `ingressId` / `rtmpUrl` / `rtmpStreamKey` | `String` | YES | `null` | LiveKit Ingress / OBS (P1) |
+| `egressId` / `recordingStatus` | `String` | YES / NO | `null` / `NONE` | Egress auto-record (P1) |
+| `pausedAt` | `DateTime` | YES | `null` | Pause without ending (P2) |
+| `beautyEnabled` / `filterSlug` / `effectSlug` / `filterSettings` | mix | YES | — | Live look (P2) |
+| `mediaMode` | `String` | NO | `'VIDEO'` | `VIDEO` or `AUDIO` (Voice Chat) |
+| `topic` | `String` | YES | `null` | Audio-room / radio topic (P3) |
+| `scene` | `String` | NO | `'CAMERA'` | `CAMERA` \| `SCREEN` \| `DUAL` (P3) |
+| `cameraFacing` | `String` | YES | `null` | `front` \| `back` (P3) |
+| `dualCameraEnabled` | `Boolean` | NO | `false` | Dual-cam flag (P3) |
+| `ticketEnabled` / `ticketPriceCoins` | `Boolean` / `Float` | NO | `false` / `0` | Paid entry (P3) |
+| `houseId` | `String` | YES | `null` | LIVE House venue (P3) |
 
 **Indexes:**
 - `@@index([userId])`
@@ -113,6 +129,10 @@ The primary table storing the broadcast lifecycle, configuration, real-time coun
 - `@@index([status, startedAt])`
 - `@@index([categoryId])`
 - `@@index([feedBoostUntil])`
+- `@@index([status, latitude, longitude])` — Nearby candidates
+- `@@index([status, mediaMode])` — Voice Chat tab
+- `@@index([status, topic])` — topic filter
+- `@@index([houseId])`
 
 ---
 
@@ -242,6 +262,11 @@ Stores PK Battle competitions between two live streams.
 | `id` | `String (UUID)` | NO | `uuid()` | Primary Key |
 | `live1Id` | `String (UUID)` | NO | — | First stream ID (Foreign Key → `Live.id` CASCADE) |
 | `live2Id` | `String (UUID)` | NO | — | Opponent stream ID (Foreign Key → `Live.id` CASCADE) |
+| `live3Id` / `live4Id` | `String (UUID)` | YES | `null` | Team PK teammates (P1 2v2) |
+| `mode` | `String` | NO | `'SOLO'` | `SOLO` \| `TEAM` |
+| `scoringMode` | `String` | NO | `'ALL'` | `ALL` \| `GIFTS` \| `LIKES` \| `SPECIFIC_GIFT` |
+| `scoringGiftId` | `String` | YES | `null` | Gift that scores when `SPECIFIC_GIFT` |
+| `likeScore1` / `likeScore2` | `Int` | NO | `0` | Heart-tap points per team |
 | `startTime` | `DateTime` | NO | `now()` | Battle start timestamp |
 | `endTime` | `DateTime` | NO | — | Battle scheduled completion timestamp |
 | `live1Score` | `Int` | NO | `0` | Points accumulated by Live 1 from gifts |
@@ -371,6 +396,31 @@ Manages pinned and showcase products in the stream shop gallery.
 
 ---
 
+### 4.8 `LiveClip` / `LiveCohostSession` (P1)
+
+See [live-p1-parity.md](./live-p1-parity.md).
+
+`LiveClip` — timed highlight on a READY replay (`startSeconds` / `endSeconds` / `sourceUrl` / optional `postId`).
+
+`LiveCohostSession` — host-to-host invite (`hostLiveId` / `guestLiveId`, status `INVITED` | `ACTIVE` | `ENDED` | `DECLINED`). Not a guest seat.
+
+---
+
+### 4.9 P3 — tickets, games, house
+
+See [live-p3-parity.md](./live-p3-parity.md). Migration `20260905190000_live_p3_parity`.
+
+| Table | Purpose |
+|-------|---------|
+| `LiveTicket` | Unique `(liveId, userId)`, `coinsPaid`. Join requires a row when `ticketEnabled`. |
+| `LiveGame` | One `ACTIVE` official game per live (`QUIZ` / `WHEEL` / `LUCKY_DRAW`), `config` / `result` JSON. |
+| `LiveGamePlay` | Unique `(gameId, userId)`, `payload`, `score`. |
+| `LiveHouse` | Venue (`OPEN` / `CLOSED`). `Live.houseId` points here. |
+
+Accounting types: `LIVE_TICKET` (debit) + `LIVE_TICKET_REVENUE` (80% host / 20% platform).
+
+---
+
 ## 5. Cross-Module Related Tables
 
 ### 5.1 `User` (Live Fields)
@@ -385,6 +435,7 @@ Fields on the core `User` model relevant to Live streaming:
 | `fanClubName` | `String?` | Custom fan club name |
 | `gifterLevel` | `Int` | Viewer gifting progression badge level (`Lv. 1` to `Lv. 50+`) |
 | `totalSpentCoins` | `Float` | Total spent coins driving `gifterLevel` calculation |
+| `dateOfBirth` | `DateTime?` | Required to watch 18+ lives (P1) |
 
 ---
 

@@ -181,6 +181,18 @@ class LivePromotionOptions {
   final List<LivePromotionOption> genders, languages, categories, countries;
   final List<int> durations;
   final num? rateCoinsPerThousand;
+
+  /// The LIVE options endpoint does not return countries; they arrive from the
+  /// shared promotions options envelope after the rest of the form is built.
+  LivePromotionOptions withCountries(List<LivePromotionOption> value) =>
+      LivePromotionOptions(
+        genders: genders,
+        languages: languages,
+        categories: categories,
+        countries: value,
+        durations: durations,
+        rateCoinsPerThousand: rateCoinsPerThousand,
+      );
 }
 
 class LivePromotionPackage {
@@ -241,7 +253,11 @@ class LivePromotionEligibility {
       authenticatedUserId != null &&
       authenticatedUserId!.isNotEmpty &&
       authenticatedUserId == hostUserId &&
-      visibility == 'PUBLIC' &&
+      // The canonical live object carries no `visibility` field (see
+      // lives/mobile-api.md §5); account privacy is what makes a stream
+      // non-public, and it is checked below. Absence therefore does not block
+      // promotion, while an explicit non-public value still does.
+      (visibility == null || visibility == 'PUBLIC') &&
       ['PLANNED', 'LIVE'].contains(liveStatus) &&
       accountPrivate == false &&
       accountBanned == false;

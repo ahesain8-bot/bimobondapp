@@ -2,7 +2,7 @@
 
 > **Audience:** admin dashboard & ops frontend developers.  
 > **Base path:** `/lives/admin/...` (plus shared read endpoints under `/lives/...`)  
-> Architecture: [logic.md](./logic.md) · Endpoints Ref: [endpoints.md](./endpoints.md) · Tasks: [tasks.md](./tasks.md) · Database: [database.md](./database.md) · Mobile app: [mobile-api.md](./mobile-api.md) · Production: [production.md](./production.md)  
+> Architecture: [logic.md](./logic.md) · **[endpoints2.md](./endpoints2.md)** · [README.md](./README.md) · Database: [database.md](./database.md) · Mobile: [mobile-api.md](./mobile-api.md) · Production: [production.md](./production.md) · [P3](./live-p3-parity.md) · [audio](./live-audio-rooms.md)  
 > RBAC: [../rbac/logic.md](../rbac/logic.md) · Conventions: [../_shared/conventions.md](../_shared/conventions.md)
 
 ---
@@ -128,6 +128,29 @@ Does **not** end the stream. For host abuse, use end/ban instead.
 
 After end/ban, confirm ACTIVE auctions cancelled (HUD clear; auction admin if stuck).
 
+### C2. Moderate chat without ending the stream
+
+| Step | Action | Endpoint |
+|------|--------|----------|
+| 1 | Open admin detail (includes comment counts) | `GET /lives/admin/:id` |
+| 2 | Delete toxic comment | `DELETE /lives/admin/:id/comments/:commentId` |
+| 3 | Mute chatter (still watches) | `POST /lives/admin/:id/viewers/:userId/mute-chat` `{ reason? }` |
+| 4 | Ban viewer from this live | `POST /lives/admin/:id/viewers/:userId/ban` `{ reason? }` |
+| 5 | Review active mutes/bans | `GET /lives/admin/:id/restrictions` |
+
+**Note:** Host/mod mobile routes (`DELETE /lives/:id/comments/…`, viewer ban/mute) require the actor to be **host or live moderator**. Admin routes work with **`lives.admin.moderate`** only — use these from the dashboard.
+
+### C3. Control stage & interactive features
+
+| Situation | Endpoint |
+|-----------|----------|
+| Disable guest requests mid-stream | `PATCH /lives/admin/:id/settings` `{ "guestsEnabled": false }` |
+| Mute guest mic | `POST /lives/admin/:id/guests/:userId/mute` |
+| Read PK state | `GET /lives/admin/:id/battle` |
+| Force-end abusive PK | `POST /lives/admin/:id/battle/:battleId/end` |
+| Force-end stuck poll | `POST /lives/admin/:id/polls/:pollId/end` |
+| Remove feed boost early | `POST /lives/admin/:id/unboost` |
+
 ### D. Watch a live in realtime (optional)
 
 1. Staff Firebase user + Socket connect  
@@ -144,6 +167,29 @@ LiveKit calls `POST /lives/webhooks/livekit` with a signed header (not Firebase)
 
 ## 4. Admin-only endpoints
 
+### `GET /lives/admin/stats`
+
+**Permission:** `lives.admin.read`
+
+Platform ops snapshot for dashboard home / HUD.
+
+**Response**
+
+```json
+{
+  "liveNow": 12,
+  "planned": 3,
+  "endedToday": 28,
+  "bannedToday": 1,
+  "boostedLive": 2,
+  "concurrentViewers": 1840,
+  "activeBattles": 4,
+  "asOf": "2026-08-26T06:00:00.000Z"
+}
+```
+
+---
+
 ### `GET /lives/admin/all`
 
 **Permission:** `lives.admin.read`
@@ -154,9 +200,12 @@ LiveKit calls `POST /lives/webhooks/livekit` with a signed header (not Firebase)
 | `limit` | int | default 20, max 100 |
 | `status` | string | `PLANNED` \| `LIVE` \| `ENDED` \| `BANNED` |
 | `userId` | UUID | filter by host |
+| `categoryId` | UUID | filter by category |
 | `search` | string | title / host username (case-insensitive) |
+| `boostedOnly` | boolean | when `true`, only **LIVE** streams with active `feedBoostUntil` |
+| `mediaMode` | string | `VIDEO` \| `AUDIO` — Voice Chat vs camera |
 
-**Use for:** ops queue (`status=LIVE`), history (`ENDED` / `BANNED`), host lookup.
+**Use for:** ops queue (`status=LIVE`), history (`ENDED` / `BANNED`), host lookup, boosted shelf review.
 
 **Response**
 
@@ -207,6 +256,55 @@ LiveKit calls `POST /lives/webhooks/livekit` with a signed header (not Firebase)
 
 Show multi-guest settings so support can see if requests are off / seat cap is low.  
 Show `banReason` when `status === "BANNED"`.
+
+---
+
+### `GET /lives/admin/:id`
+
+**Permission:** `lives.admin.read`
+
+Full admin detail — **includes BANNED lives** (public `GET /lives/:id` returns 404 for banned).
+
+Adds moderation counters, active poll/battle, and active auctions.
+
+```json
+{
+  "id": "…",
+  "title": "…",
+  "status": "LIVE",
+  "banReason": null,
+  "feedBoostUntil": null,
+  "viewers": 120,
+  "user": { "id": "…", "username": "…" },
+  "moderation": {
+    "activeGuests": 2,
+    "pendingGuestRequests": 5,
+    "totalComments": 840,
+    "activeRestrictions": 3,
+    "uniqueViewerSessions": 412,
+    "reminderSubscribers": 18
+  },
+  "activePoll": null,
+  "activeBattle": null,
+  "activeAuctions": []
+}
+```
+
+---
+
+### `GET /lives/admin/:id/summary`
+
+**Permission:** `lives.admin.read`
+
+Post-live analytics for **any** status (host-only on mobile). Includes top gifters, duration, peak viewers, earnings.
+
+---
+
+### `GET /lives/admin/:id/restrictions`
+
+**Permission:** `lives.admin.read`
+
+Lists `LiveViewerRestriction` rows (chat mutes + live bans) with target user and staff who applied.
 
 ---
 
@@ -272,6 +370,80 @@ Sets `feedBoostUntil` so the live ranks higher in the For You feed while `LIVE`.
 
 ---
 
+### `POST /lives/admin/:id/unboost`
+
+**Permission:** `lives.admin.moderate` · **Body:** none
+
+Clears `feedBoostUntil` immediately (idempotent).
+
+---
+
+### `PATCH /lives/admin/:id/settings`
+
+**Permission:** `lives.admin.moderate`
+
+Force-update multi-guest / access settings **without** host permission. Same body as host `PATCH /lives/:id/settings`:
+
+```json
+{
+  "guestsEnabled": false,
+  "guestRequestMode": "OFF",
+  "maxGuests": 4,
+  "layout": "GRID",
+  "allowGuestCamera": false,
+  "moderatorsCanManageGuests": true,
+  "watchAccessMode": "EVERYONE"
+}
+```
+
+Emits Socket `liveGuestUpdate` `{ type: "settings" }`.
+
+---
+
+### `DELETE /lives/admin/:id/comments/:commentId`
+
+**Permission:** `lives.admin.moderate`
+
+Soft-delete a chat message (same effect as host/mod delete). Emits `liveCommentDeleted`.
+
+---
+
+### `POST /lives/admin/:id/viewers/:userId/mute-chat`
+
+**Permission:** `lives.admin.moderate`
+
+```json
+{ "reason": "spam links" }
+```
+
+Viewer can still watch; cannot comment until unmuted or stream ends.
+
+---
+
+### `POST /lives/admin/:id/viewers/:userId/unmute-chat`
+
+**Permission:** `lives.admin.moderate` · **Body:** none
+
+---
+
+### `POST /lives/admin/:id/viewers/:userId/ban`
+
+**Permission:** `lives.admin.moderate`
+
+```json
+{ "reason": "harassment" }
+```
+
+Kicks viewer and blocks rejoin/comment/like for this live.
+
+---
+
+### `POST /lives/admin/:id/viewers/:userId/unban`
+
+**Permission:** `lives.admin.moderate` · **Body:** none
+
+---
+
 ### `POST /lives/admin/:id/guests/:userId/kick`
 
 **Permission:** `lives.admin.moderate`
@@ -293,6 +465,38 @@ Force-remove a guest regardless of host/mod assignment.
 
 ---
 
+### `POST /lives/admin/:id/guests/:userId/mute` / `…/unmute`
+
+**Permission:** `lives.admin.moderate` · **Body:** none
+
+Force mute/unmute guest microphone (LiveKit publish revoked/restored).
+
+---
+
+### `GET /lives/admin/:id/battle`
+
+**Permission:** `lives.admin.read`
+
+Same payload as mobile `GET /lives/:id/battle`: `{ battle: LiveBattle | null }`.
+
+---
+
+### `POST /lives/admin/:id/battle/:battleId/end`
+
+**Permission:** `lives.admin.moderate` · **Body:** none
+
+Force-finish an active PK battle on this live (scores finalized, socket `liveBattle` emitted).
+
+---
+
+### `POST /lives/admin/:id/polls/:pollId/end`
+
+**Permission:** `lives.admin.moderate` · **Body:** none
+
+Force-close an active poll.
+
+---
+
 ## 5. Shared read endpoints (staff-friendly)
 
 These are the same paths as mobile. Staff Bearer tokens work; some privacy checks allow staff roles to view private hosts on detail/join where implemented.
@@ -310,7 +514,7 @@ These are the same paths as mobile. Staff Bearer tokens work; some privacy check
 | Auction list for live | `GET /lives/:id/auctions?status=ALL` | optional |
 | Cancel/ban individual auction | Auctions admin | auction permissions |
 
-**Do not** use host-only mobile routes (settings, invite, promote) as admin overrides — use force end / ban / kick.
+**Do not** use host-only mobile routes (settings, invite, promote) as admin overrides — use **`/lives/admin/…`** force controls instead.
 
 Full shapes: [mobile-api.md](./mobile-api.md).
 
@@ -360,11 +564,27 @@ PLANNED → LIVE → ENDED
 
 | Method | Path | Permission | What it does |
 |--------|------|------------|--------------|
+| `GET` | `/lives/admin/stats` | `lives.admin.read` | Platform live ops snapshot |
 | `GET` | `/lives/admin/all` | `lives.admin.read` | Paginated list + filters |
+| `GET` | `/lives/admin/:id` | `lives.admin.read` | Detail + moderation counters (incl. BANNED) |
+| `GET` | `/lives/admin/:id/summary` | `lives.admin.read` | Post-live analytics (any status) |
+| `GET` | `/lives/admin/:id/restrictions` | `lives.admin.read` | Chat mutes / live bans on this stream |
 | `POST` | `/lives/admin/:id/end` | `lives.admin.moderate` | Force end → `ENDED` |
 | `POST` | `/lives/admin/:id/ban` | `lives.admin.moderate` | Ban → `BANNED` + `banReason` |
 | `POST` | `/lives/admin/:id/boost` | `lives.admin.moderate` | Feed boost window (`durationMinutes`) |
+| `POST` | `/lives/admin/:id/unboost` | `lives.admin.moderate` | Clear feed boost |
+| `PATCH` | `/lives/admin/:id/settings` | `lives.admin.moderate` | Force guest/access settings |
+| `DELETE` | `/lives/admin/:id/comments/:commentId` | `lives.admin.moderate` | Delete chat message |
+| `POST` | `/lives/admin/:id/viewers/:userId/mute-chat` | `lives.admin.moderate` | Mute viewer chat |
+| `POST` | `/lives/admin/:id/viewers/:userId/unmute-chat` | `lives.admin.moderate` | Unmute viewer chat |
+| `POST` | `/lives/admin/:id/viewers/:userId/ban` | `lives.admin.moderate` | Ban viewer from live |
+| `POST` | `/lives/admin/:id/viewers/:userId/unban` | `lives.admin.moderate` | Unban viewer |
 | `POST` | `/lives/admin/:id/guests/:userId/kick` | `lives.admin.moderate` | Force kick guest |
+| `POST` | `/lives/admin/:id/guests/:userId/mute` | `lives.admin.moderate` | Mute guest mic |
+| `POST` | `/lives/admin/:id/guests/:userId/unmute` | `lives.admin.moderate` | Unmute guest mic |
+| `GET` | `/lives/admin/:id/battle` | `lives.admin.read` | Active PK battle |
+| `POST` | `/lives/admin/:id/battle/:battleId/end` | `lives.admin.moderate` | Force end PK battle |
+| `POST` | `/lives/admin/:id/polls/:pollId/end` | `lives.admin.moderate` | Force end poll |
 
 ### Shared (useful in dashboard)
 
@@ -397,11 +617,17 @@ Build these screens (minimum):
 
 | Screen | Permissions | Actions |
 |--------|-------------|---------|
-| **Lives queue** | `read` | Table: status, title, host, viewers, earnings, startedAt; filters; search |
-| **Live detail** | `read` | Metadata, guests, comments, auctions, battle; optional Socket monitor |
+| **Ops home** | `read` | Stats cards from `GET /admin/stats` |
+| **Lives queue** | `read` | Table: status, title, host, viewers, earnings, boost, startedAt; filters; search |
+| **Live detail** | `read` | `GET /admin/:id` metadata, guests, comments, auctions, battle, poll; optional Socket monitor |
+| **Restrictions panel** | `read` | `GET /admin/:id/restrictions` — mutes/bans with undo buttons |
+| **Chat moderation** | `moderate` | Delete comment; mute/ban viewer |
+| **Stage control** | `moderate` | Kick/mute guest; patch settings (disable guests) |
+| **Interactive control** | `moderate` | End battle / end poll |
+| **Feed ops** | `moderate` | Boost / unboost |
 | **End confirm** | `moderate` | Call end; refresh row |
 | **Ban confirm** | `moderate` | Reason field; call ban; show `banReason` in history |
-| **Kick guest** | `moderate` | From guest list; confirm |
+| **Post-live review** | `read` | Summary tab via `GET /admin/:id/summary` |
 
 **Ops habits**
 
@@ -426,7 +652,9 @@ Build these screens (minimum):
 
 ## 11. Related docs
 
+- [README.md](./README.md) — LIVE doc index  
 - [mobile-api.md](./mobile-api.md) — full app API (shapes, sockets, gifts)  
+- [live-audio-rooms.md](./live-audio-rooms.md) — admin `?mediaMode=AUDIO`  
 - [logic.md](./logic.md) — teardown order, battles, restrictions  
 - [production.md](./production.md) — deploy, firewall, smoke tests  
 - [../rbac/admin-api.md](../rbac/admin-api.md) · [../rbac/logic.md](../rbac/logic.md)  

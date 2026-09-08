@@ -39,6 +39,8 @@ class TestContract implements LivePromotionResponseContract {
   @override
   LivePromotionOptions options(Object? d) => const LivePromotionOptions();
   @override
+  List<LivePromotionOption> countries(Object? d) => const [];
+  @override
   List<LivePromotionPackage> packages(Object? d) => [];
   @override
   LivePromotionPreview preview(Object? d) =>
@@ -425,6 +427,9 @@ void main() {
       }
       expect(requests.map((r) => '${r.method} ${r.path}'), [
         'GET /promotions/lives/options',
+        // The LIVE options envelope has no countries; the shared promotions
+        // options endpoint supplies the custom-audience country chips.
+        'GET /promotions/options',
         'GET /promotions/packages',
         'GET /promotions/lives/custom/preview',
         'GET /promotions/lives/mine',
@@ -440,13 +445,13 @@ void main() {
         'PATCH /promotions/lives/campaign-1/resume',
         'PATCH /promotions/lives/campaign-1/cancel',
       ]);
-      expect(requests[2].queryParameters, {
+      expect(requests[3].queryParameters, {
         'budgetCoins': 20,
         'durationDays': 1,
         'objective': 'VIEWS',
       });
-      expect(requests[3].queryParameters, {'page': 2, 'limit': 20});
-      expect(requests[9].data, draft.toJson(liveId: 'live-1'));
+      expect(requests[4].queryParameters, {'page': 2, 'limit': 20});
+      expect(requests[10].data, draft.toJson(liveId: 'live-1'));
       for (var i = 0; i < requests.length; i++) {
         expect(requests[i].headers['Authorization'], 'Bearer mock-${i + 1}');
       }
@@ -506,6 +511,7 @@ void main() {
       final repo = LivePromotionsRepository(
         dio: dio,
         idTokenProvider: () async => 'test',
+        contract: const UnverifiedLivePromotionContract(),
       );
       await expectLater(
         repo.create('live-1', draft),

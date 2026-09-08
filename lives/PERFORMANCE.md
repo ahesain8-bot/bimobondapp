@@ -2,8 +2,8 @@
 
 > **Scope:** Backend NestJS / Prisma / PostgreSQL  
 > **Files involved:** `src/lives/lives.service.ts` · `src/lives/lives-extras.service.ts` · `src/lives/lives-battles.service.ts`  
-> **Status:** Identified, not yet fixed  
-> **Last updated:** 2026-08-16
+> **Quality (Phase 1/3):** `mediaHints` on start/join/guest tokens — see [logic.md](./logic.md) · [mobile-api.md](./mobile-api.md)  
+> **Last updated:** 2026-08-24
 
 ---
 

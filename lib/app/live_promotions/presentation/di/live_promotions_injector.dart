@@ -59,14 +59,17 @@ Future<LivePromotionEligibility> refreshLivePromotionEligibility(
   );
   final api = sl<LiveApiClient>();
   final live = await api.get('/lives/${Uri.encodeComponent(liveId)}');
-  // Public visibility is NOT in the supplied live-object schema. Never infer
-  // it from guestRequestMode or account privacy. Await the verified adapter.
+  // `visibility` is absent from the canonical live object (lives/mobile-api.md
+  // §5). It is read here only so an explicit value, if the backend ever adds
+  // one, is honoured; publicness otherwise rests on account privacy below.
   return LivePromotionEligibility(
     liveId: liveId,
     authenticatedUserId: user.id,
     hostUserId: live['userId'] is String ? live['userId'] as String : null,
     liveStatus: live['status'] is String ? live['status'] as String : null,
-    visibility: null,
+    visibility: live['visibility'] is String
+        ? live['visibility'] as String
+        : null,
     accountPrivate: user.isPrivate,
     accountBanned: user.isBanned,
     promotionsEnabled: livePromotionsEnabled,
