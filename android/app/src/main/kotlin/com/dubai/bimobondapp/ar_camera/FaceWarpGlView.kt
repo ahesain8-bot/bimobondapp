@@ -9,6 +9,7 @@ import android.os.Looper
 import android.util.AttributeSet
 import android.util.Log
 import android.view.Surface
+import com.dubai.bimobondapp.ar_camera.beauty_v3.V3FaceRegionCalibration
 
 /**
  * Picks an EGL config the GL context can share with the video encoder's surface.
@@ -291,12 +292,6 @@ class FaceWarpGlView @JvmOverloads constructor(
     }
 
     /** Skin-confidence mask (ALPHA_8, 255=skin) from ArCameraController's landmark rasterizer. */
-    fun updateSkinMask(bitmap: Bitmap) {
-        ensureGlInitialized()
-        queueEvent {
-            renderer.updateSkinMask(bitmap)
-        }
-    }
 
     fun setRenderModeSafe(mode: Int) {
         if (glInitialized) {
@@ -381,6 +376,7 @@ class FaceWarpGlView @JvmOverloads constructor(
         }
         requestRender()
     }
+
 
     fun releaseGl() {
         if (!glInitialized) return

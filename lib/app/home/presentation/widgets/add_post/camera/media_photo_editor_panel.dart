@@ -82,6 +82,36 @@ const List<String> kMakeupLipColors = [
   '#6D1B2B',
 ];
 
+/// Named foundation shade presets (hex = target complexion tone).
+class MakeupFoundationShade {
+  const MakeupFoundationShade({
+    required this.id,
+    required this.label,
+    required this.hex,
+  });
+
+  final String id;
+  final String label;
+  final String hex;
+}
+
+/// Cooler → neutral → warmer / deeper foundation tones.
+const List<MakeupFoundationShade> kMakeupFoundationShades = [
+  MakeupFoundationShade(id: 'porcelain', label: 'Porcelain', hex: '#F2E2DA'),
+  MakeupFoundationShade(id: 'ivory', label: 'Ivory', hex: '#EED8C8'),
+  MakeupFoundationShade(id: 'light_beige', label: 'Light Beige', hex: '#E6CDB6'),
+  MakeupFoundationShade(id: 'natural_beige', label: 'Natural Beige', hex: '#D9C0A5'),
+  MakeupFoundationShade(id: 'warm_beige', label: 'Warm Beige', hex: '#D2B48C'),
+  MakeupFoundationShade(id: 'sand', label: 'Sand', hex: '#C9A882'),
+  MakeupFoundationShade(id: 'honey', label: 'Honey', hex: '#B8895E'),
+  MakeupFoundationShade(id: 'caramel', label: 'Caramel', hex: '#9A6B45'),
+];
+
+String get kDefaultFoundationShadeHex =>
+    kMakeupFoundationShades
+        .firstWhere((s) => s.id == 'natural_beige')
+        .hex;
+
 /// UI-only feature flag; the teeth filter implementation remains available.
 const bool _showTeethWhiteningTool = false;
 
@@ -110,6 +140,8 @@ class MediaPhotoEditorPanel extends StatefulWidget {
     this.onColorFilterIntensityChanged,
     this.selectedLipColor = '#DB4761',
     this.onLipColorSelected,
+    this.selectedFoundationColor = '#D9C0A5',
+    this.onFoundationColorSelected,
   });
 
   final AppLocalizations l10n;
@@ -134,6 +166,8 @@ class MediaPhotoEditorPanel extends StatefulWidget {
   final ValueChanged<double>? onColorFilterIntensityChanged;
   final String selectedLipColor;
   final ValueChanged<String>? onLipColorSelected;
+  final String selectedFoundationColor;
+  final ValueChanged<String>? onFoundationColorSelected;
 
   @override
   State<MediaPhotoEditorPanel> createState() => _MediaPhotoEditorPanelState();
@@ -270,6 +304,15 @@ class _MediaPhotoEditorPanelState extends State<MediaPhotoEditorPanel> {
                       _LipColorRow(
                         selectedHex: widget.selectedLipColor,
                         onSelected: widget.onLipColorSelected!,
+                      ),
+                    ],
+                    if (widget.selectedTool == MediaPhotoEditorTool.foundation &&
+                        widget.magicOn &&
+                        widget.onFoundationColorSelected != null) ...[
+                      const SizedBox(height: 10),
+                      _FoundationShadeRow(
+                        selectedHex: widget.selectedFoundationColor,
+                        onSelected: widget.onFoundationColorSelected!,
                       ),
                     ],
                   ] else if (widget.onColorFilterSelected != null)
@@ -755,6 +798,60 @@ class _LipColorRow extends StatelessWidget {
                 border: Border.all(
                   color: selected ? Colors.white : Colors.white24,
                   width: selected ? 2.5 : 1,
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _FoundationShadeRow extends StatelessWidget {
+  const _FoundationShadeRow({
+    required this.selectedHex,
+    required this.onSelected,
+  });
+
+  final String selectedHex;
+  final ValueChanged<String> onSelected;
+
+  Color _parse(String hex) {
+    final cleaned = hex.replaceFirst('#', '');
+    final value = int.tryParse(cleaned, radix: 16) ?? 0xD9C0A5;
+    return Color(0xFF000000 | value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 36,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: kMakeupFoundationShades.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 10),
+        itemBuilder: (context, index) {
+          final shade = kMakeupFoundationShades[index];
+          final selected =
+              shade.hex.toUpperCase() == selectedHex.toUpperCase();
+          return GestureDetector(
+            onTap: () {
+              HapticFeedback.selectionClick();
+              onSelected(shade.hex);
+            },
+            child: Tooltip(
+              message: shade.label,
+              child: Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: _parse(shade.hex),
+                  border: Border.all(
+                    color: selected ? Colors.white : Colors.white24,
+                    width: selected ? 2.5 : 1,
+                  ),
                 ),
               ),
             ),

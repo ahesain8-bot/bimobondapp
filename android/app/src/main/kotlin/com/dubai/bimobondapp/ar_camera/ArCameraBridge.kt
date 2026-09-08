@@ -1174,9 +1174,10 @@ object ArCameraBridge {
             }
 
             useScreenOverlay -> {
-                // Lottie and MP4 share the same OES beauty path as Normal Mode.
+                // Lottie and MP4 share the same V3 OES beauty path as Normal Mode.
                 // Video plays in a TextureView on top (visible inside Flutter
                 // PlatformView); recording composites OES frames + overlay frames.
+                ArCameraController.setPreferOesBinding(true)
                 gl?.submitWarpParams(FaceWarpParams.INACTIVE)
                 gl?.setCaptureEnabled(true)
                 if (!ArCameraController.isBoundToOes()) {
@@ -1193,9 +1194,10 @@ object ArCameraBridge {
             }
 
             else -> {
-                // Normal Mode: live preview runs through the full-res OES/GPU
-                // pipeline (same path used for photo/video capture) instead of a
-                // raw CameraX PreviewView pass-through.
+                // Beauty camera / Normal Mode: V3 OES is the production preview
+                // (identity pass-through when all strengths are 0). Never leave
+                // the user on raw CameraX PreviewView merely because filter is NONE.
+                ArCameraController.setPreferOesBinding(true)
                 gl?.submitWarpParams(FaceWarpParams.INACTIVE)
                 gl?.setCaptureEnabled(true)
                 if (!ArCameraController.isBoundToOes()) {
@@ -1215,7 +1217,14 @@ object ArCameraBridge {
                         // Real filter switch back to Normal Mode later in the
                         // session — freeze-frame transition still applies here.
                         beginOesTransitionWithFreeze()
+                    } else if (gl != null) {
+                        // Platform view exists but camera not started yet — keep
+                        // preferOes so the first bindCamera attaches OES when ready.
+                        gl.setOesEnabled(true)
+                        gl.ensureGlInitialized()
                     }
+                } else {
+                    showGlHidePreview()
                 }
             }
         }

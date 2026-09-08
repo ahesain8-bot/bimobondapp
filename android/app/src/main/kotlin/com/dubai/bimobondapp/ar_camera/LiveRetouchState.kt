@@ -27,8 +27,12 @@ data class LiveRetouchAdjustments(
     val eyes: Float = 0f,
     /** Teeth tone: −1 dull, 0 natural, +1 whiter. */
     val tooth: Float = 0f,
-    /** Lip thickness / openness: −1 thinner, 0 natural, +1 fuller & more open. */
+    /** Lip thickness / openness: −1 thinner, 0 natural, +1 fuller (overall fullness). */
     val mouth: Float = 0f,
+    /** Upper-lip fullness only (mesh filler). */
+    val upperLip: Float = 0f,
+    /** Lower-lip fullness only (mesh filler). */
+    val lowerLip: Float = 0f,
 ) {
     val hasColor: Boolean
         get() = kotlin.math.abs(saturation) > 0.01f ||
@@ -45,7 +49,9 @@ data class LiveRetouchAdjustments(
             kotlin.math.abs(shape) < 0.01f &&
             kotlin.math.abs(eyes) < 0.01f &&
             kotlin.math.abs(tooth) < 0.01f &&
-            kotlin.math.abs(mouth) < 0.01f
+            kotlin.math.abs(mouth) < 0.01f &&
+            kotlin.math.abs(upperLip) < 0.01f &&
+            kotlin.math.abs(lowerLip) < 0.01f
 
     /** True when color channels match the back-camera Retouch-Off baseline. */
     fun matchesLiveBaselineColors(): Boolean {
@@ -109,6 +115,8 @@ data class LiveRetouchAdjustments(
             eyes: Int = 0,
             tooth: Int = 0,
             mouth: Int = 0,
+            upperLip: Int = 0,
+            lowerLip: Int = 0,
         ): LiveRetouchAdjustments = LiveRetouchAdjustments(
             saturation = saturation / 100f,
             brightness = brightness / 100f,
@@ -122,6 +130,8 @@ data class LiveRetouchAdjustments(
             eyes = eyes / 100f,
             tooth = tooth / 100f,
             mouth = mouth / 100f,
+            upperLip = upperLip / 100f,
+            lowerLip = lowerLip / 100f,
         )
     }
 }

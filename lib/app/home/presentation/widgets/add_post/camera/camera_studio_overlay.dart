@@ -49,6 +49,8 @@ class CameraStudioOverlay extends StatelessWidget {
     this.onPhotoEditorColorFilterIntensityChanged,
     this.photoEditorLipColor = '#DB4761',
     this.onPhotoEditorLipColorSelected,
+    this.photoEditorFoundationColor = '#D9C0A5',
+    this.onPhotoEditorFoundationColorSelected,
     required this.timerEnabled,
     this.flashEnabled = false,
     required this.isRecording,
@@ -138,6 +140,8 @@ class CameraStudioOverlay extends StatelessWidget {
   final ValueChanged<double>? onPhotoEditorColorFilterIntensityChanged;
   final String photoEditorLipColor;
   final ValueChanged<String>? onPhotoEditorLipColorSelected;
+  final String photoEditorFoundationColor;
+  final ValueChanged<String>? onPhotoEditorFoundationColorSelected;
   final bool timerEnabled;
   final bool flashEnabled;
   final bool isRecording;
@@ -606,6 +610,8 @@ class CameraStudioOverlay extends StatelessWidget {
                     onPhotoEditorColorFilterIntensityChanged,
                 selectedLipColor: photoEditorLipColor,
                 onLipColorSelected: onPhotoEditorLipColorSelected,
+                selectedFoundationColor: photoEditorFoundationColor,
+                onFoundationColorSelected: onPhotoEditorFoundationColorSelected,
               ),
             ),
           ),

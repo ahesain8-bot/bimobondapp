@@ -65,6 +65,11 @@ import com.airbnb.lottie.LottieComposition
 import com.airbnb.lottie.LottieDrawable
 import com.airbnb.lottie.RenderMode
 import com.dubai.bimobondapp.beauty.BeautyFilterProcessor
+import com.dubai.bimobondapp.ar_camera.beauty_v3.V3AnalysisToCanonicalTransform
+import com.dubai.bimobondapp.ar_camera.beauty_v3.V3CameraClock
+import com.dubai.bimobondapp.ar_camera.beauty_v3.V3FaceLandmarkState
+import com.dubai.bimobondapp.ar_camera.beauty_v3.V3SparseFaceTracker
+import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarkerResult
 import java.io.File
 import java.io.FileOutputStream
 import java.util.concurrent.ExecutorService
@@ -501,6 +506,10 @@ object ArCameraController {
         if (started) return
         started = true
 
+        // Beauty/AR camera owns the V3 OES preview path by default (identity when
+        // all strengths are 0). Do not wait for a legacy filter != NONE signal.
+        preferOesBinding = true
+
         // SurfaceView path — sharper live preview than TextureView (COMPATIBLE).
         previewView.implementationMode = PreviewView.ImplementationMode.PERFORMANCE
         previewView.scaleType = PreviewView.ScaleType.FILL_CENTER
@@ -588,6 +597,10 @@ object ArCameraController {
         imageAnalysis?.clearAnalyzer()
 
         ArCameraBridge.isFrontCamera = !ArCameraBridge.isFrontCamera
+        V3AnalysisToCanonicalTransform.invalidateCamera(
+            V3AnalysisToCanonicalTransform.Reason.INVALIDATED_ON_FLIP,
+            lensFront = ArCameraBridge.isFrontCamera,
+        )
         frameCounter = 0
         cachedWarpParams = FaceWarpParams.INACTIVE
         cachedSnapshot = null
@@ -3452,6 +3465,16 @@ object ArCameraController {
                     "CAMERA rotation=${info.rotationDegrees} crop=${info.cropRect} " +
                         "SurfaceTextureBuffer=${bufW}x$bufH",
                 )
+                // V3-1: Preview geometry for analysis→canonical (does not change InputPass).
+                V3AnalysisToCanonicalTransform.updatePreview(
+                    bufferWidth = bufW,
+                    bufferHeight = bufH,
+                    cropRect = android.graphics.Rect(info.cropRect),
+                    rotationDegrees = info.rotationDegrees,
+                    sensorToBuffer = android.graphics.Matrix(info.sensorToBufferTransform),
+                    isMirroring = info.isMirroring,
+                    lensFront = ArCameraBridge.isFrontCamera,
+                )
                 glView.markCameraTransformationInfo(
                     info.rotationDegrees,
                     frontMirror = ArCameraBridge.isFrontCamera,
@@ -3497,6 +3520,9 @@ object ArCameraController {
     }
 
     fun isBoundToOes(): Boolean = boundToOes
+
+    /** Temporary diagnostic accessor for V3_ROUTE logs. */
+    fun preferOesBindingForDiag(): Boolean = preferOesBinding
 
     fun setPreferOesBinding(prefer: Boolean) {
         preferOesBinding = prefer
@@ -3730,6 +3756,13 @@ object ArCameraController {
     }
 
     fun onHostResume(force: Boolean = false) {
+        // Mark mapping stale until the resume rebind delivers TransformationInfo.
+        // (Actual generation bump happens in bindCamera.)
+        if (force || started) {
+            V3AnalysisToCanonicalTransform.invalidateLandmarksOnly(
+                V3AnalysisToCanonicalTransform.Reason.INVALIDATED_ON_RESUME,
+            )
+        }
         Log.i(
             "ArCameraLifecycle",
             "Controller.onHostResume ENTER force=$force started=$started " +
@@ -3997,6 +4030,12 @@ object ArCameraController {
         previewView: PreviewView,
         faceOverlay: FaceOverlayView,
     ) {
+        // New CameraX session → new Preview TransformationInfo required before
+        // any sensor-mapped landmarks may publish.
+        V3AnalysisToCanonicalTransform.invalidateCamera(
+            V3AnalysisToCanonicalTransform.Reason.INVALIDATED_ON_REBIND,
+            lensFront = ArCameraBridge.isFrontCamera,
+        )
         val activity = ArCameraBridge.hostActivity ?: run {
             endSwitchingCamera(bindSucceeded = false)
             return
@@ -4107,20 +4146,10 @@ object ArCameraController {
                 }
                 imageCapture = capture
 
-                // Normal Mode only — small background analysis stream feeding the
-                // landmark-rasterized skin mask (see processSkinMaskFrame /
-                // buildFaceSkinMaskBitmap). Attempted first; if this 3rd concurrent
-                // stream isn't supported on a given device, the catch block below
-                // falls back to the proven 2-stream (Preview + ImageCapture) bind.
-                // Preview + Analysis + Capture is one of CameraX's guaranteed
-                // stream combinations all the way down to LEGACY, so this does
-                // not need a hardware-level gate — and gating it did real damage:
-                // the landmarks this stream produces are what drive both the skin
-                // mask and face-metered exposure, and most phones report LIMITED,
-                // so on most phones neither was running at all. The bind is still
-                // wrapped in the fallback below for anything that surprises us.
-                val wantSkinMask =
-                    ArCameraBridge.currentFilter == FilterType.NONE
+                // V3 live path always needs landmark analysis on the OES bind
+                // (reshape/makeup). Do not gate this on FilterType.NONE — that
+                // legacy filter enum is not the V3 activation signal.
+                val wantSkinMask = true
                 val skinMaskAnalysis = if (wantSkinMask) {
                     ImageAnalysis.Builder()
                         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
@@ -4545,6 +4574,9 @@ object ArCameraController {
         val analysisStartNs = System.nanoTime()
         skinMaskFrameCounter++
         val analysisRotation = imageProxy.imageInfo.rotationDegrees
+        val frameTimestampNs = imageProxy.imageInfo.timestamp
+        val arrivalMs = android.os.SystemClock.elapsedRealtime()
+        V3CameraClock.Latency.noteAnalysisInput(frameTimestampNs, arrivalMs)
         if (skinMaskFrameCounter % 30 == 1) {
             Log.i(
                 ArCameraDiagnostics.TAG,
@@ -4554,23 +4586,39 @@ object ArCameraController {
         }
         // Tooth visibility must react quickly when lips close; the regular skin
         // mask can remain throttled because its geometry changes slowly.
-        val detectEvery = if (
-            kotlin.math.abs(LiveRetouchState.adjustments.tooth) > 0.01f
-        ) {
-            2
-        } else {
-            SKIN_MASK_DETECT_EVERY
+        // Production beauty is always V3 — keep analysis rate suitable for landmarks.
+        val v3RawActive = true
+        val detectEvery = when {
+            v3RawActive -> 2
+            kotlin.math.abs(LiveRetouchState.adjustments.tooth) > 0.01f -> 2
+            else -> SKIN_MASK_DETECT_EVERY
         }
-        val shouldRun = skinMaskFrameCounter % detectEvery == 0
-        if (!shouldRun || !skinMaskBusy.compareAndSet(false, true)) {
+        val shouldDetect = skinMaskFrameCounter % detectEvery == 0
+        // Visual tracker needs every analysis frame; MediaPipe stays gated by busy.
+        val runMediaPipe = shouldDetect && skinMaskBusy.compareAndSet(false, true)
+        if (!v3RawActive && !runMediaPipe) {
             ArCameraDiagnostics.onAnalysisDropped()
             imageProxy.close()
             return
         }
+        if (!runMediaPipe && !shouldDetect) {
+            // Inter-MP frame: still grab bitmap for sparse optical tracking.
+        } else if (!runMediaPipe && shouldDetect) {
+            // Detect slot but MP still busy — visual-track only.
+            ArCameraDiagnostics.onAnalysisDropped()
+        }
 
-        // imageProxy is read and closed here, exactly once, before any further
-        // processing — avoids a double-close if something below throws.
         val rotation = analysisRotation
+        val analysisCrop = android.graphics.Rect(imageProxy.cropRect)
+        val analysisProxyW = imageProxy.width
+        val analysisProxyH = imageProxy.height
+        val analysisSensorValues = FloatArray(9).also { values ->
+            try {
+                imageProxy.imageInfo.sensorToBufferTransformMatrix.getValues(values)
+            } catch (_: Throwable) {
+                android.graphics.Matrix().getValues(values)
+            }
+        }
         val rawBitmap = try {
             ImageProxyBitmapUtils.toBitmap(imageProxy)
         } catch (_: Exception) {
@@ -4580,16 +4628,12 @@ object ArCameraController {
 
         if (rawBitmap == null) {
             ArCameraDiagnostics.onAnalysisDropped()
-            skinMaskBusy.set(false)
+            if (runMediaPipe) skinMaskBusy.set(false)
             return
         }
 
         var mediaPipeNs = 0L
         try {
-            // Oriented but NOT mirrored — matches FaceCoordinateMapper.toWarpUv's
-            // convention (mirror applied at sample time in the shader, not baked
-            // into the bitmap), same as how landmark frames are already prepared
-            // for the proven nose-warp feature.
             val oriented = try {
                 ImageProxyBitmapUtils.orientScaled(rawBitmap, rotation, false, SKIN_MASK_ANALYSIS_EDGE)
             } catch (_: Exception) {
@@ -4598,12 +4642,27 @@ object ArCameraController {
             if (oriented !== rawBitmap && !rawBitmap.isRecycled) rawBitmap.recycle()
 
             try {
+                val frameTsMs = V3CameraClock.nsToElapsedMs(frameTimestampNs)
+
+                // Per-frame visual track BEFORE MediaPipe on the same frame so
+                // optical motion is applied, then MP soft-corrects/reseeds.
+                // Soft-fails if OpenCV natives are unavailable (camera stays up).
+                if (v3RawActive) {
+                    try {
+                        V3SparseFaceTracker.trackFrame(oriented, frameTsMs)
+                    } catch (t: Throwable) {
+                        Log.e("V3_VISUAL", "trackFrame failed (non-fatal)", t)
+                    }
+                }
+
                 val landmarker = FaceLandmarkerHolder.get()
-                val snapshot = if (landmarker != null) {
+                var detectResult: FaceLandmarkerResult? = null
+                val snapshot = if (runMediaPipe && landmarker != null) {
                     try {
                         val mediaPipeStartNs = System.nanoTime()
                         val result = landmarker.detect(oriented)
                         mediaPipeNs = System.nanoTime() - mediaPipeStartNs
+                        detectResult = result
                         result?.let {
                             FaceLandmarkMapper.fromResult(result, oriented.width, oriented.height)
                         }
@@ -4613,11 +4672,56 @@ object ArCameraController {
                 } else {
                     null
                 }
-                // Independent of the face — the light in the room is worth
-                // tracking whether or not anyone is detected in the frame.
+                if (v3RawActive) {
+                    V3FaceLandmarkState.updateAnalysisGeometry(
+                        proxyWidth = analysisProxyW,
+                        proxyHeight = analysisProxyH,
+                        cropLeft = analysisCrop.left,
+                        cropTop = analysisCrop.top,
+                        cropRight = analysisCrop.right,
+                        cropBottom = analysisCrop.bottom,
+                        rotationDegrees = rotation,
+                        sensorToBufferValues = analysisSensorValues,
+                        mediaPipeWidth = oriented.width,
+                        mediaPipeHeight = oriented.height,
+                        maxEdge = SKIN_MASK_ANALYSIS_EDGE,
+                        mirrorX = ArCameraBridge.isFrontCamera,
+                        lensFront = ArCameraBridge.isFrontCamera,
+                    )
+                    if (runMediaPipe) {
+                        V3FaceLandmarkState.publishFromMediaPipe(
+                            result = detectResult,
+                            analysisWidth = oriented.width,
+                            analysisHeight = oriented.height,
+                            mirrorX = ArCameraBridge.isFrontCamera,
+                            analysisRotation = rotation,
+                            lensFront = ArCameraBridge.isFrontCamera,
+                            frameTimestampNs = frameTimestampNs,
+                        )
+                        val faces = detectResult?.faceLandmarks()
+                        if (faces != null && faces.isNotEmpty() && faces[0].size >= 300) {
+                            try {
+                                V3SparseFaceTracker.seedFromMediaPipe(
+                                    landmarks = faces[0],
+                                    bitmapW = oriented.width,
+                                    bitmapH = oriented.height,
+                                    frameTsMs = frameTsMs,
+                                    graySource = oriented,
+                                )
+                            } catch (t: Throwable) {
+                                Log.e("V3_VISUAL", "seedFromMediaPipe failed (non-fatal)", t)
+                            }
+                        } else if (detectResult == null || faces.isNullOrEmpty()) {
+                            try {
+                                V3SparseFaceTracker.reset("face_loss")
+                            } catch (t: Throwable) {
+                                Log.e("V3_VISUAL", "reset failed (non-fatal)", t)
+                            }
+                        }
+                    }
+                }
                 measureSceneLuma(oriented)
                 if (snapshot != null) {
-                    // Neutral B Camera2 baseline: no face-driven AE/AF overrides.
                     measureSkinTone(oriented, snapshot)
                     LiveRetouchState.updateNoseLandmarks(
                         snapshot,
@@ -4639,27 +4743,20 @@ object ArCameraController {
                         oriented.width,
                         oriented.height,
                     )
-                } else {
-                    // No face — decay fill so smooth/bright stop; empty grade stays.
+                } else if (runMediaPipe) {
                     decayFacePresence()
                 }
-                val maskBitmap = if (snapshot != null) {
+                if (snapshot != null) {
                     try {
                         buildFaceSkinMaskBitmap(snapshot, SKIN_MASK_ANALYSIS_EDGE)
-                    } catch (t: Throwable) {
-                        null
+                    } catch (_: Throwable) {
                     }
-                } else {
-                    null
-                }
-                if (maskBitmap != null) {
-                    ArCameraBridge.warpGlView?.updateSkinMask(maskBitmap)
                 }
             } finally {
                 if (!oriented.isRecycled) oriented.recycle()
             }
         } finally {
-            skinMaskBusy.set(false)
+            if (runMediaPipe) skinMaskBusy.set(false)
             ArCameraDiagnostics.onAnalysisProcessed(
                 totalNs = System.nanoTime() - analysisStartNs,
                 mediaPipeNs = mediaPipeNs,

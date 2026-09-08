@@ -17,6 +17,7 @@ import com.dubai.bimobondapp.ar_camera.LiveBeautyAdjustments
 import com.dubai.bimobondapp.ar_camera.LiveBeautyState
 import com.dubai.bimobondapp.ar_camera.LiveRetouchAdjustments
 import com.dubai.bimobondapp.ar_camera.LiveRetouchState
+import com.dubai.bimobondapp.ar_camera.beauty_v3.V3BeautyCompat
 import com.dubai.bimobondapp.beauty.BeautyFilterProcessor
 import com.dubai.bimobondapp.camera_engine.NativeCameraPlugin
 import com.dubai.bimobondapp.camera_engine.TemplateExportPlugin
@@ -515,12 +516,16 @@ class MainActivity : FlutterActivity() {
                             eyes = level("eyesLevel"),
                             tooth = level("toothLevel"),
                             mouth = level("mouthLevel"),
+                            upperLip = level("upperLipLevel"),
+                            lowerLip = level("lowerLipLevel"),
                         )
+                        V3BeautyCompat.syncFromLegacy()
                         ArCameraBridge.warpGlView?.requestRender()
                         result.success(null)
                     }
                     "clearRetouchAdjustments" -> {
                         LiveRetouchState.clear()
+                        V3BeautyCompat.syncFromLegacy()
                         ArCameraBridge.warpGlView?.requestRender()
                         result.success(null)
                     }
@@ -542,11 +547,13 @@ class MainActivity : FlutterActivity() {
                             lipStrength = level("lipStrength"),
                             intensity = level("intensity"),
                         )
+                        V3BeautyCompat.syncFromLegacy()
                         ArCameraBridge.warpGlView?.requestRender()
                         result.success(null)
                     }
                     "clearBeautyFilter" -> {
                         LiveBeautyState.clear()
+                        V3BeautyCompat.syncFromLegacy()
                         ArCameraBridge.warpGlView?.requestRender()
                         result.success(null)
                     }
@@ -560,6 +567,7 @@ class MainActivity : FlutterActivity() {
                             else -> null
                         }
                         LiveBeautyState.setMagic(enabled, strength)
+                        V3BeautyCompat.syncFromLegacy()
                         android.util.Log.i(
                             "ArRetouchMagic",
                             "setMagicEnabled=$enabled strength=${LiveBeautyState.magicStrength} " +
@@ -577,6 +585,7 @@ class MainActivity : FlutterActivity() {
                             else -> LiveBeautyAdjustments.MAGIC_AUTO_STRENGTH
                         }
                         LiveBeautyState.applyMagicStrength(strength)
+                        V3BeautyCompat.syncFromLegacy()
                         ArCameraBridge.warpGlView?.requestRender()
                         result.success(null)
                     }
@@ -623,7 +632,9 @@ class MainActivity : FlutterActivity() {
                             blushHex = call.argument<String>("blushTint"),
                             eyelinerHex = call.argument<String>("eyelinerTint"),
                             eyeshadowHex = call.argument<String>("eyeshadowTint"),
+                            foundationHex = call.argument<String>("foundationTint"),
                         )
+                        V3BeautyCompat.syncFromLegacy()
                         ArCameraBridge.warpGlView?.requestRender()
                         result.success(null)
                     }

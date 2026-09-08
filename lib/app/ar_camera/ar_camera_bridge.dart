@@ -319,6 +319,8 @@ class ArCameraBridge {
     double eyes = 0,
     double tooth = 0,
     double mouth = 0,
+    double upperLip = 0,
+    double lowerLip = 0,
   }) {
     int level(double v) => (v * 100).round().clamp(-150, 150);
     _channel.invokeMethod<void>('setRetouchAdjustments', {
@@ -334,6 +336,8 @@ class ArCameraBridge {
       'eyesLevel': level(eyes),
       'toothLevel': level(tooth),
       'mouthLevel': level(mouth),
+      'upperLipLevel': level(upperLip),
+      'lowerLipLevel': level(lowerLip),
     });
   }
 
@@ -384,6 +388,7 @@ class ArCameraBridge {
     });
   }
 
+
   static Future<void> setZoom(double zoom) async {
     await _channel.invokeMethod<void>('setZoom', {
       'zoom': zoom.clamp(0.0, 1.0),
@@ -413,6 +418,7 @@ class ArCameraBridge {
     String blushTint = '#F27A85',
     String eyelinerTint = '#0F0D14',
     String eyeshadowTint = '#8C5170',
+    String foundationTint = '#D9C0A5',
   }) {
     _channel.invokeMethod<void>('setMakeup', {
       'lipstick': lipstick.clamp(0.0, 1.0),
@@ -427,6 +433,7 @@ class ArCameraBridge {
       'blushTint': blushTint,
       'eyelinerTint': eyelinerTint,
       'eyeshadowTint': eyeshadowTint,
+      'foundationTint': foundationTint,
     });
   }
 

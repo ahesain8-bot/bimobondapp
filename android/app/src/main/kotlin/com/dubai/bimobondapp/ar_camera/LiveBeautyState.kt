@@ -17,6 +17,7 @@ data class LiveBeautyAdjustments(
     val eyeliner: Float = 0f,
     val eyeshadow: Float = 0f,
     val foundation: Float = 0f,
+    val foundationColor: FloatArray = DEFAULT_FOUNDATION_COLOR,
     val contour: Float = 0f,
     val underEye: Float = 0f,
     val brightenEye: Float = 0f,
@@ -60,6 +61,8 @@ data class LiveBeautyAdjustments(
         val DEFAULT_BLUSH_COLOR = floatArrayOf(0.95f, 0.48f, 0.52f)
         val DEFAULT_LINER_COLOR = floatArrayOf(0.06f, 0.05f, 0.08f)
         val DEFAULT_SHADOW_COLOR = floatArrayOf(0.55f, 0.32f, 0.42f)
+        /** Natural Beige — default foundation shade (stable, not sampled per frame). */
+        val DEFAULT_FOUNDATION_COLOR = floatArrayOf(0.851f, 0.753f, 0.647f)
 
         /**
          * Smooth slider (0..1) → shader effect strength.
@@ -160,6 +163,7 @@ object LiveBeautyState {
         blushHex: String? = null,
         eyelinerHex: String? = null,
         eyeshadowHex: String? = null,
+        foundationHex: String? = null,
     ) {
         val i = intensity.coerceIn(0f, 1f)
         val appliedSmooth = (smooth * i).coerceIn(0f, 1f)
@@ -180,6 +184,7 @@ object LiveBeautyState {
             eyeliner = (eyeliner * i).coerceIn(0f, 1f),
             eyeshadow = (eyeshadow * i).coerceIn(0f, 1f),
             foundation = (foundation * i).coerceIn(0f, 1f),
+            foundationColor = foundationHex?.let(::parseHexColor) ?: cur.foundationColor,
             contour = (contour * i).coerceIn(0f, 1f),
             underEye = (underEye * i).coerceIn(0f, 1f),
             brightenEye = (brightenEye * i).coerceIn(0f, 1f),
@@ -203,6 +208,7 @@ object LiveBeautyState {
         blushHex: String? = null,
         eyelinerHex: String? = null,
         eyeshadowHex: String? = null,
+        foundationHex: String? = null,
     ) {
         val cur = adjustments
         adjustments = cur.copy(
@@ -211,6 +217,7 @@ object LiveBeautyState {
             eyeliner = eyeliner.coerceIn(0f, 1f),
             eyeshadow = eyeshadow.coerceIn(0f, 1f),
             foundation = foundation.coerceIn(0f, 1f),
+            foundationColor = foundationHex?.let(::parseHexColor) ?: cur.foundationColor,
             contour = contour.coerceIn(0f, 1f),
             underEye = underEye.coerceIn(0f, 1f),
             brightenEye = brightenEye.coerceIn(0f, 1f),

@@ -169,6 +169,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     MediaPhotoEditorTool.eyeliner: 0.0,
   };
   String _selectedLipColor = kMakeupLipColors.first;
+  String _selectedFoundationColor = kDefaultFoundationShadeHex;
   bool _catalogLoading = true;
   bool _filtersReady = false;
   bool _beautyEnabled = false;
@@ -763,11 +764,17 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       underEye: _photoAdjustments[MediaPhotoEditorTool.underEye] ?? 0,
       brightenEye: _photoAdjustments[MediaPhotoEditorTool.brightenEye] ?? 0,
       lipTint: _selectedLipColor,
+      foundationTint: _selectedFoundationColor,
     );
   }
 
   void _onLipColorSelected(String hex) {
     setState(() => _selectedLipColor = hex);
+    if (_useNativeArFilters) _syncMakeupToNative();
+  }
+
+  void _onFoundationColorSelected(String hex) {
+    setState(() => _selectedFoundationColor = hex);
     if (_useNativeArFilters) _syncMakeupToNative();
   }
 
@@ -808,6 +815,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
       );
       ArCameraBridge.clearMakeup();
       _selectedLipColor = kMakeupLipColors.first;
+      _selectedFoundationColor = kDefaultFoundationShadeHex;
     } else {
       unawaited(_applyBeauty(false));
     }
@@ -2147,6 +2155,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     );
   }
 
+
   Future<void> _flipCamera() async {
     _cancelCountdown();
     if (_useNativeArFilters) {
@@ -2918,6 +2927,8 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
                 _onArFilterIntensityChanged,
             photoEditorLipColor: _selectedLipColor,
             onPhotoEditorLipColorSelected: _onLipColorSelected,
+            photoEditorFoundationColor: _selectedFoundationColor,
+            onPhotoEditorFoundationColorSelected: _onFoundationColorSelected,
             timerEnabled: _timerEnabled,
             flashEnabled: _flashEnabled,
             isRecording: _isRecording,
@@ -3008,6 +3019,7 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
     );
   }
 
+
   Widget _buildCamerAwesomeBody(
     AppLocalizations l10n,
     List<CameraFilterPreset> filters,
@@ -3093,6 +3105,8 @@ class _AddPostCameraScreenState extends State<AddPostCameraScreen>
                     _onArFilterIntensityChanged,
                 photoEditorLipColor: _selectedLipColor,
                 onPhotoEditorLipColorSelected: _onLipColorSelected,
+                photoEditorFoundationColor: _selectedFoundationColor,
+                onPhotoEditorFoundationColorSelected: _onFoundationColorSelected,
                 timerEnabled: _timerEnabled,
                 flashEnabled: _flashEnabled,
                 isRecording: _isRecording,
