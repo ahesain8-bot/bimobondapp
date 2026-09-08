@@ -7,6 +7,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:bimobondapp/app/ar_camera/ar_camera_bridge.dart';
 
 import '../../../../core/constants/app_spacing.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../../live/data/repositories/camera_repository_impl.dart';
 import '../../../live/domain/repositories/camera_repository.dart';
 import '../../../live/domain/usecases/dispose_camera.dart';
@@ -26,6 +27,7 @@ import '../widgets/start_live/beautify_panel.dart';
 import '../widgets/start_live/effects_panel.dart';
 import '../widgets/start_live/live_container.dart';
 import '../widgets/start_live/live_start_topic_schedule.dart';
+import '../widgets/start_live/live_start_upcoming.dart';
 import '../widgets/start_live/options_row.dart';
 import '../widgets/start_live/settings_panel.dart';
 import '../widgets/start_live/status_bar_area.dart';
@@ -62,6 +64,17 @@ class _LiveStartPageState extends State<LiveStartPage>
   late final CameraRepository _cameraRepository;
   late final LiveBloc _liveBloc;
   bool _openingLive = false;
+  var _upcomingNonce = 0;
+  final GlobalKey _liveStartHostKey = GlobalKey();
+
+  /// Context under [BlocProvider] — [State.context] cannot read [LiveBloc].
+  BuildContext get _providedContext =>
+      _liveStartHostKey.currentContext ?? context;
+
+  void _onPlannedCreated() {
+    if (!mounted) return;
+    setState(() => _upcomingNonce++);
+  }
 
   bool get _useNativeChrome => ArLiveCameraPreview.isSupported;
 
@@ -112,9 +125,9 @@ class _LiveStartPageState extends State<LiveStartPage>
           _openFromNative(_openStartLiveInteractionSheet);
       ArCameraBridge.onLiveStartComingSoon = _showComingSoon;
       ArCameraBridge.onLiveStartAddTopic = () =>
-          _openFromNative(() => showLiveTopicDialog(context));
-      ArCameraBridge.onLiveStartSchedule = () =>
-          _openFromNative(() => showLiveSchedulePicker(context));
+          _openFromNative(() => showLiveTopicDialog(_providedContext));
+      ArCameraBridge.onLiveStartSchedule = _onNativeSchedule;
+      ArCameraBridge.onLiveStartChangeCover = _onNativeChangeCover;
       ArCameraBridge.onLiveStartMediaMode = _onNativeMediaMode;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _enableNativeChrome();
@@ -159,6 +172,7 @@ class _LiveStartPageState extends State<LiveStartPage>
         context,
         title: title.trim(),
         liveBloc: _liveBloc,
+        onPlannedCreated: _onPlannedCreated,
       );
       if (mounted && _useNativeChrome) {
         await _enableNativeChrome();
@@ -267,6 +281,7 @@ class _LiveStartPageState extends State<LiveStartPage>
       ArCameraBridge.onLiveStartComingSoon = null;
       ArCameraBridge.onLiveStartAddTopic = null;
       ArCameraBridge.onLiveStartSchedule = null;
+      ArCameraBridge.onLiveStartChangeCover = null;
       ArCameraBridge.onLiveStartMediaMode = null;
       ArCameraBridge.setLiveStartChrome(visible: false);
       ArCameraBridge.setLocalPreviewHidden(false);
@@ -365,12 +380,38 @@ class _LiveStartPageState extends State<LiveStartPage>
     ).showSnackBar(SnackBar(content: Text('$name coming soon')));
   }
 
+  /// Schedule → existing date/time picker. Never opens cover/image picking.
+  Future<void> _onNativeSchedule() {
+    return _openFromNative(() => showLiveSchedulePicker(_providedContext));
+  }
+
+  void _onNativeChangeCover() {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Change cover coming soon')),
+    );
+  }
+
   Future<void> _openFromNative(Future<void> Function() open) async {
     await _hideNativeChrome();
-    if (!mounted) return;
-    await open();
-    if (mounted && _useNativeChrome) {
-      await _enableNativeChrome();
+    var hiddenPreview = false;
+    try {
+      if (!mounted) return;
+      // FaceWarp GL paints above Flutter dialogs; hide it while the picker
+      // (or any other Flutter route) is on screen.
+      await ArCameraBridge.setLocalPreviewHidden(true);
+      hiddenPreview = true;
+      if (!mounted) return;
+      await open();
+    } finally {
+      if (hiddenPreview) {
+        try {
+          await ArCameraBridge.setLocalPreviewHidden(_isAudioMode);
+        } catch (_) {}
+      }
+      if (mounted && _useNativeChrome) {
+        await _enableNativeChrome();
+      }
     }
   }
 
@@ -383,11 +424,15 @@ class _LiveStartPageState extends State<LiveStartPage>
       return BlocProvider.value(
         value: _liveBloc,
         child: Scaffold(
+          key: _liveStartHostKey,
           backgroundColor: _reuseAr ? Colors.transparent : Colors.black,
           body: Stack(
             fit: StackFit.expand,
             children: [
               if (!_reuseAr) const Positioned.fill(child: CameraPreviewLayer()),
+              const Positioned.fill(
+                child: ColoredBox(color: Colors.transparent),
+              ),
               Positioned.fill(
                 child: BlocBuilder<LiveBloc, LiveState>(
                   buildWhen: (previous, current) {
@@ -441,6 +486,7 @@ class _LiveStartPageState extends State<LiveStartPage>
     return BlocProvider.value(
       value: _liveBloc,
       child: Scaffold(
+        key: _liveStartHostKey,
         backgroundColor: Colors.black,
         body: Stack(
           fit: StackFit.expand,
@@ -521,7 +567,36 @@ class _LiveStartPageState extends State<LiveStartPage>
                       onDualTap: () => _showComingSoon('Dual'),
                     ),
                     const SizedBox(height: AppSpacing.sm),
-                    LiveContainer(titleController: _titleController),
+                    LiveStartUpcomingLives(
+                      refreshNonce: _upcomingNonce,
+                      onGoLive: (live) async {
+                        final l10n = AppLocalizations.of(context)!;
+                        try {
+                          await startExistingPlannedLiveFromStart(
+                            context,
+                            live: live,
+                            liveBloc: _liveBloc,
+                          );
+                        } catch (e) {
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                '${l10n.liveCouldNotStartLive}: $e',
+                              ),
+                            ),
+                          );
+                        } finally {
+                          if (mounted) {
+                            setState(() => _upcomingNonce++);
+                          }
+                        }
+                      },
+                    ),
+                    LiveContainer(
+                      titleController: _titleController,
+                      onPlannedCreated: _onPlannedCreated,
+                    ),
                     const SizedBox(height: AppSpacing.sm),
                     const OptionsRow(),
                     const BottomTabs(),

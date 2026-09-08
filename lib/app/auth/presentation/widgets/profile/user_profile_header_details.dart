@@ -1,12 +1,15 @@
+import 'dart:async';
+
 import 'package:bimobondapp/app/auth/domain/entities/profile_enums.dart';
+import 'package:bimobondapp/app/auth/domain/entities/user_current_live.dart';
 import 'package:bimobondapp/app/auth/domain/entities/user_entity.dart';
-import 'package:bimobondapp/app/auth/presentation/widgets/profile/close_friends_sheet.dart';
 import 'package:bimobondapp/app/auth/presentation/widgets/profile/profile_links_sheet.dart';
 import 'package:bimobondapp/app/auth/presentation/widgets/profile/profile_verification_badge.dart';
 import 'package:bimobondapp/app/auth/presentation/widgets/profile/user_profile_stat_item.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_avatar_tap_handler.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_live_now_badge.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/stories/story_profile_avatar.dart';
+import 'package:bimobondapp/features/live_viewer/presentation/utils/open_profile_live.dart';
 import 'package:bimobondapp/app/social/presentation/widgets/profile_follow_button.dart';
 import 'package:bimobondapp/core/constants/profile_layout_constants.dart';
 import 'package:bimobondapp/core/utils/app_sizes.dart';
@@ -32,6 +35,7 @@ class UserProfileHeaderDetails extends StatelessWidget {
     required this.onOpenMessage,
     required this.onNavigateFollowers,
     required this.onNavigateFollowing,
+    this.onLiveClosed,
     super.key,
   });
 
@@ -49,6 +53,7 @@ class UserProfileHeaderDetails extends StatelessWidget {
   final VoidCallback onOpenMessage;
   final VoidCallback onNavigateFollowers;
   final VoidCallback onNavigateFollowing;
+  final VoidCallback? onLiveClosed;
 
   String _formatCount(int count) {
     if (count >= 1000000) {
@@ -71,23 +76,39 @@ class UserProfileHeaderDetails extends StatelessWidget {
         if (isLoadingUser && user == null)
           const SkeletonWidget.circular(size: 96)
         else
-          ProfileLiveNowBadge(
-            user: user,
-            child: StoryProfileAvatar(
-            userId: userId,
-            imageUrl: user?.avatarUrl,
-            radius: ProfileLayoutConstants.avatarRadius,
-            fallbackText: user?.username ?? username,
-            backgroundColor: theme.dividerColor.withValues(alpha: 0.08),
-            username: user?.username ?? username,
-            fullName: user?.fullName,
-            isFollowing: isFollowing,
-            onTap: () => handleProfileScreenAvatarTap(
-              context,
-              userId: userId,
-              avatarUrl: user?.avatarUrl,
-            ),
-          ),
+          Builder(
+            builder: (context) {
+              final profile = user;
+              return ProfileLiveNowBadge(
+                user: profile,
+                isOwnProfile: isSelf,
+                onReturned: onLiveClosed,
+                child: StoryProfileAvatar(
+                  userId: userId,
+                  imageUrl: profile?.avatarUrl,
+                  radius: ProfileLayoutConstants.avatarRadius,
+                  fallbackText: profile?.username ?? username,
+                  backgroundColor: theme.dividerColor.withValues(alpha: 0.08),
+                  username: profile?.username ?? username,
+                  fullName: profile?.fullName,
+                  isFollowing: isFollowing,
+                  onTap: profile != null && profile.showsProfileLiveBadge
+                      ? () => unawaited(
+                          openProfileCurrentLive(
+                            context,
+                            profile,
+                            isOwnProfile: isSelf,
+                            onReturned: onLiveClosed,
+                          ),
+                        )
+                      : () => handleProfileScreenAvatarTap(
+                          context,
+                          userId: userId,
+                          avatarUrl: profile?.avatarUrl,
+                        ),
+                ),
+              );
+            },
           ),
         const SizedBox(height: AppSizes.p12),
         if (isLoadingUser && user?.fullName == null)

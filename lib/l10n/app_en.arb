@@ -646,6 +646,23 @@
   },
   "liveCommentSample": "This property looks amazing!",
   "liveChatYou": "You",
+  "liveViewerJoined": "{name} joined the live",
+  "@liveViewerJoined": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "liveWelcomeViewer": "Welcome, {name}",
+  "@liveWelcomeViewer": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "liveViewerFallbackName": "Viewer",
   "liveSendGift": "Send Gift",
   "liveSelectGift": "Select a Gift",
   "liveSendToHost": "Send to Host",
@@ -2266,5 +2283,83 @@
   "lpValidation": "Check the budget mode, minimum 5 coins, duration (1, 3, 7 or 14 days), age order, and complete valid geographic coordinates with a positive radius.",
   "lpInteger": "Enter a whole number.",
   "lpNumber": "Enter a valid finite number.",
-  "lpClose": "Close promotions"
+  "lpClose": "Close promotions",
+  "liveUpcomingTitle": "Upcoming",
+  "liveScheduleLive": "Schedule LIVE",
+  "liveScheduling": "Scheduling…",
+  "liveScheduledFor": "Scheduled for {when}",
+  "@liveScheduledFor": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "liveScheduleMustBeFuture": "Schedule time must be in the future",
+  "liveScheduleCreated": "LIVE scheduled",
+  "liveCouldNotSchedule": "Could not schedule LIVE",
+  "liveCouldNotStartLive": "Could not start LIVE",
+  "liveReschedule": "Reschedule",
+  "liveClearScheduledTime": "Clear scheduled time",
+  "liveEditTitle": "Edit title",
+  "liveStartsSoon": "Starts soon",
+  "liveRemindMe": "Remind me",
+  "liveReminderSet": "Reminder set",
+  "liveScheduledDraft": "No start time",
+  "liveUpcomingEmpty": "No scheduled LIVEs",
+  "liveReview": "Review",
+  "liveSave": "Save",
+  "liveSwitchToVideo": "Switch to video",
+  "liveSwitchToAudio": "Switch to Voice Chat",
+  "liveLeave": "Leave",
+  "liveScheduledLive": "Scheduled LIVE",
+  "profileLiveBadge": "LIVE",
+  "liveChatComment": "Comment",
+  "liveChatSending": "Sending…",
+  "liveChatMuted": "Chat muted",
+  "liveChatMutedOnLive": "Your chat is muted on this live",
+  "liveChatMutedReason": "Chat muted: {reason}",
+  "@liveChatMutedReason": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "liveChatUnmuted": "Your chat was unmuted",
+  "liveChatRulesUpdated": "Chat rules updated",
+  "liveChatSlowModeEnabled": "Slow mode on: {seconds} seconds between comments",
+  "@liveChatSlowModeEnabled": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "liveChatSlowModeChanged": "Slow mode is now {seconds} seconds between comments",
+  "@liveChatSlowModeChanged": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "liveChatSlowModeDisabled": "Slow mode turned off",
+  "liveChatModeEveryone": "Chat is now open to everyone",
+  "liveChatModeFollowers": "Chat is now followers only",
+  "liveChatModeSubscribers": "Chat is now subscribers only",
+  "liveChatBlockedKeywordsUpdated": "Blocked keywords updated",
+  "liveChatFollowToComment": "Follow the host to comment",
+  "liveChatSubscribeToComment": "Join the fan club to comment",
+  "liveChatBlockedKeyword": "That comment contains a blocked word",
+  "liveChatSlowModeWait": "Wait {seconds}s",
+  "@liveChatSlowModeWait": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "liveChatSendFailed": "Couldn't send comment",
+  "liveChatDeleteFailed": "Couldn't delete comment"
 }

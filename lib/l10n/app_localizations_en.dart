@@ -1477,6 +1477,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get liveChatYou => 'You';
 
   @override
+  String liveViewerJoined(String name) {
+    return '$name joined the live';
+  }
+
+  @override
+  String liveWelcomeViewer(String name) {
+    return 'Welcome, $name';
+  }
+
+  @override
+  String get liveViewerFallbackName => 'Viewer';
+
+  @override
   String get liveSendGift => 'Send Gift';
 
   @override
@@ -5188,4 +5201,143 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get lpClose => 'Close promotions';
+
+  @override
+  String get liveUpcomingTitle => 'Upcoming';
+
+  @override
+  String get liveScheduleLive => 'Schedule LIVE';
+
+  @override
+  String get liveScheduling => 'Scheduling…';
+
+  @override
+  String liveScheduledFor(String when) {
+    return 'Scheduled for $when';
+  }
+
+  @override
+  String get liveScheduleMustBeFuture => 'Schedule time must be in the future';
+
+  @override
+  String get liveScheduleCreated => 'LIVE scheduled';
+
+  @override
+  String get liveCouldNotSchedule => 'Could not schedule LIVE';
+
+  @override
+  String get liveCouldNotStartLive => 'Could not start LIVE';
+
+  @override
+  String get liveReschedule => 'Reschedule';
+
+  @override
+  String get liveClearScheduledTime => 'Clear scheduled time';
+
+  @override
+  String get liveEditTitle => 'Edit title';
+
+  @override
+  String get liveStartsSoon => 'Starts soon';
+
+  @override
+  String get liveRemindMe => 'Remind me';
+
+  @override
+  String get liveReminderSet => 'Reminder set';
+
+  @override
+  String get liveScheduledDraft => 'No start time';
+
+  @override
+  String get liveUpcomingEmpty => 'No scheduled LIVEs';
+
+  @override
+  String get liveReview => 'Review';
+
+  @override
+  String get liveSave => 'Save';
+
+  @override
+  String get liveSwitchToVideo => 'Switch to video';
+
+  @override
+  String get liveSwitchToAudio => 'Switch to Voice Chat';
+
+  @override
+  String get liveLeave => 'Leave';
+
+  @override
+  String get liveScheduledLive => 'Scheduled LIVE';
+
+  @override
+  String get profileLiveBadge => 'LIVE';
+
+  @override
+  String get liveChatComment => 'Comment';
+
+  @override
+  String get liveChatSending => 'Sending…';
+
+  @override
+  String get liveChatMuted => 'Chat muted';
+
+  @override
+  String get liveChatMutedOnLive => 'Your chat is muted on this live';
+
+  @override
+  String liveChatMutedReason(String reason) {
+    return 'Chat muted: $reason';
+  }
+
+  @override
+  String get liveChatUnmuted => 'Your chat was unmuted';
+
+  @override
+  String get liveChatRulesUpdated => 'Chat rules updated';
+
+  @override
+  String liveChatSlowModeEnabled(int seconds) {
+    return 'Slow mode on: $seconds seconds between comments';
+  }
+
+  @override
+  String liveChatSlowModeChanged(int seconds) {
+    return 'Slow mode is now $seconds seconds between comments';
+  }
+
+  @override
+  String get liveChatSlowModeDisabled => 'Slow mode turned off';
+
+  @override
+  String get liveChatModeEveryone => 'Chat is now open to everyone';
+
+  @override
+  String get liveChatModeFollowers => 'Chat is now followers only';
+
+  @override
+  String get liveChatModeSubscribers => 'Chat is now subscribers only';
+
+  @override
+  String get liveChatBlockedKeywordsUpdated => 'Blocked keywords updated';
+
+  @override
+  String get liveChatFollowToComment => 'Follow the host to comment';
+
+  @override
+  String get liveChatSubscribeToComment => 'Join the fan club to comment';
+
+  @override
+  String get liveChatBlockedKeyword => 'That comment contains a blocked word';
+
+  @override
+  String liveChatSlowModeWait(int seconds) {
+    return 'Wait ${seconds}s';
+  }
+
+  @override
+  String get liveChatSendFailed => 'Couldn\'t send comment';
+
+  @override
+  String get liveChatDeleteFailed => 'Couldn\'t delete comment';
 }

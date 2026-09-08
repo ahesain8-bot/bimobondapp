@@ -11,7 +11,12 @@ class StartLiveSession {
     required String title,
     String mediaMode = 'VIDEO',
     String? topic,
+    String? existingLiveId,
   }) {
+    final liveId = existingLiveId?.trim();
+    if (liveId != null && liveId.isNotEmpty) {
+      return _repository.reconnectHostSession(liveId);
+    }
     return _repository.startHostSession(
       title: title,
       mediaMode: mediaMode,

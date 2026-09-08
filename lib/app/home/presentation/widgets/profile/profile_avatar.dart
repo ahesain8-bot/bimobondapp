@@ -1,9 +1,13 @@
+import 'dart:async';
+
+import 'package:bimobondapp/app/auth/domain/entities/user_current_live.dart';
 import 'package:bimobondapp/app/auth/domain/entities/user_entity.dart';
 import 'package:bimobondapp/app/home/presentation/utils/story_flow.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_avatar_tap_handler.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/profile/profile_live_now_badge.dart';
 import 'package:bimobondapp/app/home/presentation/widgets/stories/story_profile_avatar.dart';
 import 'package:bimobondapp/core/constants/profile_layout_constants.dart';
+import 'package:bimobondapp/features/live_viewer/presentation/utils/open_profile_live.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -28,6 +32,7 @@ class ProfileAvatar extends StatelessWidget {
 
     return ProfileLiveNowBadge(
       user: user,
+      isOwnProfile: true,
       child: Stack(
       clipBehavior: Clip.none,
       children: [
@@ -46,11 +51,19 @@ class ProfileAvatar extends StatelessWidget {
             username: user.username,
             fullName: user.fullName,
             isOnline: user.isOnline == true,
-            onTap: () => handleProfileScreenAvatarTap(
-              context,
-              userId: user.id,
-              avatarUrl: user.avatarUrl,
-            ),
+            onTap: user.showsProfileLiveBadge
+                ? () => unawaited(
+                    openProfileCurrentLive(
+                      context,
+                      user,
+                      isOwnProfile: true,
+                    ),
+                  )
+                : () => handleProfileScreenAvatarTap(
+                    context,
+                    userId: user.id,
+                    avatarUrl: user.avatarUrl,
+                  ),
           ),
 
         ),

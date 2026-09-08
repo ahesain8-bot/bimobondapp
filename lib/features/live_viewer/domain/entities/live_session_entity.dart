@@ -14,6 +14,7 @@ enum LiveConnectionState {
   banned,
   error,
   empty,
+  scheduled,
 }
 
 extension LiveConnectionStateX on LiveConnectionState {
@@ -48,6 +49,8 @@ extension LiveConnectionStateX on LiveConnectionState {
         return 'Something went wrong';
       case LiveConnectionState.empty:
         return 'Live not found';
+      case LiveConnectionState.scheduled:
+        return '';
     }
   }
 }

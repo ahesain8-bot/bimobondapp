@@ -5,6 +5,7 @@ import '../../../domain/entities/comment_entity.dart';
 import '../../../domain/entities/gift_entity.dart';
 import '../../../domain/entities/live_entity.dart';
 import '../../../domain/entities/live_session_entity.dart';
+import '../../../domain/live_chat_rules.dart';
 import '../../../domain/repositories/guest_repository.dart';
 import '../../../../../core/models/live_battle.dart';
 
@@ -34,6 +35,9 @@ class LiveViewerState extends Equatable {
   final CommentEntity? pinnedComment;
   final bool chatMuted;
   final String? moderationBanner;
+  final LiveChatNotice? chatNotice;
+  /// Local cooldown after a successful viewer send. Backend remains authority.
+  final DateTime? slowModeUntil;
   final String? currentUserId;
   final Set<String> bannedUserIds;
   final Set<String> mutedUserIds;
@@ -73,6 +77,7 @@ class LiveViewerState extends Equatable {
   final String? reportFeedback;
   /// Viewer must enter DOB before join on an `ageRestricted` live.
   final bool needsDateOfBirth;
+  final bool reminderSet;
 
   const LiveViewerState({
     this.session,
@@ -90,6 +95,8 @@ class LiveViewerState extends Equatable {
     this.pinnedComment,
     this.chatMuted = false,
     this.moderationBanner,
+    this.chatNotice,
+    this.slowModeUntil,
     this.currentUserId,
     this.bannedUserIds = const {},
     this.mutedUserIds = const {},
@@ -107,6 +114,7 @@ class LiveViewerState extends Equatable {
     this.isReporting = false,
     this.reportFeedback,
     this.needsDateOfBirth = false,
+    this.reminderSet = false,
   });
 
   /// Guests actually publishing right now — what the stage renders.
@@ -117,6 +125,27 @@ class LiveViewerState extends Equatable {
       session?.connectionState ?? LiveConnectionState.idle;
 
   LiveEntity? get live => session?.live;
+
+  LiveChatRules get chatRules => LiveChatRules.fromLive(live);
+
+  bool get isViewerHost {
+    final uid = currentUserId;
+    final hostId = live?.hostId;
+    return uid != null && hostId != null && uid.isNotEmpty && uid == hostId;
+  }
+
+  bool? get isFanClubMember => LiveChatRules.fanClubMemberFrom(live?.metadata);
+
+  LiveChatComposerStatus composerStatus({DateTime? now}) {
+    return chatRules.composerStatus(
+      chatMuted: chatMuted,
+      isHost: isViewerHost,
+      isFollowing: live?.isFollowing ?? false,
+      isFanClubMember: isFanClubMember,
+      slowModeUntil: slowModeUntil,
+      now: now,
+    );
+  }
 
   /// PK is server-authoritative. A stale `isPk`/`battle` field in live
   /// metadata must never turn an accepted guest into the battle UI.
@@ -142,6 +171,8 @@ class LiveViewerState extends Equatable {
     bool? chatMuted,
     String? moderationBanner,
     bool clearModerationBanner = false,
+    Object? chatNotice = _unset,
+    Object? slowModeUntil = _unset,
     String? currentUserId,
     Set<String>? bannedUserIds,
     Set<String>? mutedUserIds,
@@ -162,6 +193,7 @@ class LiveViewerState extends Equatable {
     bool? isReporting,
     Object? reportFeedback = _unset,
     bool? needsDateOfBirth,
+    bool? reminderSet,
   }) {
     return LiveViewerState(
       session: session ?? this.session,
@@ -188,6 +220,12 @@ class LiveViewerState extends Equatable {
       moderationBanner: clearModerationBanner
           ? null
           : (moderationBanner ?? this.moderationBanner),
+      chatNotice: identical(chatNotice, _unset)
+          ? this.chatNotice
+          : chatNotice as LiveChatNotice?,
+      slowModeUntil: identical(slowModeUntil, _unset)
+          ? this.slowModeUntil
+          : slowModeUntil as DateTime?,
       currentUserId: currentUserId ?? this.currentUserId,
       bannedUserIds: bannedUserIds ?? this.bannedUserIds,
       mutedUserIds: mutedUserIds ?? this.mutedUserIds,
@@ -217,6 +255,7 @@ class LiveViewerState extends Equatable {
           ? this.reportFeedback
           : reportFeedback as String?,
       needsDateOfBirth: needsDateOfBirth ?? this.needsDateOfBirth,
+      reminderSet: reminderSet ?? this.reminderSet,
     );
   }
 
@@ -237,6 +276,8 @@ class LiveViewerState extends Equatable {
     pinnedComment,
     chatMuted,
     moderationBanner,
+    chatNotice,
+    slowModeUntil,
     currentUserId,
     bannedUserIds,
     mutedUserIds,
@@ -254,6 +295,7 @@ class LiveViewerState extends Equatable {
     isReporting,
     reportFeedback,
     needsDateOfBirth,
+    reminderSet,
   ];
 }
 

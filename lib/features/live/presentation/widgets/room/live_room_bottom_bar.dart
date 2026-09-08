@@ -102,7 +102,8 @@ class _CommentSlot extends StatelessWidget {
         }
         return previous.isChatComposerVisible !=
                 current.isChatComposerVisible ||
-            previous.isSendingChat != current.isSendingChat;
+            previous.isSendingChat != current.isSendingChat ||
+            previous.chatComposerPrefill != current.chatComposerPrefill;
       },
       builder: (context, state) {
         final bloc = context.read<LiveRoomBloc>();
@@ -114,9 +115,11 @@ class _CommentSlot extends StatelessWidget {
         return Align(
           alignment: Alignment.bottomCenter,
           child: CommentInputBar(
+            key: ValueKey(state.chatComposerPrefill ?? 'composer'),
             // Matches the viewer, so the pill and the field it opens into
             // read the same on both sides of the stream.
             hintText: 'Comment',
+            initialText: state.chatComposerPrefill,
             isSending: state.isSendingChat,
             onSend: (text) => bloc.add(LiveRoomChatMessageSubmitted(text)),
             onDismiss: () => bloc.add(const LiveRoomChatComposerClosed()),

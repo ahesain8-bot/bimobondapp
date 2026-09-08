@@ -18,7 +18,10 @@ import '../../../domain/entities/live_chat_feed_merge.dart';
 import '../../../domain/entities/live_guest.dart';
 import '../../../domain/entities/live_chat_message.dart';
 import '../../../domain/entities/live_host.dart';
+import '../../../domain/entities/live_host_outbound_pause_plan.dart';
 import '../../../domain/entities/live_scene.dart';
+import '../../../domain/live_viewer_ban_state.dart';
+import '../../../domain/live_viewer_display_name.dart';
 import '../../../domain/entities/live_session.dart';
 import '../../../domain/repositories/live_session_repository.dart';
 import '../../../domain/usecases/dispose_camera.dart';
@@ -72,6 +75,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     on<LiveRoomAppPaused>(_onAppPaused);
     on<LiveRoomAppResumed>(_onAppResumed);
     on<LiveRoomChatTapped>(_onChatTapped);
+    on<LiveRoomChatPrefillRequested>(_onChatPrefillRequested);
     on<LiveRoomChatComposerClosed>(_onChatComposerClosed);
     on<LiveRoomChatMessageSubmitted>(_onChatMessageSubmitted);
     on<LiveRoomShareTapped>(_onUiAction);
@@ -165,6 +169,9 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
   var _appPaused = false;
   var _closing = false;
 
+  /// Captured at Pause so Resume restores the same sources (not a new scene).
+  LiveHostOutboundPausePlan? _pausedMediaPlan;
+
   /// Android: FaceWarp owns CameraX; LiveKit publishes beauty frames.
   var _useArBeautyCamera = false;
 
@@ -191,6 +198,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     emit(const LiveRoomLoading());
     _sessionTeardownDone = false;
     _cameraOpInFlight = false;
+    _pausedMediaPlan = null;
     final audioOnly = LiveMediaMode.isAudio(mediaMode: event.mediaMode);
     _useArBeautyCamera = event.useArBeautyCamera && !audioOnly;
     if (_useArBeautyCamera) {
@@ -219,6 +227,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
       title: title,
       mediaMode: LiveMediaMode.normalize(event.mediaMode),
       topic: event.topic,
+      existingLiveId: event.existingLiveId,
     );
 
     final controller = await cameraFuture;
@@ -265,16 +274,20 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         return;
       }
       final conflict = e is ApiException && _isActiveLiveConflict(e);
-      if (conflict) {
+      final startingExisting =
+          event.existingLiveId != null && event.existingLiveId!.trim().isNotEmpty;
+      if (conflict || startingExisting) {
         if (controller != null) await _disposeCamera(controller);
         emit(
           LiveRoomFailure(
-            message:
-                'لديك بث مباشر نشط بالفعل. أنهِه قبل بدء بث جديد، أو استأنف البث الحالي.',
-            isActiveLiveConflict: true,
+            message: conflict
+                ? 'لديك بث مباشر نشط بالفعل. أنهِه قبل بدء بث جديد، أو استأنف البث الحالي.'
+                : e.toString(),
+            isActiveLiveConflict: conflict,
             pendingTitle: title,
             pendingTopic: event.topic,
             pendingMediaMode: event.mediaMode,
+            pendingExistingLiveId: event.existingLiveId,
           ),
         );
         return;
@@ -331,6 +344,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         pendingTitle: failure.pendingTitle,
         pendingTopic: failure.pendingTopic,
         pendingMediaMode: failure.pendingMediaMode,
+        pendingExistingLiveId: failure.pendingExistingLiveId,
         isRecovering: true,
       ),
     );
@@ -349,6 +363,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
           pendingTitle: failure.pendingTitle,
           pendingTopic: failure.pendingTopic,
           pendingMediaMode: failure.pendingMediaMode,
+          pendingExistingLiveId: failure.pendingExistingLiveId,
         ),
       );
       return;
@@ -361,6 +376,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
           pendingTitle: failure.pendingTitle,
           pendingTopic: failure.pendingTopic,
           pendingMediaMode: failure.pendingMediaMode,
+          pendingExistingLiveId: failure.pendingExistingLiveId,
         ),
       );
       return;
@@ -372,6 +388,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         title: failure.pendingTitle,
         topic: failure.pendingTopic,
         mediaMode: failure.pendingMediaMode ?? 'VIDEO',
+        existingLiveId: failure.pendingExistingLiveId,
       ),
     );
   }
@@ -394,6 +411,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         pendingTitle: failure.pendingTitle,
         pendingTopic: failure.pendingTopic,
         pendingMediaMode: failure.pendingMediaMode,
+        pendingExistingLiveId: failure.pendingExistingLiveId,
         isRecovering: true,
       ),
     );
@@ -408,6 +426,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
             pendingTitle: failure.pendingTitle,
             pendingTopic: failure.pendingTopic,
             pendingMediaMode: failure.pendingMediaMode,
+          pendingExistingLiveId: failure.pendingExistingLiveId,
           ),
         );
         return;
@@ -452,6 +471,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
           pendingTitle: failure.pendingTitle,
           pendingTopic: failure.pendingTopic,
           pendingMediaMode: failure.pendingMediaMode,
+          pendingExistingLiveId: failure.pendingExistingLiveId,
         ),
       );
     } catch (e) {
@@ -463,6 +483,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
           pendingTitle: failure.pendingTitle,
           pendingTopic: failure.pendingTopic,
           pendingMediaMode: failure.pendingMediaMode,
+          pendingExistingLiveId: failure.pendingExistingLiveId,
         ),
       );
     }
@@ -973,7 +994,28 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
   void _onChatTapped(LiveRoomChatTapped event, Emitter<LiveRoomState> emit) {
     final current = _readyOrNull;
     if (current == null) return;
-    emit(current.copyWith(isChatComposerVisible: true));
+    emit(
+      current.copyWith(
+        isChatComposerVisible: true,
+        clearChatComposerPrefill: true,
+      ),
+    );
+  }
+
+  void _onChatPrefillRequested(
+    LiveRoomChatPrefillRequested event,
+    Emitter<LiveRoomState> emit,
+  ) {
+    final current = _readyOrNull;
+    if (current == null) return;
+    final text = event.text.trim();
+    if (text.isEmpty) return;
+    emit(
+      current.copyWith(
+        isChatComposerVisible: true,
+        chatComposerPrefill: text,
+      ),
+    );
   }
 
   void _onChatComposerClosed(
@@ -982,7 +1024,12 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
   ) {
     final current = _readyOrNull;
     if (current == null) return;
-    emit(current.copyWith(isChatComposerVisible: false));
+    emit(
+      current.copyWith(
+        isChatComposerVisible: false,
+        clearChatComposerPrefill: true,
+      ),
+    );
   }
 
   Future<void> _onChatMessageSubmitted(
@@ -1011,6 +1058,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
           session: ready.session.copyWith(messages: messages),
           isSendingChat: false,
           isChatComposerVisible: false,
+          clearChatComposerPrefill: true,
         ),
       );
     } on ApiException catch (e) {
@@ -1066,6 +1114,29 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     if (value is int) return value;
     if (value is num) return value.toInt();
     return int.tryParse(value.toString());
+  }
+
+  LiveRoomReady _withViewerBanState(
+    LiveRoomReady current, {
+    required String? userId,
+    required bool banned,
+    String? displayName,
+    String? actionMessage,
+  }) {
+    return current.copyWith(
+      bannedUserIds: applyLiveViewerBanState(
+        current: current.bannedUserIds,
+        userId: userId,
+        banned: banned,
+      ),
+      bannedViewerNames: applyLiveViewerBanName(
+        current: current.bannedViewerNames,
+        userId: userId,
+        banned: banned,
+        displayName: displayName,
+      ),
+      actionMessage: actionMessage ?? current.actionMessage,
+    );
   }
 
   String _moderationMessage(String type) {
@@ -1817,7 +1888,30 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
             return;
           }
           await _sessionRepository.banViewer(liveId: liveId, userId: userId);
-          emit(current.copyWith(actionMessage: 'تم حظر المشاهد من البث'));
+          emit(
+            _withViewerBanState(
+              current,
+              userId: userId,
+              banned: true,
+              displayName: event.username,
+              actionMessage: 'تم حظر المشاهد من البث',
+            ),
+          );
+        case LiveRoomModerationAction.unbanViewer:
+          final userId = event.userId;
+          if (userId == null || userId.isEmpty) {
+            emit(current.copyWith(actionMessage: 'لا يوجد معرف مستخدم'));
+            return;
+          }
+          await _sessionRepository.unbanViewer(liveId: liveId, userId: userId);
+          emit(
+            _withViewerBanState(
+              current,
+              userId: userId,
+              banned: false,
+              actionMessage: 'تم إلغاء حظر المشاهد',
+            ),
+          );
         case LiveRoomModerationAction.assignModerator:
           final userId = event.userId;
           if (userId == null || userId.isEmpty) {
@@ -1981,7 +2075,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
             ),
           ),
         );
-      case LiveHudModerationEvent(:final type, :final chatRules):
+      case LiveHudModerationEvent(:final type, :final userId, :final chatRules):
         var session = current.session;
         if (type == 'chat_rules_updated' && chatRules != null) {
           final keywords = chatRules['blockedKeywords'];
@@ -1998,12 +2092,17 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
                 : session.blockedKeywords,
           );
         }
-        emit(
-          current.copyWith(
-            session: session,
-            actionMessage: _moderationMessage(type),
-          ),
+        final next = current.copyWith(
+          session: session,
+          actionMessage: _moderationMessage(type),
         );
+        if (type == 'viewer_banned') {
+          emit(_withViewerBanState(next, userId: userId, banned: true));
+        } else if (type == 'viewer_unbanned') {
+          emit(_withViewerBanState(next, userId: userId, banned: false));
+        } else {
+          emit(next);
+        }
       case LiveHudViewersEvent(:final viewers):
         emit(
           current.copyWith(
@@ -2015,7 +2114,10 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         :final username,
         :final viewers,
       ):
-        if (userId == current.session.host.id) {
+        if (!shouldInsertLiveJoinSystemMessage(
+          joinerId: userId,
+          skipUserId: current.session.host.id,
+        )) {
           if (viewers != null) {
             emit(
               current.copyWith(
@@ -2025,12 +2127,11 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
           }
           return;
         }
-        final joinText = '$username انضم';
         final messages = [
           ...current.session.messages,
           LiveChatMessage(
             id: 'join-$userId-${DateTime.now().microsecondsSinceEpoch}',
-            text: joinText,
+            text: username,
             userId: userId,
             username: username,
             isJoinEvent: true,
@@ -2303,6 +2404,25 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
           );
           return;
         }
+        if (current.isLivePaused) {
+          final stall = (event.event.reason ?? '').contains(
+            'outbound_video_stalled',
+          );
+          if (stall) {
+            debugPrint(
+              '[Host] ignoring outbound stall during live pause — stay in live_${current.session.id}',
+            );
+            return;
+          }
+          debugPrint(
+            '[Host] media disconnected during live pause — defer recover until resume',
+          );
+          _mediaConnectedAt = null;
+          emit(
+            current.copyWith(isMediaConnected: false, localVideoTrack: null),
+          );
+          return;
+        }
         _mediaConnectedAt = null;
         emit(current.copyWith(isMediaConnected: false, localVideoTrack: null));
         if (!_appPaused) {
@@ -2319,12 +2439,16 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
   /// permanent after token expiry or a failed ICE restart.
   Future<void> _recoverHostMedia(
     String liveId,
-    Emitter<LiveRoomState> emit,
-  ) async {
+    Emitter<LiveRoomState> emit, {
+    bool evenIfPaused = false,
+  }) async {
     if (_mediaRecoveryInFlight ||
         _sessionTeardownDone ||
         _appPaused ||
         _closing) {
+      return;
+    }
+    if (!evenIfPaused && (_readyOrNull?.isLivePaused ?? false)) {
       return;
     }
     _mediaRecoveryInFlight = true;
@@ -2508,6 +2632,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
   ) async {
     final current = _readyOrNull;
     if (current == null || _cameraOpInFlight) return;
+    if (current.isLivePaused) return;
     if (current.session.isAudioOnly) return;
     _cameraOpInFlight = true;
     final nextIsFront = !current.isFrontCamera;
@@ -2660,6 +2785,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
   ) async {
     final current = _readyOrNull;
     if (current == null || current.session.isAudioOnly) return;
+    if (current.isLivePaused) return;
     if (_cameraOpInFlight) return;
     final liveId = current.session.id;
     if (liveId.isEmpty) return;
@@ -2911,7 +3037,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     if (current == null) return;
     final next = !current.isMicMuted;
     emit(current.copyWith(isMicMuted: next));
-    if (current.isMediaConnected) {
+    if (current.isMediaConnected && !current.isLivePaused) {
       await _sessionRepository.setMicrophoneEnabled(!next);
     }
   }
@@ -2992,22 +3118,141 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         !current.session.isLive) {
       return;
     }
+    if (_cameraOpInFlight) return;
+    if (event.pause == current.isLivePaused) return;
 
     emit(current.copyWith(isPauseActionBusy: true, clearActionMessage: true));
+    _cameraOpInFlight = true;
     try {
-      final paused = current.isLivePaused
-          ? await _pauseLiveSession.resume(current.session.id)
-          : await _pauseLiveSession.pause(current.session.id);
+      if (event.pause) {
+        await _applyLivePause(current, emit);
+      } else {
+        await _applyLiveResume(current, emit);
+      }
+    } finally {
+      _cameraOpInFlight = false;
+      if (!isClosed) {
+        final ready = _readyOrNull;
+        if (ready != null && ready.isPauseActionBusy) {
+          emit(ready.copyWith(isPauseActionBusy: false));
+        }
+      }
+    }
+  }
+
+  Future<void> _applyLivePause(
+    LiveRoomReady current,
+    Emitter<LiveRoomState> emit,
+  ) async {
+    final plan = LiveHostOutboundPausePlan.fromSession(
+      isAudioOnly: current.session.isAudioOnly,
+      scene: current.session.scene,
+      micWasEnabled: !current.isMicMuted,
+    );
+    var mediaApplied = false;
+    try {
+      await _sessionRepository.pauseHostOutboundMedia(plan);
+      mediaApplied = true;
+      final paused = await _pauseLiveSession.pause(current.session.id);
       if (isClosed) return;
-      final ready = _readyOrNull;
-      if (ready == null) return;
+      if (!paused) {
+        await _sessionRepository.resumeHostOutboundMedia(plan);
+        emit(
+          (_readyOrNull ?? current).copyWith(
+            isPauseActionBusy: false,
+            actionMessage: 'تعذر إيقاف البث مؤقتاً',
+          ),
+        );
+        return;
+      }
+      _pausedMediaPlan = plan;
       emit(
-        ready.copyWith(
+        (_readyOrNull ?? current).copyWith(
           isPauseActionBusy: false,
-          session: ready.session.copyWith(paused: paused),
+          session: (_readyOrNull ?? current).session.copyWith(paused: true),
         ),
       );
     } on ApiException catch (e) {
+      if (mediaApplied) {
+        try {
+          await _sessionRepository.resumeHostOutboundMedia(plan);
+        } catch (_) {}
+      }
+      _pausedMediaPlan = null;
+      if (!isClosed) {
+        emit(
+          (_readyOrNull ?? current).copyWith(
+            isPauseActionBusy: false,
+            actionMessage: e.message,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mediaApplied) {
+        try {
+          await _sessionRepository.resumeHostOutboundMedia(plan);
+        } catch (_) {}
+      }
+      _pausedMediaPlan = null;
+      if (!isClosed) {
+        emit(
+          (_readyOrNull ?? current).copyWith(
+            isPauseActionBusy: false,
+            actionMessage: 'تعذر إيقاف البث مؤقتاً',
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _applyLiveResume(
+    LiveRoomReady current,
+    Emitter<LiveRoomState> emit,
+  ) async {
+    final stored = _pausedMediaPlan;
+    final plan = (stored ??
+            LiveHostOutboundPausePlan.fromSession(
+              isAudioOnly: current.session.isAudioOnly,
+              scene: current.session.scene,
+              micWasEnabled: !current.isMicMuted,
+            ))
+        .copyWith(restoreMicrophone: !current.isMicMuted);
+    try {
+      var ready = _readyOrNull ?? current;
+      if (!ready.isMediaConnected) {
+        await _recoverHostMedia(
+          ready.session.id,
+          emit,
+          evenIfPaused: true,
+        );
+        ready = _readyOrNull ?? ready;
+      }
+      await _sessionRepository.resumeHostOutboundMedia(plan);
+      final paused = await _pauseLiveSession.resume(current.session.id);
+      if (isClosed) return;
+      if (paused) {
+        try {
+          await _sessionRepository.pauseHostOutboundMedia(plan);
+        } catch (_) {}
+        emit(
+          (_readyOrNull ?? current).copyWith(
+            isPauseActionBusy: false,
+            actionMessage: 'تعذر استئناف البث',
+          ),
+        );
+        return;
+      }
+      _pausedMediaPlan = null;
+      emit(
+        (_readyOrNull ?? current).copyWith(
+          isPauseActionBusy: false,
+          session: (_readyOrNull ?? current).session.copyWith(paused: false),
+        ),
+      );
+    } on ApiException catch (e) {
+      try {
+        await _sessionRepository.pauseHostOutboundMedia(plan);
+      } catch (_) {}
       if (!isClosed) {
         emit(
           (_readyOrNull ?? current).copyWith(
@@ -3021,7 +3266,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         emit(
           (_readyOrNull ?? current).copyWith(
             isPauseActionBusy: false,
-            actionMessage: e.toString(),
+            actionMessage: 'تعذر استئناف البث',
           ),
         );
       }

@@ -9,6 +9,7 @@ import '../../../../core/models/live_media_hints.dart';
 import '../../domain/entities/live_chat_message.dart';
 import '../../domain/entities/live_gallery_item.dart';
 import '../../domain/entities/live_guest.dart';
+import '../../domain/entities/live_host_outbound_pause_plan.dart';
 import '../../domain/entities/live_house.dart';
 import '../../domain/entities/live_leaderboard_entry.dart';
 import '../../domain/entities/live_moderator.dart';
@@ -17,6 +18,7 @@ import '../../domain/entities/live_session.dart';
 import '../../domain/entities/live_share_result.dart';
 import '../../domain/entities/live_studio.dart';
 import '../../../../core/models/live_topic.dart';
+import '../../domain/live_planned_scheduling.dart';
 import '../../domain/repositories/live_session_repository.dart';
 import '../datasources/lives_media_datasource.dart';
 import '../datasources/lives_remote_datasource.dart';
@@ -149,7 +151,7 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
     final normalized = LiveTopic.normalize(topic);
     final response = await _remote.createPlanned(
       title: trimmed,
-      scheduledAt: LiveSchedule.toUtcIso(scheduledAt),
+      scheduledAt: scheduledAt,
       mediaMode: mediaMode,
       topic: normalized,
     );
@@ -218,6 +220,59 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
   }
 
   @override
+  Future<List<LiveSession>> listPlannedHostLives({
+    int page = 1,
+    int limit = 50,
+  }) async {
+    final json = await _remote.mine(page: page, limit: limit);
+    return LivePlannedScheduling.plannedMapsFromMinePayload(json)
+        .map(LiveSessionMapper.fromLiveJson)
+        .toList(growable: false);
+  }
+
+  @override
+  Future<LiveSession> updatePlannedLive({
+    required String liveId,
+    String? title,
+    String? topic,
+    String? mediaMode,
+    DateTime? scheduledAt,
+    bool clearScheduledAt = false,
+  }) async {
+    Map<String, dynamic> live;
+    if (clearScheduledAt) {
+      live = await _remote.updateLive(
+        liveId,
+        title: title,
+        topic: topic,
+        mediaMode: mediaMode,
+        scheduledAt: null,
+      );
+    } else if (scheduledAt != null) {
+      live = await _remote.updateLive(
+        liveId,
+        title: title,
+        topic: topic,
+        mediaMode: mediaMode,
+        scheduledAt: scheduledAt,
+      );
+    } else {
+      live = await _remote.updateLive(
+        liveId,
+        title: title,
+        topic: topic,
+        mediaMode: mediaMode,
+      );
+    }
+    final map = (live['id'] != null)
+        ? live
+        : (live['live'] as Map<String, dynamic>? ??
+              live['data'] as Map<String, dynamic>? ??
+              live);
+    return LiveSessionMapper.fromLiveJson(map);
+  }
+
+  @override
   Future<LiveSession?> findActiveHostLive() async {
     final json = await _remote.mine(limit: 50);
     final raw = json['data'];
@@ -253,6 +308,17 @@ class LiveSessionRepositoryImpl implements LiveSessionRepository {
     final json = await _remote.resume(liveId);
     return _pausedFromResponse(json);
   }
+
+  @override
+  Future<void> pauseHostOutboundMedia(LiveHostOutboundPausePlan plan) =>
+      _media.pauseHostOutboundMedia(plan);
+
+  @override
+  Future<void> resumeHostOutboundMedia(LiveHostOutboundPausePlan plan) =>
+      _media.resumeHostOutboundMedia(plan);
+
+  @override
+  bool get isHostOutboundMediaPaused => _media.isHostSessionMediaPaused;
 
   @override
   Future<LiveStudio?> loadStudio(String liveId) async {

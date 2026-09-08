@@ -102,6 +102,9 @@ abstract class LiveRepository {
     String? channel,
   });
 
+  /// POST /lives/:id/remind — viewer reminder; host cannot remind self.
+  Future<Either<Failure, void>> remindLive(String liveId);
+
   /// GET /lives/:id/moderators
   Future<Either<Failure, List<LiveModerator>>> listModerators(String liveId);
 }

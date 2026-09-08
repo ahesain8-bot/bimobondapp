@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:cached_network_image/cached_network_image.dart';
@@ -25,6 +26,9 @@ import '../../../live/presentation/bloc/live_interactive/live_interactive_event.
 import '../bloc/live_viewer/live_viewer_bloc.dart';
 import '../bloc/live_viewer/live_viewer_event.dart';
 import '../bloc/live_viewer/live_viewer_state.dart';
+import '../utils/live_chat_l10n.dart';
+import '../../../../l10n/app_localizations.dart';
+import '../../domain/live_chat_rules.dart';
 import 'comment_input_bar.dart';
 import 'comments_section.dart';
 import 'fallback_media.dart';
@@ -40,6 +44,7 @@ import 'live_interactive_viewer_panel.dart';
 import 'viewer_stage.dart';
 import 'guest_stage_prompt.dart';
 import 'league_overlay.dart';
+import 'live_scheduled_countdown_overlay.dart';
 import 'live_state_overlay.dart';
 import 'live_video_player.dart';
 import 'multi_guest_grid.dart';
@@ -1279,9 +1284,16 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
               if (widget.isActive && isThisRoom)
                 BlocBuilder<LiveViewerBloc, LiveViewerState>(
                   buildWhen: (prev, curr) =>
-                      prev.moderationBanner != curr.moderationBanner,
+                      prev.moderationBanner != curr.moderationBanner ||
+                      prev.chatNotice != curr.chatNotice,
                   builder: (context, state) {
-                    final banner = state.moderationBanner;
+                    final l10n =
+                        AppLocalizations.of(context) ??
+                        lookupAppLocalizations(const Locale('en'));
+                    final notice = state.chatNotice;
+                    final banner = notice != null
+                        ? liveChatNoticeText(l10n, notice)
+                        : state.moderationBanner;
                     if (banner == null || banner.isEmpty) {
                       return const SizedBox.shrink();
                     }
@@ -1334,15 +1346,20 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                         prev.chatMuted != curr.chatMuted ||
                         prev.isCommentSending != curr.isCommentSending ||
                         prev.isOnStage != curr.isOnStage ||
+                        prev.slowModeUntil != curr.slowModeUntil ||
+                        prev.live?.isFollowing != curr.live?.isFollowing ||
+                        pm?['chatMode'] != cm?['chatMode'] ||
+                        pm?['slowModeSeconds'] != cm?['slowModeSeconds'] ||
+                        pm?['blockedKeywords'] != cm?['blockedKeywords'] ||
                         pShare != cShare;
                   },
                   builder: (context, state) {
-                    final chatMuted = isThisRoom ? state.chatMuted : false;
+                    final l10n =
+                        AppLocalizations.of(context) ??
+                        lookupAppLocalizations(const Locale('en'));
                     final isCommentSending = isThisRoom
                         ? state.isCommentSending
                         : false;
-                    // No stand-in count: the share glyph stays bare until the
-                    // room actually reports one.
                     final shareCount = isThisRoom
                         ? (state.live?.metadata?['shareCount'] as int?)
                         : (live.metadata?['shareCount'] as int?);
@@ -1351,17 +1368,37 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                         isThisRoom &&
                         !state.isOnStage &&
                         !live.paused;
+                    return _SlowModeTicker(
+                      until: isThisRoom ? state.slowModeUntil : null,
+                      builder: (context) {
+                    final status = isThisRoom
+                        ? state.composerStatus()
+                        : const LiveChatComposerStatus.allowed();
+                    final composerEnabled =
+                        connected && status.canSend && !isCommentSending;
+                    final hint = liveChatComposerHint(
+                      l10n,
+                      status,
+                      sending: isCommentSending,
+                    );
                     return TikTokLiveBottomBar(
                       onTypeTap: () {
-                        if (chatMuted) {
+                        if (!status.canSend) {
+                          final message = liveChatComposerHint(
+                            l10n,
+                            status,
+                            sending: false,
+                          );
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Your chat is muted on this live'),
+                            SnackBar(
+                              content: Text(message),
                               backgroundColor: AppColors.surface,
                               behavior: SnackBarBehavior.floating,
                             ),
                           );
-                          return;
+                          if (status.block != LiveChatComposerBlock.slowMode) {
+                            return;
+                          }
                         }
                         setState(() => _showComposer = true);
                       },
@@ -1382,7 +1419,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                         }
                       },
                       onQuickReact: (text) {
-                        if (!widget.isActive || chatMuted) return;
+                        if (!widget.isActive || !status.canSend) return;
                         context.read<LiveViewerBloc>().add(
                           LiveViewerCommentSent(text),
                         );
@@ -1406,19 +1443,36 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                           ? () => _openGuestRequest(live)
                           : null,
                       shareCount: shareCount,
+                      commentPromptLabel: hint,
                       commentField: _showComposer
                           ? CommentInputBar(
-                              enabled: connected && !chatMuted,
+                              enabled: composerEnabled,
                               isSending: isCommentSending,
-                              hintText: chatMuted ? 'Chat muted' : 'Comment',
+                              hintText: hint,
+                              onValidate: (text) {
+                                if (state.isViewerHost) return true;
+                                if (!state.chatRules.containsBlockedKeyword(
+                                  text,
+                                )) {
+                                  return true;
+                                }
+                                context.read<LiveViewerBloc>().add(
+                                  const LiveViewerBlockedKeywordRejected(),
+                                );
+                                return false;
+                              },
                               onSend: (text) {
-                                if (isCommentSending) return;
+                                if (isCommentSending || !status.canSend) {
+                                  return;
+                                }
                                 context.read<LiveViewerBloc>().add(
                                   LiveViewerCommentSent(text),
                                 );
                               },
                             )
                           : null,
+                    );
+                      },
                     );
                   },
                 ),
@@ -1434,11 +1488,32 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                           curr.session?.errorMessage ||
                       prev.session?.reconnectAttempt !=
                           curr.session?.reconnectAttempt ||
-                      prev.needsDateOfBirth != curr.needsDateOfBirth,
+                      prev.needsDateOfBirth != curr.needsDateOfBirth ||
+                      prev.reminderSet != curr.reminderSet ||
+                      prev.currentUserId != curr.currentUserId,
                   builder: (context, state) {
                     if (state.needsDateOfBirth) {
                       return _AgeDobGateOverlay(
                         onSubmit: (dob) => _submitDateOfBirth(dob),
+                        onLeave: widget.onClose,
+                      );
+                    }
+                    if (state.connectionState ==
+                        LiveConnectionState.scheduled) {
+                      final scheduledLive = state.live ?? live;
+                      final isHost =
+                          state.currentUserId != null &&
+                          state.currentUserId == scheduledLive.hostId;
+                      return LiveScheduledCountdownOverlay(
+                        live: scheduledLive,
+                        reminderSet: state.reminderSet,
+                        isHost: isHost,
+                        onRemind: () => context.read<LiveViewerBloc>().add(
+                          const LiveViewerRemindRequested(),
+                        ),
+                        onShare: () => context.read<LiveViewerBloc>().add(
+                          const LiveViewerShareRequested(),
+                        ),
                         onLeave: widget.onClose,
                       );
                     }
@@ -2081,4 +2156,54 @@ class _AgeDobGateOverlay extends StatelessWidget {
       ),
     );
   }
+}
+
+class _SlowModeTicker extends StatefulWidget {
+  const _SlowModeTicker({required this.until, required this.builder});
+
+  final DateTime? until;
+  final Widget Function(BuildContext context) builder;
+
+  @override
+  State<_SlowModeTicker> createState() => _SlowModeTickerState();
+}
+
+class _SlowModeTickerState extends State<_SlowModeTicker> {
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _sync();
+  }
+
+  @override
+  void didUpdateWidget(covariant _SlowModeTicker oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.until != widget.until) _sync();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _sync() {
+    _timer?.cancel();
+    _timer = null;
+    final remaining = LiveChatRules.remainingSlowModeSeconds(widget.until);
+    if (remaining <= 0) return;
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      setState(() {});
+      if (LiveChatRules.remainingSlowModeSeconds(widget.until) <= 0) {
+        _timer?.cancel();
+        _timer = null;
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.builder(context);
 }

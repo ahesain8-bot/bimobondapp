@@ -63,6 +63,7 @@ class LiveRoomPage extends StatefulWidget {
     this.useArBeautyCamera = false,
     this.mediaMode = 'VIDEO',
     this.topic,
+    this.existingLiveId,
   });
 
   /// Optional title entered on the start screen.
@@ -80,6 +81,9 @@ class LiveRoomPage extends StatefulWidget {
 
   /// Optional topic from the start screen (`POST /lives` `topic`, max 80).
   final String? topic;
+
+  /// Existing `PLANNED` live to start (`POST /lives/:id/start`).
+  final String? existingLiveId;
 
   @override
   State<LiveRoomPage> createState() => _LiveRoomPageState();
@@ -166,6 +170,7 @@ class _LiveRoomPageState extends State<LiveRoomPage>
             useArBeautyCamera: widget.useArBeautyCamera,
             mediaMode: widget.mediaMode,
             topic: widget.topic,
+            existingLiveId: widget.existingLiveId,
           ),
         );
   }

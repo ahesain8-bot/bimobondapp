@@ -189,6 +189,11 @@ class LiveEntity extends Equatable {
 
 enum LiveStatus { scheduled, live, paused, ended, banned }
 
+extension LiveStatusViewerJoin on LiveStatus {
+  /// Viewers connect LiveKit only while the room is broadcasting.
+  bool get allowsViewerLiveKitJoin => this == LiveStatus.live;
+}
+
 extension LiveStatusExtension on LiveStatus {
   String get displayName {
     switch (this) {

@@ -55,6 +55,9 @@ abstract class LiveRemoteDataSource {
   /// POST /lives/:id/share
   Future<LiveShareResult> shareLive(String liveId, {String? channel});
 
+  /// POST /lives/:id/remind
+  Future<void> remindLive(String liveId);
+
   /// POST /lives/:id/report `{ "reason": "…" }`
   Future<void> reportLive(String liveId, {required String reason});
 
@@ -168,6 +171,9 @@ class FakeLiveRemoteDataSource implements LiveRemoteDataSource {
     if (live.status == LiveStatus.ended) {
       throw Exception('ENDED');
     }
+    if (live.status == LiveStatus.scheduled) {
+      throw Exception('Live is not currently broadcasting');
+    }
 
     return JoinLiveResult(
       liveId: liveId,
@@ -250,6 +256,15 @@ class FakeLiveRemoteDataSource implements LiveRemoteDataSource {
       deepLink: 'dcc://lives/$liveId',
       shareCount: next,
     );
+  }
+
+  @override
+  Future<void> remindLive(String liveId) async {
+    await Future.delayed(const Duration(milliseconds: 200));
+    final live = await getLiveById(liveId);
+    if (live.status == LiveStatus.ended) {
+      throw Exception('Live has already ended');
+    }
   }
 
   @override

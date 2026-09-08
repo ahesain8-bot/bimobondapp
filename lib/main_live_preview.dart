@@ -272,6 +272,9 @@ class _PkFirstDataSource implements LiveRemoteDataSource {
       _inner.shareLive(liveId, channel: channel);
 
   @override
+  Future<void> remindLive(String liveId) => _inner.remindLive(liveId);
+
+  @override
   Future<void> reportLive(String liveId, {required String reason}) =>
       _inner.reportLive(liveId, reason: reason);
 

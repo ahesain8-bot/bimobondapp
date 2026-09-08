@@ -40,7 +40,10 @@ class LiveStartInfoCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _CoverThumb(coverUrl: coverUrl, onChange: onChangeCover),
+              _CoverThumb(
+                coverUrl: coverUrl,
+                onChange: onChangeCover,
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Padding(
@@ -95,6 +98,7 @@ class LiveStartInfoCard extends StatelessWidget {
                 onTap: onAddTopic,
               ),
               _ChipButton(
+                key: const Key('live_start_schedule_chip'),
                 icon: Icons.schedule,
                 iconColor: const Color(0xFF80DEEA),
                 label: scheduledAt != null
@@ -124,31 +128,32 @@ class _CoverThumb extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: SizedBox(
-            width: 64,
-            height: 64,
-            child: coverUrl != null && coverUrl!.isNotEmpty
-                ? Image.network(coverUrl!, fit: BoxFit.cover)
-                : ColoredBox(
-                    color: const Color(0xFF2A2A2E),
-                    child: Icon(
-                      Icons.image_outlined,
-                      color: Colors.white.withValues(alpha: 0.45),
-                      size: 28,
+    return GestureDetector(
+      key: const Key('live_start_change_cover'),
+      onTap: onChange,
+      behavior: HitTestBehavior.opaque,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: SizedBox(
+              width: 64,
+              height: 64,
+              child: coverUrl != null && coverUrl!.isNotEmpty
+                  ? Image.network(coverUrl!, fit: BoxFit.cover)
+                  : const ColoredBox(
+                      color: Color(0xFF2A2A2E),
+                      child: Icon(
+                        Icons.image_outlined,
+                        color: Color(0x73FFFFFF),
+                        size: 28,
+                      ),
                     ),
-                  ),
+            ),
           ),
-        ),
-        const SizedBox(height: 4),
-        GestureDetector(
-          onTap: onChange,
-          behavior: HitTestBehavior.opaque,
-          child: Text(
+          const SizedBox(height: 4),
+          Text(
             'Change',
             style: TextStyle(
               color: Colors.white.withValues(alpha: 0.9),
@@ -156,14 +161,15 @@ class _CoverThumb extends StatelessWidget {
               fontWeight: FontWeight.w600,
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
 
 class _ChipButton extends StatelessWidget {
   const _ChipButton({
+    super.key,
     required this.icon,
     required this.iconColor,
     required this.label,

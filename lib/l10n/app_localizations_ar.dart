@@ -1477,6 +1477,19 @@ class AppLocalizationsAr extends AppLocalizations {
   String get liveChatYou => 'أنت';
 
   @override
+  String liveViewerJoined(String name) {
+    return '$name انضم إلى البث';
+  }
+
+  @override
+  String liveWelcomeViewer(String name) {
+    return 'مرحباً $name';
+  }
+
+  @override
+  String get liveViewerFallbackName => 'مشاهد';
+
+  @override
   String get liveSendGift => 'إرسال هدية';
 
   @override
@@ -5188,4 +5201,143 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get lpClose => 'إغلاق الترويج';
+
+  @override
+  String get liveUpcomingTitle => 'القادمة';
+
+  @override
+  String get liveScheduleLive => 'جدولة البث';
+
+  @override
+  String get liveScheduling => 'جارٍ الجدولة…';
+
+  @override
+  String liveScheduledFor(String when) {
+    return 'مجدول في $when';
+  }
+
+  @override
+  String get liveScheduleMustBeFuture => 'يجب أن يكون وقت الجدولة في المستقبل';
+
+  @override
+  String get liveScheduleCreated => 'تم جدولة البث';
+
+  @override
+  String get liveCouldNotSchedule => 'تعذر جدولة البث';
+
+  @override
+  String get liveCouldNotStartLive => 'تعذر بدء البث';
+
+  @override
+  String get liveReschedule => 'إعادة الجدولة';
+
+  @override
+  String get liveClearScheduledTime => 'مسح وقت الجدولة';
+
+  @override
+  String get liveEditTitle => 'تعديل العنوان';
+
+  @override
+  String get liveStartsSoon => 'يبدأ قريباً';
+
+  @override
+  String get liveRemindMe => 'ذكّرني';
+
+  @override
+  String get liveReminderSet => 'تم ضبط التذكير';
+
+  @override
+  String get liveScheduledDraft => 'بدون وقت بدء';
+
+  @override
+  String get liveUpcomingEmpty => 'لا توجد بثوث مجدولة';
+
+  @override
+  String get liveReview => 'عرض';
+
+  @override
+  String get liveSave => 'حفظ';
+
+  @override
+  String get liveSwitchToVideo => 'التبديل إلى الفيديو';
+
+  @override
+  String get liveSwitchToAudio => 'التبديل إلى الدردشة الصوتية';
+
+  @override
+  String get liveLeave => 'مغادرة';
+
+  @override
+  String get liveScheduledLive => 'بث مجدول';
+
+  @override
+  String get profileLiveBadge => 'مباشر';
+
+  @override
+  String get liveChatComment => 'تعليق';
+
+  @override
+  String get liveChatSending => 'جارٍ الإرسال…';
+
+  @override
+  String get liveChatMuted => 'الدردشة مكتومة';
+
+  @override
+  String get liveChatMutedOnLive => 'تم كتم دردشتك في هذا البث';
+
+  @override
+  String liveChatMutedReason(String reason) {
+    return 'تم كتم الدردشة: $reason';
+  }
+
+  @override
+  String get liveChatUnmuted => 'تم إلغاء كتم دردشتك';
+
+  @override
+  String get liveChatRulesUpdated => 'تم تحديث قواعد الدردشة';
+
+  @override
+  String liveChatSlowModeEnabled(int seconds) {
+    return 'تم تفعيل الوضع البطيء: $seconds ثوانٍ بين التعليقات';
+  }
+
+  @override
+  String liveChatSlowModeChanged(int seconds) {
+    return 'تم تغيير الوضع البطيء: $seconds ثوانٍ بين التعليقات';
+  }
+
+  @override
+  String get liveChatSlowModeDisabled => 'تم إيقاف الوضع البطيء';
+
+  @override
+  String get liveChatModeEveryone => 'أصبحت الدردشة متاحة للجميع';
+
+  @override
+  String get liveChatModeFollowers => 'أصبحت الدردشة للمتابعين فقط';
+
+  @override
+  String get liveChatModeSubscribers => 'أصبحت الدردشة للمشتركين فقط';
+
+  @override
+  String get liveChatBlockedKeywordsUpdated => 'تم تحديث الكلمات المحظورة';
+
+  @override
+  String get liveChatFollowToComment => 'تابع المضيف للتعليق';
+
+  @override
+  String get liveChatSubscribeToComment => 'انضم إلى نادي المعجبين للتعليق';
+
+  @override
+  String get liveChatBlockedKeyword => 'يحتوي التعليق على كلمة محظورة';
+
+  @override
+  String liveChatSlowModeWait(int seconds) {
+    return 'انتظر $seconds ث';
+  }
+
+  @override
+  String get liveChatSendFailed => 'تعذر إرسال التعليق';
+
+  @override
+  String get liveChatDeleteFailed => 'تعذر حذف التعليق';
 }

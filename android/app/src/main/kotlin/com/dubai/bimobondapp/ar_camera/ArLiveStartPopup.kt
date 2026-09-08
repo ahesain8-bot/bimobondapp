@@ -92,6 +92,8 @@ object ArLiveStartPopup {
                 ViewGroup.LayoutParams.MATCH_PARENT,
             )
             setBackgroundColor(Color.TRANSPARENT)
+            isClickable = true
+            isFocusable = false
         }
 
         // ── Top: close + info card ───────────────────────────────────────
@@ -148,17 +150,23 @@ object ArLiveStartPopup {
             },
             FrameLayout.LayoutParams(dp(28), dp(28), Gravity.CENTER),
         )
+        val changeCover = View.OnClickListener {
+            ArCameraBridge.liveStartEventSink?.invoke("onLiveStartChangeCover", null)
+        }
+        cover.isClickable = true
+        cover.setOnClickListener(changeCover)
         coverCol.addView(cover, LinearLayout.LayoutParams(dp(64), dp(64)))
-        coverCol.addView(
-            TextView(activity).apply {
-                text = "Change"
-                setTextColor(Color.WHITE)
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
-                setTypeface(Typeface.DEFAULT_BOLD)
-                gravity = Gravity.CENTER
-                setPadding(0, dp(4), 0, 0)
-            },
-        )
+        val changeLabel = TextView(activity).apply {
+            text = "Change"
+            setTextColor(Color.WHITE)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            setTypeface(Typeface.DEFAULT_BOLD)
+            gravity = Gravity.CENTER
+            setPadding(0, dp(4), 0, 0)
+            isClickable = true
+            setOnClickListener(changeCover)
+        }
+        coverCol.addView(changeLabel)
         titleRow.addView(coverCol)
 
         val titleCol = LinearLayout(activity).apply {
@@ -204,7 +212,11 @@ object ArLiveStartPopup {
                 setTextColor(Color.WHITE)
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
                 setTypeface(Typeface.DEFAULT_BOLD)
-                setPadding(dp(10), dp(7), dp(10), dp(7))
+                setPadding(dp(10), dp(10), dp(10), dp(10))
+                minHeight = dp(40)
+                gravity = Gravity.CENTER
+                isClickable = true
+                isFocusable = true
                 background = GradientDrawable().apply {
                     setColor(Color.parseColor("#1FFFFFFF"))
                     cornerRadius = dpF(18f)
@@ -688,6 +700,7 @@ object ArLiveStartPopup {
             )
             setBackgroundDrawableResource(android.R.color.transparent)
             clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+            clearFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL)
             setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
         }
 

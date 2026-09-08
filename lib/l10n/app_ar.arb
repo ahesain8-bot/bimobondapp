@@ -646,6 +646,23 @@
   },
   "liveCommentSample": "هذا العقار ممتاز جداً!",
   "liveChatYou": "أنت",
+  "liveViewerJoined": "{name} انضم إلى البث",
+  "@liveViewerJoined": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "liveWelcomeViewer": "مرحباً {name}",
+  "@liveWelcomeViewer": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "liveViewerFallbackName": "مشاهد",
   "liveSendGift": "إرسال هدية",
   "liveSelectGift": "اختر هدية",
   "liveSendToHost": "إرسال للمضيف",
@@ -2237,5 +2254,55 @@
   "lpInteger": "أدخل عدداً صحيحاً.",
   "lpNumber": "أدخل رقماً صالحاً ومحدوداً.",
   "lpClose": "إغلاق الترويج",
-  "notificationBodyGift": "أرسل لك {name} هدية"
+  "notificationBodyGift": "أرسل لك {name} هدية",
+  "liveUpcomingTitle": "القادمة",
+  "liveScheduleLive": "جدولة البث",
+  "liveScheduling": "جارٍ الجدولة…",
+  "liveScheduledFor": "مجدول في {when}",
+  "@liveScheduledFor": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "liveScheduleMustBeFuture": "يجب أن يكون وقت الجدولة في المستقبل",
+  "liveScheduleCreated": "تم جدولة البث",
+  "liveCouldNotSchedule": "تعذر جدولة البث",
+  "liveCouldNotStartLive": "تعذر بدء البث",
+  "liveReschedule": "إعادة الجدولة",
+  "liveClearScheduledTime": "مسح وقت الجدولة",
+  "liveEditTitle": "تعديل العنوان",
+  "liveStartsSoon": "يبدأ قريباً",
+  "liveRemindMe": "ذكّرني",
+  "liveReminderSet": "تم ضبط التذكير",
+  "liveScheduledDraft": "بدون وقت بدء",
+  "liveUpcomingEmpty": "لا توجد بثوث مجدولة",
+  "liveReview": "عرض",
+  "liveSave": "حفظ",
+  "liveSwitchToVideo": "التبديل إلى الفيديو",
+  "liveSwitchToAudio": "التبديل إلى الدردشة الصوتية",
+  "liveLeave": "مغادرة",
+  "liveScheduledLive": "بث مجدول",
+  "profileLiveBadge": "مباشر",
+  "liveChatComment": "تعليق",
+  "liveChatSending": "جارٍ الإرسال…",
+  "liveChatMuted": "الدردشة مكتومة",
+  "liveChatMutedOnLive": "تم كتم دردشتك في هذا البث",
+  "liveChatMutedReason": "تم كتم الدردشة: {reason}",
+  "liveChatUnmuted": "تم إلغاء كتم دردشتك",
+  "liveChatRulesUpdated": "تم تحديث قواعد الدردشة",
+  "liveChatSlowModeEnabled": "تم تفعيل الوضع البطيء: {seconds} ثوانٍ بين التعليقات",
+  "liveChatSlowModeChanged": "تم تغيير الوضع البطيء: {seconds} ثوانٍ بين التعليقات",
+  "liveChatSlowModeDisabled": "تم إيقاف الوضع البطيء",
+  "liveChatModeEveryone": "أصبحت الدردشة متاحة للجميع",
+  "liveChatModeFollowers": "أصبحت الدردشة للمتابعين فقط",
+  "liveChatModeSubscribers": "أصبحت الدردشة للمشتركين فقط",
+  "liveChatBlockedKeywordsUpdated": "تم تحديث الكلمات المحظورة",
+  "liveChatFollowToComment": "تابع المضيف للتعليق",
+  "liveChatSubscribeToComment": "انضم إلى نادي المعجبين للتعليق",
+  "liveChatBlockedKeyword": "يحتوي التعليق على كلمة محظورة",
+  "liveChatSlowModeWait": "انتظر {seconds} ث",
+  "liveChatSendFailed": "تعذر إرسال التعليق",
+  "liveChatDeleteFailed": "تعذر حذف التعليق"
 }

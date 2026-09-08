@@ -50,6 +50,7 @@ class LiveRoomFailure extends LiveRoomState {
     this.pendingTitle,
     this.pendingTopic,
     this.pendingMediaMode,
+    this.pendingExistingLiveId,
     this.isRecovering = false,
   });
 
@@ -63,6 +64,9 @@ class LiveRoomFailure extends LiveRoomState {
 
   final String? pendingTopic;
   final String? pendingMediaMode;
+
+  /// Existing `PLANNED` live to start after conflict recovery.
+  final String? pendingExistingLiveId;
 
   /// True while end/resume recovery is in flight.
   final bool isRecovering;
@@ -90,6 +94,7 @@ class LiveRoomReady extends LiveRoomState {
     this.showLiveTitleBadge = true,
     this.isMediaConnected = false,
     this.isChatComposerVisible = false,
+    this.chatComposerPrefill,
     this.isSendingChat = false,
     this.isEnding = false,
     this.isPauseActionBusy = false,
@@ -106,6 +111,8 @@ class LiveRoomReady extends LiveRoomState {
     this.battleMediaRoom,
     this.topGifterAvatars = const [],
     this.opponentTopGifterAvatars = const [],
+    this.bannedUserIds = const <String>{},
+    this.bannedViewerNames = const <String, String>{},
   });
 
   final LiveSession session;
@@ -139,6 +146,10 @@ class LiveRoomReady extends LiveRoomState {
   final bool isMediaConnected;
 
   final bool isChatComposerVisible;
+
+  /// Prefill for the host comment composer (join-line welcome).
+  final String? chatComposerPrefill;
+
   final bool isSendingChat;
   final bool isEnding;
 
@@ -195,6 +206,13 @@ class LiveRoomReady extends LiveRoomState {
   /// The same, for the opponent's side of an active battle.
   final List<String> opponentTopGifterAvatars;
 
+  /// LIVE-specific banned viewer ids from ban/unban success and
+  /// `liveModeration` `viewer_banned` / `viewer_unbanned`. Not a global block.
+  final Set<String> bannedUserIds;
+
+  /// Display names for [bannedUserIds] when known from the roster or chat.
+  final Map<String, String> bannedViewerNames;
+
   bool get isBattleActive => battle?.isActive == true;
 
   /// Server pause flag. Status stays `LIVE`; LiveKit is not torn down.
@@ -228,6 +246,8 @@ class LiveRoomReady extends LiveRoomState {
     bool? showLiveTitleBadge,
     bool? isMediaConnected,
     bool? isChatComposerVisible,
+    String? chatComposerPrefill,
+    bool clearChatComposerPrefill = false,
     bool? isSendingChat,
     bool? isEnding,
     bool? isPauseActionBusy,
@@ -245,6 +265,8 @@ class LiveRoomReady extends LiveRoomState {
     Object? battleMediaRoom = _unset,
     List<String>? topGifterAvatars,
     List<String>? opponentTopGifterAvatars,
+    Set<String>? bannedUserIds,
+    Map<String, String>? bannedViewerNames,
   }) {
     return LiveRoomReady(
       session: session ?? this.session,
@@ -277,6 +299,9 @@ class LiveRoomReady extends LiveRoomState {
       isMediaConnected: isMediaConnected ?? this.isMediaConnected,
       isChatComposerVisible:
           isChatComposerVisible ?? this.isChatComposerVisible,
+      chatComposerPrefill: clearChatComposerPrefill
+          ? null
+          : (chatComposerPrefill ?? this.chatComposerPrefill),
       isSendingChat: isSendingChat ?? this.isSendingChat,
       isEnding: isEnding ?? this.isEnding,
       isPauseActionBusy: isPauseActionBusy ?? this.isPauseActionBusy,
@@ -307,6 +332,8 @@ class LiveRoomReady extends LiveRoomState {
       topGifterAvatars: topGifterAvatars ?? this.topGifterAvatars,
       opponentTopGifterAvatars:
           opponentTopGifterAvatars ?? this.opponentTopGifterAvatars,
+      bannedUserIds: bannedUserIds ?? this.bannedUserIds,
+      bannedViewerNames: bannedViewerNames ?? this.bannedViewerNames,
     );
   }
 }

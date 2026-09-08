@@ -27,6 +27,7 @@ class ArCameraBridge {
   static void Function(String label)? onLiveStartComingSoon;
   static void Function()? onLiveStartAddTopic;
   static void Function()? onLiveStartSchedule;
+  static void Function()? onLiveStartChangeCover;
   static void Function(bool isAudioMode)? onLiveStartMediaMode;
 
   /// Registers platform → Dart callbacks (e.g. layout max-duration auto-stop).
@@ -65,6 +66,8 @@ class ArCameraBridge {
         onLiveStartAddTopic?.call();
       } else if (call.method == 'onLiveStartSchedule') {
         onLiveStartSchedule?.call();
+      } else if (call.method == 'onLiveStartChangeCover') {
+        onLiveStartChangeCover?.call();
       } else if (call.method == 'onLiveStartMediaMode') {
         onLiveStartMediaMode?.call(call.arguments == true);
       }
@@ -87,6 +90,7 @@ class ArCameraBridge {
     onLiveStartComingSoon = null;
     onLiveStartAddTopic = null;
     onLiveStartSchedule = null;
+    onLiveStartChangeCover = null;
     onLiveStartMediaMode = null;
     _channel.setMethodCallHandler(null);
   }

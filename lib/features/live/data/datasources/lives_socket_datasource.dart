@@ -9,6 +9,7 @@ import '../../../../core/network/api_endpoints.dart';
 import '../../../../core/models/live_battle.dart';
 import '../../domain/entities/live_interactive.dart';
 import '../../domain/entities/live_scene.dart';
+import '../../domain/live_viewer_display_name.dart';
 import '../../domain/repositories/live_session_repository.dart';
 import '../mappers/live_session_mapper.dart';
 
@@ -219,11 +220,7 @@ class LivesSocketDataSource {
       _controller.add(
         LiveHudUserJoinedEvent(
           userId: userId,
-          username: (() {
-            final full = user['fullName']?.toString().trim();
-            if (full != null && full.isNotEmpty) return full;
-            return user['username']?.toString() ?? 'مشاهد';
-          })(),
+          username: liveViewerDisplayNameFrom(user) ?? '',
           avatarUrl:
               user['avatarUrl']?.toString() ?? user['avatar']?.toString(),
           viewers: _asInt(

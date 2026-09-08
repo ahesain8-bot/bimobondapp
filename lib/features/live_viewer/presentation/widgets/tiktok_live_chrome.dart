@@ -790,6 +790,7 @@ class TikTokLiveBottomBar extends StatelessWidget {
   final ValueChanged<String>? onQuickReact;
   final int? shareCount;
   final Widget? commentField;
+  final String commentPromptLabel;
 
   const TikTokLiveBottomBar({
     super.key,
@@ -806,6 +807,7 @@ class TikTokLiveBottomBar extends StatelessWidget {
     this.onQuickReact,
     this.shareCount,
     this.commentField,
+    this.commentPromptLabel = 'Comment',
   });
 
   static const _quickEmojis = ['😂', '😍', '😮', '🔥', '👏', '❤️'];
@@ -843,7 +845,10 @@ class TikTokLiveBottomBar extends StatelessWidget {
                   children: [
                     Expanded(
                       child: commentField == null
-                          ? CommentPromptPill(onTap: onTypeTap)
+                          ? CommentPromptPill(
+                              onTap: onTypeTap,
+                              label: commentPromptLabel,
+                            )
                           : Align(
                               alignment: Alignment.bottomCenter,
                               child: commentField,

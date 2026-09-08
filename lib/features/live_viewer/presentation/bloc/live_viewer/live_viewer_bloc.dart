@@ -16,6 +16,7 @@ import '../../../domain/entities/comment_entity.dart';
 import '../../../domain/entities/live_entity.dart';
 import '../../../domain/entities/live_session_entity.dart';
 import '../../../domain/entities/socket_event.dart';
+import '../../../domain/live_chat_rules.dart';
 import '../../../domain/repositories/comment_repository.dart';
 import '../../../domain/repositories/gift_repository.dart';
 import '../../../domain/repositories/guest_repository.dart';
@@ -58,6 +59,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     on<LiveViewerHudEnrichRequested>(_onHudEnrichRequested);
     on<LiveViewerRetryRequested>(_onRetryRequested);
     on<LiveViewerCommentSent>(_onCommentSent);
+    on<LiveViewerBlockedKeywordRejected>(_onBlockedKeywordRejected);
     on<LiveViewerLiked>(_onLiked);
     on<LiveViewerGiftBalanceRefreshRequested>(_onGiftBalanceRefreshRequested);
     on<LiveViewerGiftComboReceived>(_onGiftComboReceived);
@@ -88,6 +90,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     on<LiveViewerBattleRoomStateChanged>(_onBattleRoomStateChanged);
     on<LiveViewerShareRequested>(_onShareRequested);
     on<LiveViewerShareFeedbackConsumed>(_onShareFeedbackConsumed);
+    on<LiveViewerRemindRequested>(_onRemindRequested);
     on<LiveViewerReportRequested>(_onReportRequested);
     on<LiveViewerReportFeedbackConsumed>(_onReportFeedbackConsumed);
 
@@ -276,6 +279,19 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
       _activeActivation = event.activation;
       final live = event.live;
 
+      if (live.status == LiveStatus.scheduled) {
+        emit(
+          LiveViewerState(
+            session: LiveSessionEntity(
+              live: live,
+              connectionState: LiveConnectionState.scheduled,
+            ),
+            currentUserId: _currentUserId,
+          ),
+        );
+        return;
+      }
+
       final isPk = live.metadata?['isPk'] == true;
       final initialAvatars = _avatarsFromLive(live);
 
@@ -295,6 +311,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
               ? ((live.metadata?['scoreRight'] as num?)?.toInt() ?? 0)
               : 0,
           currentUserId: _currentUserId,
+          chatMuted: LiveChatRules.chatMutedFlag(live.metadata) ?? false,
         ),
       );
 
@@ -461,11 +478,16 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
           LiveRoomPerf.mark(activatePerf, 'livekit_connected');
 
           final joinedAvatars = _avatarsFromLive(result.live);
+          final mergedMeta = LiveChatRules.mergeJoinMetadata(
+            feed: live.metadata,
+            join: result.live.metadata,
+          );
+          final mutedFromJoin = LiveChatRules.chatMutedFlag(mergedMeta);
           emit(
             state.copyWith(
               session: state.session!.copyWith(
                 live: result.live.copyWith(
-                  metadata: live.metadata,
+                  metadata: mergedMeta,
                   isFollowing: live.isFollowing,
                 ),
                 connectionState: LiveConnectionState.connected,
@@ -478,6 +500,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
               topViewerAvatars: joinedAvatars.isNotEmpty
                   ? joinedAvatars
                   : state.topViewerAvatars,
+              chatMuted: mutedFromJoin ?? state.chatMuted,
             ),
           );
           LiveRoomPerf.mark(activatePerf, 'room_ready');
@@ -639,8 +662,26 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     final inMutedUserIds =
         currentUserUid != null && state.mutedUserIds.contains(currentUserUid);
     final muted = chatMutedFlag || inMutedUserIds;
-    if (muted) {
-      emit(state.copyWith(moderationBanner: 'Your chat is muted on this live'));
+    final isHost = state.isViewerHost;
+    final rules = state.chatRules;
+    final composer = rules.composerStatus(
+      chatMuted: muted,
+      isHost: isHost,
+      isFollowing: state.live?.isFollowing ?? false,
+      isFanClubMember: state.isFanClubMember,
+      slowModeUntil: state.slowModeUntil,
+    );
+    if (!composer.canSend) {
+      emit(state.copyWith(chatNotice: _noticeForComposer(composer)));
+      _scheduleBannerClear();
+      return;
+    }
+    if (!isHost && rules.containsBlockedKeyword(content)) {
+      emit(
+        state.copyWith(
+          chatNotice: const LiveChatNotice(LiveChatNoticeKind.blockedKeyword),
+        ),
+      );
       _scheduleBannerClear();
       return;
     }
@@ -652,13 +693,16 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     );
     await result.fold(
       (failure) async {
-        final msg = failure.message;
-        final muted = msg.toLowerCase().contains('mute');
+        final parsed = LiveCommentSendFailure.parse(failure);
         emit(
           state.copyWith(
             isCommentSending: false,
-            chatMuted: muted || state.chatMuted,
-            moderationBanner: muted ? 'Your chat is muted on this live' : msg,
+            chatMuted:
+                parsed.kind == LiveCommentSendFailureKind.muted ||
+                state.chatMuted,
+            chatNotice: parsed.toNotice(
+              slowModeSeconds: rules.slowModeSeconds,
+            ),
           ),
         );
         _scheduleBannerClear();
@@ -667,12 +711,18 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
         if (comment.userId.isNotEmpty) {
           _currentUserId ??= comment.userId;
         }
-        final emitState = state.copyWith(isCommentSending: false);
+        final until = !isHost && rules.slowModeSeconds > 0
+            ? DateTime.now().add(Duration(seconds: rules.slowModeSeconds))
+            : null;
+        final emitState = state.copyWith(
+          isCommentSending: false,
+          slowModeUntil: until,
+          currentUserId: _currentUserId,
+        );
         if (!state.comments.any((c) => c.id == comment.id)) {
           emit(
             emitState.copyWith(
               comments: _capComments([...emitState.comments, comment]),
-              currentUserId: _currentUserId,
             ),
           );
         } else {
@@ -680,6 +730,18 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
         }
       },
     );
+  }
+
+  Future<void> _onBlockedKeywordRejected(
+    LiveViewerBlockedKeywordRejected event,
+    Emitter<LiveViewerState> emit,
+  ) async {
+    emit(
+      state.copyWith(
+        chatNotice: const LiveChatNotice(LiveChatNoticeKind.blockedKeyword),
+      ),
+    );
+    _scheduleBannerClear();
   }
 
   Future<void> _onLiked(
@@ -731,6 +793,29 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
             shareError: null,
           ),
         );
+      },
+    );
+  }
+
+  Future<void> _onRemindRequested(
+    LiveViewerRemindRequested event,
+    Emitter<LiveViewerState> emit,
+  ) async {
+    final live = state.live;
+    final id = _activeLiveId;
+    if (live == null || id == null || state.reminderSet) return;
+    if (state.currentUserId != null && state.currentUserId == live.hostId) {
+      return;
+    }
+    final result = await liveRepository.remindLive(id);
+    if (_activeLiveId != id || isClosed) return;
+    result.fold(
+      (failure) {
+        emit(state.copyWith(moderationBanner: failure.message));
+        _scheduleBannerClear();
+      },
+      (_) {
+        emit(state.copyWith(reminderSet: true));
       },
     );
   }
@@ -865,8 +950,10 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     LiveViewerModerationBannerConsumed event,
     Emitter<LiveViewerState> emit,
   ) async {
-    if (state.moderationBanner != null) {
-      emit(state.copyWith(clearModerationBanner: true));
+    if (state.moderationBanner != null || state.chatNotice != null) {
+      emit(
+        state.copyWith(clearModerationBanner: true, chatNotice: null),
+      );
     }
   }
 
@@ -911,7 +998,8 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
   ) async {
     final liveId = _activeLiveId;
     if (liveId == null) return;
-    // Optimistic removal from the visible comment list.
+    final previousComments = state.comments;
+    final previousPinned = state.pinnedComment;
     final nextComments = state.comments
         .where((c) => c.id != event.commentId)
         .toList(growable: false);
@@ -926,7 +1014,14 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
       liveId: liveId,
     );
     await result.fold((failure) async {
-      emit(state.copyWith(moderationBanner: 'Failed to delete comment'));
+      emit(
+        state.copyWith(
+          comments: previousComments,
+          pinnedComment: previousPinned,
+          clearPinnedComment: previousPinned == null,
+          chatNotice: const LiveChatNotice(LiveChatNoticeKind.deleteFailed),
+        ),
+      );
       _scheduleBannerClear();
     }, (_) async {});
   }
@@ -1442,7 +1537,8 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     final liveId = _activeLiveId;
     if (session == null || liveId == null || _tearingDown) return;
     if (session.connectionState == LiveConnectionState.liveEnded ||
-        session.connectionState == LiveConnectionState.banned) {
+        session.connectionState == LiveConnectionState.banned ||
+        session.connectionState == LiveConnectionState.scheduled) {
       return;
     }
 
@@ -1800,7 +1896,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
         userId: event.userId,
         username: event.username,
         userAvatar: event.avatarUrl,
-        content: '${event.username} joined the live',
+        content: '',
         createdAt: event.timestamp,
         metadata: const {'type': 'join'},
       );
@@ -1937,9 +2033,12 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
           emit(
             state.copyWith(
               chatMuted: true,
-              moderationBanner: event.reason?.isNotEmpty == true
-                  ? 'Chat muted: ${event.reason}'
-                  : 'Your chat was muted',
+              chatNotice: event.reason?.isNotEmpty == true
+                  ? LiveChatNotice(
+                      LiveChatNoticeKind.mutedReason,
+                      reason: event.reason,
+                    )
+                  : const LiveChatNotice(LiveChatNoticeKind.muted),
             ),
           );
           _scheduleBannerClear();
@@ -1954,7 +2053,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
           emit(
             state.copyWith(
               chatMuted: false,
-              moderationBanner: 'Your chat was unmuted',
+              chatNotice: const LiveChatNotice(LiveChatNoticeKind.unmuted),
             ),
           );
           _scheduleBannerClear();
@@ -2004,7 +2103,26 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
         emit(state.copyWith(bannedUserIds: nextBanned));
         return;
       case 'chat_rules_updated':
-        emit(state.copyWith(moderationBanner: 'Chat rules updated'));
+        final session = state.session;
+        if (session == null) return;
+        final previous = LiveChatRules.fromLive(session.live);
+        final nextRules = previous.mergeChatRules(event.chatRules);
+        emit(
+          state.copyWith(
+            session: session.copyWith(
+              live: session.live.copyWith(
+                metadata: nextRules.applyToMetadata(session.live.metadata),
+              ),
+            ),
+            slowModeUntil: nextRules.slowModeSeconds == 0
+                ? null
+                : state.slowModeUntil,
+            chatNotice: LiveChatNotice(
+              LiveChatNoticeKind.rulesUpdated,
+              ruleChanges: LiveChatRules.diff(previous, nextRules),
+            ),
+          ),
+        );
         _scheduleBannerClear();
         return;
       default:
@@ -2060,11 +2178,36 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     });
   }
 
+  LiveChatNotice _noticeForComposer(LiveChatComposerStatus status) {
+    switch (status.block) {
+      case LiveChatComposerBlock.muted:
+        return const LiveChatNotice(LiveChatNoticeKind.muted);
+      case LiveChatComposerBlock.followers:
+        return const LiveChatNotice(LiveChatNoticeKind.followToComment);
+      case LiveChatComposerBlock.subscribers:
+        return const LiveChatNotice(LiveChatNoticeKind.subscribeToComment);
+      case LiveChatComposerBlock.slowMode:
+        return LiveChatNotice(
+          LiveChatNoticeKind.slowMode,
+          seconds: status.slowModeRemainingSeconds,
+        );
+      case LiveChatComposerBlock.none:
+        return const LiveChatNotice(LiveChatNoticeKind.sendFailed);
+    }
+  }
+
   bool _isMe(String? userId) {
     if (userId == null || userId.isEmpty) return false;
     if (_currentUserId != null && userId == _currentUserId) return true;
-    final firebaseUid = fb.FirebaseAuth.instance.currentUser?.uid;
-    return firebaseUid != null && userId == firebaseUid;
+    if (state.currentUserId != null && userId == state.currentUserId) {
+      return true;
+    }
+    try {
+      final firebaseUid = fb.FirebaseAuth.instance.currentUser?.uid;
+      return firebaseUid != null && userId == firebaseUid;
+    } catch (_) {
+      return false;
+    }
   }
 
   void _scheduleGuestApprovalCheck(String liveId, {int attempt = 1}) {
@@ -2212,9 +2355,12 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     final me = await _loadViewerProfile();
     final id = me?['id']?.toString();
     if (id != null && id.isNotEmpty) return id;
-    return allowFirebaseFallback
-        ? fb.FirebaseAuth.instance.currentUser?.uid
-        : null;
+    if (!allowFirebaseFallback) return null;
+    try {
+      return fb.FirebaseAuth.instance.currentUser?.uid;
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<Map<String, dynamic>?> _loadViewerProfile() async {

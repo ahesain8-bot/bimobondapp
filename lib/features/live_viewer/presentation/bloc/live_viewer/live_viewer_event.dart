@@ -59,6 +59,10 @@ class LiveViewerCommentSent extends LiveViewerEvent {
   List<Object?> get props => [content];
 }
 
+class LiveViewerBlockedKeywordRejected extends LiveViewerEvent {
+  const LiveViewerBlockedKeywordRejected();
+}
+
 class LiveViewerLiked extends LiveViewerEvent {
   final int burst;
 
@@ -289,6 +293,10 @@ class LiveViewerShareRequested extends LiveViewerEvent {
 
 class LiveViewerShareFeedbackConsumed extends LiveViewerEvent {
   const LiveViewerShareFeedbackConsumed();
+}
+
+class LiveViewerRemindRequested extends LiveViewerEvent {
+  const LiveViewerRemindRequested();
 }
 
 class LiveViewerReportRequested extends LiveViewerEvent {

@@ -2915,6 +2915,24 @@ abstract class AppLocalizations {
   /// **'You'**
   String get liveChatYou;
 
+  /// No description provided for @liveViewerJoined.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} joined the live'**
+  String liveViewerJoined(String name);
+
+  /// No description provided for @liveWelcomeViewer.
+  ///
+  /// In en, this message translates to:
+  /// **'Welcome, {name}'**
+  String liveWelcomeViewer(String name);
+
+  /// No description provided for @liveViewerFallbackName.
+  ///
+  /// In en, this message translates to:
+  /// **'Viewer'**
+  String get liveViewerFallbackName;
+
   /// No description provided for @liveSendGift.
   ///
   /// In en, this message translates to:
@@ -9976,6 +9994,264 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Close promotions'**
   String get lpClose;
+
+  /// No description provided for @liveUpcomingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Upcoming'**
+  String get liveUpcomingTitle;
+
+  /// No description provided for @liveScheduleLive.
+  ///
+  /// In en, this message translates to:
+  /// **'Schedule LIVE'**
+  String get liveScheduleLive;
+
+  /// No description provided for @liveScheduling.
+  ///
+  /// In en, this message translates to:
+  /// **'Scheduling…'**
+  String get liveScheduling;
+
+  /// No description provided for @liveScheduledFor.
+  ///
+  /// In en, this message translates to:
+  /// **'Scheduled for {when}'**
+  String liveScheduledFor(String when);
+
+  /// No description provided for @liveScheduleMustBeFuture.
+  ///
+  /// In en, this message translates to:
+  /// **'Schedule time must be in the future'**
+  String get liveScheduleMustBeFuture;
+
+  /// No description provided for @liveScheduleCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'LIVE scheduled'**
+  String get liveScheduleCreated;
+
+  /// No description provided for @liveCouldNotSchedule.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not schedule LIVE'**
+  String get liveCouldNotSchedule;
+
+  /// No description provided for @liveCouldNotStartLive.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not start LIVE'**
+  String get liveCouldNotStartLive;
+
+  /// No description provided for @liveReschedule.
+  ///
+  /// In en, this message translates to:
+  /// **'Reschedule'**
+  String get liveReschedule;
+
+  /// No description provided for @liveClearScheduledTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear scheduled time'**
+  String get liveClearScheduledTime;
+
+  /// No description provided for @liveEditTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit title'**
+  String get liveEditTitle;
+
+  /// No description provided for @liveStartsSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'Starts soon'**
+  String get liveStartsSoon;
+
+  /// No description provided for @liveRemindMe.
+  ///
+  /// In en, this message translates to:
+  /// **'Remind me'**
+  String get liveRemindMe;
+
+  /// No description provided for @liveReminderSet.
+  ///
+  /// In en, this message translates to:
+  /// **'Reminder set'**
+  String get liveReminderSet;
+
+  /// No description provided for @liveScheduledDraft.
+  ///
+  /// In en, this message translates to:
+  /// **'No start time'**
+  String get liveScheduledDraft;
+
+  /// No description provided for @liveUpcomingEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No scheduled LIVEs'**
+  String get liveUpcomingEmpty;
+
+  /// No description provided for @liveReview.
+  ///
+  /// In en, this message translates to:
+  /// **'Review'**
+  String get liveReview;
+
+  /// No description provided for @liveSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get liveSave;
+
+  /// No description provided for @liveSwitchToVideo.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch to video'**
+  String get liveSwitchToVideo;
+
+  /// No description provided for @liveSwitchToAudio.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch to Voice Chat'**
+  String get liveSwitchToAudio;
+
+  /// No description provided for @liveLeave.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave'**
+  String get liveLeave;
+
+  /// No description provided for @liveScheduledLive.
+  ///
+  /// In en, this message translates to:
+  /// **'Scheduled LIVE'**
+  String get liveScheduledLive;
+
+  /// No description provided for @profileLiveBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'LIVE'**
+  String get profileLiveBadge;
+
+  /// No description provided for @liveChatComment.
+  ///
+  /// In en, this message translates to:
+  /// **'Comment'**
+  String get liveChatComment;
+
+  /// No description provided for @liveChatSending.
+  ///
+  /// In en, this message translates to:
+  /// **'Sending…'**
+  String get liveChatSending;
+
+  /// No description provided for @liveChatMuted.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat muted'**
+  String get liveChatMuted;
+
+  /// No description provided for @liveChatMutedOnLive.
+  ///
+  /// In en, this message translates to:
+  /// **'Your chat is muted on this live'**
+  String get liveChatMutedOnLive;
+
+  /// No description provided for @liveChatMutedReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat muted: {reason}'**
+  String liveChatMutedReason(String reason);
+
+  /// No description provided for @liveChatUnmuted.
+  ///
+  /// In en, this message translates to:
+  /// **'Your chat was unmuted'**
+  String get liveChatUnmuted;
+
+  /// No description provided for @liveChatRulesUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat rules updated'**
+  String get liveChatRulesUpdated;
+
+  /// No description provided for @liveChatSlowModeEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Slow mode on: {seconds} seconds between comments'**
+  String liveChatSlowModeEnabled(int seconds);
+
+  /// No description provided for @liveChatSlowModeChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'Slow mode is now {seconds} seconds between comments'**
+  String liveChatSlowModeChanged(int seconds);
+
+  /// No description provided for @liveChatSlowModeDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Slow mode turned off'**
+  String get liveChatSlowModeDisabled;
+
+  /// No description provided for @liveChatModeEveryone.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat is now open to everyone'**
+  String get liveChatModeEveryone;
+
+  /// No description provided for @liveChatModeFollowers.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat is now followers only'**
+  String get liveChatModeFollowers;
+
+  /// No description provided for @liveChatModeSubscribers.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat is now subscribers only'**
+  String get liveChatModeSubscribers;
+
+  /// No description provided for @liveChatBlockedKeywordsUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Blocked keywords updated'**
+  String get liveChatBlockedKeywordsUpdated;
+
+  /// No description provided for @liveChatFollowToComment.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow the host to comment'**
+  String get liveChatFollowToComment;
+
+  /// No description provided for @liveChatSubscribeToComment.
+  ///
+  /// In en, this message translates to:
+  /// **'Join the fan club to comment'**
+  String get liveChatSubscribeToComment;
+
+  /// No description provided for @liveChatBlockedKeyword.
+  ///
+  /// In en, this message translates to:
+  /// **'That comment contains a blocked word'**
+  String get liveChatBlockedKeyword;
+
+  /// No description provided for @liveChatSlowModeWait.
+  ///
+  /// In en, this message translates to:
+  /// **'Wait {seconds}s'**
+  String liveChatSlowModeWait(int seconds);
+
+  /// No description provided for @liveChatSendFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t send comment'**
+  String get liveChatSendFailed;
+
+  /// No description provided for @liveChatDeleteFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t delete comment'**
+  String get liveChatDeleteFailed;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

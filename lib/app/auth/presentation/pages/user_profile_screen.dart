@@ -891,6 +891,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                                 userId: widget.userId,
                                 username: username,
                                 isSelf: _isSelf,
+                                onLiveClosed: _refreshProfile,
                                 isLoadingUser: _isLoadingUser,
                                 isFollowing: _isFollowing,
                                 isFollowedBy: _isFollowedBy,

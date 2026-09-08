@@ -4,7 +4,9 @@ import 'package:flutter_animate/flutter_animate.dart';
 
 import '../../../../core/utils/live_feed_fade.dart';
 import '../../../../core/widgets/gifter_level_badge.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../domain/entities/comment_entity.dart';
+import '../../domain/live_chat_rules.dart';
 import 'fallback_media.dart';
 import 'tiktok_live_tokens.dart';
 
@@ -120,13 +122,6 @@ class _CommentsSectionState extends State<CommentsSection> {
                 final comment = widget.alignTop
                     ? visible[index]
                     : visible[visible.length - 1 - index];
-                final isHostOrMod =
-                    (widget.currentUserId != null &&
-                        widget.currentUserId == widget.hostId) ||
-                    widget.moderatorIds.contains(widget.currentUserId);
-                final isSelf = comment.userId == widget.currentUserId;
-                final cIsJoin = comment.metadata?['type'] == 'join';
-                final cIsGift = comment.metadata?['type'] == 'gift';
                 final isMuted = widget.mutedUserIds.contains(comment.userId);
                 final isBanned = widget.bannedUserIds.contains(comment.userId);
                 return TikTokCommentBubble(
@@ -138,8 +133,13 @@ class _CommentsSectionState extends State<CommentsSection> {
                       isFromModerator: widget.moderatorIds.contains(
                         comment.userId,
                       ),
-                      showModerationMenu:
-                          isHostOrMod && !isSelf && !cIsJoin && !cIsGift,
+                      showModerationMenu: LiveChatModerationAccess.canShowMenu(
+                        currentUserId: widget.currentUserId,
+                        hostId: widget.hostId,
+                        moderatorIds: widget.moderatorIds,
+                        commentUserId: comment.userId,
+                        metadata: comment.metadata,
+                      ),
                       isMuted: isMuted,
                       isBanned: isBanned,
                       isPinned: comment.isPinned,
@@ -239,6 +239,12 @@ class TikTokCommentBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (_isJoin) {
+      final l10n = AppLocalizations.of(context);
+      final raw = comment.username.trim();
+      final name = raw.isNotEmpty
+          ? raw
+          : (l10n?.liveViewerFallbackName ?? '');
+      final text = l10n?.liveViewerJoined(name) ?? name;
       return Padding(
         padding: const EdgeInsets.only(bottom: TikTokLiveTokens.commentGap),
         child: Container(
@@ -249,23 +255,9 @@ class TikTokCommentBubble extends StatelessWidget {
             color: highContrast ? const Color(0xD90B0B0D) : Colors.transparent,
             borderRadius: BorderRadius.circular(10),
           ),
-          child: RichText(
-            text: TextSpan(
-              children: [
-                TextSpan(
-                  text: comment.username,
-                  style: TikTokLiveTokens.joinUser,
-                ),
-                TextSpan(
-                  text: ' joined',
-                  style: TikTokLiveTokens.commentBody.copyWith(
-                    color: Colors.white,
-                    shadows: const [],
-                  ),
-                ),
-                const TextSpan(text: ' 👋', style: TextStyle(fontSize: 12)),
-              ],
-            ),
+          child: Text(
+            text,
+            style: TikTokLiveTokens.joinUser,
           ),
         ),
       );

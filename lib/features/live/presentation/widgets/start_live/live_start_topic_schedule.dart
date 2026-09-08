@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:intl/intl.dart';
 
 import '../../../../../core/models/live_topic.dart';
+import '../../../../../l10n/app_localizations.dart';
 import '../../bloc/start_live/live_bloc.dart';
 import '../../bloc/start_live/live_event.dart';
 import '../../bloc/start_live/live_state.dart';
@@ -56,24 +56,25 @@ Future<void> showLiveTopicDialog(BuildContext context) async {
   bloc.add(LiveTopicChanged(LiveTopic.normalize(result)));
 }
 
-Future<void> showLiveSchedulePicker(BuildContext context) async {
-  final bloc = context.read<LiveBloc>();
-  final ready = bloc.state is LiveReady ? bloc.state as LiveReady : null;
+Future<DateTime?> pickLiveScheduleDateTime(
+  BuildContext context, {
+  DateTime? initial,
+}) async {
+  final l10n = AppLocalizations.of(context)!;
   final now = DateTime.now();
-  final initial = ready?.scheduledAt?.toLocal() ??
-      now.add(const Duration(hours: 1));
+  final seed = initial?.toLocal() ?? now.add(const Duration(hours: 1));
   final date = await showDatePicker(
     context: context,
-    initialDate: initial.isAfter(now) ? initial : now.add(const Duration(minutes: 5)),
+    initialDate: seed.isAfter(now) ? seed : now.add(const Duration(minutes: 5)),
     firstDate: DateTime(now.year, now.month, now.day),
     lastDate: now.add(const Duration(days: 365)),
   );
-  if (date == null || !context.mounted) return;
+  if (date == null || !context.mounted) return null;
   final time = await showTimePicker(
     context: context,
-    initialTime: TimeOfDay.fromDateTime(initial),
+    initialTime: TimeOfDay.fromDateTime(seed),
   );
-  if (time == null || !context.mounted) return;
+  if (time == null || !context.mounted) return null;
   final local = DateTime(
     date.year,
     date.month,
@@ -83,13 +84,24 @@ Future<void> showLiveSchedulePicker(BuildContext context) async {
   );
   if (!local.isAfter(DateTime.now())) {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Schedule time must be in the future')),
+      SnackBar(content: Text(l10n.liveScheduleMustBeFuture)),
     );
-    return;
+    return null;
   }
+  return local;
+}
+
+Future<void> showLiveSchedulePicker(BuildContext context) async {
+  final bloc = context.read<LiveBloc>();
+  final ready = bloc.state is LiveReady ? bloc.state as LiveReady : null;
+  final local = await pickLiveScheduleDateTime(
+    context,
+    initial: ready?.scheduledAt,
+  );
+  if (local == null) return;
   bloc.add(LiveScheduleChanged(local));
 }
 
 String formatLiveSchedule(DateTime value) {
-  return DateFormat.yMMMd().add_jm().format(value.toLocal());
+  return LiveSchedule.formatLocal(value);
 }

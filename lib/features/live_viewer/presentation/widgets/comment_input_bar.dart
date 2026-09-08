@@ -54,18 +54,24 @@ class CommentInputBar extends StatefulWidget {
   /// that keep the composer's visibility in a BLoC rather than local state.
   final VoidCallback? onDismiss;
 
+  /// When false, the field stays filled so a local rule rejection is not a drop.
+  final bool Function(String text)? onValidate;
+
   final bool enabled;
   final bool isSending;
   final String hintText;
+  final String? initialText;
 
   const CommentInputBar({
     super.key,
     required this.onSend,
     this.onEmojiTap,
     this.onDismiss,
+    this.onValidate,
     this.enabled = true,
     this.isSending = false,
     this.hintText = 'Write...',
+    this.initialText,
   });
 
   @override
@@ -82,6 +88,11 @@ class _CommentInputBarState extends State<CommentInputBar> {
   @override
   void initState() {
     super.initState();
+    final initial = widget.initialText?.trim();
+    if (initial != null && initial.isNotEmpty) {
+      _controller.text = initial;
+      _hasText = true;
+    }
     _controller.addListener(() {
       final has = _controller.text.trim().isNotEmpty;
       if (has != _hasText) setState(() => _hasText = has);
@@ -90,6 +101,19 @@ class _CommentInputBarState extends State<CommentInputBar> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _focusNode.requestFocus();
     });
+  }
+
+  @override
+  void didUpdateWidget(CommentInputBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final next = widget.initialText?.trim();
+    final previous = oldWidget.initialText?.trim();
+    if (next != null && next.isNotEmpty && next != previous) {
+      _controller.value = TextEditingValue(
+        text: next,
+        selection: TextSelection.collapsed(offset: next.length),
+      );
+    }
   }
 
   @override
@@ -111,6 +135,7 @@ class _CommentInputBarState extends State<CommentInputBar> {
   void _submit() {
     final text = _controller.text.trim();
     if (text.isEmpty || !widget.enabled || widget.isSending) return;
+    if (widget.onValidate != null && !widget.onValidate!(text)) return;
     widget.onSend(text);
     _controller.clear();
   }
@@ -202,11 +227,7 @@ class _CommentInputBarState extends State<CommentInputBar> {
               decoration: InputDecoration(
                 isDense: true,
                 border: InputBorder.none,
-                hintText: widget.isSending
-                    ? 'Sending...'
-                    : widget.enabled
-                    ? widget.hintText
-                    : 'Chat muted',
+                hintText: widget.hintText,
                 hintStyle: TikTokLiveTokens.inputHint,
                 contentPadding: EdgeInsets.zero,
               ),

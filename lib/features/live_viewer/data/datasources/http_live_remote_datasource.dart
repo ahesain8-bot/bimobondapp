@@ -101,7 +101,18 @@ class HttpLiveRemoteDataSource implements LiveRemoteDataSource {
     );
 
     final nestedLive = payload['live'];
-    final liveJson = nestedLive is Map<String, dynamic> ? nestedLive : payload;
+    final liveJson = Map<String, dynamic>.from(
+      nestedLive is Map
+          ? Map<String, dynamic>.from(nestedLive)
+          : payload,
+    );
+    if (!liveJson.containsKey('chatMuted') && payload.containsKey('chatMuted')) {
+      liveJson['chatMuted'] = payload['chatMuted'];
+    }
+    if (!liveJson.containsKey('isChatMuted') &&
+        payload.containsKey('isChatMuted')) {
+      liveJson['isChatMuted'] = payload['isChatMuted'];
+    }
 
     final live = LiveMapper.fromJson(liveJson);
     final liveKitUrl = payload['url']?.toString() ?? '';
@@ -224,6 +235,11 @@ class HttpLiveRemoteDataSource implements LiveRemoteDataSource {
       body: {if (channel != null && channel.isNotEmpty) 'channel': channel},
     );
     return LiveShareResult.fromJson(payload, liveId: liveId);
+  }
+
+  @override
+  Future<void> remindLive(String liveId) async {
+    await _api.post(ApiEndpoints.liveRemind(liveId));
   }
 
   @override

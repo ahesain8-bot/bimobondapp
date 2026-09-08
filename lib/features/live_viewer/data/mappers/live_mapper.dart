@@ -1,3 +1,4 @@
+import '../../../../app/auth/domain/entities/user_current_live.dart';
 import '../../domain/entities/live_entity.dart';
 import '../../domain/entities/live_feed_promotion.dart';
 import '../../domain/entities/live_feed_page_result.dart';
@@ -255,6 +256,12 @@ class LiveMapper {
           .where((s) => s.isNotEmpty)
           .toList(growable: false);
     }
+    if (json.containsKey('chatMuted')) {
+      meta['chatMuted'] = json['chatMuted'] == true;
+    }
+    if (json.containsKey('isChatMuted')) {
+      meta['isChatMuted'] = json['isChatMuted'] == true;
+    }
     if (houseId != null && houseId.isNotEmpty) {
       meta['houseId'] = houseId;
     }
@@ -345,6 +352,10 @@ class LiveMapper {
   ///
   /// Documented fields: `id`, `title`, `coverUrl`, `viewers`, `mediaMode`,
   /// `audioOnly`. Host identity comes from the profile user.
+  ///
+  /// Returns null when [isLive] is false (stale `currentLive` is ignored),
+  /// when `currentLive.id` is missing, or when the payload is PLANNED /
+  /// scheduled rather than an active broadcast. Never fabricates an id.
   static LiveEntity? fromProfileCurrentLive({
     required bool isLive,
     Map<String, dynamic>? currentLive,
@@ -353,15 +364,18 @@ class LiveMapper {
     String? hostAvatar,
   }) {
     if (!isLive) return null;
-    final raw = currentLive;
-    if (raw == null) return null;
-    final id = raw['id']?.toString();
-    if (id == null || id.isEmpty) return null;
+    final parsed = UserCurrentLive.tryParse(currentLive);
+    if (parsed == null) return null;
+    final raw = currentLive ?? const <String, dynamic>{};
     return fromJson({
       ...raw,
-      'status': raw['status'] ?? 'LIVE',
-      'coverUrl': raw['coverUrl'] ?? raw['cover'],
-      'viewers': raw['viewers'] ?? raw['viewerCount'],
+      'id': parsed.id,
+      'status': 'LIVE',
+      'title': parsed.title ?? raw['title'],
+      'coverUrl': parsed.coverUrl ?? raw['coverUrl'] ?? raw['cover'],
+      'viewers': parsed.viewers,
+      'mediaMode': parsed.mediaMode,
+      'audioOnly': parsed.audioOnly,
       'user': {'id': hostId, 'fullName': hostName, 'avatarUrl': hostAvatar},
     });
   }

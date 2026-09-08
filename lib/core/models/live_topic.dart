@@ -1,3 +1,5 @@
+import 'package:intl/intl.dart';
+
 /// Live `topic` (max 80) and `scheduledAt` (ISO-8601 UTC).
 ///
 /// Backend: `POST /lives`, `PATCH /lives/:id`, `PATCH /lives/:id/settings`
@@ -28,5 +30,10 @@ class LiveSchedule {
     if (raw == null) return null;
     if (raw is DateTime) return raw.toUtc();
     return DateTime.tryParse(raw.toString())?.toUtc();
+  }
+
+  /// Render a backend UTC instant in the device's local timezone.
+  static String formatLocal(DateTime value) {
+    return DateFormat.yMMMd().add_jm().format(value.toLocal());
   }
 }

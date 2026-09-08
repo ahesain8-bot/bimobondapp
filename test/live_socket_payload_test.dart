@@ -771,6 +771,17 @@ void main() {
       );
     });
 
+    test('LiveMapper.fromProfileCurrentLive is null for PLANNED', () {
+      expect(
+        LiveMapper.fromProfileCurrentLive(
+          isLive: true,
+          currentLive: {'id': 'live-9', 'status': 'PLANNED'},
+          hostId: 'host-1',
+        ),
+        isNull,
+      );
+    });
+
     test('report live path is POST /lives/:id/report', () {
       expect(ApiEndpoints.liveReport('abc'), '/lives/abc/report');
     });

@@ -6,8 +6,10 @@ import 'package:bimobondapp/app/ar_camera/ar_camera_bridge.dart';
 
 import '../../../../../core/models/live_media_mode.dart';
 import '../../../../../core/models/live_topic.dart';
+import '../../../../../l10n/app_localizations.dart';
 import '../../../data/datasources/lives_remote_datasource.dart';
 import '../../../data/mappers/live_session_mapper.dart';
+import '../../../domain/entities/live_session.dart';
 import '../../bloc/start_live/live_bloc.dart';
 import '../../bloc/start_live/live_event.dart';
 import '../../bloc/start_live/live_state.dart';
@@ -22,15 +24,21 @@ Future<void> openLiveRoomFromStart(
   required String title,
   LiveBloc? liveBloc,
   String? topic,
+  String? existingLiveId,
+  String? mediaMode,
 }) async {
   final bloc = liveBloc ?? context.read<LiveBloc>();
   final ready = bloc.state is LiveReady ? bloc.state as LiveReady : null;
-  final audioMode = ready?.isAudioMode == true;
+  final audioMode = mediaMode != null
+      ? LiveMediaMode.isAudio(mediaMode: mediaMode)
+      : ready?.isAudioMode == true;
   final resolvedTopic = LiveTopic.normalize(topic ?? ready?.topic);
+  final resolvedMode = audioMode ? LiveMediaMode.audio : LiveMediaMode.video;
   final useAr = ArLiveCameraPreview.isSupported && !audioMode;
   if (useAr) {
     await ArCameraBridge.setLivePublishingExclusive(true);
   }
+  if (!context.mounted) return;
 
   await LiveCountdownOverlay.run(context);
   if (!context.mounted) {
@@ -66,20 +74,22 @@ Future<void> openLiveRoomFromStart(
         ? PageRouteBuilder<void>(
             opaque: false,
             barrierColor: Colors.transparent,
-            pageBuilder: (_, __, ___) => LiveRoomPage(
+            pageBuilder: (context, animation, secondaryAnimation) => LiveRoomPage(
               title: title.isEmpty ? null : title,
               initialCamera: null,
               useArBeautyCamera: true,
-              mediaMode: audioMode ? LiveMediaMode.audio : LiveMediaMode.video,
+              mediaMode: resolvedMode,
               topic: resolvedTopic,
+              existingLiveId: existingLiveId,
             ),
           )
         : MaterialPageRoute<void>(
             builder: (_) => LiveRoomPage(
               title: title.isEmpty ? null : title,
               initialCamera: audioMode ? null : runningCamera,
-              mediaMode: audioMode ? LiveMediaMode.audio : LiveMediaMode.video,
+              mediaMode: resolvedMode,
               topic: resolvedTopic,
+              existingLiveId: existingLiveId,
             ),
           ),
   );
@@ -102,7 +112,7 @@ Future<bool> createPlannedLiveFromStart({
   }
   final response = await LivesRemoteDataSource().createPlanned(
     title: title.trim().isEmpty ? 'بث مباشر' : title.trim(),
-    scheduledAt: LiveSchedule.toUtcIso(scheduledAt),
+    scheduledAt: scheduledAt,
     mediaMode: audioMode ? LiveMediaMode.audio : LiveMediaMode.video,
     topic: LiveTopic.normalize(topic),
   );
@@ -115,7 +125,9 @@ Future<void> startOrScheduleFromStart(
   BuildContext context, {
   required String title,
   LiveBloc? liveBloc,
+  VoidCallback? onPlannedCreated,
 }) async {
+  final l10n = AppLocalizations.of(context)!;
   final bloc = liveBloc ?? context.read<LiveBloc>();
   final ready = bloc.state is LiveReady ? bloc.state as LiveReady : null;
   final scheduledAt = ready?.scheduledAt;
@@ -130,20 +142,51 @@ Future<void> startOrScheduleFromStart(
       topic: topic,
     );
     if (!context.mounted) return;
+    bloc.add(const LiveScheduleChanged(null));
+    onPlannedCreated?.call();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Scheduled for ${formatLiveSchedule(scheduledAt)}'),
+        content: Text(
+          l10n.liveScheduledFor(formatLiveSchedule(scheduledAt)),
+        ),
       ),
     );
     return;
   }
 
-  await openLiveRoomFromStart(context, title: title, liveBloc: bloc, topic: topic);
+  await openLiveRoomFromStart(
+    context,
+    title: title,
+    liveBloc: bloc,
+    topic: topic,
+  );
 }
+
+Future<void> startExistingPlannedLiveFromStart(
+  BuildContext context, {
+  required LiveSession live,
+  LiveBloc? liveBloc,
+}) async {
+  final title = live.title?.trim() ?? '';
+  await openLiveRoomFromStart(
+    context,
+    title: title,
+    liveBloc: liveBloc,
+    topic: live.topic,
+    existingLiveId: live.id,
+    mediaMode: live.mediaMode,
+  );
+}
+
 class LiveContainer extends StatefulWidget {
-  const LiveContainer({super.key, required this.titleController});
+  const LiveContainer({
+    super.key,
+    required this.titleController,
+    this.onPlannedCreated,
+  });
 
   final TextEditingController titleController;
+  final VoidCallback? onPlannedCreated;
 
   static const Color _tikTokRed = Color(0xFFFE2C55);
 
@@ -157,15 +200,17 @@ class _LiveContainerState extends State<LiveContainer> {
   Future<void> _onPressed() async {
     if (_busy) return;
     setState(() => _busy = true);
+    final l10n = AppLocalizations.of(context)!;
     try {
       await startOrScheduleFromStart(
         context,
         title: widget.titleController.text.trim(),
+        onPlannedCreated: widget.onPlannedCreated,
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not start live: $e')),
+        SnackBar(content: Text('${l10n.liveCouldNotStartLive}: $e')),
       );
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -174,6 +219,7 @@ class _LiveContainerState extends State<LiveContainer> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 28),
       child: SizedBox(
@@ -196,10 +242,10 @@ class _LiveContainerState extends State<LiveContainer> {
               ),
               child: Text(
                 _busy
-                    ? 'Scheduling…'
+                    ? l10n.liveScheduling
                     : scheduled
-                    ? 'Schedule LIVE'
-                    : 'Go LIVE',
+                    ? l10n.liveScheduleLive
+                    : l10n.cameraGoLive,
                 style: const TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.w800,

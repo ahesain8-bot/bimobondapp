@@ -321,7 +321,7 @@ class _OptionsContent extends StatelessWidget {
               onTap: pauseBusy
                   ? null
                   : () {
-                      bloc.add(const LiveRoomPauseLiveTapped());
+                      bloc.add(LiveRoomPauseLiveTapped(pause: !isPaused));
                       _close(context);
                     },
             ),

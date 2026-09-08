@@ -586,6 +586,28 @@ class FakeLiveRepository implements LiveRepository {
   }
 
   @override
+  Future<Either<Failure, void>> remindLive(String liveId) async {
+    try {
+      await _remote.remindLive(liveId);
+      return const Right(null);
+    } on SocketException catch (e) {
+      return Left(
+        NetworkFailure('No internet connection.', details: e.message),
+      );
+    } on UnauthorizedException catch (e) {
+      return Left(
+        AuthorizationFailure(
+          e.message,
+          code: e.statusCode?.toString(),
+          details: e.details,
+        ),
+      );
+    } catch (e) {
+      return Left(ServerFailure('Failed to set reminder: $e'));
+    }
+  }
+
+  @override
   Future<Either<Failure, List<LiveModerator>>> listModerators(
     String liveId,
   ) async {

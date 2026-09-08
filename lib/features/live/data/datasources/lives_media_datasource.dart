@@ -14,6 +14,7 @@ import '../../../../core/services/media_progress_watchdog.dart';
 import '../../../../core/services/live_video_quality_preference.dart';
 import '../../../../core/models/live_media_hints.dart';
 import '../../domain/entities/live_capture_profile.dart';
+import '../../domain/entities/live_host_outbound_pause_plan.dart';
 
 /// Publishes / subscribes LiveKit A/V using **server-issued** `url` + `token` only.
 ///
@@ -55,6 +56,11 @@ class LivesMediaDataSource {
 
   /// True while front/back flip pauses frames — must not tear down the room.
   var _outboundHealthPaused = false;
+
+  /// True while the host has intentionally paused the LIVE. Outbound tracks
+  /// are muted on purpose; stall sampling must not reconnect or tear down.
+  var _hostSessionMediaPaused = false;
+  Future<void> _hostPauseOperation = Future<void>.value();
   Timer? _battleVideoHealthTimer;
   var _battleVideoHealthCheckInFlight = false;
   // The opponent room is secondary and crosses another host's uplink, so it
@@ -456,7 +462,7 @@ class LivesMediaDataSource {
   Future<void> _sampleOutboundVideo(Room room, LocalVideoTrack track) async {
     try {
       // Front/back flip pauses beauty frames briefly — do not tear down LiveKit.
-      if (_outboundHealthPaused) {
+      if (_outboundHealthPaused || _hostSessionMediaPaused) {
         _videoProgress.reset();
         _screenShareProgress.reset();
         return;
@@ -545,12 +551,20 @@ class LivesMediaDataSource {
   void pauseOutboundHealthCheck() {
     _outboundHealthPaused = true;
     _videoProgress.reset();
+    _screenShareProgress.reset();
   }
 
   void resumeOutboundHealthCheck() {
-    _outboundHealthPaused = false;
     _videoProgress.reset();
+    _screenShareProgress.reset();
+    if (_hostSessionMediaPaused) {
+      return;
+    }
+    _outboundHealthPaused = false;
   }
+
+  /// True while Pause LIVE is holding outbound media muted on purpose.
+  bool get isHostSessionMediaPaused => _hostSessionMediaPaused;
 
   /// Signal mute to LiveKit/SFU so viewers freeze on the last good frame
   /// instead of decoding sideways/static buffers during CameraX rebind.
@@ -1615,6 +1629,197 @@ class LivesMediaDataSource {
     await _room?.localParticipant?.setCameraEnabled(enabled);
   }
 
+  Future<T> _serializeHostPause<T>(Future<T> Function() operation) {
+    final result = _hostPauseOperation.then((_) => operation());
+    _hostPauseOperation = result.then<void>((_) {}, onError: (_) {});
+    return result;
+  }
+
+  /// Mute outbound host media for a temporary LIVE pause.
+  ///
+  /// Uses [LocalTrack.mute] with `stopOnMute: false` so camera / mic / screen
+  /// capturers (including Android MediaProjection) stay alive. Never calls
+  /// [setScreenShareEnabled] — that unpublishes and destroys the share session.
+  Future<void> pauseHostOutboundMedia(LiveHostOutboundPausePlan plan) {
+    return _serializeHostPause(() async {
+      _hostSessionMediaPaused = true;
+      pauseOutboundHealthCheck();
+      try {
+        if (plan.muteMicrophone) {
+          await _setMicrophoneSendingForSessionPause(false);
+        }
+        if (plan.muteCamera) {
+          await _setCameraSendingForSessionPause(false);
+        }
+        if (plan.muteScreenShare) {
+          await _setScreenShareSendingForSessionPause(false);
+        }
+      } catch (e, st) {
+        debugPrint('[Host] live pause media failed: $e\n$st');
+        try {
+          await _restoreHostOutboundFromPlan(plan);
+        } catch (rollback, rollbackSt) {
+          debugPrint(
+            '[Host] live pause media rollback failed: $rollback\n$rollbackSt',
+          );
+        }
+        _hostSessionMediaPaused = false;
+        resumeOutboundHealthCheck();
+        rethrow;
+      }
+    });
+  }
+
+  /// Restore outbound host media after [pauseHostOutboundMedia].
+  Future<void> resumeHostOutboundMedia(LiveHostOutboundPausePlan plan) {
+    return _serializeHostPause(() async {
+      try {
+        await _restoreHostOutboundFromPlan(plan);
+      } catch (e, st) {
+        debugPrint('[Host] live resume media failed: $e\n$st');
+        try {
+          await _reapplyHostOutboundPauseFromPlan(plan);
+        } catch (rollback, rollbackSt) {
+          debugPrint(
+            '[Host] live resume media re-pause failed: $rollback\n$rollbackSt',
+          );
+        }
+        rethrow;
+      }
+      _hostSessionMediaPaused = false;
+      resumeOutboundHealthCheck();
+    });
+  }
+
+  Future<void> _restoreHostOutboundFromPlan(
+    LiveHostOutboundPausePlan plan,
+  ) async {
+    if (plan.restoreCamera) {
+      await _setCameraSendingForSessionPause(true);
+    }
+    if (plan.restoreScreenShare) {
+      await _setScreenShareSendingForSessionPause(true);
+    }
+    if (plan.restoreMicrophone) {
+      await _setMicrophoneSendingForSessionPause(true);
+    }
+  }
+
+  Future<void> _reapplyHostOutboundPauseFromPlan(
+    LiveHostOutboundPausePlan plan,
+  ) async {
+    if (plan.muteMicrophone) {
+      await _setMicrophoneSendingForSessionPause(false);
+    }
+    if (plan.muteCamera) {
+      await _setCameraSendingForSessionPause(false);
+    }
+    if (plan.muteScreenShare) {
+      await _setScreenShareSendingForSessionPause(false);
+    }
+  }
+
+  Future<void> _setMicrophoneSendingForSessionPause(bool enabled) async {
+    final track = _publishedMicrophoneTrack();
+    if (track != null) {
+      if (enabled) {
+        if (track.muted) await track.unmute(stopOnMute: false);
+      } else if (!track.muted) {
+        await track.mute(stopOnMute: false);
+      }
+      return;
+    }
+    if (enabled) {
+      await setMicrophoneEnabled(true);
+    }
+  }
+
+  Future<void> _setCameraSendingForSessionPause(bool enabled) async {
+    if (_arBeautyPublished) {
+      await _setArBeautyCameraSending(enabled);
+      return;
+    }
+    final track = _publishedCameraTrack();
+    if (track != null) {
+      if (enabled) {
+        if (track.muted) await track.unmute(stopOnMute: false);
+      } else if (!track.muted) {
+        await track.mute(stopOnMute: false);
+      }
+      return;
+    }
+    if (enabled) {
+      await setCameraEnabled(true);
+    }
+  }
+
+  Future<void> _setScreenShareSendingForSessionPause(bool enabled) async {
+    final video = _publishedScreenShareTrack();
+    final audio = _publishedScreenShareAudioTrack();
+    if (video == null && audio == null) {
+      if (enabled) {
+        throw StateError(
+          'Screen share track missing; cannot resume without MediaProjection',
+        );
+      }
+      return;
+    }
+    if (video != null) {
+      if (enabled) {
+        if (video.muted) await video.unmute(stopOnMute: false);
+      } else if (!video.muted) {
+        await video.mute(stopOnMute: false);
+      }
+    }
+    if (audio != null) {
+      if (enabled) {
+        if (audio.muted) await audio.unmute(stopOnMute: false);
+      } else if (!audio.muted) {
+        await audio.mute(stopOnMute: false);
+      }
+    }
+  }
+
+  LocalVideoTrack? _publishedCameraTrack() {
+    final held = _videoTrack;
+    if (held != null) return held;
+    final local = _room?.localParticipant;
+    if (local == null) return null;
+    for (final publication in local.videoTrackPublications) {
+      if (publication.source == TrackSource.camera &&
+          publication.track is LocalVideoTrack) {
+        return publication.track as LocalVideoTrack;
+      }
+    }
+    return null;
+  }
+
+  LocalAudioTrack? _publishedMicrophoneTrack() {
+    final held = _audioTrack;
+    if (held != null) return held;
+    final local = _room?.localParticipant;
+    if (local == null) return null;
+    for (final publication in local.audioTrackPublications) {
+      if (publication.source == TrackSource.microphone &&
+          publication.track is LocalAudioTrack) {
+        return publication.track as LocalAudioTrack;
+      }
+    }
+    return null;
+  }
+
+  LocalAudioTrack? _publishedScreenShareAudioTrack() {
+    final local = _room?.localParticipant;
+    if (local == null) return null;
+    for (final publication in local.audioTrackPublications) {
+      if (publication.source == TrackSource.screenShareAudio &&
+          publication.track is LocalAudioTrack) {
+        return publication.track as LocalAudioTrack;
+      }
+    }
+    return null;
+  }
+
   bool _arBeautyTrackNeedsRestore(LocalVideoTrack track) {
     return !track.isActive;
   }
@@ -1711,6 +1916,9 @@ class LivesMediaDataSource {
     if (room == null || local == null) {
       throw StateError('LiveKit room unavailable for screen share');
     }
+    // Temporary LIVE pause must NOT call this with false: LiveKit unpublishes
+    // the track and Android MediaProjection / FGS are destroyed. Pause uses
+    // mute(stopOnMute: false) on the existing publication instead.
     if (!enabled) {
       debugPrint(
         'LIVE_SCREEN_DIAG host before screen disable'
@@ -1928,6 +2136,8 @@ class LivesMediaDataSource {
     );
     _stopOutboundVideoWatchdog();
     _stopScreenShareDiagnostics();
+    _hostSessionMediaPaused = false;
+    _outboundHealthPaused = false;
     _arBeautyPublished = false;
     if (!keepBattleRoom) {
       await disconnectBattle();

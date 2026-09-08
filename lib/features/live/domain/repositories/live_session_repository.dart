@@ -1,6 +1,7 @@
 import '../entities/live_chat_message.dart';
 import '../entities/live_gallery_item.dart';
 import '../entities/live_guest.dart';
+import '../entities/live_host_outbound_pause_plan.dart';
 import '../entities/live_house.dart';
 import '../entities/live_interactive.dart';
 import '../entities/live_leaderboard_entry.dart';
@@ -308,8 +309,28 @@ abstract class LiveSessionRepository {
     String? topic,
   });
 
-  /// Reconnects to an existing LIVE as host (`POST /lives/:id/start`).
+  /// Starts or reconnects as host (`POST /lives/:id/start`).
+  ///
+  /// Starts a `PLANNED` live (early or late) or reconnects an existing `LIVE`.
+  /// Does not create a second live.
   Future<LiveSession> reconnectHostSession(String liveId);
+
+  /// `GET /lives/mine` filtered to `status == PLANNED`. Multiple rows allowed.
+  Future<List<LiveSession>> listPlannedHostLives({
+    int page = 1,
+    int limit = 50,
+  });
+
+  /// Host `PATCH /lives/:id` while `PLANNED` (title, topic, mediaMode, schedule).
+  /// Pass [clearScheduledAt] to send `{ "scheduledAt": null }` (not a delete).
+  Future<LiveSession> updatePlannedLive({
+    required String liveId,
+    String? title,
+    String? topic,
+    String? mediaMode,
+    DateTime? scheduledAt,
+    bool clearScheduledAt = false,
+  });
 
   /// Finds the caller's current `LIVE` session via `GET /lives/mine`, if any.
   Future<LiveSession?> findActiveHostLive();
@@ -323,6 +344,18 @@ abstract class LiveSessionRepository {
 
   /// Resume (`POST /lives/:id/resume`). Returns the server `paused` flag.
   Future<bool> resumeLive(String liveId);
+
+  /// Mute outbound host publications for a temporary LIVE pause.
+  ///
+  /// Does not disconnect LiveKit. Screen share is muted in place so Android
+  /// MediaProjection is not destroyed.
+  Future<void> pauseHostOutboundMedia(LiveHostOutboundPausePlan plan);
+
+  /// Restore outbound host publications after [pauseHostOutboundMedia].
+  Future<void> resumeHostOutboundMedia(LiveHostOutboundPausePlan plan);
+
+  /// True while an intentional LIVE pause is holding outbound media muted.
+  bool get isHostOutboundMediaPaused;
 
   /// Host-only OBS / RTMP bundle (`GET /lives/:id/studio`).
   /// Missing Ingress returns null credentials — never fails go-live.

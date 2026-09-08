@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../domain/entities/live_session.dart';
+import '../../../domain/live_viewer_ban_state.dart';
 import '../../../domain/repositories/live_session_repository.dart';
 import '../../bloc/live_room/live_room_bloc.dart';
 import '../../bloc/live_room/live_room_event.dart';
@@ -107,15 +108,30 @@ class _LiveRoomPeopleSheetBodyState extends State<_LiveRoomPeopleSheetBody>
           : _error != null
               ? LiveRoomSheetStatus.error(message: _error!)
               : BlocBuilder<LiveRoomBloc, LiveRoomState>(
-                  buildWhen: (previous, current) =>
-                      current is LiveRoomReady &&
-                      (previous is! LiveRoomReady ||
-                          previous.session.viewerCount !=
-                              current.session.viewerCount),
+                  buildWhen: (previous, current) {
+                    if (current is! LiveRoomReady) return false;
+                    if (previous is! LiveRoomReady) return true;
+                    return previous.session.viewerCount !=
+                            current.session.viewerCount ||
+                        previous.bannedUserIds != current.bannedUserIds ||
+                        previous.bannedViewerNames !=
+                            current.bannedViewerNames;
+                  },
                   builder: (context, state) {
-                    final viewers = state is LiveRoomReady
-                        ? state.session.viewerCount
-                        : widget.session.viewerCount;
+                    final ready = state is LiveRoomReady ? state : null;
+                    final viewers = ready?.session.viewerCount ??
+                        widget.session.viewerCount;
+                    final hostId = ready?.session.host.id ??
+                        widget.session.host.id;
+                    final bannedIds = ready?.bannedUserIds ?? const <String>{};
+                    final bannedNames =
+                        ready?.bannedViewerNames ?? const <String, String>{};
+                    final roster = liveRoomPeopleRosterForModeration(
+                      roster: _viewers,
+                      hostId: hostId,
+                      bannedUserIds: bannedIds,
+                      bannedViewerNames: bannedNames,
+                    );
                     return ListView(
                       padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                       children: [
@@ -137,7 +153,7 @@ class _LiveRoomPeopleSheetBodyState extends State<_LiveRoomPeopleSheetBody>
                           value: '$_pendingGuests',
                           subtitle: 'REQUESTED + INVITED',
                         ),
-                        if (_viewers.isNotEmpty) ...[
+                        if (roster.isNotEmpty) ...[
                           const SizedBox(height: 20),
                           const Text(
                             'من يشاهد الآن',
@@ -148,8 +164,14 @@ class _LiveRoomPeopleSheetBodyState extends State<_LiveRoomPeopleSheetBody>
                             ),
                           ),
                           const SizedBox(height: 8),
-                          for (final viewer in _viewers)
-                            _ViewerRow(viewer: viewer),
+                          for (final viewer in roster)
+                            LiveRoomPeopleViewerRow(
+                              viewer: viewer,
+                              isBanned: isLiveViewerBanned(
+                                bannedIds,
+                                viewer.userId,
+                              ),
+                            ),
                         ],
                         const SizedBox(height: 20),
                         FilledButton.icon(
@@ -210,12 +232,16 @@ class _LiveRoomPeopleSheetBodyState extends State<_LiveRoomPeopleSheetBody>
   }
 }
 
-/// One person in the roster: picture, name, and their gifter level when the
-/// server sends one.
-class _ViewerRow extends StatelessWidget {
-  const _ViewerRow({required this.viewer});
+/// One person in the host People roster, with LIVE-specific Ban / Unban.
+class LiveRoomPeopleViewerRow extends StatelessWidget {
+  const LiveRoomPeopleViewerRow({
+    super.key,
+    required this.viewer,
+    required this.isBanned,
+  });
 
   final LiveViewer viewer;
+  final bool isBanned;
 
   @override
   Widget build(BuildContext context) {
@@ -252,13 +278,35 @@ class _ViewerRow extends StatelessWidget {
           ),
           if (viewer.isVerified)
             const Padding(
-              padding: EdgeInsets.only(left: 4),
+              padding: EdgeInsets.only(left: 4, right: 4),
               child: Icon(Icons.verified, size: 15, color: Colors.lightBlue),
             ),
           if ((viewer.gifterLevel ?? 0) > 0) ...[
             const SizedBox(width: 6),
             GifterLevelBadge(level: viewer.gifterLevel!, compact: true),
           ],
+          const SizedBox(width: 8),
+          TextButton(
+            onPressed: () {
+              context.read<LiveRoomBloc>().add(
+                LiveRoomModerationRequested(
+                  action: isBanned
+                      ? LiveRoomModerationAction.unbanViewer
+                      : LiveRoomModerationAction.banViewer,
+                  commentId: '',
+                  userId: viewer.userId,
+                  username: viewer.displayName,
+                ),
+              );
+            },
+            style: TextButton.styleFrom(
+              foregroundColor: isBanned
+                  ? Colors.white70
+                  : Colors.redAccent,
+              visualDensity: VisualDensity.compact,
+            ),
+            child: Text(isBanned ? 'إلغاء الحظر' : 'حظر من البث'),
+          ),
         ],
       ),
     );

@@ -3,10 +3,12 @@ import 'dart:async';
 import 'package:dartz/dartz.dart';
 
 import '../../../../core/network/api_endpoints.dart';
+import '../../../../core/network/api_exceptions.dart';
 import '../../../../core/network/live_api_client.dart';
 import 'package:bimobondapp/features/live_viewer/core/errors/failures.dart';
 import '../../domain/entities/comment_entity.dart';
 import '../../domain/entities/socket_event.dart';
+import '../../domain/live_chat_rules.dart';
 import '../../domain/repositories/comment_repository.dart';
 import '../services/fake_socket_service.dart' show SocketService;
 
@@ -110,8 +112,25 @@ class RealCommentRepository implements CommentRepository {
       // Local echo for instant UI (the server also broadcasts liveComment).
       _append(liveId, comment);
       return Right(comment);
+    } on ApiException catch (e) {
+      final code = e.details is Map
+          ? (e.details['code'] ?? e.details['error'] ?? e.details['errorCode'])
+                ?.toString()
+          : null;
+      return Left(
+        ServerFailure(
+          e.message,
+          code: (code != null && code.isNotEmpty)
+              ? code
+              : e.statusCode?.toString(),
+          details: e.details,
+        ),
+      );
     } catch (e) {
-      return Left(ServerFailure('Failed to send comment: $e'));
+      final cleaned = LiveCommentSendFailure.sanitizeServerMessage(e.toString());
+      return Left(
+        ServerFailure(cleaned ?? 'Could not send comment'),
+      );
     }
   }
 

@@ -117,6 +117,7 @@ class LiveStateOverlay extends StatelessWidget {
         );
       case LiveConnectionState.connected:
       case LiveConnectionState.idle:
+      case LiveConnectionState.scheduled:
         return const SizedBox.shrink();
     }
   }

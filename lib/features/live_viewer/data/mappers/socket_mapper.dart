@@ -3,6 +3,7 @@ import '../../domain/entities/gift_entity.dart';
 import '../../domain/entities/socket_event.dart';
 import '../../../../core/models/live_battle.dart';
 import '../../../live/domain/entities/live_interactive.dart';
+import '../../../live/domain/live_viewer_display_name.dart';
 import 'hourly_ranking_mapper.dart';
 
 /// Converts Socket.IO payloads (lives/mobile-api.md §16) into typed
@@ -330,7 +331,7 @@ class SocketMapper {
     return UserJoinedEvent(
       liveId: map['liveId']?.toString() ?? fallbackLiveId ?? '',
       userId: userId,
-      username: _displayName(user, fallback: 'User'),
+      username: liveViewerDisplayNameFrom(user) ?? '',
       avatarUrl: user['avatarUrl']?.toString() ?? user['avatar']?.toString(),
       viewerCount: _viewerCount(map),
       timestamp: DateTime.now(),

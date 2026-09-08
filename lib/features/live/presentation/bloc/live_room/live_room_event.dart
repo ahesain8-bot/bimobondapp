@@ -18,6 +18,7 @@ class LiveRoomStarted extends LiveRoomEvent {
     this.useArBeautyCamera = false,
     this.mediaMode = 'VIDEO',
     this.topic,
+    this.existingLiveId,
   });
 
   final String? title;
@@ -33,6 +34,10 @@ class LiveRoomStarted extends LiveRoomEvent {
 
   /// Optional `topic` (max 80) sent on `POST /lives`.
   final String? topic;
+
+  /// When set, start this existing `PLANNED`/`LIVE` via `POST /lives/:id/start`.
+  /// Never creates a second live.
+  final String? existingLiveId;
 }
 
 /// Ends the stuck active live (`GET /lives/mine` → `POST …/end`) then retries start.
@@ -68,6 +73,13 @@ class LiveRoomAppResumed extends LiveRoomEvent {
 /// Bottom-bar chat action tapped.
 class LiveRoomChatTapped extends LiveRoomEvent {
   const LiveRoomChatTapped();
+}
+
+/// Opens the host comment composer with [text] already in the field.
+class LiveRoomChatPrefillRequested extends LiveRoomEvent {
+  const LiveRoomChatPrefillRequested(this.text);
+
+  final String text;
 }
 
 class LiveRoomChatComposerClosed extends LiveRoomEvent {
@@ -236,8 +248,13 @@ class LiveRoomAiContentToggled extends LiveRoomEvent {
 }
 
 /// Pauses or resumes the live via `POST /lives/:id/pause` or `/resume`.
+///
+/// [pause] is the intended action captured at tap time so a queued second
+/// tap cannot toggle the opposite way.
 class LiveRoomPauseLiveTapped extends LiveRoomEvent {
-  const LiveRoomPauseLiveTapped();
+  const LiveRoomPauseLiveTapped({required this.pause});
+
+  final bool pause;
 }
 
 /// Navigable / deferred options from the more menu.
@@ -410,6 +427,7 @@ enum LiveRoomModerationAction {
   muteChat,
   unmuteChat,
   banViewer,
+  unbanViewer,
   assignModerator,
   removeModerator,
 }
@@ -419,9 +437,13 @@ class LiveRoomModerationRequested extends LiveRoomEvent {
     required this.action,
     required this.commentId,
     this.userId,
+    this.username,
   });
 
   final LiveRoomModerationAction action;
   final String commentId;
   final String? userId;
+
+  /// Optional display name so the People roster can label Unban after a ban.
+  final String? username;
 }

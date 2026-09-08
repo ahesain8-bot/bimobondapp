@@ -8,6 +8,7 @@ import '../../../../../core/utils/live_feed_fade.dart';
 import '../../../../../core/constants/app_spacing.dart';
 import '../../../../../core/utils/app_text_styles.dart';
 import '../../../../../core/widgets/gifter_level_badge.dart';
+import '../../../../../l10n/app_localizations.dart';
 import '../../../domain/entities/live_chat_message.dart';
 import '../../bloc/live_room/live_room_bloc.dart';
 import '../../bloc/live_room/live_room_event.dart';
@@ -224,7 +225,20 @@ class _ChatMessageTile extends StatelessWidget {
         action: action,
         commentId: message.id,
         userId: message.userId,
+        username: message.username,
       ),
+    );
+  }
+
+  void _prefillWelcome(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    if (l10n == null) return;
+    final raw = message.username?.trim();
+    final name = (raw != null && raw.isNotEmpty)
+        ? raw
+        : l10n.liveViewerFallbackName;
+    context.read<LiveRoomBloc>().add(
+      LiveRoomChatPrefillRequested(l10n.liveWelcomeViewer(name)),
     );
   }
 
@@ -238,6 +252,7 @@ class _ChatMessageTile extends StatelessWidget {
         message.username!.isNotEmpty;
 
     return GestureDetector(
+      onTap: message.isJoinEvent ? () => _prefillWelcome(context) : null,
       onLongPress: () => _showModeration(context),
       child: Container(
         // No surface and no border, during a battle too. TikTok carries its
@@ -343,6 +358,22 @@ class _MessageText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    if (message.isJoinEvent) {
+      final raw = message.username?.trim();
+      final name = (raw != null && raw.isNotEmpty)
+          ? raw
+          : (l10n?.liveViewerFallbackName ?? '');
+      final text = l10n?.liveViewerJoined(name) ?? name;
+      return Text(
+        text,
+        style: AppTextStyles.roomChat,
+        textAlign: TextAlign.start,
+        maxLines: maxLines,
+        overflow: maxLines == null ? null : TextOverflow.ellipsis,
+      );
+    }
+
     final name = message.username;
     final body = message.body;
     final pin = message.isPinned && showPinMarker ? '📌 ' : '';

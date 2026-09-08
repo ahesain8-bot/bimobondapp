@@ -1,5 +1,9 @@
+import '../../../../core/models/live_topic.dart';
 import '../../../../core/network/api_endpoints.dart';
 import '../../../../core/network/live_api_client.dart';
+import '../../domain/live_planned_scheduling.dart';
+
+const Object _livePatchUnset = Object();
 
 /// HTTP access to `/lives` and `/gifts` endpoints documented in mobile-api.md.
 class LivesRemoteDataSource {
@@ -30,10 +34,10 @@ class LivesRemoteDataSource {
     );
   }
 
-  /// `POST /lives` as `PLANNED`. Do not send `startNow: true`.
+  /// `POST /lives` as `PLANNED`. Never send `startNow` with `scheduledAt`.
   Future<Map<String, dynamic>> createPlanned({
     required String title,
-    required String scheduledAt,
+    required DateTime scheduledAt,
     String? coverUrl,
     String? categoryId,
     String mediaMode = 'VIDEO',
@@ -41,15 +45,14 @@ class LivesRemoteDataSource {
   }) {
     return _api.post(
       ApiEndpoints.lives,
-      body: {
-        'title': title,
-        'startNow': false,
-        'scheduledAt': scheduledAt,
-        'mediaMode': mediaMode,
-        if (coverUrl != null) 'coverUrl': coverUrl,
-        if (categoryId != null) 'categoryId': categoryId,
-        if (topic != null && topic.isNotEmpty) 'topic': topic,
-      },
+      body: LivePlannedScheduling.createBody(
+        title: title,
+        scheduledAt: scheduledAt,
+        mediaMode: mediaMode,
+        coverUrl: coverUrl,
+        topic: topic,
+        categoryId: categoryId,
+      ),
     );
   }
 
@@ -118,6 +121,8 @@ class LivesRemoteDataSource {
     String? title,
     String? coverUrl,
     String? topic,
+    String? mediaMode,
+    Object? scheduledAt = _livePatchUnset,
   }) {
     return _api.patch(
       ApiEndpoints.liveById(liveId),
@@ -125,8 +130,18 @@ class LivesRemoteDataSource {
         if (title != null) 'title': title,
         if (coverUrl != null) 'coverUrl': coverUrl,
         if (topic != null) 'topic': topic,
+        if (mediaMode != null) 'mediaMode': mediaMode,
+        if (!identical(scheduledAt, _livePatchUnset))
+          'scheduledAt': scheduledAt is DateTime
+              ? LiveSchedule.toUtcIso(scheduledAt)
+              : scheduledAt,
       },
     );
+  }
+
+  /// `POST /lives/:id/remind` — viewer reminder; host cannot remind self.
+  Future<Map<String, dynamic>> remind(String liveId) {
+    return _api.post(ApiEndpoints.liveRemind(liveId));
   }
 
   Future<Map<String, dynamic>> like(String liveId) {
