@@ -62,10 +62,17 @@ class _LiveRepo implements LiveRepository {
   _LiveRepo(this.live);
   final LiveEntity live;
 
+  // Activation now checks fresh room permissions before joining. Supply the
+  // same unrestricted fixture; keep all stage/publish assertions unchanged.
+  @override
+  Future<Either<Failure, LiveEntity>> getLiveById(String liveId) async =>
+      Right(live);
+
   @override
   Future<Either<Failure, JoinLiveResult>> joinLive(
     String liveId, {
     String? campaignId,
+    String? trafficSource,
   }) async {
     return Right(
       JoinLiveResult(

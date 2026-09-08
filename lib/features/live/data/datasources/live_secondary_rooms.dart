@@ -18,7 +18,23 @@ import '../../domain/entities/live_cohost.dart';
 /// This never publishes. The primary room — camera, microphone, the host's own
 /// uplink — is owned elsewhere and is not touched from here.
 class LiveSecondaryRooms extends ChangeNotifier {
-  LiveSecondaryRooms({int maxRooms = 3}) : _maxRooms = maxRooms;
+  LiveSecondaryRooms({
+    int maxRooms = 3,
+    Room Function()? roomFactory,
+    Future<void> Function()? acquireAudioSession,
+    Future<void> Function()? releaseAudioSession,
+  }) : _maxRooms = maxRooms,
+       _roomFactory = roomFactory ?? _newRoom,
+       _acquireAudio = acquireAudioSession ?? LiveAudioSession.instance.acquire,
+       _releaseAudio = releaseAudioSession ?? LiveAudioSession.instance.release;
+
+  final Room Function() _roomFactory;
+  final Future<void> Function() _acquireAudio;
+  final Future<void> Function() _releaseAudio;
+
+  static Room _newRoom() => Room(
+    roomOptions: const RoomOptions(adaptiveStream: false, dynacast: false),
+  );
 
   /// A room plus three partners is the documented ceiling.
   final int _maxRooms;
@@ -26,6 +42,10 @@ class LiveSecondaryRooms extends ChangeNotifier {
   final Map<String, _SecondarySlot> _slots = {};
   var _holdsAudioSession = false;
   var _disposed = false;
+  var _syncGeneration = 0;
+  var _roomCount = 0;
+  Future<void> _audioQueue = Future<void>.value();
+  Future<void> _cleanupQueue = Future<void>.value();
 
   /// Live ids currently held, in insertion order.
   List<String> get liveIds => List.unmodifiable(_slots.keys);
@@ -41,14 +61,23 @@ class LiveSecondaryRooms extends ChangeNotifier {
 
   bool isConnecting(String liveId) => _slots[liveId]?.connecting ?? false;
 
-  /// The first remote video track published in [liveId]'s room, if any.
-  RemoteVideoTrack? videoTrackFor(String liveId) {
+  /// Only a camera published by the verified LiveKit host identity is eligible.
+  /// The caller must obtain that identity from the room credential contract;
+  /// neither liveId nor a guessed first participant is an identity source.
+  RemoteVideoTrack? videoTrackFor(String liveId, {String? hostIdentity}) {
+    if (hostIdentity == null || hostIdentity.isEmpty) return null;
     final room = roomFor(liveId);
     if (room == null) return null;
     for (final participant in room.remoteParticipants.values) {
+      if (participant.identity != hostIdentity) continue;
       for (final publication in participant.videoTrackPublications) {
         final track = publication.track;
-        if (track is RemoteVideoTrack && publication.subscribed) return track;
+        if (track is RemoteVideoTrack &&
+            publication.subscribed &&
+            !publication.muted &&
+            publication.source == TrackSource.camera) {
+          return track;
+        }
       }
     }
     return null;
@@ -61,6 +90,7 @@ class LiveSecondaryRooms extends ChangeNotifier {
   /// Ordering is preserved so tiles do not jump when one partner leaves.
   Future<void> sync(List<LiveCohostRoom> desired) async {
     if (_disposed) return;
+    final syncGeneration = ++_syncGeneration;
     final wanted = <String, LiveCohostRoom>{};
     for (final room in desired) {
       if (!room.isConnectable) continue;
@@ -72,21 +102,32 @@ class LiveSecondaryRooms extends ChangeNotifier {
         .where((id) => !wanted.containsKey(id))
         .toList(growable: false);
     for (final id in stale) {
-      await disconnect(id);
+      if (_disposed || syncGeneration != _syncGeneration) return;
+      await _disconnect(id);
     }
 
     for (final entry in wanted.entries) {
+      if (_disposed || syncGeneration != _syncGeneration) return;
       final existing = _slots[entry.key];
       // A token refresh for a room we already hold is not a reason to tear the
       // tile down; only a different room or a dead connection is.
-      if (existing != null && existing.isUsable) continue;
-      await connect(entry.value);
+      if (existing != null &&
+          existing.matches(entry.value) &&
+          (existing.isUsable || existing.connecting)) {
+        continue;
+      }
+      await _connect(entry.value);
     }
   }
 
   /// Connects one partner room. Safe to call again for the same live id: the
   /// previous connection for that id is closed first, and only by this slot.
-  Future<void> connect(LiveCohostRoom target) async {
+  Future<void> connect(LiveCohostRoom target) {
+    _syncGeneration++;
+    return _connect(target);
+  }
+
+  Future<void> _connect(LiveCohostRoom target) async {
     if (_disposed || !target.isConnectable) return;
     if (!_slots.containsKey(target.liveId) && _slots.length >= _maxRooms) {
       return;
@@ -96,91 +137,134 @@ class LiveSecondaryRooms extends ChangeNotifier {
       () => _SecondarySlot(target.liveId),
     );
     final generation = ++slot.generation;
+    slot.target = target;
+    slot.connecting = true;
     await slot.serialize(() async {
       if (_disposed || generation != slot.generation) return;
       await slot.closeCurrent();
+      if (_disposed || generation != slot.generation) return;
       slot.connecting = true;
       _notify();
       Room? room;
+      EventsListener<RoomEvent>? listener;
       try {
         await _acquireAudioSession();
-        room = Room(
-          roomOptions: const RoomOptions(
-            // These tiles mount their renderer only once a track exists;
-            // adaptive stream can unsubscribe before that and leave a room
-            // that never shows a frame.
-            adaptiveStream: false,
-            dynacast: false,
-          ),
-        );
-        final listener = room.createListener();
-        listener.on<RoomDisconnectedEvent>((_) {
-          // Only the slot that still owns this room reacts to its events.
-          if (slot.room == room && generation == slot.generation) _notify();
-        });
-        listener.on<TrackSubscribedEvent>((_) {
-          if (slot.room == room && generation == slot.generation) _notify();
-        });
-        listener.on<TrackUnsubscribedEvent>((_) {
-          if (slot.room == room && generation == slot.generation) _notify();
-        });
-        await room.connect(target.url, target.token);
-        if (_disposed || generation != slot.generation) {
-          // A newer connect (or a disconnect) won while we were in flight.
-          await listener.dispose();
-          await room.disconnect();
-          await room.dispose();
-          return;
-        }
-        slot.adopt(room: room, listener: listener);
-      } catch (error, stack) {
-        debugPrint('Co-host room ${target.liveId} connect failed: $error');
-        debugPrintStack(stackTrace: stack);
-        if (room != null && slot.room != room) {
-          try {
-            await room.disconnect();
-            await room.dispose();
-          } catch (_) {
-            /* Already gone. */
+        if (_disposed || generation != slot.generation) return;
+        room = _roomFactory();
+        _roomCount++;
+        listener = room.createListener();
+        void changed() {
+          if (identical(slot.room, room) && generation == slot.generation) {
+            _notify();
           }
         }
+
+        listener
+          ..on<RoomDisconnectedEvent>((_) => changed())
+          ..on<RoomReconnectingEvent>((_) => changed())
+          ..on<RoomReconnectedEvent>((_) => changed())
+          ..on<ParticipantConnectedEvent>((_) => changed())
+          ..on<ParticipantDisconnectedEvent>((_) => changed())
+          ..on<TrackPublishedEvent>((_) => changed())
+          ..on<TrackUnpublishedEvent>((_) => changed())
+          ..on<TrackSubscribedEvent>((_) => changed())
+          ..on<TrackUnsubscribedEvent>((_) => changed())
+          ..on<TrackMutedEvent>((_) => changed())
+          ..on<TrackUnmutedEvent>((_) => changed());
+        await room.connect(target.url, target.token);
+        if (_disposed || generation != slot.generation) return;
+        slot.adopt(room: room, listener: listener);
+      } catch (_) {
+        // Connection exceptions can contain URLs or credential fragments.
+        debugPrint('Secondary LiveKit connection failed');
       } finally {
-        if (generation == slot.generation) slot.connecting = false;
+        if (generation == slot.generation) {
+          slot.connecting = false;
+          if (slot.room == null && identical(_slots[target.liveId], slot)) {
+            _slots.remove(target.liveId);
+          }
+        }
+        if (room != null && !identical(slot.room, room)) {
+          await _cleanup(
+            () => _SecondarySlot.closeResources(room, listener),
+            hasRoom: true,
+          );
+        }
+        await _releaseAudioSessionIfIdle();
         _notify();
       }
     });
   }
 
-  /// Closes one partner room and forgets its slot.
-  Future<void> disconnect(String liveId) async {
-    final slot = _slots[liveId];
+  /// Detach ownership before awaiting cleanup so reconnect gets a new slot.
+  Future<void> disconnect(String liveId) {
+    _syncGeneration++;
+    return _disconnect(liveId);
+  }
+
+  Future<void> _disconnect(String liveId) async {
+    final slot = _slots.remove(liveId);
     if (slot == null) return;
     slot.generation++;
-    await slot.serialize(slot.closeCurrent);
-    _slots.remove(liveId);
-    await _releaseAudioSessionIfIdle();
+    _notify();
+    await slot.serialize(
+      () => _cleanup(slot.closeCurrent, hasRoom: slot.room != null),
+    );
     _notify();
   }
 
-  /// Closes every partner room. The primary room is untouched.
+  /// Closes only the slots held when this call starts, including in-flight
+  /// connects. A later reconnect belongs to the subsequent caller.
   Future<void> disconnectAll() async {
+    _syncGeneration++;
     final ids = _slots.keys.toList(growable: false);
-    for (final id in ids) {
-      await disconnect(id);
-    }
+    await Future.wait(ids.map(_disconnect));
   }
 
-  Future<void> _acquireAudioSession() async {
+  // Serialize final cleanup so simultaneous closes hand the audio lease back
+  // before the last Room teardown, not after every SDK room has already gone.
+  Future<void> _cleanup(
+    Future<void> Function() close, {
+    required bool hasRoom,
+  }) {
+    final result = _cleanupQueue.then((_) async {
+      try {
+        try {
+          await _releaseAudioSessionIfIdle(finalClose: hasRoom);
+        } finally {
+          await close();
+        }
+      } finally {
+        if (hasRoom) _roomCount--;
+        await _releaseAudioSessionIfIdle();
+      }
+    });
+    _cleanupQueue = result.then<void>((_) {}, onError: (_, _) {});
+    return result;
+  }
+
+  Future<void> _serializeAudio(Future<void> Function() operation) {
+    final result = _audioQueue.then((_) => operation());
+    _audioQueue = result.then<void>((_) {}, onError: (_, _) {});
+    return result;
+  }
+
+  Future<void> _acquireAudioSession() => _serializeAudio(() async {
     if (_holdsAudioSession) return;
-    await LiveAudioSession.instance.acquire();
+    await _acquireAudio();
     _holdsAudioSession = true;
-  }
+  });
 
-  Future<void> _releaseAudioSessionIfIdle() async {
-    if (!_holdsAudioSession || _slots.isNotEmpty) return;
-    await LiveAudioSession.instance.release();
-    _holdsAudioSession = false;
-  }
+  Future<void> _releaseAudioSessionIfIdle({bool finalClose = false}) =>
+      _serializeAudio(() async {
+        if (!_holdsAudioSession ||
+            _slots.isNotEmpty ||
+            _roomCount > (finalClose ? 1 : 0)) {
+          return;
+        }
+        await _releaseAudio();
+        _holdsAudioSession = false;
+      });
 
   void _notify() {
     if (_disposed) return;
@@ -208,6 +292,10 @@ class _SecondarySlot {
   /// that it has been superseded.
   int generation = 0;
   bool connecting = false;
+  LiveCohostRoom? target;
+
+  bool matches(LiveCohostRoom other) =>
+      target?.url == other.url && target?.roomName == other.roomName;
 
   Future<void> _queue = Future<void>.value();
 
@@ -221,7 +309,10 @@ class _SecondarySlot {
     return result;
   }
 
-  void adopt({required Room room, required EventsListener<RoomEvent> listener}) {
+  void adopt({
+    required Room room,
+    required EventsListener<RoomEvent> listener,
+  }) {
     this.room = room;
     _listener = listener;
   }
@@ -232,19 +323,29 @@ class _SecondarySlot {
     final listener = _listener;
     room = null;
     _listener = null;
-    if (listener != null) {
-      try {
-        await listener.dispose();
-      } catch (_) {
-        /* Already disposed. */
-      }
+    await closeResources(current, listener);
+  }
+
+  static Future<void> closeResources(
+    Room? current,
+    EventsListener<RoomEvent>? listener,
+  ) async {
+    try {
+      await listener?.dispose();
+    } catch (_) {
+      debugPrint('Secondary listener cleanup failed');
     }
     if (current == null) return;
     try {
       await current.disconnect();
-      await current.dispose();
-    } catch (error) {
-      debugPrint('Co-host room $liveId disconnect failed: $error');
+    } catch (_) {
+      debugPrint('Secondary room disconnect failed');
+    } finally {
+      try {
+        await current.dispose();
+      } catch (_) {
+        debugPrint('Secondary room disposal failed');
+      }
     }
   }
 }

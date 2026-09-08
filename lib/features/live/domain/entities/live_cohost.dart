@@ -84,6 +84,7 @@ class LiveCohostRoom extends Equatable {
     this.roomName,
     this.role,
     this.hostId,
+    this.hostIdentity,
     this.hostName,
     this.hostAvatarUrl,
   });
@@ -96,6 +97,13 @@ class LiveCohostRoom extends Equatable {
   /// Documented as `viewer` for these tiles — subscribe only.
   final String? role;
   final String? hostId;
+
+  /// LiveKit participant identity for the partner host.
+  ///
+  /// It is intentionally distinct from [hostId]: a user id is not a safe
+  /// LiveKit identity. Without this value the tile waits rather than rendering
+  /// an arbitrary remote participant.
+  final String? hostIdentity;
   final String? hostName;
   final String? hostAvatarUrl;
 
@@ -110,6 +118,7 @@ class LiveCohostRoom extends Equatable {
     roomName,
     role,
     hostId,
+    hostIdentity,
     hostName,
     hostAvatarUrl,
   ];

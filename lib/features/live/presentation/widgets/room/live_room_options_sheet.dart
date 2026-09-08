@@ -111,8 +111,7 @@ class _LiveRoomOptionsSheetBody extends StatelessWidget {
                             previous.isLivePaused != current.isLivePaused ||
                             previous.isPauseActionBusy !=
                                 current.isPauseActionBusy ||
-                            previous.session.paused !=
-                                current.session.paused ||
+                            previous.session.paused != current.session.paused ||
                             previous.showLiveGiftsBadge !=
                                 current.showLiveGiftsBadge ||
                             previous.showLiveTitleBadge !=
@@ -123,8 +122,7 @@ class _LiveRoomOptionsSheetBody extends StatelessWidget {
                                 current.session.scene.scene;
                       },
                       builder: (context, state) {
-                        final ready =
-                            state is LiveRoomReady ? state : null;
+                        final ready = state is LiveRoomReady ? state : null;
                         return _OptionsContent(ready: ready);
                       },
                     ),
@@ -153,9 +151,9 @@ class _OptionsContent extends StatelessWidget {
     LiveRoomMenuDestination destination, {
     bool closeSheet = true,
   }) {
-    context
-        .read<LiveRoomBloc>()
-        .add(LiveRoomMenuDestinationRequested(destination));
+    context.read<LiveRoomBloc>().add(
+      LiveRoomMenuDestinationRequested(destination),
+    );
     if (!closeSheet) return;
     if (destination == LiveRoomMenuDestination.settings ||
         destination == LiveRoomMenuDestination.startBattle ||
@@ -194,92 +192,83 @@ class _OptionsContent extends StatelessWidget {
               title: 'هدايا البث',
               trailing: LiveRoomOptionTrailing.chevron,
               showBadge: giftsBadge,
-              onTap: () => _navigate(
-                context,
-                LiveRoomMenuDestination.liveGifts,
-              ),
+              onTap: () =>
+                  _navigate(context, LiveRoomMenuDestination.liveGifts),
             ),
             // Direct way into a PK round. Before this the only trigger was
             // accepting a guest's chat request, which then blind-auto-matched
             // a stranger; the host could never simply pick who to face.
             LiveRoomOptionTile(
               icon: Icons.sports_mma_outlined,
-              title: 'بدء منافسة',
+              title: ready?.battle != null ? 'إدارة منافسة PK' : 'بدء منافسة',
               subtitle: isPaused
                   ? 'غير متاح أثناء الإيقاف المؤقت'
                   : 'اختر بثاً مباشراً آخر لتتنافس معه.',
               trailing: LiveRoomOptionTrailing.chevron,
               onTap: isPaused
                   ? null
-                  : () => _navigate(
-                      context,
-                      LiveRoomMenuDestination.startBattle,
-                    ),
+                  : () =>
+                        _navigate(context, LiveRoomMenuDestination.startBattle),
             ),
             LiveRoomOptionTile(
               icon: Icons.movie_filter_outlined,
               title: 'لحظات البث البارزة',
               trailing: LiveRoomOptionTrailing.chevron,
-              onTap: () => _navigate(
-                context,
-                LiveRoomMenuDestination.liveHighlights,
-              ),
+              onTap: () =>
+                  _navigate(context, LiveRoomMenuDestination.liveHighlights),
             ),
             if (!audioOnly) ...[
-            LiveRoomOptionTile(
-              icon: Icons.cameraswitch_outlined,
-              title: 'قلب الكاميرا',
-              onTap: () {
-                bloc.add(const LiveRoomFlipCameraRequested());
-                _close(context);
-              },
-            ),
-            LiveRoomOptionTile(
-              icon: Icons.flip_outlined,
-              title: 'انعكاس الفيديو',
-              trailing: LiveRoomOptionTrailing.toggle,
-              toggleValue: isMirror,
-              onToggle: (_) => bloc.add(const LiveRoomMirrorToggled()),
-            ),
-            LiveRoomOptionTile(
-              icon: Icons.videocam_outlined,
-              title: 'كاميرا',
-              subtitle: scene == 'CAMERA' ? 'المشهد الحالي' : null,
-              onTap: () {
-                bloc.add(const LiveRoomSceneRequested('CAMERA'));
-                _close(context);
-              },
-            ),
-            LiveRoomOptionTile(
-              icon: Icons.screen_share_outlined,
-              title: 'مشاركة الشاشة',
-              subtitle: scene == 'SCREEN' ? 'المشهد الحالي' : null,
-              onTap: () {
-                bloc.add(const LiveRoomSceneRequested('SCREEN'));
-                _close(context);
-              },
-            ),
-            LiveRoomOptionTile(
-              icon: Icons.filter_none_outlined,
-              title: 'كاميرا مزدوجة',
-              subtitle: scene == 'DUAL'
-                  ? 'كاميرا + شاشة'
-                  : 'كاميرا + مشاركة الشاشة',
-              onTap: () {
-                bloc.add(const LiveRoomSceneRequested('DUAL'));
-                _close(context);
-              },
-            ),
+              LiveRoomOptionTile(
+                icon: Icons.cameraswitch_outlined,
+                title: 'قلب الكاميرا',
+                onTap: () {
+                  bloc.add(const LiveRoomFlipCameraRequested());
+                  _close(context);
+                },
+              ),
+              LiveRoomOptionTile(
+                icon: Icons.flip_outlined,
+                title: 'انعكاس الفيديو',
+                trailing: LiveRoomOptionTrailing.toggle,
+                toggleValue: isMirror,
+                onToggle: (_) => bloc.add(const LiveRoomMirrorToggled()),
+              ),
+              LiveRoomOptionTile(
+                icon: Icons.videocam_outlined,
+                title: 'كاميرا',
+                subtitle: scene == 'CAMERA' ? 'المشهد الحالي' : null,
+                onTap: () {
+                  bloc.add(const LiveRoomSceneRequested('CAMERA'));
+                  _close(context);
+                },
+              ),
+              LiveRoomOptionTile(
+                icon: Icons.screen_share_outlined,
+                title: 'مشاركة الشاشة',
+                subtitle: scene == 'SCREEN' ? 'المشهد الحالي' : null,
+                onTap: () {
+                  bloc.add(const LiveRoomSceneRequested('SCREEN'));
+                  _close(context);
+                },
+              ),
+              LiveRoomOptionTile(
+                icon: Icons.filter_none_outlined,
+                title: 'كاميرا مزدوجة',
+                subtitle: scene == 'DUAL'
+                    ? 'كاميرا + شاشة'
+                    : 'كاميرا + مشاركة الشاشة',
+                onTap: () {
+                  bloc.add(const LiveRoomSceneRequested('DUAL'));
+                  _close(context);
+                },
+              ),
             ],
             LiveRoomOptionTile(
               icon: Icons.cast_connected_outlined,
               title: 'البث من OBS',
               subtitle: 'رابط RTMP ومفتاح البث',
               trailing: LiveRoomOptionTrailing.chevron,
-              onTap: () => _navigate(
-                context,
-                LiveRoomMenuDestination.studio,
-              ),
+              onTap: () => _navigate(context, LiveRoomMenuDestination.studio),
             ),
             LiveRoomOptionTile(
               icon: Icons.mic_off_outlined,
@@ -301,8 +290,7 @@ class _OptionsContent extends StatelessWidget {
               ),
               trailing: LiveRoomOptionTrailing.toggle,
               toggleValue: isStabilization,
-              onToggle: (_) =>
-                  bloc.add(const LiveRoomStabilizationToggled()),
+              onToggle: (_) => bloc.add(const LiveRoomStabilizationToggled()),
             ),
             LiveRoomOptionTile(
               icon: Icons.graphic_eq_outlined,
@@ -310,8 +298,7 @@ class _OptionsContent extends StatelessWidget {
               subtitle: 'اجعل المشاهدين يسمعون صوتك بوضوح أكبر.',
               trailing: LiveRoomOptionTrailing.toggle,
               toggleValue: isNoiseReduction,
-              onToggle: (_) =>
-                  bloc.add(const LiveRoomNoiseReductionToggled()),
+              onToggle: (_) => bloc.add(const LiveRoomNoiseReductionToggled()),
             ),
             LiveRoomOptionTile(
               icon: isPaused
@@ -329,10 +316,7 @@ class _OptionsContent extends StatelessWidget {
               icon: Icons.settings_outlined,
               title: 'الإعدادات',
               trailing: LiveRoomOptionTrailing.chevron,
-              onTap: () => _navigate(
-                context,
-                LiveRoomMenuDestination.settings,
-              ),
+              onTap: () => _navigate(context, LiveRoomMenuDestination.settings),
             ),
           ],
         ),
@@ -342,19 +326,13 @@ class _OptionsContent extends StatelessWidget {
             LiveRoomOptionTile(
               icon: Icons.chat_bubble_outline,
               title: 'تعليق',
-              onTap: () => _navigate(
-                context,
-                LiveRoomMenuDestination.comments,
-              ),
+              onTap: () => _navigate(context, LiveRoomMenuDestination.comments),
             ),
             LiveRoomOptionTile(
               icon: Icons.article_outlined,
               title: 'نبذة عني',
               trailing: LiveRoomOptionTrailing.chevron,
-              onTap: () => _navigate(
-                context,
-                LiveRoomMenuDestination.aboutMe,
-              ),
+              onTap: () => _navigate(context, LiveRoomMenuDestination.aboutMe),
             ),
             LiveRoomOptionTile(
               icon: Icons.edit_outlined,
@@ -371,8 +349,9 @@ class _OptionsContent extends StatelessWidget {
                     return AppFormDialog(
                       title: 'عنوان البث',
                       primaryLabel: 'حفظ',
-                      onPrimary: () => Navigator.of(dialogContext)
-                          .pop(controller.text.trim()),
+                      onPrimary: () => Navigator.of(
+                        dialogContext,
+                      ).pop(controller.text.trim()),
                       secondaryLabel: 'إلغاء',
                       onSecondary: () => Navigator.of(dialogContext).pop(),
                       children: [
@@ -398,19 +377,14 @@ class _OptionsContent extends StatelessWidget {
               icon: Icons.verified_user_outlined,
               title: 'الفعاليات',
               trailing: LiveRoomOptionTrailing.chevron,
-              onTap: () => _navigate(
-                context,
-                LiveRoomMenuDestination.events,
-              ),
+              onTap: () => _navigate(context, LiveRoomMenuDestination.events),
             ),
             LiveRoomOptionTile(
               icon: Icons.filter_none_outlined,
               title: 'الإفصاح عن المحتوى',
               trailing: LiveRoomOptionTrailing.chevron,
-              onTap: () => _navigate(
-                context,
-                LiveRoomMenuDestination.contentDisclosure,
-              ),
+              onTap: () =>
+                  _navigate(context, LiveRoomMenuDestination.contentDisclosure),
             ),
             LiveRoomOptionTile(
               icon: Icons.smart_toy_outlined,
@@ -431,14 +405,9 @@ class _OptionsContent extends StatelessWidget {
         ),
         const SizedBox(height: AppSpacing.lg),
         _HelpFooter(
-          onHelp: () => _navigate(
-            context,
-            LiveRoomMenuDestination.help,
-          ),
-          onReport: () => _navigate(
-            context,
-            LiveRoomMenuDestination.reportProblem,
-          ),
+          onHelp: () => _navigate(context, LiveRoomMenuDestination.help),
+          onReport: () =>
+              _navigate(context, LiveRoomMenuDestination.reportProblem),
         ),
       ],
     );
@@ -446,10 +415,7 @@ class _OptionsContent extends StatelessWidget {
 }
 
 class _HelpFooter extends StatelessWidget {
-  const _HelpFooter({
-    required this.onHelp,
-    required this.onReport,
-  });
+  const _HelpFooter({required this.onHelp, required this.onReport});
 
   final VoidCallback onHelp;
   final VoidCallback onReport;

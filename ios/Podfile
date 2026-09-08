@@ -44,6 +44,14 @@ post_install do |installer|
     flutter_additional_ios_build_settings(target)
 
     target.build_configurations.each do |config|
+      # This project has large native debug dependencies (WebRTC, LiveKit and
+      # ML Kit). Index-store output is useful for browsing Pod sources, but it
+      # is not needed to run Flutter and makes every local Debug rebuild slower.
+      # Keep Release untouched so archive symbols and production diagnostics
+      # retain their normal settings.
+      if config.name == 'Debug'
+        config.build_settings['COMPILER_INDEX_STORE_ENABLE'] = 'NO'
+      end
       config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= [
         '$(inherited)',
         'PERMISSION_MICROPHONE=1',

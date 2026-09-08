@@ -349,9 +349,13 @@ class LiveRoomGuestsChanged extends LiveRoomEvent {
 
 /// Applies an HTTP/socket battle snapshot and connects the opponent video.
 class LiveRoomBattleChanged extends LiveRoomEvent {
-  const LiveRoomBattleChanged(this.battle);
+  const LiveRoomBattleChanged(this.battle, {this.updateType});
 
   final LiveBattle? battle;
+
+  /// Socket updates carry a narrower payload than an HTTP snapshot. The type
+  /// tells the battle model whether omitted fields must be retained.
+  final String? updateType;
 }
 
 /// Re-reads `GET /lives/:id/battle` while the HUD socket is down.

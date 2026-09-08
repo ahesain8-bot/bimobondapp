@@ -10,6 +10,7 @@ import '../../../../../core/utils/build_safe_notifier.dart';
 import '../../../../../core/utils/livekit_participant_match.dart';
 import '../../../../../core/models/live_battle.dart';
 import '../../../../../core/widgets/pk_battle_start_overlay.dart';
+import '../../../../../core/widgets/live_team_battle_grid.dart';
 import '../../../../../core/widgets/safe_network_image.dart';
 import '../../../domain/entities/live_guest.dart';
 import '../../../domain/repositories/live_session_repository.dart';
@@ -52,6 +53,9 @@ class LiveRoomStage extends StatelessWidget {
             prevBattle?.id != currBattle?.id ||
             prevBattle?.live1Id != currBattle?.live1Id ||
             prevBattle?.live2Id != currBattle?.live2Id ||
+            prevBattle?.mode != currBattle?.mode ||
+            prevBattle?.live3Id != currBattle?.live3Id ||
+            prevBattle?.live4Id != currBattle?.live4Id ||
             prevBattle?.status != currBattle?.status ||
             prevBattle?.phase != currBattle?.phase;
         return previous.guests != current.guests ||
@@ -266,33 +270,50 @@ class _BattleStageState extends State<_BattleStage> {
                       fit: StackFit.expand,
                       clipBehavior: Clip.hardEdge,
                       children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Expanded(
-                              child: RepaintBoundary(
-                                key: const ValueKey('host_pk_self_video'),
-                                child: _BattleFeedTile(
-                                  child: _HostBattleVideo(
-                                    avatarUrl: widget.hostAvatarUrl,
+                        if (battle.isTeamMode)
+                          LiveTeamBattleGrid(
+                            battle: battle,
+                            currentLiveId: currentLiveId,
+                            videoFor: (liveId) {
+                              if (liveId == currentLiveId) {
+                                return _HostBattleVideo(
+                                  avatarUrl: widget.hostAvatarUrl,
+                                );
+                              }
+                              // TEAM remote tracks need verified host identities and
+                              // credentials. Do not show the first guest in a room
+                              // as a team's host while that contract is missing.
+                              return null;
+                            },
+                          )
+                        else
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Expanded(
+                                child: RepaintBoundary(
+                                  key: const ValueKey('host_pk_self_video'),
+                                  child: _BattleFeedTile(
+                                    child: _HostBattleVideo(
+                                      avatarUrl: widget.hostAvatarUrl,
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                            Container(width: 1.5, color: Colors.black),
-                            Expanded(
-                              child: RepaintBoundary(
-                                key: const ValueKey('host_pk_opponent_video'),
-                                child: _BattleFeedTile(
-                                  child: _OpponentVideo(
-                                    room: room is Room ? room : null,
-                                    avatarUrl: widget.opponentAvatarUrl,
+                              Container(width: 1.5, color: Colors.black),
+                              Expanded(
+                                child: RepaintBoundary(
+                                  key: const ValueKey('host_pk_opponent_video'),
+                                  child: _BattleFeedTile(
+                                    child: _OpponentVideo(
+                                      room: room is Room ? room : null,
+                                      avatarUrl: widget.opponentAvatarUrl,
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
+                            ],
+                          ),
                         Positioned(
                           left: 0,
                           right: 0,
@@ -309,7 +330,12 @@ class _BattleStageState extends State<_BattleStage> {
                               if (prev == null || curr == null) {
                                 return prev != curr;
                               }
-                              return prev.live1Score != curr.live1Score ||
+                              return prev.bestOf != curr.bestOf ||
+                                  prev.roundNumber != curr.roundNumber ||
+                                  prev.wins1 != curr.wins1 ||
+                                  prev.wins2 != curr.wins2 ||
+                                  prev.powerUps != curr.powerUps ||
+                                  prev.live1Score != curr.live1Score ||
                                   prev.live2Score != curr.live2Score ||
                                   prev.endTime != curr.endTime ||
                                   prev.multiplier != curr.multiplier ||
@@ -322,6 +348,7 @@ class _BattleStageState extends State<_BattleStage> {
                                   : null;
                               final b = active ?? battle;
                               return _HostBattleChrome(
+                                battle: b,
                                 leftScore: b.scoreFor(currentLiveId),
                                 rightScore: b.opponentScoreFor(currentLiveId),
                                 endTime: b.endTime,
@@ -443,7 +470,11 @@ class _HostBattleVideo extends StatelessWidget {
               ColoredBox(
                 color: Colors.black.withValues(alpha: 0.55),
                 child: const Center(
-                  child: Icon(Icons.pause_circle_filled, color: Colors.white70, size: 40),
+                  child: Icon(
+                    Icons.pause_circle_filled,
+                    color: Colors.white70,
+                    size: 40,
+                  ),
                 ),
               ),
           ],
@@ -470,9 +501,7 @@ class _BattleAvatarFallback extends StatelessWidget {
     }
     return const ColoredBox(
       color: Color(0xFF17171A),
-      child: Center(
-        child: Icon(Icons.person, size: 48, color: Colors.white38),
-      ),
+      child: Center(child: Icon(Icons.person, size: 48, color: Colors.white38)),
     );
   }
 }
@@ -494,6 +523,7 @@ class _BattleFeedTile extends StatelessWidget {
 
 class _HostBattleChrome extends StatelessWidget {
   const _HostBattleChrome({
+    required this.battle,
     required this.leftScore,
     required this.rightScore,
     required this.endTime,
@@ -502,6 +532,7 @@ class _HostBattleChrome extends StatelessWidget {
     required this.currentLiveId,
   });
 
+  final LiveBattle battle;
   final int leftScore;
   final int rightScore;
   final DateTime? endTime;
@@ -520,17 +551,15 @@ class _HostBattleChrome extends StatelessWidget {
       clipBehavior: Clip.none,
       children: [
         PkBattleBar(scoreLeft: leftScore, scoreRight: rightScore),
+        Positioned(
+          top: 54,
+          left: 8,
+          right: 8,
+          child: LiveBattleStatusLabel(battle: battle),
+        ),
         if (decided) ...[
-          Positioned(
-            top: 26,
-            left: 8,
-            child: _PkResultBadge(won: leftWon),
-          ),
-          Positioned(
-            top: 26,
-            right: 8,
-            child: _PkResultBadge(won: !leftWon),
-          ),
+          Positioned(top: 26, left: 8, child: _PkResultBadge(won: leftWon)),
+          Positioned(top: 26, right: 8, child: _PkResultBadge(won: !leftWon)),
         ],
         Positioned(
           top: 22,

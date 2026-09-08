@@ -4,12 +4,23 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   LiveBattle snapshot([Map<String, dynamic> patch = const {}]) =>
       LiveBattle.fromJson({
-        'id': 'pk', 'live1Id': 'a', 'live2Id': 'b',
-        'live3Id': 'c', 'live4Id': 'd', 'mode': 'TEAM',
-        'status': 'ACTIVE', 'phase': 'BATTLE',
-        'live1Score': 80, 'live2Score': 40, 'likeScore1': 8,
-        'multiplier': 2, 'bestOf': 3, 'roundNumber': 2,
-        'wins1': 1, 'wins2': 0, 'openSlots': <int>[],
+        'id': 'pk',
+        'live1Id': 'a',
+        'live2Id': 'b',
+        'live3Id': 'c',
+        'live4Id': 'd',
+        'mode': 'TEAM',
+        'status': 'ACTIVE',
+        'phase': 'BATTLE',
+        'live1Score': 80,
+        'live2Score': 40,
+        'likeScore1': 8,
+        'multiplier': 2,
+        'bestOf': 3,
+        'roundNumber': 2,
+        'wins1': 1,
+        'wins2': 0,
+        'openSlots': <int>[],
         'endTime': '2026-09-08T12:05:00Z',
         'powerUps': {'stunTeam': 2, 'gloveTeam': 1, 'gloveCharges': 2},
         ...patch,
@@ -26,7 +37,9 @@ void main() {
 
   test('roster patch clears one seat and preserves other fields', () {
     final battle = LiveBattle.fromJson({
-      'id': 'pk', 'live3Id': null, 'openSlots': [1],
+      'id': 'pk',
+      'live3Id': null,
+      'openSlots': [1],
     }).withTimingFrom(snapshot(), updateType: 'roster');
     expect(battle.live3Id, isNull);
     expect(battle.live4Id, 'd');
@@ -39,7 +52,9 @@ void main() {
 
   test('explicit zero and null are applied; absent fields survive', () {
     final battle = LiveBattle.fromJson({
-      'id': 'pk', 'live1Score': 0, 'multiplierEndsAt': null,
+      'id': 'pk',
+      'live1Score': 0,
+      'multiplierEndsAt': null,
       'powerUps': {'gloveCharges': 0, 'stunTeam': null},
     }).withTimingFrom(snapshot(), updateType: 'score');
     expect(battle.live1Score, 0);
@@ -51,7 +66,8 @@ void main() {
 
   test('finish patch preserves score, roster and series result', () {
     final battle = LiveBattle.fromJson({
-      'id': 'pk', 'winnerLiveId': null,
+      'id': 'pk',
+      'winnerLiveId': null,
     }).withTimingFrom(snapshot(), updateType: 'finished');
     expect(battle.isFinished, isTrue);
     expect(battle.live1Score, 80);
@@ -67,18 +83,52 @@ void main() {
 
   test('older round cannot overwrite current round', () {
     final current = snapshot();
-    expect(snapshot({'roundNumber': 1, 'wins1': 0})
-        .withTimingFrom(current, updateType: 'score'), current);
+    expect(
+      snapshot({
+        'roundNumber': 1,
+        'wins1': 0,
+      }).withTimingFrom(current, updateType: 'score'),
+      current,
+    );
   });
 
   test('round_finished is not a series finished event', () {
-    expect(snapshot().normalizedForUpdate(updateType: 'round_finished').isActive,
-        isTrue);
+    expect(
+      snapshot().normalizedForUpdate(updateType: 'round_finished').isActive,
+      isTrue,
+    );
   });
 
   test('explicit empty flat seat overrides a stale nested teammate', () {
-    expect(snapshot({'live3Id': null, 'teams': {
-      'team1': {'teammateLiveId': 'old'},
-    }}).live3Id, isNull);
+    expect(
+      snapshot({
+        'live3Id': null,
+        'teams': {
+          'team1': {'teammateLiveId': 'old'},
+        },
+      }).live3Id,
+      isNull,
+    );
+  });
+  test('finished patch without winner does not fabricate an explicit tie', () {
+    final result = LiveBattle.fromJson({
+      'id': 'pk',
+      'status': 'FINISHED',
+    }).withTimingFrom(snapshot());
+    expect(result.presentFields!.contains('winnerLiveId'), isFalse);
+  });
+
+  test('empty power-up patch preserves prior effect fields', () {
+    final result = LiveBattle.fromJson({
+      'id': 'pk',
+      'powerUps': <String, dynamic>{},
+    }).withTimingFrom(snapshot());
+    expect(result.powerUps!.gloveCharges, 2);
+  });
+
+  test('old battle delta cannot replace a newer match', () {
+    final current = snapshot({'id': 'new-pk'});
+    final delayed = snapshot({'status': 'FINISHED'});
+    expect(delayed.withTimingFrom(current, updateType: 'finished'), current);
   });
 }

@@ -1219,7 +1219,10 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
   ) async {
     final current = _readyOrNull;
     if (current == null) return;
-    final battle = event.battle?.withTimingFrom(current.battle);
+    final battle = event.battle?.withTimingFrom(
+      current.battle,
+      updateType: event.updateType,
+    );
     final opponentId = battle?.isActive == true
         ? battle!.opponentLiveId(current.session.id)
         : '';
@@ -1899,7 +1902,10 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         }
       case LiveHudBattleEvent(:final type, :final battle):
         add(
-          LiveRoomBattleChanged(battle.normalizedForUpdate(updateType: type)),
+          LiveRoomBattleChanged(
+            battle.normalizedForUpdate(updateType: type),
+            updateType: type,
+          ),
         );
       case LiveHudConnectionEvent(:final connected):
         // Comments, viewers and likes all ride this socket. The flag is kept in
@@ -2792,10 +2798,7 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     if (isClosed) return;
     final afterStop = _readyOrNull ?? current;
     emit(
-      afterStop.copyWith(
-        localScreenShareTrack: null,
-        clearActionMessage: true,
-      ),
+      afterStop.copyWith(localScreenShareTrack: null, clearActionMessage: true),
     );
 
     String? cameraError;

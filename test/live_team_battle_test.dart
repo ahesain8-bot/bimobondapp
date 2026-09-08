@@ -60,7 +60,9 @@ const _teamBattle = {
 void main() {
   group('the team roster is read from the server', () {
     test('seats, teams and open slots parse as documented', () {
-      final battle = LiveBattle.fromJson(Map<String, dynamic>.from(_teamBattle));
+      final battle = LiveBattle.fromJson(
+        Map<String, dynamic>.from(_teamBattle),
+      );
 
       expect(battle.isTeamMode, isTrue);
       expect(battle.live3Id, 'l3');
@@ -262,11 +264,8 @@ void main() {
       });
 
       expect(
-        () => h.remote.startBattle(
-          liveId: 'l1',
-          opponentLiveId: 'l2',
-          bestOf: 5,
-        ),
+        () =>
+            h.remote.startBattle(liveId: 'l1', opponentLiveId: 'l2', bestOf: 5),
         throwsA(isA<ArgumentError>()),
       );
       expect(
@@ -373,6 +372,21 @@ void main() {
       expect(payload.rooms.last.role, 'viewer');
     });
 
+    test('cohost video uses only an explicit LiveKit host identity', () {
+      final payload = LiveCohostMapper.payloadFromJson({
+        'cohost': {
+          'liveId': 'partner-live',
+          'token': 'subscribe-token',
+          'url': 'wss://live.example.test',
+          'hostId': 'application-user-id',
+          'hostIdentity': 'livekit-host-identity',
+        },
+      });
+
+      expect(payload.rooms.single.hostId, 'application-user-id');
+      expect(payload.rooms.single.hostIdentity, 'livekit-host-identity');
+    });
+
     test('our own room and incomplete entries are never tiled', () {
       final payload = LiveCohostMapper.payloadFromJson({
         'cohosts': [
@@ -423,7 +437,9 @@ void main() {
             'live': {'id': 'l9', 'title': 'Night', 'viewers': 12},
             'user': {'id': 'u9', 'fullName': 'Nine'},
           },
-          {'user': {'id': 'u10'}},
+          {
+            'user': {'id': 'u10'},
+          },
         ],
       });
 

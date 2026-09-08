@@ -40,7 +40,10 @@ class LiveCohostTiles extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 2),
                     child: _CohostTile(
                       partner: partner,
-                      track: rooms.videoTrackFor(partner.liveId),
+                      track: rooms.videoTrackFor(
+                        partner.liveId,
+                        hostIdentity: partner.hostIdentity,
+                      ),
                       connecting: rooms.isConnecting(partner.liveId),
                     ),
                   ),

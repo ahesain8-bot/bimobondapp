@@ -121,9 +121,7 @@ class LiveBattle extends Equatable {
   List<String> opponentLiveIds(String liveId) {
     final team = teamOf(liveId);
     if (team == null) return const [];
-    final ids = team == 1
-        ? [live2Id, live4Id]
-        : [live1Id, live3Id];
+    final ids = team == 1 ? [live2Id, live4Id] : [live1Id, live3Id];
     return ids
         .whereType<String>()
         .where((id) => id.isNotEmpty)
@@ -180,11 +178,12 @@ class LiveBattle extends Equatable {
     return this;
   }
 
-  String opponentLiveId(String currentLiveId) => switch (teamOf(currentLiveId)) {
-    1 => live2Id,
-    2 => live1Id,
-    _ => '',
-  };
+  String opponentLiveId(String currentLiveId) =>
+      switch (teamOf(currentLiveId)) {
+        1 => live2Id,
+        2 => live1Id,
+        _ => '',
+      };
 
   int scoreFor(String liveId) => switch (teamOf(liveId)) {
     1 => live1Score,
@@ -211,8 +210,16 @@ class LiveBattle extends Equatable {
     return LiveBattle(
       presentFields: Set.unmodifiable({
         ...source.keys,
-        if (_map(_map(source['teams'])?['team1'])?.containsKey('teammateLiveId') == true) 'live3Id',
-        if (_map(_map(source['teams'])?['team2'])?.containsKey('teammateLiveId') == true) 'live4Id',
+        if (_map(
+              _map(source['teams'])?['team1'],
+            )?.containsKey('teammateLiveId') ==
+            true)
+          'live3Id',
+        if (_map(
+              _map(source['teams'])?['team2'],
+            )?.containsKey('teammateLiveId') ==
+            true)
+          'live4Id',
       }),
       id: source['id']?.toString() ?? '',
       live1Id: source['live1Id']?.toString() ?? '',
@@ -275,11 +282,33 @@ class LiveBattle extends Equatable {
     bool? hasRosterPayload,
   }) {
     return LiveBattle(
-      presentFields: presentFields == null ? null : Set.unmodifiable({
-        ...presentFields!,
-        if (status != null) 'status',
-        if (phase != null) 'phase',
-      }),
+      presentFields: presentFields == null
+          ? null
+          : Set.unmodifiable({
+              ...presentFields!,
+              if (status != null) 'status',
+              if (phase != null) 'phase',
+              if (live1Score != null) 'live1Score',
+              if (live2Score != null) 'live2Score',
+              if (multiplier != null) 'multiplier',
+              if (multiplierEndsAt != null) 'multiplierEndsAt',
+              if (startTime != null) 'startTime',
+              if (endTime != null) 'endTime',
+              if (winnerLiveId != null) 'winnerLiveId',
+              if (mode != null) 'mode',
+              if (live3Id != null) 'live3Id',
+              if (live4Id != null) 'live4Id',
+              if (openSlots != null) 'openSlots',
+              if (likeScore1 != null) 'likeScore1',
+              if (likeScore2 != null) 'likeScore2',
+              if (scoringMode != null) 'scoringMode',
+              if (scoringGiftId != null) 'scoringGiftId',
+              if (bestOf != null) 'bestOf',
+              if (roundNumber != null) 'roundNumber',
+              if (wins1 != null) 'wins1',
+              if (wins2 != null) 'wins2',
+              if (powerUps != null) 'powerUps',
+            }),
       id: id,
       live1Id: live1Id,
       live2Id: live2Id,
@@ -316,30 +345,51 @@ class LiveBattle extends Equatable {
     if (previous.id != incoming.id) {
       // A delta for another battle is not evidence that a new match started.
       if (updateType != null &&
-          !const {'started', 'start', 'snapshot'}.contains(updateType.toLowerCase())) {
+          !const {
+            'started',
+            'start',
+            'snapshot',
+          }.contains(updateType.toLowerCase())) {
         return previous;
       }
-      if (previous.startTime != null && incoming.startTime != null &&
-          incoming.startTime!.isBefore(previous.startTime!)) return previous;
+      if (previous.startTime != null &&
+          incoming.startTime != null &&
+          incoming.startTime!.isBefore(previous.startTime!)) {
+        return previous;
+      }
       return incoming;
     }
     if (previous.isFinished && !incoming.isFinished) return previous;
-    if (previous.roundNumber != null && incoming.roundNumber != null &&
-        incoming.roundNumber! < previous.roundNumber!) return previous;
+    if (previous.roundNumber != null &&
+        incoming.roundNumber != null &&
+        incoming.roundNumber! < previous.roundNumber!) {
+      return previous;
+    }
 
     final patch = incoming._snapshotJson();
     final keys = incoming.presentFields;
     if (keys != null) patch.removeWhere((key, _) => !keys.contains(key));
     final oldPowerUps = previous.powerUps;
     final newPowerUps = incoming.powerUps;
-    if (patch.containsKey('powerUps') && oldPowerUps != null && newPowerUps != null) {
+    if (patch.containsKey('powerUps') &&
+        oldPowerUps != null &&
+        newPowerUps != null) {
       final powerPatch = newPowerUps._snapshotJson();
       final powerKeys = newPowerUps.presentFields;
-      if (powerKeys != null) powerPatch.removeWhere((key, _) => !powerKeys.contains(key));
+      if (powerKeys != null) {
+        powerPatch.removeWhere((key, _) => !powerKeys.contains(key));
+      }
       patch['powerUps'] = {...oldPowerUps._snapshotJson(), ...powerPatch};
     }
-    return LiveBattle.fromJson({...previous._snapshotJson(), ...patch})
-        .normalizedForUpdate(updateType: updateType);
+    final prior = previous._snapshotJson();
+    final priorKeys = previous.presentFields;
+    if (priorKeys != null) {
+      prior.removeWhere((key, _) => !priorKeys.contains(key));
+    }
+    return LiveBattle.fromJson({
+      ...prior,
+      ...patch,
+    }).normalizedForUpdate(updateType: updateType);
   }
 
   Map<String, dynamic> _snapshotJson() => {
@@ -452,7 +502,7 @@ class LiveBattlePowerUps extends Equatable {
   };
 
   static LiveBattlePowerUps? fromJson(Map<String, dynamic>? json) {
-    if (json == null || json.isEmpty) return null;
+    if (json == null) return null;
     return LiveBattlePowerUps(
       presentFields: Set.unmodifiable(json.keys),
       stunTeam: _integerOrNull(json['stunTeam']),
@@ -517,7 +567,8 @@ class LiveBattleOpponent extends Equatable {
         '';
     return LiveBattleOpponent(
       liveId: liveId,
-      title: live['title']?.toString() ?? json['title']?.toString() ?? 'بث مباشر',
+      title:
+          live['title']?.toString() ?? json['title']?.toString() ?? 'بث مباشر',
       hostId:
           user['id']?.toString() ??
           live['userId']?.toString() ??

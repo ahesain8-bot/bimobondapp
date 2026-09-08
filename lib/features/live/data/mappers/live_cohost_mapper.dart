@@ -58,6 +58,7 @@ class LiveCohostMapper {
       roomName: _string(map['roomName']),
       role: _string(map['role']),
       hostId: _string(host['id'] ?? map['hostId']),
+      hostIdentity: _string(map['hostIdentity'] ?? map['liveKitHostIdentity']),
       hostName: _string(host['username'] ?? host['fullName']),
       hostAvatarUrl: _string(host['avatarUrl']),
     );
@@ -131,8 +132,7 @@ class LiveCohostMapper {
           liveId: liveId,
           title: _string(live['title']) ?? '',
           hostId: _string(user['id'] ?? live['userId']) ?? '',
-          hostName:
-              _string(user['fullName'] ?? user['username']) ?? '',
+          hostName: _string(user['fullName'] ?? user['username']) ?? '',
           hostAvatarUrl: _string(user['avatarUrl']),
           viewers: _int(live['viewers'] ?? live['viewerCount']),
         ),
