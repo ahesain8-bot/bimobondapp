@@ -1,11 +1,6 @@
-import '../../../live/presentation/widgets/room/live_host_league_sheet.dart';
-import '../../domain/repositories/ranking_repository.dart';
 import 'dart:math' as math;
 
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:firebase_auth/firebase_auth.dart' as fb;
-import '../../../../core/network/live_api_client.dart';
-import '../../../live/presentation/pages/fans_community_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -24,16 +19,7 @@ import '../../core/theme/app_colors.dart';
 import '../../domain/entities/live_entity.dart';
 import '../../domain/entities/live_session_entity.dart';
 import '../../domain/repositories/guest_repository.dart';
-import '../../../live/data/datasources/lives_media_datasource.dart';
-import '../../../live/data/datasources/lives_remote_datasource.dart';
-import '../../../live/data/datasources/lives_socket_datasource.dart';
-import '../../../live/data/repositories/live_session_repository_impl.dart';
 import '../../../live/domain/repositories/live_interactive_repository.dart';
-import '../../../live/data/datasources/live_games_remote_datasource.dart';
-import '../../../live/data/repositories/live_games_repository_impl.dart';
-import '../../../live/presentation/bloc/live_games/live_games_bloc.dart';
-import '../../../live/presentation/pages/live_replay_page.dart';
-import '../../../live/presentation/widgets/room/live_games_sheet.dart';
 import '../../../live/presentation/bloc/live_interactive/live_interactive_bloc.dart';
 import '../../../live/presentation/bloc/live_interactive/live_interactive_event.dart';
 import '../bloc/live_viewer/live_viewer_bloc.dart';
@@ -48,12 +34,12 @@ import 'floating_hearts.dart';
 import 'gift_goal_card.dart';
 import '../../data/services/fake_livekit_service.dart' show LiveKitService;
 import '../../data/services/fake_socket_service.dart' show SocketService;
-import 'package:bimobondapp/l10n/app_localizations.dart';
 import '../di/live_viewer_injector.dart' as di;
 import 'guest_panel.dart';
 import 'live_interactive_viewer_panel.dart';
 import 'viewer_stage.dart';
 import 'guest_stage_prompt.dart';
+import 'league_overlay.dart';
 import 'live_state_overlay.dart';
 import 'live_video_player.dart';
 import 'multi_guest_grid.dart';
@@ -88,19 +74,45 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     socketEvents: di.sl<SocketService>().events,
   );
 
-  /// Official games share the viewer's existing room socket for `liveGame`.
-  late final LiveGamesBloc _gamesBloc = LiveGamesBloc(
-    repository: LiveGamesRepositoryImpl(
-      remote: LiveGamesRemoteDataSource(apiClient: di.sl<LiveApiClient>()),
-    ),
-    socketEvents: di.sl<SocketService>().events,
-  );
+  @override
+  void initState() {
+    super.initState();
+    _scheduleActivate();
+  }
+
+  @override
+  void didUpdateWidget(covariant LiveRoomPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.live.id != widget.live.id) {
+      _scheduleActivate();
+    } else if (widget.isActive && !oldWidget.isActive) {
+      _scheduleActivate();
+    }
+  }
 
   @override
   void dispose() {
+    _deactivateIfThis();
     _interactiveBloc.close();
-    _gamesBloc.close();
     super.dispose();
+  }
+
+  void _deactivateIfThis() {
+    final viewerBloc = context.read<LiveViewerBloc>();
+    if (viewerBloc.activeLiveId == widget.live.id) {
+      viewerBloc.add(const LiveViewerDeactivated());
+    }
+  }
+
+  void _scheduleActivate() {
+    // PageView keeps neighbouring TikTok-style pages mounted. An off-screen
+    // page must never replace the one LiveKit room owned by the visible page.
+    if (!widget.isActive) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !widget.isActive) return;
+      context.read<LiveViewerBloc>().add(LiveViewerActivated(widget.live));
+      _interactiveBloc.add(LiveInteractiveStarted(widget.live.id));
+    });
   }
 
   void _spawnHearts(int count) {
@@ -156,23 +168,6 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
         if (!mounted) return;
         setState(() => _showLiveFeatures = true);
       },
-      onShowGames: _openGames,
-    );
-  }
-
-  /// Opens the official games sheet. The active game is re-read on open, so a
-  /// viewer who joined mid-game sees the server's current state.
-  void _openGames() {
-    final liveId = widget.live.id;
-    if (liveId.isEmpty) return;
-    _gamesBloc.add(LiveGamesStarted(liveId));
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) => BlocProvider<LiveGamesBloc>.value(
-        value: _gamesBloc,
-        child: const LiveGamesSheet(isHost: false),
-      ),
     );
   }
 
@@ -221,29 +216,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     );
     if (result == null || !mounted) return;
     bloc.add(
-      LiveViewerReportRequested(reason: result.reason, details: result.details),
-    );
-  }
-
-  /// Opens the replay of a finished LIVE. The screen itself asks the server
-  /// whether a replay exists and whether this viewer may watch it; this only
-  /// provides the route. `GET /lives/:id/replay` counts a view, so it is not
-  /// called from here.
-  Future<void> _openReplay(String liveId) async {
-    if (liveId.isEmpty) return;
-    // Replay reads are plain REST; the socket datasource is only constructed
-    // because the repository owns one, and this screen never connects it.
-    final repository = LiveSessionRepositoryImpl(
-      remote: LivesRemoteDataSource(apiClient: di.sl<LiveApiClient>()),
-      socket: LivesSocketDataSource(
-        idTokenProvider: () async =>
-            fb.FirebaseAuth.instance.currentUser?.getIdToken(),
-      ),
-      media: LivesMediaDataSource(),
-    );
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => LiveReplayPage(liveId: liveId, repository: repository),
+      LiveViewerReportRequested(
+        reason: result.reason,
+        details: result.details,
       ),
     );
   }
@@ -252,9 +227,9 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
     final formatted =
         '${dob.year.toString().padLeft(4, '0')}-${dob.month.toString().padLeft(2, '0')}-${dob.day.toString().padLeft(2, '0')}';
     try {
-      final result = await auth_di.sl<UpdateProfileUseCase>()({
-        'dateOfBirth': formatted,
-      });
+      final result = await auth_di.sl<UpdateProfileUseCase>()(
+        {'dateOfBirth': formatted},
+      );
       if (!mounted) return;
       final ok = result.fold((_) => false, (_) => true);
       if (!ok) {
@@ -286,25 +261,40 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       liveId: live.id,
       hostName: live.hostName,
       hostAvatar: live.hostAvatar,
-      onJoinFanClub: () => _openFanClub(live),
-    );
-  }
-
-  void _openFanClub(LiveEntity live) {
-    if (!widget.isActive || live.hostId.isEmpty) return;
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => FansCommunityPage(creatorId: live.hostId),
-      ),
+      onJoinFanClub: () {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Joined Fan Club'),
+            backgroundColor: AppColors.surface,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      },
     );
   }
 
   void _openLeague(LiveEntity live) {
-    final repository = di.sl<RankingRepository>();
-    LiveHostLeagueSheet.show(
+    final entries = List.generate(6, (i) {
+      return RankingEntry(
+        rank: i + 1,
+        userId: 'lg_$i',
+        username: 'League Star ${i + 1}',
+        avatarUrl: 'https://i.pravatar.cc/150?u=lg_${live.id}_$i',
+        score: 8300000 - i * 900000,
+      );
+    });
+    showLeagueMatchOverlay(
       context,
-      loadLeague: () => repository.loadHostLeague(live.hostId),
-      loadTiers: repository.loadLeagueTiers,
+      entries: entries,
+      myEntry: const RankingEntry(
+        rank: 99,
+        userId: 'me',
+        username: 'You',
+        avatarUrl: 'https://i.pravatar.cc/150?u=me',
+        score: 1100000,
+      ),
+      pointsToNext: 1100000,
+      onSendGift: _openGifts,
     );
   }
 
@@ -472,1058 +462,1001 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
           const LiveViewerShareFeedbackConsumed(),
         );
       },
-      child: BlocConsumer<LiveViewerBloc, LiveViewerState>(
-        listenWhen: (previous, current) =>
-            current.live?.id == widget.live.id &&
-            current.connectionState == LiveConnectionState.connected &&
-            previous.connectionState != LiveConnectionState.connected,
-        listener: (context, state) {
-          final live = state.live;
-          if (live != null) {
-            _interactiveBloc.add(
-              LiveInteractiveStarted(live.id, giftGoal: live.giftGoal),
-            );
-          }
-          if (live != null &&
-              live.metadata?.containsKey('giftGoalTarget') == true) {
-            _interactiveBloc.add(
-              LiveInteractiveGiftGoalSnapshotReceived(live.id, live.giftGoal),
-            );
-          }
-        },
-        buildWhen: (prev, curr) {
-          final prevLive = prev.live;
-          final currLive = curr.live;
-          final prevInfo = prevLive == null
-              ? null
-              : (
-                  prevLive.id,
-                  prevLive.hostId,
-                  prevLive.hostName,
-                  prevLive.hostAvatar,
-                  prevLive.title,
-                  prevLive.description,
-                  prevLive.thumbnailUrl,
-                  prevLive.streamUrl,
-                  prevLive.category,
-                  prevLive.status,
-                  prevLive.startTime,
-                  prevLive.endTime,
-                  prevLive.isLive,
-                  prevLive.isFollowing,
-                  prevLive.paused,
-                  prevLive.metadata,
-                );
-          final currInfo = currLive == null
-              ? null
-              : (
-                  currLive.id,
-                  currLive.hostId,
-                  currLive.hostName,
-                  currLive.hostAvatar,
-                  currLive.title,
-                  currLive.description,
-                  currLive.thumbnailUrl,
-                  currLive.streamUrl,
-                  currLive.category,
-                  currLive.status,
-                  currLive.startTime,
-                  currLive.endTime,
-                  currLive.isLive,
-                  currLive.isFollowing,
-                  currLive.paused,
-                  currLive.metadata,
-                );
-          return prev.ticketGate != curr.ticketGate ||
-              prev.ticketPriceCoins != curr.ticketPriceCoins ||
-              prev.connectionState != curr.connectionState ||
-              (prev.live?.id) != (curr.live?.id) ||
-              prev.guests != curr.guests ||
-              prev.isOnStage != curr.isOnStage ||
-              // Score ticks update via nested PkBattleBar — do not rebuild
-              // the whole stage (VideoTrackRenderer flash).
-              (prev.battle?.isActive == true) !=
-                  (curr.battle?.isActive == true) ||
-              prev.battle?.id != curr.battle?.id ||
-              prev.battle?.live1Id != curr.battle?.live1Id ||
-              prev.battle?.live2Id != curr.battle?.live2Id ||
-              prev.battle?.status != curr.battle?.status ||
-              prev.battle?.phase != curr.battle?.phase ||
-              prev.battleOpponentLive != curr.battleOpponentLive ||
-              prev.battleRoom != curr.battleRoom ||
-              prev.opponentTopGifterAvatars != curr.opponentTopGifterAvatars ||
-              prevInfo != currInfo;
-        },
-        builder: (context, state) {
-          final connectionState = state.connectionState;
-          final activeLiveId = state.live?.id;
-          final isThisRoom = activeLiveId == widget.live.id;
-          LiveEntity live;
-          if (isThisRoom && state.live != null) {
-            final l = state.live!;
-            live = LiveEntity(
-              id: l.id,
-              hostId: l.hostId,
-              hostName: l.hostName,
-              hostAvatar: l.hostAvatar,
-              title: l.title,
-              description: l.description,
-              thumbnailUrl: l.thumbnailUrl,
-              streamUrl: l.streamUrl,
-              category: l.category,
-              status: l.status,
-              startTime: l.startTime,
-              endTime: l.endTime,
-              isLive: l.isLive,
-              isFollowing: l.isFollowing,
-              paused: l.paused,
-              mediaMode: l.mediaMode,
-              audioOnly: l.audioOnly,
-              scene: l.scene,
-              cameraFacing: l.cameraFacing,
-              dualCameraEnabled: l.dualCameraEnabled,
-              topic: l.topic,
-              scheduledAt: l.scheduledAt,
-              shareCount: l.shareCount,
-              houseId: l.houseId,
-              ageRestricted: l.ageRestricted,
-              metadata: l.metadata,
-              viewerCount: 0,
-              likeCount: 0,
-            );
-          } else {
-            live = widget.live;
-          }
-          final connected =
-              isThisRoom &&
-              (connectionState == LiveConnectionState.connected ||
-                  connectionState == LiveConnectionState.reconnecting);
-          final isPk = isThisRoom ? state.isPk : live.metadata?['isPk'] == true;
-          // Someone actually publishing on stage puts the room in grid layout on
-          // its own — waiting for a metadata flag meant an accepted co-host was
-          // invisible to everyone watching.
-          final stageGuests = isThisRoom
-              ? state.activeGuests
-              : const <GuestSummary>[];
-          final hasLiveGuests = stageGuests.isNotEmpty;
-          final isMultiGrid =
-              live.metadata?['isMultiGrid'] == true || (hasLiveGuests && !isPk);
-          final isMultiGuest =
-              live.metadata?['isMultiGuest'] == true || hasLiveGuests;
-          final showFanClub =
-              !isPk && !isMultiGrid && live.metadata?['showFanClub'] != false;
-          final giftGoalTarget =
-              (live.metadata?['giftGoalTarget'] as num?)?.toInt() ?? 0;
-          final showGiftGoal =
-              !isPk &&
-              !_giftGoalDismissed &&
-              live.metadata?['showGiftGoal'] == true &&
-              giftGoalTarget > 0;
-          final bottomPad = MediaQuery.paddingOf(context).bottom;
-          final viewBottomPad = MediaQuery.viewPaddingOf(context).bottom;
-          final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
-          final guests = _guestsFrom(live, stageGuests);
-          // The visible bar can lose navigation padding while the keyboard is
-          // open, but the canvas/stage reservation must remain constant.
-          // Reactions (~36) + gap + comment row (~44) + safe padding.
-          final barTotalH = 90 + 8 + (bottomPad < 16 ? 16.0 : bottomPad);
-          final canvasBarTotalH =
-              90 + 8 + (viewBottomPad < 16 ? 16.0 : viewBottomPad);
-          final giftGoalH = showGiftGoal ? (isMultiGrid ? 112.0 : 96.0) : 0.0;
-          final screenW = MediaQuery.sizeOf(context).width;
-          final screenH = MediaQuery.sizeOf(context).height;
-          final pkVideoH = screenW / TikTokLiveTokens.pkVideoAspect;
-          final chromeGap = isMultiGrid
-              ? TikTokLiveTokens.multiGridChromeGap
-              : TikTokLiveTokens.badgeGapBelow;
-          final headerBottom =
-              MediaQuery.paddingOf(context).top +
-              TikTokLiveTokens.topChromeBodyH +
-              chromeGap;
-          final contentBottom = canvasBarTotalH + giftGoalH + 8;
-
-          return GestureDetector(
-            onDoubleTap: () {
-              _spawnHearts(5);
-              context.read<LiveViewerBloc>().add(
-                const LiveViewerLiked(burst: 5),
+      child: BlocBuilder<LiveViewerBloc, LiveViewerState>(
+      buildWhen: (prev, curr) {
+        final prevLive = prev.live;
+        final currLive = curr.live;
+        final prevInfo = prevLive == null
+            ? null
+            : (
+                prevLive.id,
+                prevLive.hostId,
+                prevLive.hostName,
+                prevLive.hostAvatar,
+                prevLive.title,
+                prevLive.description,
+                prevLive.thumbnailUrl,
+                prevLive.streamUrl,
+                prevLive.category,
+                prevLive.status,
+                prevLive.startTime,
+                prevLive.endTime,
+                prevLive.isLive,
+                prevLive.isFollowing,
+                prevLive.paused,
+                prevLive.metadata,
               );
-            },
-            onTap: () {
-              if (_showComposer) {
-                FocusScope.of(context).unfocus();
-                setState(() => _showComposer = false);
-              }
-            },
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                if (isPk)
-                  Positioned(
-                    top: headerBottom,
-                    left: 0,
-                    right: 0,
-                    bottom: contentBottom,
-                    child: Column(
-                      children: [
-                        SizedBox(
-                          height: pkVideoH,
-                          width: double.infinity,
-                          child: Stack(
-                            fit: StackFit.expand,
-                            children: [
-                              _PkVideoLayout(
-                                live: live,
-                                opponentLive: state.battleOpponentLive,
-                                isActive: widget.isActive && connected,
-                                battleRoom: isThisRoom
-                                    ? state.battleRoom
-                                    : null,
-                              ),
-                              if (isThisRoom)
-                                Positioned(
-                                  top: 0,
-                                  left: 0,
-                                  right: 0,
-                                  child:
-                                      BlocBuilder<
-                                        LiveViewerBloc,
-                                        LiveViewerState
-                                      >(
-                                        buildWhen: (prev, curr) =>
-                                            prev.pkScoreLeft !=
-                                                curr.pkScoreLeft ||
-                                            prev.pkScoreRight !=
-                                                curr.pkScoreRight ||
-                                            prev.battle != curr.battle,
-                                        builder: (context, state) {
-                                          final battle = state.battle;
-                                          final winner = battle?.winnerLiveId;
-                                          final decided =
-                                              battle != null &&
-                                              winner != null &&
-                                              winner.isNotEmpty;
-                                          final leftWon =
-                                              decided && winner == live.id;
+        final currInfo = currLive == null
+            ? null
+            : (
+                currLive.id,
+                currLive.hostId,
+                currLive.hostName,
+                currLive.hostAvatar,
+                currLive.title,
+                currLive.description,
+                currLive.thumbnailUrl,
+                currLive.streamUrl,
+                currLive.category,
+                currLive.status,
+                currLive.startTime,
+                currLive.endTime,
+                currLive.isLive,
+                currLive.isFollowing,
+                currLive.paused,
+                currLive.metadata,
+              );
+        return prev.connectionState != curr.connectionState ||
+            (prev.live?.id) != (curr.live?.id) ||
+            prev.guests != curr.guests ||
+            prev.isOnStage != curr.isOnStage ||
+            // Score ticks update via nested PkBattleBar — do not rebuild
+            // the whole stage (VideoTrackRenderer flash).
+            (prev.battle?.isActive == true) != (curr.battle?.isActive == true) ||
+            prev.battle?.id != curr.battle?.id ||
+            prev.battle?.live1Id != curr.battle?.live1Id ||
+            prev.battle?.live2Id != curr.battle?.live2Id ||
+            prev.battle?.status != curr.battle?.status ||
+            prev.battle?.phase != curr.battle?.phase ||
+            prev.battleOpponentLive != curr.battleOpponentLive ||
+            prev.battleRoom != curr.battleRoom ||
+            prev.opponentTopGifterAvatars != curr.opponentTopGifterAvatars ||
+            prevInfo != currInfo;
+      },
+      builder: (context, state) {
+        final connectionState = state.connectionState;
+        final activeLiveId = state.live?.id;
+        final isThisRoom = activeLiveId == widget.live.id;
+        LiveEntity live;
+        if (isThisRoom && state.live != null) {
+          final l = state.live!;
+          live = LiveEntity(
+            id: l.id,
+            hostId: l.hostId,
+            hostName: l.hostName,
+            hostAvatar: l.hostAvatar,
+            title: l.title,
+            description: l.description,
+            thumbnailUrl: l.thumbnailUrl,
+            streamUrl: l.streamUrl,
+            category: l.category,
+            status: l.status,
+            startTime: l.startTime,
+            endTime: l.endTime,
+            isLive: l.isLive,
+            isFollowing: l.isFollowing,
+            paused: l.paused,
+            mediaMode: l.mediaMode,
+            audioOnly: l.audioOnly,
+            scene: l.scene,
+            cameraFacing: l.cameraFacing,
+            dualCameraEnabled: l.dualCameraEnabled,
+            topic: l.topic,
+            scheduledAt: l.scheduledAt,
+            shareCount: l.shareCount,
+            houseId: l.houseId,
+            ageRestricted: l.ageRestricted,
+            metadata: l.metadata,
+            viewerCount: 0,
+            likeCount: 0,
+          );
+        } else {
+          live = widget.live;
+        }
+        final connected =
+            isThisRoom &&
+            (connectionState == LiveConnectionState.connected ||
+                connectionState == LiveConnectionState.reconnecting);
+        final isPk = isThisRoom ? state.isPk : live.metadata?['isPk'] == true;
+        // Someone actually publishing on stage puts the room in grid layout on
+        // its own — waiting for a metadata flag meant an accepted co-host was
+        // invisible to everyone watching.
+        final stageGuests = isThisRoom
+            ? state.activeGuests
+            : const <GuestSummary>[];
+        final hasLiveGuests = stageGuests.isNotEmpty;
+        final isMultiGrid =
+            live.metadata?['isMultiGrid'] == true || (hasLiveGuests && !isPk);
+        final isMultiGuest =
+            live.metadata?['isMultiGuest'] == true || hasLiveGuests;
+        final showFanClub =
+            !isPk && !isMultiGrid && live.metadata?['showFanClub'] != false;
+        final giftGoalTarget =
+            (live.metadata?['giftGoalTarget'] as num?)?.toInt() ?? 0;
+        final showGiftGoal =
+            !isPk &&
+            !_giftGoalDismissed &&
+            live.metadata?['showGiftGoal'] == true &&
+            giftGoalTarget > 0;
+        final bottomPad = MediaQuery.paddingOf(context).bottom;
+        final viewBottomPad = MediaQuery.viewPaddingOf(context).bottom;
+        final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+        final guests = _guestsFrom(live, stageGuests);
+        // The visible bar can lose navigation padding while the keyboard is
+        // open, but the canvas/stage reservation must remain constant.
+        // Reactions (~36) + gap + comment row (~44) + safe padding.
+        final barTotalH = 90 + 8 + (bottomPad < 16 ? 16.0 : bottomPad);
+        final canvasBarTotalH =
+            90 + 8 + (viewBottomPad < 16 ? 16.0 : viewBottomPad);
+        final giftGoalH = showGiftGoal ? (isMultiGrid ? 112.0 : 96.0) : 0.0;
+        final screenW = MediaQuery.sizeOf(context).width;
+        final screenH = MediaQuery.sizeOf(context).height;
+        final pkVideoH = screenW / TikTokLiveTokens.pkVideoAspect;
+        final chromeGap = isMultiGrid
+            ? TikTokLiveTokens.multiGridChromeGap
+            : TikTokLiveTokens.badgeGapBelow;
+        final headerBottom =
+            MediaQuery.paddingOf(context).top +
+            TikTokLiveTokens.topChromeBodyH +
+            chromeGap;
+        final contentBottom = canvasBarTotalH + giftGoalH + 8;
 
-                                          return Stack(
-                                            alignment: Alignment.topCenter,
-                                            clipBehavior: Clip.none,
-                                            children: [
-                                              PkBattleBar(
-                                                scoreLeft: state.pkScoreLeft,
-                                                scoreRight: state.pkScoreRight,
-                                              ),
-                                              // TikTok calls the round on the
-                                              // panels themselves, not only in
-                                              // the score numbers.
-                                              if (decided) ...[
-                                                Positioned(
-                                                  top: 28,
-                                                  left: 8,
-                                                  child: _PkResultBadge(
-                                                    won: leftWon,
-                                                  ),
-                                                ),
-                                                Positioned(
-                                                  top: 28,
-                                                  right: 8,
-                                                  child: _PkResultBadge(
-                                                    won: !leftWon,
-                                                  ),
-                                                ),
-                                              ],
-                                              Positioned(
-                                                top: 26,
-                                                child: _PkBattleTimer(
-                                                  endTime: battle?.endTime,
-                                                  multiplier:
-                                                      battle?.multiplier ?? 1,
-                                                ),
-                                              ),
-                                            ],
-                                          );
-                                        },
-                                      ),
-                                ),
-                              if (isThisRoom)
-                                Positioned.fill(
-                                  child:
-                                      BlocBuilder<
-                                        LiveViewerBloc,
-                                        LiveViewerState
-                                      >(
-                                        buildWhen: (prev, curr) =>
-                                            prev.battle?.id !=
-                                                curr.battle?.id ||
-                                            prev.battle?.status !=
-                                                curr.battle?.status,
-                                        builder: (context, state) {
-                                          final battle = state.battle;
-                                          if (battle == null ||
-                                              !battle.isActive) {
-                                            return const SizedBox.shrink();
-                                          }
-                                          return _PkBattleStartGate(
-                                            battle: battle,
-                                            leftAvatarUrl: live.hostAvatar,
-                                            rightAvatarUrl:
-                                                state
-                                                    .battleOpponentLive
-                                                    ?.hostAvatar ??
-                                                live.metadata?['guestAvatar']
-                                                    as String?,
-                                          );
-                                        },
-                                      ),
-                                ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          // Follows the tiles above it: left cluster under the
-                          // left feed in every locale.
-                          child: Directionality(
-                            textDirection: TextDirection.ltr,
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: _PkContributors(
-                                    avatars: isThisRoom
-                                        ? state.topViewerAvatars
-                                        : (live.metadata?['pkContributorsLeft']
-                                                      as List?)
-                                                  ?.map(
-                                                    (item) => item.toString(),
-                                                  )
-                                                  .toList() ??
-                                              const <String>[],
-                                    isLeft: true,
-                                  ),
-                                ),
-                                Expanded(
-                                  child: _PkContributors(
-                                    avatars: isThisRoom
-                                        ? state.opponentTopGifterAvatars
-                                        : (live.metadata?['pkContributorsRight']
-                                                      as List?)
-                                                  ?.map(
-                                                    (item) => item.toString(),
-                                                  )
-                                                  .toList() ??
-                                              const <String>[],
-                                    isLeft: false,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        if (widget.isActive && isThisRoom)
-                          Expanded(
-                            child: Padding(
-                              padding: const EdgeInsets.fromLTRB(10, 4, 54, 0),
-                              child: BlocBuilder<LiveViewerBloc, LiveViewerState>(
-                                buildWhen: (prev, curr) =>
-                                    prev.comments != curr.comments ||
-                                    prev.pinnedComment != curr.pinnedComment,
-                                builder: (context, state) {
-                                  final pinned = state.pinnedComment;
-                                  return LayoutBuilder(
-                                    builder: (context, constraints) {
-                                      // A LayoutBuilder can briefly receive less
-                                      // than the preferred 40px (for example
-                                      // while the keyboard or page is resizing).
-                                      // Keep the comment area within the space
-                                      // actually available instead of using an
-                                      // invalid clamp range.
-                                      final pinH = pinned == null ? 0.0 : 56.0;
-                                      final commentsHeight = math.max(
-                                        0.0,
-                                        constraints.maxHeight - pinH,
-                                      );
-                                      return Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          if (pinned != null) ...[
-                                            PinnedCommentBar(comment: pinned),
-                                            const SizedBox(height: 6),
-                                          ],
-                                          _buildCommentsSection(
-                                            context: context,
-                                            state: state,
-                                            live: live,
-                                            height: commentsHeight,
-                                            alignTop: false,
-                                            highContrast: true,
-                                          ),
-                                        ],
-                                      );
-                                    },
-                                  );
-                                },
-                              ),
-                            ),
-                          )
-                        else
-                          const Spacer(),
-                      ],
-                    ),
-                  )
-                else if (isMultiGrid)
-                  Positioned(
-                    top: headerBottom,
-                    left: 0,
-                    right: 0,
-                    bottom: contentBottom,
-                    child: Column(
-                      children: [
-                        // Real LiveKit tiles once the server says someone is on
-                        // stage; the mock grid stays for rooms the guest API has
-                        // nothing to say about.
-                        if (hasLiveGuests)
-                          ViewerStage(
-                            live: live,
-                            guests: stageGuests,
-                            liveKit: di.sl<LiveKitService>(),
-                            isSelfOnStage: state.isOnStage,
-                            currentUserId: state.currentUserId,
-                            // Always reserve a usable comment band and the
-                            // composer on short phones / large text scales.
-                            maxHeight: math.max(
-                              180,
-                              screenH - headerBottom - contentBottom - 112,
-                            ),
-                          )
-                        else
-                          MultiGuestGrid(
-                            live: live,
-                            isActive: widget.isActive && connected,
-                            guests: guests,
-                            onRequestTap: () => _openGuestRequest(live),
-                          ),
-                        if (widget.isActive && isThisRoom)
-                          Expanded(
-                            child: Padding(
-                              padding: const EdgeInsets.fromLTRB(10, 2, 16, 0),
-                              child:
-                                  BlocBuilder<LiveViewerBloc, LiveViewerState>(
-                                    buildWhen: (prev, curr) =>
-                                        prev.comments != curr.comments ||
-                                        prev.pinnedComment !=
-                                            curr.pinnedComment,
-                                    builder: (context, state) {
-                                      final pinned = state.pinnedComment;
-                                      return LayoutBuilder(
-                                        builder: (context, constraints) {
-                                          final pinH = pinned == null
-                                              ? 0.0
-                                              : 56.0;
-                                          final commentsHeight = math.max(
-                                            0.0,
-                                            constraints.maxHeight - pinH,
-                                          );
-                                          return Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              if (pinned != null) ...[
-                                                PinnedCommentBar(
-                                                  comment: pinned,
-                                                ),
-                                                const SizedBox(height: 6),
-                                              ],
-                                              _buildCommentsSection(
-                                                context: context,
-                                                state: state,
-                                                live: live,
-                                                height: commentsHeight,
-                                                alignTop: false,
-                                              ),
-                                            ],
-                                          );
-                                        },
-                                      );
-                                    },
-                                  ),
-                            ),
-                          )
-                        else
-                          const Spacer(),
-                      ],
-                    ),
-                  )
-                else
-                  LiveVideoPlayer(
-                    key: ValueKey('viewer_primary_${live.id}'),
-                    live: live,
-                    isActive: widget.isActive && connected,
-                  ),
-                IgnorePointer(
-                  child: Align(
-                    alignment: Alignment.bottomCenter,
-                    child: Container(
-                      height: isPk || isMultiGrid
-                          ? MediaQuery.sizeOf(context).height * 0.34
-                          : TikTokLiveTokens.bottomScrimH,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.bottomCenter,
-                          end: Alignment.topCenter,
-                          colors: [
-                            Colors.black.withValues(
-                              alpha: (isPk || isMultiGrid)
-                                  ? 0.76
-                                  : TikTokLiveTokens.bottomScrimAlpha,
-                            ),
-                            Colors.black.withValues(
-                              alpha: (isPk || isMultiGrid) ? 0.3 : 0.78,
-                            ),
-                            Colors.black.withValues(
-                              alpha: (isPk || isMultiGrid) ? 0.08 : 0.38,
-                            ),
-                            Colors.transparent,
-                          ],
-                          stops: const [0.0, 0.28, 0.55, 1.0],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                IgnorePointer(
-                  child: Align(
-                    alignment: Alignment.topCenter,
-                    child: Container(
-                      height:
-                          MediaQuery.paddingOf(context).top +
-                          TikTokLiveTokens.topScrimH,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            Colors.black.withValues(
-                              alpha: TikTokLiveTokens.topScrimAlpha,
-                            ),
-                            Colors.transparent,
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
+        return GestureDetector(
+          onDoubleTap: () {
+            _spawnHearts(5);
+            context.read<LiveViewerBloc>().add(const LiveViewerLiked(burst: 5));
+          },
+          onTap: () {
+            if (_showComposer) {
+              FocusScope.of(context).unfocus();
+              setState(() => _showComposer = false);
+            }
+          },
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              if (isPk)
                 Positioned(
-                  top: 0,
+                  top: headerBottom,
                   left: 0,
                   right: 0,
-                  child: BlocBuilder<LiveViewerBloc, LiveViewerState>(
-                    buildWhen: (prev, curr) {
-                      final pCount = (
-                        prev.live?.viewerCount ?? 0,
-                        prev.live?.likeCount ?? 0,
-                        prev.live?.isFollowing ?? false,
-                      );
-                      final cCount = (
-                        curr.live?.viewerCount ?? 0,
-                        curr.live?.likeCount ?? 0,
-                        curr.live?.isFollowing ?? false,
-                      );
-                      return prev.topViewerAvatars != curr.topViewerAvatars ||
-                          pCount != cCount ||
-                          prev.currentUserId != curr.currentUserId ||
-                          prev.isReporting != curr.isReporting;
-                    },
-                    builder: (context, state) {
-                      final avatars = isThisRoom
-                          ? state.topViewerAvatars
-                          : (widget.live.metadata?['topViewerAvatars'] as List?)
-                                    ?.map((e) => e.toString())
-                                    .where((url) => url.isNotEmpty)
-                                    .take(3)
-                                    .toList() ??
-                                const <String>[];
-                      final counts = isThisRoom
-                          ? (
-                              viewer: state.live?.viewerCount ?? 0,
-                              like: state.live?.likeCount ?? 0,
-                              following: state.live?.isFollowing ?? false,
-                            )
-                          : (
-                              viewer: widget.live.viewerCount,
-                              like: widget.live.likeCount,
-                              following: widget.live.isFollowing,
-                            );
-                      final liveForTop = live.copyWith(
-                        viewerCount: counts.viewer,
-                        likeCount: counts.like,
-                        isFollowing: counts.following,
-                      );
-                      return TikTokLiveTopBar(
-                        live: liveForTop,
-                        topViewerAvatars: avatars,
-                        onFollow: () {
-                          if (widget.isActive) {
-                            context.read<LiveViewerBloc>().add(
-                              const LiveViewerFollowToggled(),
-                            );
-                          }
-                        },
-                        onClose: () {
-                          if (widget.onClose != null) {
-                            widget.onClose!();
-                            return;
-                          }
-                          context.read<LiveViewerBloc>().add(
-                            const LiveViewerDeactivated(leavingFeed: true),
-                          );
-                          if (context.canPop()) {
-                            context.pop();
-                          } else {
-                            context.go('/');
-                          }
-                        },
-                        onHourlyRankTap: widget.isActive
-                            ? () => _openRanking(live)
-                            : null,
-                        onLeagueTap: widget.isActive
-                            ? () => _openLeague(live)
-                            : null,
-                        onMoreTap: widget.isActive && !_isOwnLive(live, state)
-                            ? () => _openLiveReport(live)
-                            : null,
-                      );
-                    },
-                  ),
-                ),
-                if (showFanClub && !isMultiGrid)
-                  Positioned(
-                    top: MediaQuery.paddingOf(context).top + 78,
-                    left: TikTokLiveTokens.topInsetH,
-                    child: FanClubJoinButton(
-                      onTap: () => _openFanClub(live),
-                    ),
-                  ),
-                if (isMultiGuest && !isPk && !isMultiGrid)
-                  Positioned(
-                    top: MediaQuery.paddingOf(context).top + 108,
-                    right: 4,
-                    child: GuestRequestPanel(
-                      slots: [
-                        GuestSlotData(
-                          userId: live.hostId,
-                          name: live.hostName,
-                          avatarUrl: live.hostAvatar,
-                          isHost: true,
-                        ),
-                        ...guests,
-                      ],
-                      onRequestTap: () => _openGuestRequest(live),
-                      onManageTap: _canManageGuests(live, state)
-                          ? () => LiveViewerGuestManageSheet.show(
-                              context,
-                              liveId: live.id,
-                              audioOnly: live.isAudioOnly,
-                            )
-                          : null,
-                    ),
-                  ),
-                if (isPk && isThisRoom)
-                  Positioned(
-                    right: 10,
-                    bottom: barTotalH + keyboardInset + 72,
-                    child: Column(
-                      children: [
-                        _SideAction(
-                          icon: Icons.back_hand_outlined,
-                          onTap: () {},
-                        ),
-                        const SizedBox(height: 12),
-                        _SideAction(
-                          icon: Icons.favorite,
-                          iconColor: const Color(0xFFFF2D55),
-                          onTap: () {
-                            _spawnHearts(3);
-                            context.read<LiveViewerBloc>().add(
-                              const LiveViewerLiked(burst: 3),
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 12),
-                        _SideAction(icon: Icons.layers_outlined, onTap: () {}),
-                      ],
-                    ),
-                  ),
-                if (isThisRoom && !isPk)
-                  Positioned(
-                    right: 0,
-                    top: headerBottom,
-                    bottom: barTotalH + keyboardInset + 48,
-                    width: 64,
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.translucent,
-                      onTap: () {
-                        _spawnHearts(2);
-                        context.read<LiveViewerBloc>().add(
-                          const LiveViewerLiked(burst: 1),
-                        );
-                      },
-                    ),
-                  ),
-                if (widget.isActive && isThisRoom && !isMultiGrid && !isPk)
-                  Positioned(
-                    left: TikTokLiveTokens.commentLeft,
-                    right: isMultiGuest ? 68 : 56,
-                    bottom: barTotalH + keyboardInset + 8 + giftGoalH,
-                    child: BlocBuilder<LiveViewerBloc, LiveViewerState>(
-                      buildWhen: (prev, curr) =>
-                          prev.comments != curr.comments ||
-                          prev.pinnedComment != curr.pinnedComment,
-                      builder: (context, state) {
-                        final pinned = state.pinnedComment;
-                        return Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                  bottom: contentBottom,
+                  child: Column(
+                    children: [
+                      SizedBox(
+                        height: pkVideoH,
+                        width: double.infinity,
+                        child: Stack(
+                          fit: StackFit.expand,
                           children: [
-                            if (pinned != null) ...[
-                              PinnedCommentBar(comment: pinned),
-                              const SizedBox(height: 8),
-                            ],
-                            _buildCommentsSection(
-                              context: context,
-                              state: state,
+                            _PkVideoLayout(
                               live: live,
-                              // A fixed 216 is most of a short phone once the
-                              // header, the bars and a pinned comment are out.
-                              // Cap it at the space actually between them.
-                              height: math.min(
-                                TikTokLiveTokens.commentFeedH,
-                                (MediaQuery.sizeOf(context).height -
-                                        headerBottom -
-                                        barTotalH -
-                                        keyboardInset -
-                                        giftGoalH -
-                                        (pinned == null ? 0 : 58) -
-                                        24)
-                                    .clamp(64.0, TikTokLiveTokens.commentFeedH),
-                              ),
+                              opponentLive: state.battleOpponentLive,
+                              isActive: widget.isActive && connected,
+                              battleRoom: isThisRoom
+                                  ? state.battleRoom
+                                  : null,
                             ),
+                            if (isThisRoom)
+                              Positioned(
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                child:
+                                    BlocBuilder<
+                                      LiveViewerBloc,
+                                      LiveViewerState
+                                    >(
+                                      buildWhen: (prev, curr) =>
+                                          prev.pkScoreLeft !=
+                                              curr.pkScoreLeft ||
+                                          prev.pkScoreRight !=
+                                              curr.pkScoreRight ||
+                                          prev.battle != curr.battle,
+                                      builder: (context, state) {
+                                        final battle = state.battle;
+                                        final winner = battle?.winnerLiveId;
+                                        final decided =
+                                            battle != null &&
+                                            winner != null &&
+                                            winner.isNotEmpty;
+                                        final leftWon =
+                                            decided && winner == live.id;
+
+                                        return Stack(
+                                          alignment: Alignment.topCenter,
+                                          clipBehavior: Clip.none,
+                                          children: [
+                                            PkBattleBar(
+                                              scoreLeft: state.pkScoreLeft,
+                                              scoreRight: state.pkScoreRight,
+                                            ),
+                                            // TikTok calls the round on the
+                                            // panels themselves, not only in
+                                            // the score numbers.
+                                            if (decided) ...[
+                                              Positioned(
+                                                top: 28,
+                                                left: 8,
+                                                child: _PkResultBadge(
+                                                  won: leftWon,
+                                                ),
+                                              ),
+                                              Positioned(
+                                                top: 28,
+                                                right: 8,
+                                                child: _PkResultBadge(
+                                                  won: !leftWon,
+                                                ),
+                                              ),
+                                            ],
+                                            Positioned(
+                                              top: 26,
+                                              child: _PkBattleTimer(
+                                                endTime: battle?.endTime,
+                                                multiplier:
+                                                    battle?.multiplier ?? 1,
+                                              ),
+                                            ),
+                                          ],
+                                        );
+                                      },
+                                    ),
+                              ),
+                            if (isThisRoom)
+                              Positioned.fill(
+                                child: BlocBuilder<LiveViewerBloc, LiveViewerState>(
+                                  buildWhen: (prev, curr) =>
+                                      prev.battle?.id != curr.battle?.id ||
+                                      prev.battle?.status !=
+                                          curr.battle?.status,
+                                  builder: (context, state) {
+                                    final battle = state.battle;
+                                    if (battle == null || !battle.isActive) {
+                                      return const SizedBox.shrink();
+                                    }
+                                    return _PkBattleStartGate(
+                                      battle: battle,
+                                      leftAvatarUrl: live.hostAvatar,
+                                      rightAvatarUrl:
+                                          state.battleOpponentLive?.hostAvatar ??
+                                          live.metadata?['guestAvatar']
+                                              as String?,
+                                    );
+                                  },
+                                ),
+                              ),
                           ],
-                        );
-                      },
-                    ),
-                  ),
-                if (widget.isActive && isThisRoom && showGiftGoal)
-                  Positioned(
-                    left: 10,
-                    right: 10,
-                    bottom: barTotalH + keyboardInset + 6,
-                    child: BlocBuilder<LiveViewerBloc, LiveViewerState>(
-                      buildWhen: (prev, curr) {
-                        final pm = prev.live?.metadata;
-                        final cm = curr.live?.metadata;
-                        final p = (
-                          pm?['giftGoalCurrent'] as int? ?? 0,
-                          pm?['giftGoalTarget'] as int? ?? 0,
-                        );
-                        final c = (
-                          cm?['giftGoalCurrent'] as int? ?? 0,
-                          cm?['giftGoalTarget'] as int? ?? 0,
-                        );
-                        return p != c;
-                      },
-                      builder: (context, state) {
-                        final goal = isThisRoom
-                            ? (
-                                current:
-                                    state.live?.metadata?['giftGoalCurrent']
-                                        as int? ??
-                                    0,
-                                target:
-                                    state.live?.metadata?['giftGoalTarget']
-                                        as int? ??
-                                    0,
-                              )
-                            : (
-                                current:
-                                    live.metadata?['giftGoalCurrent'] as int? ??
-                                    7,
-                                target:
-                                    live.metadata?['giftGoalTarget'] as int? ??
-                                    8,
-                              );
-                        return GiftGoalCard(
-                          title: 'Help ${live.hostName} reach the gift goal!',
-                          current: goal.current,
-                          target: goal.target,
-                          onSend: () {
-                            _openGifts();
-                          },
-                          onClose: () =>
-                              setState(() => _giftGoalDismissed = true),
-                        );
-                      },
-                    ),
-                  ),
-                if (widget.isActive && isThisRoom)
-                  Positioned(
-                    left: 12,
-                    right: 12,
-                    bottom: barTotalH + keyboardInset + giftGoalH + 18,
-                    child: AnimatedSize(
-                      duration: const Duration(milliseconds: 180),
-                      curve: Curves.easeOut,
-                      alignment: Alignment.bottomCenter,
-                      child: _showLiveFeatures
-                          ? LiveInteractiveViewerPanel(
-                              onClose: () =>
-                                  setState(() => _showLiveFeatures = false),
-                            )
-                          : const SizedBox(width: double.infinity),
-                    ),
-                  ),
-                if (widget.isActive && isThisRoom)
-                  BlocBuilder<LiveViewerBloc, LiveViewerState>(
-                    buildWhen: (prev, curr) =>
-                        prev.recentGifts != curr.recentGifts ||
-                        prev.activeGiftAnimation != curr.activeGiftAnimation ||
-                        prev.latestGiftCombo != curr.latestGiftCombo,
-                    builder: (context, state) {
-                      final bloc = context.read<LiveViewerBloc>();
-                      return FloatingGiftsLayer(
-                        recentGifts: state.recentGifts,
-                        activeGift: state.activeGiftAnimation,
-                        latestCombo: state.latestGiftCombo,
-                        onAnimationComplete: () => context
-                            .read<LiveViewerBloc>()
-                            .add(const LiveViewerGiftAnimationCleared()),
-                        onComboConsumed: (payload) {
-                          if (bloc.isClosed) return;
-                          bloc.add(LiveViewerGiftComboConsumed(payload));
-                        },
-                      );
-                    },
-                  ),
-                if (isThisRoom) ...[
-                  BlocBuilder<LiveViewerBloc, LiveViewerState>(
-                    buildWhen: (prev, curr) =>
-                        prev.floatingHeartBurst != curr.floatingHeartBurst,
-                    builder: (context, state) {
-                      return FloatingHeartsOverlay(
-                        burst: state.floatingHeartBurst,
-                        onConsumed: () => context.read<LiveViewerBloc>().add(
-                          const LiveViewerHeartBurstConsumed(),
                         ),
-                      );
-                    },
-                  ),
-                  ..._tapHearts,
-                ],
-                if (widget.isActive && isThisRoom)
-                  BlocBuilder<LiveViewerBloc, LiveViewerState>(
-                    buildWhen: (prev, curr) =>
-                        prev.moderationBanner != curr.moderationBanner,
-                    builder: (context, state) {
-                      final banner = state.moderationBanner;
-                      if (banner == null || banner.isEmpty) {
-                        return const SizedBox.shrink();
-                      }
-                      return Positioned(
-                        left: 12,
-                        right: 12,
-                        top: headerBottom + 8,
-                        child: Material(
-                          color: Colors.black.withValues(alpha: 0.72),
-                          borderRadius: BorderRadius.circular(10),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
-                            ),
-                            child: Text(
-                              banner,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
+                      ),
+                      const SizedBox(height: 6),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        // Follows the tiles above it: left cluster under the
+                        // left feed in every locale.
+                        child: Directionality(
+                          textDirection: TextDirection.ltr,
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: _PkContributors(
+                                  avatars: isThisRoom
+                                      ? state.topViewerAvatars
+                                      : (live.metadata?['pkContributorsLeft']
+                                                    as List?)
+                                                ?.map((item) => item.toString())
+                                                .toList() ??
+                                            const <String>[],
+                                  isLeft: true,
+                                ),
                               ),
-                            ),
+                              Expanded(
+                                child: _PkContributors(
+                                  avatars: isThisRoom
+                                      ? state.opponentTopGifterAvatars
+                                      : (live.metadata?['pkContributorsRight']
+                                                    as List?)
+                                                ?.map((item) => item.toString())
+                                                .toList() ??
+                                            const <String>[],
+                                  isLeft: false,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
+                      ),
+                      if (widget.isActive && isThisRoom)
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(10, 4, 54, 0),
+                            child: BlocBuilder<LiveViewerBloc, LiveViewerState>(
+                              buildWhen: (prev, curr) =>
+                                  prev.comments != curr.comments ||
+                                  prev.pinnedComment != curr.pinnedComment,
+                              builder: (context, state) {
+                                final pinned = state.pinnedComment;
+                                return LayoutBuilder(
+                                  builder: (context, constraints) {
+                                    final pinH = pinned == null ? 0.0 : 50.0;
+                                    return Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        if (pinned != null) ...[
+                                          PinnedCommentBar(comment: pinned),
+                                          const SizedBox(height: 6),
+                                        ],
+                                        _buildCommentsSection(
+                                          context: context,
+                                          state: state,
+                                          live: live,
+                                          height: (constraints.maxHeight - pinH)
+                                              .clamp(
+                                                40.0,
+                                                constraints.maxHeight,
+                                              ),
+                                          alignTop: false,
+                                          highContrast: true,
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                );
+                              },
+                            ),
+                          ),
+                        )
+                      else
+                        const Spacer(),
+                    ],
+                  ),
+                )
+              else if (isMultiGrid)
+                Positioned(
+                  top: headerBottom,
+                  left: 0,
+                  right: 0,
+                  bottom: contentBottom,
+                  child: Column(
+                    children: [
+                      // Real LiveKit tiles once the server says someone is on
+                      // stage; the mock grid stays for rooms the guest API has
+                      // nothing to say about.
+                      if (hasLiveGuests)
+                        ViewerStage(
+                          live: live,
+                          guests: stageGuests,
+                          liveKit: di.sl<LiveKitService>(),
+                          isSelfOnStage: state.isOnStage,
+                          currentUserId: state.currentUserId,
+                          // Always reserve a usable comment band and the
+                          // composer on short phones / large text scales.
+                          maxHeight: math.max(
+                            180,
+                            screenH - headerBottom - contentBottom - 112,
+                          ),
+                        )
+                      else
+                        MultiGuestGrid(
+                          live: live,
+                          isActive: widget.isActive && connected,
+                          guests: guests,
+                          onRequestTap: () => _openGuestRequest(live),
+                        ),
+                      if (widget.isActive && isThisRoom)
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(10, 2, 16, 0),
+                            child: BlocBuilder<LiveViewerBloc, LiveViewerState>(
+                              buildWhen: (prev, curr) =>
+                                  prev.comments != curr.comments ||
+                                  prev.pinnedComment != curr.pinnedComment,
+                              builder: (context, state) {
+                                final pinned = state.pinnedComment;
+                                return LayoutBuilder(
+                                  builder: (context, constraints) {
+                                    final pinH = pinned == null ? 0.0 : 50.0;
+                                    return Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        if (pinned != null) ...[
+                                          PinnedCommentBar(comment: pinned),
+                                          const SizedBox(height: 6),
+                                        ],
+                                        _buildCommentsSection(
+                                          context: context,
+                                          state: state,
+                                          live: live,
+                                          height: (constraints.maxHeight - pinH)
+                                              .clamp(
+                                                40.0,
+                                                constraints.maxHeight,
+                                              ),
+                                          alignTop: false,
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                );
+                              },
+                            ),
+                          ),
+                        )
+                      else
+                        const Spacer(),
+                    ],
+                  ),
+                )
+              else
+                LiveVideoPlayer(
+                  key: ValueKey('viewer_primary_${live.id}'),
+                  live: live,
+                  isActive: widget.isActive && connected,
+                  onRaiseHand:
+                      widget.isActive &&
+                          isThisRoom &&
+                          !state.isOnStage &&
+                          !live.paused
+                      ? () => _openGuestRequest(live)
+                      : null,
+                ),
+              IgnorePointer(
+                child: Align(
+                  alignment: Alignment.bottomCenter,
+                  child: Container(
+                    height: isPk || isMultiGrid
+                        ? MediaQuery.sizeOf(context).height * 0.34
+                        : TikTokLiveTokens.bottomScrimH,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                        colors: [
+                          Colors.black.withValues(
+                            alpha: (isPk || isMultiGrid)
+                                ? 0.76
+                                : TikTokLiveTokens.bottomScrimAlpha,
+                          ),
+                          Colors.black.withValues(
+                            alpha: (isPk || isMultiGrid) ? 0.3 : 0.78,
+                          ),
+                          Colors.black.withValues(
+                            alpha: (isPk || isMultiGrid) ? 0.08 : 0.38,
+                          ),
+                          Colors.transparent,
+                        ],
+                        stops: const [0.0, 0.28, 0.55, 1.0],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              IgnorePointer(
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  child: Container(
+                    height:
+                        MediaQuery.paddingOf(context).top +
+                        TikTokLiveTokens.topScrimH,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.black.withValues(
+                            alpha: TikTokLiveTokens.topScrimAlpha,
+                          ),
+                          Colors.transparent,
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: BlocBuilder<LiveViewerBloc, LiveViewerState>(
+                  buildWhen: (prev, curr) {
+                    final pCount = (
+                      prev.live?.viewerCount ?? 0,
+                      prev.live?.likeCount ?? 0,
+                      prev.live?.isFollowing ?? false,
+                    );
+                    final cCount = (
+                      curr.live?.viewerCount ?? 0,
+                      curr.live?.likeCount ?? 0,
+                      curr.live?.isFollowing ?? false,
+                    );
+                    return prev.topViewerAvatars != curr.topViewerAvatars ||
+                        pCount != cCount ||
+                        prev.currentUserId != curr.currentUserId ||
+                        prev.isReporting != curr.isReporting;
+                  },
+                  builder: (context, state) {
+                    final avatars = isThisRoom
+                        ? state.topViewerAvatars
+                        : (widget.live.metadata?['topViewerAvatars'] as List?)
+                                  ?.map((e) => e.toString())
+                                  .where((url) => url.isNotEmpty)
+                                  .take(3)
+                                  .toList() ??
+                              const <String>[];
+                    final counts = isThisRoom
+                        ? (
+                            viewer: state.live?.viewerCount ?? 0,
+                            like: state.live?.likeCount ?? 0,
+                            following: state.live?.isFollowing ?? false,
+                          )
+                        : (
+                            viewer: widget.live.viewerCount,
+                            like: widget.live.likeCount,
+                            following: widget.live.isFollowing,
+                          );
+                    final liveForTop = live.copyWith(
+                      viewerCount: counts.viewer,
+                      likeCount: counts.like,
+                      isFollowing: counts.following,
+                    );
+                    return TikTokLiveTopBar(
+                      live: liveForTop,
+                      topViewerAvatars: avatars,
+                      onFollow: () {
+                        if (widget.isActive) {
+                          context.read<LiveViewerBloc>().add(
+                            const LiveViewerFollowToggled(),
+                          );
+                        }
+                      },
+                      onClose: () {
+                        if (widget.onClose != null) {
+                          widget.onClose!();
+                          return;
+                        }
+                        context.read<LiveViewerBloc>().add(
+                          const LiveViewerDeactivated(leavingFeed: true),
+                        );
+                        if (context.canPop()) {
+                          context.pop();
+                        } else {
+                          context.go('/');
+                        }
+                      },
+                      onHourlyRankTap: widget.isActive
+                          ? () => _openRanking(live)
+                          : null,
+                      onLeagueTap: widget.isActive
+                          ? () => _openLeague(live)
+                          : null,
+                      onMoreTap: widget.isActive &&
+                              !_isOwnLive(live, state)
+                          ? () => _openLiveReport(live)
+                          : null,
+                    );
+                  },
+                ),
+              ),
+              if (showFanClub && !isMultiGrid)
+                Positioned(
+                  top: MediaQuery.paddingOf(context).top + 78,
+                  left: TikTokLiveTokens.topInsetH,
+                  child: FanClubJoinButton(
+                    onTap: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Joined Fan Club'),
+                          backgroundColor: AppColors.surface,
+                          behavior: SnackBarBehavior.floating,
+                        ),
                       );
                     },
                   ),
-                // Sits directly above the input bar so an invite (or the leave
-                // control once on stage) is never buried behind the HUD.
-                if (widget.isActive && isThisRoom)
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: barTotalH + keyboardInset + 6,
-                    child: const GuestStagePrompt(),
-                  ),
+                ),
+              if (isMultiGuest && !isPk && !isMultiGrid)
                 Positioned(
-                  left: 0,
+                  top: MediaQuery.paddingOf(context).top + 108,
+                  right: 4,
+                  child: GuestRequestPanel(
+                    slots: [
+                      GuestSlotData(
+                        userId: live.hostId,
+                        name: live.hostName,
+                        avatarUrl: live.hostAvatar,
+                        isHost: true,
+                      ),
+                      ...guests,
+                    ],
+                    onRequestTap: () => _openGuestRequest(live),
+                    onManageTap: _canManageGuests(live, state)
+                        ? () => LiveViewerGuestManageSheet.show(
+                            context,
+                            liveId: live.id,
+                            audioOnly: live.isAudioOnly,
+                          )
+                        : null,
+                  ),
+                ),
+              if (isPk && isThisRoom)
+                Positioned(
+                  right: 10,
+                  bottom: barTotalH + keyboardInset + 72,
+                  child: Column(
+                    children: [
+                      _SideAction(icon: Icons.back_hand_outlined, onTap: () {}),
+                      const SizedBox(height: 12),
+                      _SideAction(
+                        icon: Icons.favorite,
+                        iconColor: const Color(0xFFFF2D55),
+                        onTap: () {
+                          _spawnHearts(3);
+                          context.read<LiveViewerBloc>().add(
+                            const LiveViewerLiked(burst: 3),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      _SideAction(icon: Icons.layers_outlined, onTap: () {}),
+                    ],
+                  ),
+                ),
+              if (isThisRoom && !isPk)
+                Positioned(
                   right: 0,
-                  bottom: keyboardInset,
+                  top: headerBottom,
+                  bottom: barTotalH + keyboardInset + 48,
+                  width: 64,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.translucent,
+                    onTap: () {
+                      _spawnHearts(2);
+                      context.read<LiveViewerBloc>().add(
+                        const LiveViewerLiked(burst: 1),
+                      );
+                    },
+                  ),
+                ),
+              if (widget.isActive && isThisRoom && !isMultiGrid && !isPk)
+                Positioned(
+                  left: TikTokLiveTokens.commentLeft,
+                  right: isMultiGuest ? 68 : 56,
+                  bottom: barTotalH + keyboardInset + 8 + giftGoalH,
+                  child: BlocBuilder<LiveViewerBloc, LiveViewerState>(
+                    buildWhen: (prev, curr) =>
+                        prev.comments != curr.comments ||
+                        prev.pinnedComment != curr.pinnedComment,
+                    builder: (context, state) {
+                      final pinned = state.pinnedComment;
+                      return Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (pinned != null) ...[
+                            PinnedCommentBar(comment: pinned),
+                            const SizedBox(height: 8),
+                          ],
+                          _buildCommentsSection(
+                            context: context,
+                            state: state,
+                            live: live,
+                            // A fixed 216 is most of a short phone once the
+                            // header, the bars and a pinned comment are out.
+                            // Cap it at the space actually between them.
+                            height: math.min(
+                              TikTokLiveTokens.commentFeedH,
+                              (MediaQuery.sizeOf(context).height -
+                                      headerBottom -
+                                      barTotalH -
+                                      keyboardInset -
+                                      giftGoalH -
+                                      (pinned == null ? 0 : 58) -
+                                      24)
+                                  .clamp(64.0, TikTokLiveTokens.commentFeedH),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+              if (widget.isActive && isThisRoom && showGiftGoal)
+                Positioned(
+                  left: 10,
+                  right: 10,
+                  bottom: barTotalH + keyboardInset + 6,
                   child: BlocBuilder<LiveViewerBloc, LiveViewerState>(
                     buildWhen: (prev, curr) {
                       final pm = prev.live?.metadata;
                       final cm = curr.live?.metadata;
-                      final pShare = pm?['shareCount'] as int?;
-                      final cShare = cm?['shareCount'] as int?;
-                      return prev.session?.coinBalance !=
-                              curr.session?.coinBalance ||
-                          prev.chatMuted != curr.chatMuted ||
-                          prev.isCommentSending != curr.isCommentSending ||
-                          prev.isOnStage != curr.isOnStage ||
-                          pShare != cShare;
+                      final p = (
+                        pm?['giftGoalCurrent'] as int? ?? 0,
+                        pm?['giftGoalTarget'] as int? ?? 0,
+                      );
+                      final c = (
+                        cm?['giftGoalCurrent'] as int? ?? 0,
+                        cm?['giftGoalTarget'] as int? ?? 0,
+                      );
+                      return p != c;
                     },
                     builder: (context, state) {
-                      final chatMuted = isThisRoom ? state.chatMuted : false;
-                      final isCommentSending = isThisRoom
-                          ? state.isCommentSending
-                          : false;
-                      // No stand-in count: the share glyph stays bare until the
-                      // room actually reports one.
-                      final shareCount = isThisRoom
-                          ? (state.live?.metadata?['shareCount'] as int?)
-                          : (live.metadata?['shareCount'] as int?);
-                      final canRequestGuest =
-                          widget.isActive &&
-                          isThisRoom &&
-                          !state.isOnStage &&
-                          !live.paused;
-                      return TikTokLiveBottomBar(
-                        onTypeTap: () {
-                          if (chatMuted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Your chat is muted on this live',
-                                ),
-                                backgroundColor: AppColors.surface,
-                                behavior: SnackBarBehavior.floating,
-                              ),
+                      final goal = isThisRoom
+                          ? (
+                              current:
+                                  state.live?.metadata?['giftGoalCurrent']
+                                      as int? ??
+                                  0,
+                              target:
+                                  state.live?.metadata?['giftGoalTarget']
+                                      as int? ??
+                                  0,
+                            )
+                          : (
+                              current:
+                                  live.metadata?['giftGoalCurrent'] as int? ??
+                                  7,
+                              target:
+                                  live.metadata?['giftGoalTarget'] as int? ?? 8,
                             );
-                            return;
-                          }
-                          setState(() => _showComposer = true);
+                      return GiftGoalCard(
+                        title: 'Help ${live.hostName} reach the gift goal!',
+                        current: goal.current,
+                        target: goal.target,
+                        onSend: () {
+                          _openGifts();
                         },
-                        onGiftTap: _openGifts,
-                        onShareTap: widget.isActive
-                            ? () {
-                                context.read<LiveViewerBloc>().add(
-                                  const LiveViewerShareRequested(),
-                                );
-                              }
-                            : () {},
-                        onLikeTap: () {
-                          _spawnHearts(3);
-                          if (widget.isActive) {
-                            context.read<LiveViewerBloc>().add(
-                              const LiveViewerLiked(burst: 3),
-                            );
-                          }
-                        },
-                        onQuickReact: (text) {
-                          if (!widget.isActive || chatMuted) return;
-                          context.read<LiveViewerBloc>().add(
-                            LiveViewerCommentSent(text),
-                          );
-                        },
-                        onTreasureTap: (isPk || isMultiGrid)
-                            ? null
-                            : () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Treasure chest'),
-                                    backgroundColor: AppColors.surface,
-                                    behavior: SnackBarBehavior.floating,
-                                  ),
-                                );
-                              },
-                        onRoseTap: widget.isActive ? _sendRose : null,
-                        onToolsTap: widget.isActive
-                            ? _openInteractiveTools
-                            : null,
-                        onMultiGuestTap: canRequestGuest
-                            ? () => _openGuestRequest(live)
-                            : null,
-                        shareCount: shareCount,
-                        commentField: _showComposer
-                            ? CommentInputBar(
-                                enabled: connected && !chatMuted,
-                                isSending: isCommentSending,
-                                hintText: chatMuted ? 'Chat muted' : 'Comment',
-                                onSend: (text) {
-                                  if (isCommentSending) return;
-                                  context.read<LiveViewerBloc>().add(
-                                    LiveViewerCommentSent(text),
-                                  );
-                                },
-                              )
-                            : null,
+                        onClose: () =>
+                            setState(() => _giftGoalDismissed = true),
                       );
                     },
                   ),
                 ),
-                if (live.paused &&
-                    connectionState != LiveConnectionState.liveEnded)
-                  const IgnorePointer(child: _PausedIndicator()),
-                if (widget.isActive && isThisRoom)
-                  BlocBuilder<LiveViewerBloc, LiveViewerState>(
-                    buildWhen: (prev, curr) =>
-                        prev.connectionState != curr.connectionState ||
-                        prev.session?.errorMessage !=
-                            curr.session?.errorMessage ||
-                        prev.session?.reconnectAttempt !=
-                            curr.session?.reconnectAttempt ||
-                        prev.needsDateOfBirth != curr.needsDateOfBirth,
-                    builder: (context, state) {
-                      if (state.needsDateOfBirth) {
-                        return _AgeDobGateOverlay(
-                          onSubmit: (dob) => _submitDateOfBirth(dob),
-                          onLeave: widget.onClose,
-                        );
-                      }
-                      return LiveStateOverlay(
-                        state: state.connectionState,
-                        message: state.session?.errorMessage,
-                        reconnectAttempt: state.session?.reconnectAttempt ?? 0,
-                        onRetry: () => context.read<LiveViewerBloc>().add(
-                          const LiveViewerRetryRequested(),
-                        ),
-                        onLeave: widget.onClose,
-                        onWatchReplay: () => _openReplay(live.id),
-                      );
-                    },
+              if (widget.isActive && isThisRoom)
+                Positioned(
+                  left: 12,
+                  right: 12,
+                  bottom: barTotalH + keyboardInset + giftGoalH + 18,
+                  child: AnimatedSize(
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOut,
+                    alignment: Alignment.bottomCenter,
+                    child: _showLiveFeatures
+                        ? LiveInteractiveViewerPanel(
+                            onClose: () =>
+                                setState(() => _showLiveFeatures = false),
+                          )
+                        : const SizedBox(width: double.infinity),
                   ),
-                if (widget.isActive &&
-                    isThisRoom &&
-                    state.ticketGate != LiveTicketGateState.open)
-                  Positioned.fill(
-                    child: _LiveTicketGate(
-                      state: state.ticketGate,
-                      priceCoins: state.ticketPriceCoins,
-                      onPurchase:
-                          state.ticketGate == LiveTicketGateState.required
-                          ? () => context.read<LiveViewerBloc>().add(
-                              const LiveViewerTicketPurchaseRequested(),
+                ),
+              if (widget.isActive && isThisRoom)
+                BlocBuilder<LiveViewerBloc, LiveViewerState>(
+                  buildWhen: (prev, curr) =>
+                      prev.recentGifts != curr.recentGifts ||
+                      prev.activeGiftAnimation != curr.activeGiftAnimation ||
+                      prev.latestGiftCombo != curr.latestGiftCombo,
+                  builder: (context, state) {
+                    final bloc = context.read<LiveViewerBloc>();
+                    return FloatingGiftsLayer(
+                      recentGifts: state.recentGifts,
+                      activeGift: state.activeGiftAnimation,
+                      latestCombo: state.latestGiftCombo,
+                      onAnimationComplete: () => context
+                          .read<LiveViewerBloc>()
+                          .add(const LiveViewerGiftAnimationCleared()),
+                      onComboConsumed: (payload) {
+                        if (bloc.isClosed) return;
+                        bloc.add(LiveViewerGiftComboConsumed(payload));
+                      },
+                    );
+                  },
+                ),
+              if (isThisRoom) ...[
+                BlocBuilder<LiveViewerBloc, LiveViewerState>(
+                  buildWhen: (prev, curr) =>
+                      prev.floatingHeartBurst != curr.floatingHeartBurst,
+                  builder: (context, state) {
+                    return FloatingHeartsOverlay(
+                      burst: state.floatingHeartBurst,
+                      onConsumed: () => context.read<LiveViewerBloc>().add(
+                        const LiveViewerHeartBurstConsumed(),
+                      ),
+                    );
+                  },
+                ),
+                ..._tapHearts,
+              ],
+              if (widget.isActive && isThisRoom)
+                BlocBuilder<LiveViewerBloc, LiveViewerState>(
+                  buildWhen: (prev, curr) =>
+                      prev.moderationBanner != curr.moderationBanner,
+                  builder: (context, state) {
+                    final banner = state.moderationBanner;
+                    if (banner == null || banner.isEmpty) {
+                      return const SizedBox.shrink();
+                    }
+                    return Positioned(
+                      left: 12,
+                      right: 12,
+                      top: headerBottom + 8,
+                      child: Material(
+                        color: Colors.black.withValues(alpha: 0.72),
+                        borderRadius: BorderRadius.circular(10),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          child: Text(
+                            banner,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              // Sits directly above the input bar so an invite (or the leave
+              // control once on stage) is never buried behind the HUD.
+              if (widget.isActive && isThisRoom)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: barTotalH + keyboardInset + 6,
+                  child: const GuestStagePrompt(),
+                ),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: keyboardInset,
+                child: BlocBuilder<LiveViewerBloc, LiveViewerState>(
+                  buildWhen: (prev, curr) {
+                    final pm = prev.live?.metadata;
+                    final cm = curr.live?.metadata;
+                    final pShare = pm?['shareCount'] as int?;
+                    final cShare = cm?['shareCount'] as int?;
+                    return prev.session?.coinBalance !=
+                            curr.session?.coinBalance ||
+                        prev.chatMuted != curr.chatMuted ||
+                        prev.isCommentSending != curr.isCommentSending ||
+                        prev.isOnStage != curr.isOnStage ||
+                        pShare != cShare;
+                  },
+                  builder: (context, state) {
+                    final chatMuted = isThisRoom ? state.chatMuted : false;
+                    final isCommentSending = isThisRoom
+                        ? state.isCommentSending
+                        : false;
+                    // No stand-in count: the share glyph stays bare until the
+                    // room actually reports one.
+                    final shareCount = isThisRoom
+                        ? (state.live?.metadata?['shareCount'] as int?)
+                        : (live.metadata?['shareCount'] as int?);
+                    final canRequestGuest =
+                        widget.isActive &&
+                        isThisRoom &&
+                        !state.isOnStage &&
+                        !live.paused;
+                    return TikTokLiveBottomBar(
+                      onTypeTap: () {
+                        if (chatMuted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Your chat is muted on this live'),
+                              backgroundColor: AppColors.surface,
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                          return;
+                        }
+                        setState(() => _showComposer = true);
+                      },
+                      onGiftTap: _openGifts,
+                      onShareTap: widget.isActive
+                          ? () {
+                              context.read<LiveViewerBloc>().add(
+                                const LiveViewerShareRequested(),
+                              );
+                            }
+                          : () {},
+                      onLikeTap: () {
+                        _spawnHearts(3);
+                        if (widget.isActive) {
+                          context.read<LiveViewerBloc>().add(
+                            const LiveViewerLiked(burst: 3),
+                          );
+                        }
+                      },
+                      onQuickReact: (text) {
+                        if (!widget.isActive || chatMuted) return;
+                        context.read<LiveViewerBloc>().add(
+                          LiveViewerCommentSent(text),
+                        );
+                      },
+                      onTreasureTap: (isPk || isMultiGrid)
+                          ? null
+                          : () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Treasure chest'),
+                                  backgroundColor: AppColors.surface,
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            },
+                      onRoseTap: widget.isActive ? _sendRose : null,
+                      onToolsTap: widget.isActive
+                          ? _openInteractiveTools
+                          : null,
+                      onMultiGuestTap: canRequestGuest
+                          ? () => _openGuestRequest(live)
+                          : null,
+                      shareCount: shareCount,
+                      commentField: _showComposer
+                          ? CommentInputBar(
+                              enabled: connected && !chatMuted,
+                              isSending: isCommentSending,
+                              hintText: chatMuted ? 'Chat muted' : 'Comment',
+                              onSend: (text) {
+                                if (isCommentSending) return;
+                                context.read<LiveViewerBloc>().add(
+                                  LiveViewerCommentSent(text),
+                                );
+                              },
                             )
                           : null,
-                      onRefresh: () => context.read<LiveViewerBloc>().add(
+                    );
+                  },
+                ),
+              ),
+              if (live.paused &&
+                  connectionState != LiveConnectionState.liveEnded)
+                const IgnorePointer(child: _PausedIndicator()),
+              if (widget.isActive && isThisRoom)
+                BlocBuilder<LiveViewerBloc, LiveViewerState>(
+                  buildWhen: (prev, curr) =>
+                      prev.connectionState != curr.connectionState ||
+                      prev.session?.errorMessage !=
+                          curr.session?.errorMessage ||
+                      prev.session?.reconnectAttempt !=
+                          curr.session?.reconnectAttempt ||
+                      prev.needsDateOfBirth != curr.needsDateOfBirth,
+                  builder: (context, state) {
+                    if (state.needsDateOfBirth) {
+                      return _AgeDobGateOverlay(
+                        onSubmit: (dob) => _submitDateOfBirth(dob),
+                        onLeave: widget.onClose,
+                      );
+                    }
+                    return LiveStateOverlay(
+                      state: state.connectionState,
+                      message: state.session?.errorMessage,
+                      reconnectAttempt: state.session?.reconnectAttempt ?? 0,
+                      onRetry: () => context.read<LiveViewerBloc>().add(
                         const LiveViewerRetryRequested(),
                       ),
-                      onClose: widget.onClose,
-                    ),
-                  ),
-              ],
-            ),
-          );
-        },
+                      onLeave: widget.onClose,
+                    );
+                  },
+                ),
+            ],
+          ),
+        );
+      },
       ),
     );
   }
@@ -1557,103 +1490,6 @@ class _PausedIndicator extends StatelessWidget {
                 ),
               ),
             ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _LiveTicketGate extends StatelessWidget {
-  const _LiveTicketGate({
-    required this.state,
-    required this.priceCoins,
-    required this.onPurchase,
-    required this.onRefresh,
-    required this.onClose,
-  });
-
-  final LiveTicketGateState state;
-  final int? priceCoins;
-  final VoidCallback? onPurchase;
-  final VoidCallback onRefresh;
-  final VoidCallback? onClose;
-
-  @override
-  Widget build(BuildContext context) {
-    final checking =
-        state == LiveTicketGateState.checking ||
-        state == LiveTicketGateState.purchasing;
-    final l10n = AppLocalizations.of(context)!;
-    final purchaseLabel = l10n.liveTicketBuy(priceCoins ?? 0);
-    final detail = switch (state) {
-      LiveTicketGateState.required => l10n.liveTicketRequiredDetail,
-      LiveTicketGateState.unavailable => l10n.liveTicketUnavailable,
-      LiveTicketGateState.paymentUnresolved => l10n.livePaymentUnresolved,
-      _ => l10n.liveTicketChecking,
-    };
-    return Material(
-      color: Colors.black.withValues(alpha: 0.94),
-      child: SafeArea(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 360),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(
-                    Icons.confirmation_number_outlined,
-                    color: Colors.white,
-                    size: 42,
-                  ),
-                  const SizedBox(height: 14),
-                  Text(
-                    l10n.liveTicketTitle,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    detail,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.white70, height: 1.35),
-                  ),
-                  if (checking) ...[
-                    const SizedBox(height: 22),
-                    const CircularProgressIndicator(color: Colors.white),
-                  ] else ...[
-                    const SizedBox(height: 22),
-                    if (onPurchase != null)
-                      SizedBox(
-                        width: double.infinity,
-                        child: FilledButton(
-                          onPressed: onPurchase,
-                          child: Text(purchaseLabel),
-                        ),
-                      ),
-                    const SizedBox(height: 10),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton(
-                        onPressed: onRefresh,
-                        child: Text(l10n.liveTicketRefresh),
-                      ),
-                    ),
-                    if (onClose != null)
-                      TextButton(
-                        onPressed: onClose,
-                        child: Text(l10n.liveEntryBack),
-                      ),
-                  ],
-                ],
-              ),
-            ),
           ),
         ),
       ),
@@ -2237,10 +2073,7 @@ class _AgeDobGateOverlay extends StatelessWidget {
               const SizedBox(height: 8),
               TextButton(
                 onPressed: onLeave,
-                child: const Text(
-                  'مغادرة',
-                  style: TextStyle(color: Colors.white70),
-                ),
+                child: const Text('مغادرة', style: TextStyle(color: Colors.white70)),
               ),
             ],
           ),

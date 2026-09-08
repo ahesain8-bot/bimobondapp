@@ -1637,7 +1637,23 @@ class LivesMediaDataSource {
       }
       return;
     }
-    if (track == null || _arBeautyTrackNeedsRestore(track)) {
+    if (track != null && _arBeautyTrackNeedsRestore(track)) {
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+      final afterTeardown = _videoTrack;
+      if (afterTeardown != null && !_arBeautyTrackNeedsRestore(afterTeardown)) {
+        if (afterTeardown.muted) {
+          await afterTeardown.unmute(stopOnMute: false);
+        }
+        return;
+      }
+      if (afterTeardown != null && afterTeardown.muted) {
+        try {
+          await afterTeardown.unmute(stopOnMute: false);
+          if (!_arBeautyTrackNeedsRestore(afterTeardown)) return;
+        } catch (_) {}
+      }
+    }
+    if (track == null || _arBeautyTrackNeedsRestore(_videoTrack ?? track)) {
       await _restoreArBeautyCamera(
         reason: track == null ? 'missing' : 'ended',
       );
@@ -1710,6 +1726,11 @@ class LivesMediaDataSource {
       _screenShareTrack = null;
       _screenShareProgress.reset();
       await _stopScreenShareForeground();
+      // MediaProjection / FaceWarp GL teardown races unmute if we restore
+      // the camera on the same frame the virtual display is released.
+      if (defaultTargetPlatform == TargetPlatform.android) {
+        await Future<void>.delayed(const Duration(milliseconds: 350));
+      }
       debugPrint(
         'LIVE_SCREEN_DIAG host after screen disable'
         ' pubs=${_screenSharePublicationSummary(local)}',

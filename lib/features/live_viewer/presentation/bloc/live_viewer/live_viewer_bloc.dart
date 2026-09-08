@@ -8,6 +8,7 @@ import 'package:bimobondapp/app/auctions/data/datasources/auction_socket_service
 import '../../../../../core/network/api_endpoints.dart';
 import '../../../../../core/network/live_api_client.dart';
 import '../../../../../core/models/live_battle.dart';
+import '../../../../../core/models/live_media_hints.dart';
 import '../../../../../core/models/live_competition_request.dart';
 import '../../../data/services/fake_livekit_service.dart';
 import '../../../data/services/fake_socket_service.dart';
@@ -144,6 +145,53 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
   Timer? _battleSupportersRefreshTimer;
   DateTime? _battleSupportersRefreshedAt;
   String? _battleOpponentLiveId;
+
+  /// True while [joinStage] (and its token fetch) is already running so a
+  /// roster refresh and the approval poll cannot start a second publish.
+  bool _guestJoinInFlight = false;
+
+  /// True after roster ACTIVE has queued [LiveViewerGuestApprovalChecked]
+  /// until that attempt finishes.
+  bool _guestAutoJoinQueued = false;
+
+  bool get _hasPendingSeatRequest {
+    final me = state.currentUserId ?? _currentUserId;
+    if (me == null || me.isEmpty) return false;
+    return state.guests.any((guest) => guest.userId == me && guest.isPending);
+  }
+
+  bool get _isAudioLive => state.live?.isAudioOnly == true;
+
+  /// Local publish / join — never derived from GET /guests ACTIVE.
+  bool get _hasLocalGuestStage =>
+      state.isOnStage || liveKitService.isPublishing || _guestJoinInFlight;
+
+  LiveMediaHints _guestPublishHints(GuestStageCredentials credentials) {
+    return LiveMediaHints.forGuestPublish(
+      incoming: credentials.mediaHints,
+      role: credentials.role,
+      audioOnly: _isAudioLive,
+    );
+  }
+
+  void _clearGuestApprovalPoll() {
+    _guestApprovalTimer?.cancel();
+    _guestApprovalTimer = null;
+  }
+
+  bool _isTerminalGuestStatus(String? status) {
+    return status == 'REJECTED' || status == 'KICKED' || status == 'LEFT';
+  }
+
+  /// Kick the existing token/join poll immediately when the roster says
+  /// this viewer is ACTIVE but this device has not published yet.
+  void _requestGuestAutoJoin(String liveId) {
+    if (_tearingDown || liveId.isEmpty || _activeLiveId != liveId) return;
+    if (_hasLocalGuestStage || _guestAutoJoinQueued) return;
+    _guestAutoJoinQueued = true;
+    _clearGuestApprovalPoll();
+    add(LiveViewerGuestApprovalChecked(liveId: liveId, attempt: 1));
+  }
 
   /// Keeps one media connect per battle/opponent pair while allowing a newer
   /// battle to invalidate an older in-flight operation.
@@ -1186,37 +1234,58 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
 
   // ---------- Multi-guest ----------
 
-  /// Ask the host for a seat on stage. Permissions are granted before the
-  /// request leaves the device, so acceptance can publish without another UI
-  /// pause. Capture still starts only after server-issued publish credentials.
+  /// Ask the host for a seat on stage.
+  ///
+  /// VIDEO still captures camera+mic before the POST so a denial does not
+  /// leave the host an un-joinable request. AUDIO sends the raise-hand
+  /// request first; microphone permission runs later in [joinStage].
   Future<void> _onGuestSeatRequested(
     LiveViewerGuestSeatRequested event,
     Emitter<LiveViewerState> emit,
   ) async {
     final liveId = state.live?.id;
     if (liveId == null || liveId.isEmpty || state.isGuestActionBusy) return;
+    if (_hasLocalGuestStage) return;
     if (state.live?.paused == true) {
       emit(
         state.copyWith(
-          moderationBanner: 'لا يمكن طلب الانضمام أثناء إيقاف البث مؤقتاً',
+          moderationBanner: state.live?.isAudioOnly == true
+              ? 'لا يمكن رفع اليد أثناء إيقاف البث مؤقتاً'
+              : 'لا يمكن طلب الانضمام أثناء إيقاف البث مؤقتاً',
+        ),
+      );
+      return;
+    }
+    if (_guestApprovalTimer != null || _hasPendingSeatRequest) {
+      emit(
+        state.copyWith(
+          moderationBanner: state.live?.isAudioOnly == true
+              ? 'طلبك لرفع اليد ما زال بانتظار المضيف'
+              : 'طلبك ما زال بانتظار المضيف',
         ),
       );
       return;
     }
 
     emit(state.copyWith(isGuestActionBusy: true));
-    try {
-      await liveKitService.prepareStage();
-    } catch (error) {
-      if (!isClosed) {
-        emit(
-          state.copyWith(
-            isGuestActionBusy: false,
-            moderationBanner: error.toString().replaceFirst('Bad state: ', ''),
-          ),
-        );
+    final audioOnly = state.live?.isAudioOnly == true;
+    if (!audioOnly) {
+      try {
+        await liveKitService.prepareStage(audioOnly: false);
+      } catch (error) {
+        if (!isClosed) {
+          emit(
+            state.copyWith(
+              isGuestActionBusy: false,
+              moderationBanner: error.toString().replaceFirst(
+                'Bad state: ',
+                '',
+              ),
+            ),
+          );
+        }
+        return;
       }
-      return;
     }
     final result = await guestRepository.requestSeat(liveId);
     if (isClosed) return;
@@ -1238,8 +1307,10 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
         }
         emit(
           state.copyWith(
-            isGuestActionBusy: true,
-            moderationBanner: 'تم إرسال طلب الانضمام إلى المضيف',
+            isGuestActionBusy: false,
+            moderationBanner: state.live?.isAudioOnly == true
+                ? 'تم رفع اليد، بانتظار المضيف'
+                : 'تم إرسال طلب الانضمام إلى المضيف',
           ),
         );
         // Keep the request pending while we wait for the host. Socket.IO is
@@ -1308,6 +1379,8 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     if (liveId == null || liveId.isEmpty) return;
 
     emit(state.copyWith(isGuestActionBusy: true));
+    _clearGuestApprovalPoll();
+    _guestAutoJoinQueued = false;
     await liveKitService.leaveStage();
     final result = await guestRepository.leaveStage(liveId);
     if (isClosed) return;
@@ -1377,52 +1450,107 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     if (liveId == null || liveId.isEmpty) return;
     final result = await guestRepository.listGuests(liveId);
     if (isClosed) return;
-    result.fold((_) {}, (guests) => emit(state.copyWith(guests: guests)));
+    final guests = result.fold<List<GuestSummary>?>(
+      (_) => null,
+      (items) => items,
+    );
+    if (guests == null) return;
+
+    GuestSummary? mine;
+    final me = state.currentUserId ?? _currentUserId;
+    if (me != null && me.isNotEmpty) {
+      for (final guest in guests) {
+        if (guest.userId == me) {
+          mine = guest;
+          break;
+        }
+      }
+    }
+    final terminal = mine != null && _isTerminalGuestStatus(mine.status);
+    if (terminal) {
+      _clearGuestApprovalPoll();
+      _guestAutoJoinQueued = false;
+      if (state.isOnStage || liveKitService.isPublishing) {
+        await liveKitService.leaveStage();
+      }
+    }
+    if (isClosed) return;
+    emit(
+      state.copyWith(
+        guests: guests,
+        isGuestActionBusy: terminal ? false : null,
+        // Roster ACTIVE is a server seat, not local publish.
+        isOnStage: terminal ? false : state.isOnStage,
+      ),
+    );
+    if (terminal || isClosed) return;
+    if (mine?.isActive == true) {
+      _requestGuestAutoJoin(liveId);
+    }
   }
 
   Future<void> _onGuestApprovalChecked(
     LiveViewerGuestApprovalChecked event,
     Emitter<LiveViewerState> emit,
   ) async {
-    if (_activeLiveId != event.liveId ||
-        state.isOnStage ||
-        !state.isGuestActionBusy) {
-      _guestApprovalTimer?.cancel();
-      _guestApprovalTimer = null;
+    if (_activeLiveId != event.liveId) {
+      _guestAutoJoinQueued = false;
+      _clearGuestApprovalPoll();
+      return;
+    }
+    if (state.isOnStage || liveKitService.isPublishing) {
+      _guestAutoJoinQueued = false;
+      _clearGuestApprovalPoll();
+      return;
+    }
+    if (_guestJoinInFlight) {
       return;
     }
 
-    final result = await guestRepository.refreshStageCredentials(event.liveId);
-    if (isClosed || _activeLiveId != event.liveId) return;
-
-    final credentials = result.fold<GuestStageCredentials?>(
-      (_) => null,
-      (c) => c,
-    );
-    if (credentials != null && credentials.isUsable) {
-      _guestApprovalTimer?.cancel();
-      _guestApprovalTimer = null;
-      await _joinGuestStage(
-        liveId: event.liveId,
-        credentials: credentials,
-        emit: emit,
+    _guestJoinInFlight = true;
+    try {
+      final result = await guestRepository.refreshStageCredentials(
+        event.liveId,
       );
-      return;
-    }
+      if (isClosed || _activeLiveId != event.liveId) {
+        return;
+      }
+      if (state.isOnStage || liveKitService.isPublishing) {
+        _clearGuestApprovalPoll();
+        return;
+      }
 
-    if (event.attempt >= 15) {
-      _guestApprovalTimer?.cancel();
-      _guestApprovalTimer = null;
-      emit(
-        state.copyWith(
-          isGuestActionBusy: false,
-          moderationBanner: 'طلب الانضمام ما زال بانتظار المضيف',
-        ),
+      final credentials = result.fold<GuestStageCredentials?>(
+        (_) => null,
+        (c) => c,
       );
-      return;
-    }
+      if (credentials != null && credentials.isUsable) {
+        _clearGuestApprovalPoll();
+        await _joinGuestStage(
+          liveId: event.liveId,
+          credentials: credentials,
+          emit: emit,
+          acquireLock: false,
+        );
+        return;
+      }
 
-    _scheduleGuestApprovalCheck(event.liveId, attempt: event.attempt + 1);
+      if (event.attempt >= 15) {
+        _clearGuestApprovalPoll();
+        emit(
+          state.copyWith(
+            isGuestActionBusy: false,
+            moderationBanner: 'طلب الانضمام ما زال بانتظار المضيف',
+          ),
+        );
+        return;
+      }
+
+      _scheduleGuestApprovalCheck(event.liveId, attempt: event.attempt + 1);
+    } finally {
+      _guestJoinInFlight = false;
+      _guestAutoJoinQueued = false;
+    }
   }
 
   Future<void> _onLiveKitStateChanged(
@@ -1633,7 +1761,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
       // Being removed from the stage has to stop the camera locally too — the
       // server revoking the grant does not turn the hardware off by itself.
       final isMe = _isMe(event.guestUserId);
-      if (isMe && event.updateType == 'joined' && !state.isOnStage) {
+      if (isMe && event.updateType == 'joined' && !_hasLocalGuestStage) {
         final result = await guestRepository.refreshStageCredentials(
           event.liveId,
         );
@@ -1642,8 +1770,9 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
           (failure) async => emit(
             state.copyWith(
               isGuestActionBusy: false,
-              moderationBanner:
-                  'تم قبولك، لكن تعذر تشغيل الكاميرا: ${failure.message}',
+              moderationBanner: _isAudioLive
+                  ? 'تم قبولك، لكن تعذر تشغيل المايك: ${failure.message}'
+                  : 'تم قبولك، لكن تعذر تشغيل الكاميرا: ${failure.message}',
             ),
           ),
           (credentials) => _joinGuestStage(
@@ -1655,17 +1784,37 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
         return;
       }
       if (isMe &&
-          (event.updateType == 'kicked' || event.updateType == 'left')) {
-        await liveKitService.leaveStage();
-        emit(state.copyWith(isOnStage: false));
+          (event.updateType == 'kicked' ||
+              event.updateType == 'left' ||
+              event.updateType == 'rejected')) {
+        _clearGuestApprovalPoll();
+        _guestAutoJoinQueued = false;
+        if (event.updateType != 'rejected') {
+          await liveKitService.leaveStage();
+        }
+        emit(
+          state.copyWith(
+            isOnStage: false,
+            isGuestActionBusy: false,
+            moderationBanner: event.updateType == 'rejected'
+                ? (_isAudioLive
+                      ? 'رفض المضيف طلب رفع اليد'
+                      : 'رفض المضيف طلب الانضمام')
+                : null,
+          ),
+        );
       } else if (isMe && event.updateType == 'muted') {
         await liveKitService.setStageMicrophoneEnabled(false);
       } else if (isMe && event.updateType == 'unmuted') {
         await liveKitService.setStageMicrophoneEnabled(true);
       } else if (isMe && event.updateType == 'camera_off') {
-        await liveKitService.setStageCameraEnabled(false);
+        if (!_isAudioLive) {
+          await liveKitService.setStageCameraEnabled(false);
+        }
       } else if (isMe && event.updateType == 'camera_on') {
-        await liveKitService.setStageCameraEnabled(true);
+        if (!_isAudioLive) {
+          await liveKitService.setStageCameraEnabled(true);
+        }
       }
       return;
     }
@@ -2050,6 +2199,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     required String liveId,
     required GuestStageCredentials credentials,
     required Emitter<LiveViewerState> emit,
+    bool acquireLock = true,
   }) async {
     if (!credentials.isUsable) {
       emit(
@@ -2060,14 +2210,22 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
       );
       return;
     }
+    if (state.isOnStage || liveKitService.isPublishing) {
+      _clearGuestApprovalPoll();
+      _guestAutoJoinQueued = false;
+      return;
+    }
+    if (acquireLock) {
+      if (_guestJoinInFlight) return;
+      _guestJoinInFlight = true;
+    }
     try {
-      _guestApprovalTimer?.cancel();
-      _guestApprovalTimer = null;
+      _clearGuestApprovalPoll();
       await liveKitService.joinStage(
         url: credentials.url,
         token: credentials.token,
         roomName: liveId,
-        mediaHints: credentials.mediaHints,
+        mediaHints: _guestPublishHints(credentials),
       );
       if (isClosed || _activeLiveId != liveId) return;
       emit(
@@ -2076,7 +2234,7 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
           isOnStage: true,
           moderationBanner: credentials.isCoHost
               ? 'انضممت كمضيف مشارك'
-              : 'انضممت إلى المسرح',
+              : (_isAudioLive ? 'أصبحت متحدثاً' : 'انضممت إلى المسرح'),
         ),
       );
       add(const LiveViewerGuestsRefreshed());
@@ -2087,9 +2245,16 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
         state.copyWith(
           isGuestActionBusy: false,
           isOnStage: false,
-          moderationBanner: 'تعذر تشغيل الكاميرا للنشر: $message',
+          moderationBanner: _isAudioLive
+              ? 'تعذر تشغيل المايك للنشر: $message'
+              : 'تعذر تشغيل الكاميرا للنشر: $message',
         ),
       );
+    } finally {
+      if (acquireLock) {
+        _guestJoinInFlight = false;
+        _guestAutoJoinQueued = false;
+      }
     }
   }
 
@@ -2483,6 +2648,8 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     _battleSupportersRefreshTimer = null;
     _guestApprovalTimer?.cancel();
     _guestApprovalTimer = null;
+    _guestJoinInFlight = false;
+    _guestAutoJoinQueued = false;
     await _disconnectBattleOpponent(emit: emit);
     final id = _activeLiveId;
     _activeLiveId = null;
@@ -2529,6 +2696,8 @@ class LiveViewerBloc extends Bloc<LiveViewerEvent, LiveViewerState> {
     _battleSupportersRefreshTimer = null;
     _guestApprovalTimer?.cancel();
     _guestApprovalTimer = null;
+    _guestJoinInFlight = false;
+    _guestAutoJoinQueued = false;
     await _disconnectBattleOpponent();
     final id = _activeLiveId;
     _activeLiveId = null;

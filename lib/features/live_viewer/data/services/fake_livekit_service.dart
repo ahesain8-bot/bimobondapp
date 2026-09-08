@@ -54,9 +54,10 @@ abstract class LiveKitService {
   /// Whether this device is publishing camera/mic into the room right now.
   bool get isPublishing => false;
 
-  /// Requests camera/microphone before a seat request is sent so accepting the
-  /// request can publish immediately instead of waiting on a system dialog.
-  Future<void> prepareStage() async {}
+  /// Requests capture permission before a VIDEO seat request is sent so
+  /// accepting can publish immediately. AUDIO lives skip this and request
+  /// the microphone in [joinStage] after the host accepts.
+  Future<void> prepareStage({bool audioOnly = false}) async {}
 
   /// Re-joins the room with the publish credentials the server issued when the
   /// guest was accepted, then turns the camera and mic on. Subscribe-only
@@ -130,7 +131,7 @@ class FakeLiveKitService implements LiveKitService {
   bool get isPublishing => _publishing;
 
   @override
-  Future<void> prepareStage() async {}
+  Future<void> prepareStage({bool audioOnly = false}) async {}
 
   @override
   Future<void> joinStage({

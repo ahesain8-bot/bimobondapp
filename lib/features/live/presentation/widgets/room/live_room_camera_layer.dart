@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:livekit_client/livekit_client.dart';
 
 import '../../bloc/live_room/live_room_bloc.dart';
+import '../../bloc/live_room/live_room_event.dart';
 import '../../bloc/live_room/live_room_state.dart';
 import '../start_live/ar_live_camera_preview.dart';
 import '../start_live/aspect_preserving_camera_preview.dart';
@@ -91,6 +92,7 @@ class LiveRoomCameraLayer extends StatelessWidget {
             children: [
               const _ScreenShareLocalPlaceholder(),
               const LiveRoomColorGradeOverlay(),
+              const _StopScreenShareCta(),
               if (state.isLivePaused) const _PausedOverlay(),
             ],
           );
@@ -151,10 +153,50 @@ class LiveRoomCameraLayer extends StatelessWidget {
           children: [
             preview,
             const LiveRoomColorGradeOverlay(),
+            if (state.session.scene.isDual) const _StopScreenShareCta(),
             if (state.isLivePaused) const _PausedOverlay(),
           ],
         );
       },
+    );
+  }
+}
+
+class _StopScreenShareCta extends StatelessWidget {
+  const _StopScreenShareCta();
+
+  @override
+  Widget build(BuildContext context) {
+    final top = MediaQuery.paddingOf(context).top + 96;
+    return Positioned(
+      top: top,
+      left: 16,
+      right: 16,
+      child: Center(
+        child: Material(
+          color: const Color(0xE6FF2D55),
+          borderRadius: BorderRadius.circular(22),
+          child: InkWell(
+            onTap: () {
+              context.read<LiveRoomBloc>().add(
+                const LiveRoomSceneRequested('CAMERA'),
+              );
+            },
+            borderRadius: BorderRadius.circular(22),
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+              child: Text(
+                'إيقاف مشاركة الشاشة',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

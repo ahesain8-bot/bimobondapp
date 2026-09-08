@@ -16,8 +16,6 @@ import '../../data/datasources/lives_remote_datasource.dart';
 import '../../data/datasources/lives_socket_datasource.dart';
 import '../../data/repositories/camera_repository_impl.dart';
 import '../../data/repositories/live_interactive_repository_impl.dart';
-import '../../data/datasources/live_games_remote_datasource.dart';
-import '../../data/repositories/live_games_repository_impl.dart';
 import '../../data/repositories/live_session_repository_impl.dart';
 import '../../domain/effects/live_effects_catalog.dart';
 import '../../domain/repositories/camera_repository.dart';
@@ -31,9 +29,6 @@ import '../../domain/usecases/pause_live_session.dart';
 import '../../domain/usecases/send_live_comment.dart';
 import '../../domain/usecases/start_live_session.dart';
 import '../../domain/usecases/update_live_title.dart';
-import '../bloc/live_games/live_games_bloc.dart';
-import '../../data/datasources/live_secondary_rooms.dart';
-import '../widgets/room/live_cohost_tiles.dart';
 import '../bloc/live_interactive/live_interactive_bloc.dart';
 import '../bloc/live_interactive/live_interactive_event.dart';
 import '../bloc/live_room/live_room_bloc.dart';
@@ -94,13 +89,8 @@ class _LiveRoomPageState extends State<LiveRoomPage>
     with WidgetsBindingObserver {
   LiveRoomBloc? _bloc;
   LiveInteractiveBloc? _interactiveBloc;
-  LiveGamesBloc? _gamesBloc;
   LiveInteractiveRepository? _interactiveRepository;
   LiveSessionRepository? _sessionRepository;
-
-  /// Same object as [_sessionRepository], typed so the page can read the
-  /// co-host room registry that only the implementation owns.
-  LiveSessionRepositoryImpl? _sessionRepositoryImpl;
   late final CameraRepository _cameraRepository;
   late final LiveFaceTracker _faceTracker;
   late final DateTime _startIndicatorDeadline;
@@ -142,21 +132,13 @@ class _LiveRoomPageState extends State<LiveRoomPage>
       idTokenProvider: () async => apiClient.idTokenProvider?.call(),
     );
     final media = LivesMediaDataSource();
-    _sessionRepository = _sessionRepositoryImpl = LiveSessionRepositoryImpl(
+    _sessionRepository = LiveSessionRepositoryImpl(
       remote: remote,
       socket: socket,
       media: media,
     );
     _interactiveRepository = LiveInteractiveRepositoryImpl(
-      userIdProvider: () => fb.FirebaseAuth.instance.currentUser?.uid ?? '',
       remote: LiveInteractiveRemoteDataSource(apiClient: apiClient),
-    );
-    // Official games share the room's HUD socket for their `liveGame` pushes.
-    _gamesBloc = LiveGamesBloc(
-      repository: LiveGamesRepositoryImpl(
-        remote: LiveGamesRemoteDataSource(apiClient: apiClient),
-      ),
-      socketEvents: socket.events,
     );
     // The room's own HUD socket already carries the interactive pushes, so the
     // BLoC listens to it instead of opening a second connection.
@@ -209,7 +191,6 @@ class _LiveRoomPageState extends State<LiveRoomPage>
     _faceTracker.dispose();
     _bloc?.close();
     _interactiveBloc?.close();
-    _gamesBloc?.close();
     LiveScreenWakelock.disable();
     super.dispose();
   }
@@ -228,7 +209,6 @@ class _LiveRoomPageState extends State<LiveRoomPage>
       providers: [
         BlocProvider<LiveRoomBloc>.value(value: bloc),
         BlocProvider<LiveInteractiveBloc>.value(value: _interactiveBloc!),
-        BlocProvider<LiveGamesBloc>.value(value: _gamesBloc!),
       ],
       child: RepositoryProvider<LiveSessionRepository>.value(
         value: _sessionRepository!,
@@ -263,7 +243,6 @@ class _LiveRoomPageState extends State<LiveRoomPage>
                           builder: (_) => LiveSummaryPage(
                             liveId: liveId,
                             repository: _interactiveRepository!,
-                            sessionRepository: _sessionRepository,
                           ),
                         ),
                       );
@@ -282,23 +261,9 @@ class _LiveRoomPageState extends State<LiveRoomPage>
                       (previous is! LiveRoomReady ||
                           previous.session.id != current.session.id),
                   listener: (context, state) {
-                    final session = (state as LiveRoomReady).session;
                     context.read<LiveInteractiveBloc>().add(
-                      LiveInteractiveStarted(
-                        session.id,
-                        giftGoal: session.giftGoal,
-                      ),
+                      LiveInteractiveStarted((state as LiveRoomReady).session.id),
                     );
-                    context.read<LiveGamesBloc>().add(
-                      LiveGamesStarted(session.id),
-                    );
-                    // Tile whatever partner rooms the start/join payload
-                    // listed. An empty list closes any tile still open.
-                    _sessionRepository!
-                        .syncCohostMedia(session.cohost)
-                        .catchError((Object error) {
-                          debugPrint('Co-host tiles sync failed: $error');
-                        });
                   },
                 ),
                 BlocListener<LiveRoomBloc, LiveRoomState>(
@@ -364,7 +329,6 @@ class _LiveRoomPageState extends State<LiveRoomPage>
                 resizeToAvoidBottomInset: false,
                 body: _LiveRoomBody(
                   startIndicatorDeadline: _startIndicatorDeadline,
-                  cohostRooms: _sessionRepositoryImpl!.cohostRooms,
                 ),
               ),
             ),
@@ -376,16 +340,9 @@ class _LiveRoomPageState extends State<LiveRoomPage>
 }
 
 class _LiveRoomBody extends StatelessWidget {
-  const _LiveRoomBody({
-    required this.startIndicatorDeadline,
-    required this.cohostRooms,
-  });
+  const _LiveRoomBody({required this.startIndicatorDeadline});
 
   final DateTime startIndicatorDeadline;
-
-  /// The partner rooms this client tiles; the registry notifies as tracks
-  /// arrive so only the tile strip rebuilds, never the camera stage.
-  final LiveSecondaryRooms cohostRooms;
 
   @override
   Widget build(BuildContext context) {
@@ -480,7 +437,7 @@ class _LiveRoomBody extends StatelessWidget {
             fit: StackFit.expand,
             children: [
               const LiveRoomCameraLayer(),
-              const VignetteLayer(),
+              const IgnorePointer(child: VignetteLayer()),
               LiveStartingIndicator(
                 deadline: startIndicatorDeadline,
                 isPublished: false,
@@ -502,18 +459,7 @@ class _LiveRoomBody extends StatelessWidget {
               topInset:
                   MediaQuery.paddingOf(context).top + AppSpacing.roomStageTop,
             ),
-            const VignetteLayer(),
-            // Co-host partners tile above the bottom bar, each its own room.
-            if (state is LiveRoomReady && state.session.cohost.rooms.isNotEmpty)
-              PositionedDirectional(
-                start: 8,
-                end: 8,
-                bottom: 140,
-                child: LiveCohostTiles(
-                  rooms: cohostRooms,
-                  partners: state.session.cohost.rooms,
-                ),
-              ),
+            const IgnorePointer(child: VignetteLayer()),
             LiveStartingIndicator(
               deadline: startIndicatorDeadline,
               isPublished: state is LiveRoomReady && state.isMediaConnected,

@@ -1114,8 +1114,11 @@ class RealLiveKitService implements LiveKitService {
   @override
   bool get isPublishing => _publishing;
 
+  /// VIDEO guest requests capture camera+mic before POST /guests/request.
+  /// AUDIO raise-hand skips this and asks for the microphone in [joinStage].
   @override
-  Future<void> prepareStage() => _ensureCapturePermissions();
+  Future<void> prepareStage({bool audioOnly = false}) =>
+      _ensureCapturePermissions(audioOnly: audioOnly);
 
   @override
   Future<void> joinStage({
@@ -1136,6 +1139,8 @@ class RealLiveKitService implements LiveKitService {
             : 'الخادم لم يمنح الضيف صلاحية نشر الكاميرا والمايك.',
       );
     }
+    // AUDIO raise-hand waits until this point for the microphone. VIDEO
+    // guests already passed prepareStage before the seat POST.
     await _ensureCapturePermissions(audioOnly: hints.audioOnly);
     await connect(
       url: url,
@@ -1270,6 +1275,7 @@ class RealLiveKitService implements LiveKitService {
   @override
   Future<void> setStageCameraEnabled(bool enabled) async {
     if (!_publishing) return;
+    if (_mediaHints?.audioOnly == true) return;
     await _room?.localParticipant?.setCameraEnabled(enabled);
   }
 

@@ -38,6 +38,7 @@ class LiveRoomShareSheet {
 
   static Future<void> show(BuildContext context) async {
     final bloc = context.read<LiveRoomBloc>();
+    final repo = context.read<LiveSessionRepository>();
 
     await showModalBottomSheet<void>(
       context: context,
@@ -48,7 +49,12 @@ class LiveRoomShareSheet {
       builder: (_) {
         return BlocProvider.value(
           value: bloc,
-          child: const _LiveRoomShareSheetBody(contacts: <LiveShareContact>[]),
+          child: RepositoryProvider.value(
+            value: repo,
+            child: const _LiveRoomShareSheetBody(
+              contacts: <LiveShareContact>[],
+            ),
+          ),
         );
       },
     );
@@ -149,7 +155,8 @@ class _LiveRoomShareSheetBodyState extends State<_LiveRoomShareSheetBody> {
       final url = result.shareUrl?.trim();
       if (url == null || url.isEmpty) return null;
       return url;
-    } catch (_) {
+    } catch (error, stack) {
+      debugPrint('LIVE_SHARE registerShare failed: $error\n$stack');
       return null;
     }
   }

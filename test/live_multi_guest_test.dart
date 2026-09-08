@@ -143,6 +143,15 @@ void main() {
       expect(const LiveViewerState().pendingGuestInvite, isNull);
     });
 
+    test('ACTIVE roster does not imply local isOnStage', () {
+      final state = LiveViewerState(
+        currentUserId: 'u1',
+        guests: [viewerGuest('u1', 'ACTIVE')],
+      );
+      expect(state.activeGuests.map((g) => g.userId), ['u1']);
+      expect(state.isOnStage, isFalse);
+    });
+
     test('clearing a pending invite actually removes it', () {
       const state = LiveViewerState(
         pendingGuestInvite: PendingGuestInvite(
@@ -167,6 +176,14 @@ void main() {
       const state = LiveViewerState(pendingGuestInvite: invite);
 
       expect(state.copyWith(isOnStage: true).pendingGuestInvite, invite);
+    });
+
+    test('REJECTED and LEFT are not pending raise-hand requests', () {
+      expect(viewerGuest('a', 'REQUESTED').isPending, isTrue);
+      expect(viewerGuest('a', 'INVITED').isPending, isTrue);
+      expect(viewerGuest('a', 'REJECTED').isPending, isFalse);
+      expect(viewerGuest('a', 'LEFT').isPending, isFalse);
+      expect(viewerGuest('a', 'ACTIVE').isActive, isTrue);
     });
   });
 }
