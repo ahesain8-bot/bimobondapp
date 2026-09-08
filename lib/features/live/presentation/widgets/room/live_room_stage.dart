@@ -280,9 +280,20 @@ class _BattleStageState extends State<_BattleStage> {
                                   avatarUrl: widget.hostAvatarUrl,
                                 );
                               }
-                              // TEAM remote tracks need verified host identities and
-                              // credentials. Do not show the first guest in a room
-                              // as a team's host while that contract is missing.
+                              // The opposing captain is the one remote room the
+                              // client already holds credentials for: the battle
+                              // room, connected the same way as in 1v1.
+                              if (liveId ==
+                                  battle.opponentLiveId(currentLiveId)) {
+                                return _OpponentVideo(
+                                  room: room is Room ? room : null,
+                                  avatarUrl: widget.opponentAvatarUrl,
+                                );
+                              }
+                              // Teammate seats (live3 / live4) have no documented
+                              // media contract — live-p1-parity.md §7 defines the
+                              // lobby, roster and scores only. Never show the
+                              // first guest of a room as that team's host.
                               return null;
                             },
                           )

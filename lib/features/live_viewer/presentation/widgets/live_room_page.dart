@@ -647,17 +647,35 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                                 LiveTeamBattleGrid(
                                   battle: state.battle!,
                                   currentLiveId: live.id,
-                                  videoFor: (liveId) => liveId == live.id
-                                      ? LiveVideoPlayer(
-                                          key: ValueKey(
-                                            'viewer_pk_host_${live.id}',
-                                          ),
-                                          live: live,
-                                          isActive:
-                                              widget.isActive && connected,
-                                          fit: BoxFit.cover,
-                                        )
-                                      : null,
+                                  videoFor: (liveId) {
+                                    if (liveId == live.id) {
+                                      return LiveVideoPlayer(
+                                        key: ValueKey(
+                                          'viewer_pk_host_${live.id}',
+                                        ),
+                                        live: live,
+                                        isActive: widget.isActive && connected,
+                                        fit: BoxFit.cover,
+                                      );
+                                    }
+                                    // The opposing captain is the one other room
+                                    // this viewer already holds a battle
+                                    // connection to, exactly as in 1v1.
+                                    final opponent = state.battleOpponentLive;
+                                    if (isThisRoom &&
+                                        opponent != null &&
+                                        liveId == opponent.id) {
+                                      return _PkGuestFeed(
+                                        liveId: opponent.id,
+                                        guestName: opponent.hostName,
+                                        guestAvatar: opponent.hostAvatar,
+                                        room: state.battleRoom,
+                                      );
+                                    }
+                                    // Teammate seats have no documented media
+                                    // contract (live-p1-parity.md §7).
+                                    return null;
+                                  },
                                 )
                               else
                                 _PkVideoLayout(
