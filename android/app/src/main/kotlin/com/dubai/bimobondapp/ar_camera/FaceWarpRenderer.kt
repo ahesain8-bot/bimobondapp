@@ -600,6 +600,19 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
     @Volatile
     var captureEnabled: Boolean = false
 
+    /**
+     * Why GPU front-buffer capture is running. Still photos must preserve preview
+     * aspect; live/video may use a legacy 9:16 fallback only for tiny invalid viewports.
+     */
+    @Volatile
+    var capturePurpose: CapturePurpose = CapturePurpose.STILL_PHOTO
+
+    enum class CapturePurpose {
+        STILL_PHOTO,
+        LIVE_PUBLISH,
+        VIDEO,
+    }
+
     private val captureGeneration = AtomicInteger(0)
 
     fun captureGeneration(): Int = captureGeneration.get()
@@ -1456,20 +1469,47 @@ class FaceWarpRenderer : GLSurfaceView.Renderer {
         val useFbo = redraw != null
         val readW: Int
         val readH: Int
+        var usedLegacy916Fallback = false
         if (useFbo) {
             val maxEdge = captureMaxEdge.coerceAtLeast(2)
             val largest = maxOf(screenW, screenH)
-            val aspect = screenW.toFloat() / screenH.toFloat()
-            // Transparent live routes can shrink the PlatformView viewport to
-            // ~320px wide. Force a 9:16 FBO so beauty publish is not muddy.
-            val brokenViewport = aspect < 0.48f || aspect > 0.72f || screenW < 480
-            if (brokenViewport) {
+            val previewAspect = screenW.toFloat() / screenH.toFloat()
+            // Tiny PlatformView / virtual-display viewports (live publish) can be
+            // ~320px wide — only then allow a 9:16 FBO. Never treat a valid tall
+            // phone preview (e.g. 1080×2356, aspect ≈ 0.46) as broken from aspect alone.
+            val tinyInvalidViewport = screenW < 480 || screenH < 480
+            val allowLegacy916 =
+                capturePurpose != CapturePurpose.STILL_PHOTO && tinyInvalidViewport
+            if (allowLegacy916) {
+                usedLegacy916Fallback = true
                 readH = maxEdge and 1.inv()
                 readW = ((readH * 9f / 16f).toInt() and 1.inv()).coerceAtLeast(2)
             } else {
+                // Still photo (and healthy live/video viewports): scale resolution only;
+                // preserve preview aspect so V3PresentPass framing matches shutter FOV.
                 val s = maxEdge.toFloat() / largest
                 readW = ((screenW * s).toInt() and 1.inv()).coerceAtLeast(2)
                 readH = ((screenH * s).toInt() and 1.inv()).coerceAtLeast(2)
+            }
+            if (capturePurpose == CapturePurpose.STILL_PHOTO) {
+                val captureAspect = readW.toFloat() / readH.toFloat()
+                val wideZoom = if (ArCameraBridge.isFrontCamera) {
+                    FRONT_WIDE_ZOOM_OUT
+                } else {
+                    BACK_WIDE_ZOOM_OUT
+                }
+                Log.i(
+                    "V3_STILL_FRAME",
+                    "preview=${screenW}x$screenH " +
+                        "previewAspect=${"%.4f".format(previewAspect)} " +
+                        "captureFbo=${readW}x$readH " +
+                        "captureAspect=${"%.4f".format(captureAspect)} " +
+                        "wideZoom=$wideZoom " +
+                        "rotation=$cameraRotationDegrees " +
+                        "mirror=$cameraFrontMirror " +
+                        "fallback916=$usedLegacy916Fallback " +
+                        "purpose=$capturePurpose",
+                )
             }
             if (!ensureCaptureFbo(readW, readH)) {
                 // No usable framebuffer here — skip the readback rather than draw

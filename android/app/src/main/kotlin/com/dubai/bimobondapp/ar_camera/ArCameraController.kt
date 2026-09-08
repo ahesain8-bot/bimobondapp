@@ -1074,12 +1074,14 @@ object ArCameraController {
         }
         cached?.recycle()
 
+        gl.setCapturePurpose(FaceWarpRenderer.CapturePurpose.STILL_PHOTO)
         gl.setCaptureMaxEdge(INSTANT_CAPTURE_EDGE)
         gl.setCaptureEnabled(true)
         gl.requestCaptureNow()
     }
 
     private fun scheduleOesPhotoWarmup(glView: FaceWarpGlView) {
+        glView.setCapturePurpose(FaceWarpRenderer.CapturePurpose.STILL_PHOTO)
         glView.setCaptureMaxEdge(INSTANT_CAPTURE_EDGE)
         // Two light kicks are enough to seed the warm buffer; a 6× burst was
         // stalling the first second of live preview with glReadPixels.
@@ -1191,6 +1193,7 @@ object ArCameraController {
 
         readFrame()?.let { return it }
 
+        gl.setCapturePurpose(FaceWarpRenderer.CapturePurpose.STILL_PHOTO)
         gl.setCaptureMaxEdge(maxEdge)
         gl.setCaptureEnabled(true)
         gl.requestCaptureNow()
@@ -1730,6 +1733,7 @@ object ArCameraController {
             // Back down to the small warm buffer and stop continuous readback so
             // live preview stays smooth. One forced warm frame seeds the cache;
             // the next shutter raises the edge again for its own capture.
+            gl.setCapturePurpose(FaceWarpRenderer.CapturePurpose.STILL_PHOTO)
             gl.setCaptureMaxEdge(INSTANT_CAPTURE_EDGE)
             if (boundToOes && !recording) {
                 gl.requestCaptureNow()
@@ -1768,6 +1772,7 @@ object ArCameraController {
         // soft and noisy next to the stock camera app. Waiting a couple of frames
         // for the real one is worth it, and once the deadline passes we take
         // whatever is available rather than failing.
+        gl.setCapturePurpose(FaceWarpRenderer.CapturePurpose.STILL_PHOTO)
         gl.setCaptureMaxEdge(CAPTURE_MAX_EDGE)
         gl.setCaptureEnabled(true)
         gl.requestCaptureNow()
@@ -2073,6 +2078,7 @@ object ArCameraController {
                 // bitmap recorder — see [requestConfettiFrame].
                 if (boundToOes) {
                     val gl = ArCameraBridge.warpGlView
+                    gl?.setCapturePurpose(FaceWarpRenderer.CapturePurpose.VIDEO)
                     gl?.setCaptureEnabled(true)
                     // Overlay composites downscale anyway; smaller readback keeps
                     // live preview responsive while recording.
@@ -2081,6 +2087,7 @@ object ArCameraController {
                 startConfettiFramePump()
             } else if (boundToOes || filter.useShader()) {
                 val gl = ArCameraBridge.warpGlView
+                gl?.setCapturePurpose(FaceWarpRenderer.CapturePurpose.VIDEO)
                 gl?.setCaptureEnabled(true)
                 gl?.setCaptureMaxEdge(RECORD_GL_EDGE)
                 gl?.setOnFramePresented { onOesFramePresented() }
@@ -2201,6 +2208,7 @@ object ArCameraController {
             gl?.setCaptureEnabled(
                 ArCameraBridge.currentFilter.isDistortion(),
             )
+            gl?.setCapturePurpose(FaceWarpRenderer.CapturePurpose.STILL_PHOTO)
             gl?.setCaptureMaxEdge(CAPTURE_MAX_EDGE)
 
             if (!boundToOes) {
@@ -2301,6 +2309,13 @@ object ArCameraController {
 
         val gl = ArCameraBridge.warpGlView
         if (gl != null && gl.visibility == View.VISIBLE && gl.isGlInitialized()) {
+            gl.setCapturePurpose(
+                if (recording) {
+                    FaceWarpRenderer.CapturePurpose.VIDEO
+                } else {
+                    FaceWarpRenderer.CapturePurpose.STILL_PHOTO
+                },
+            )
             gl.setCaptureEnabled(true)
             fun readGpu() {
                 val gpu = try {
@@ -5435,6 +5450,7 @@ object ArCameraController {
                     if (!recording) retainCaptureFrame(display)
 
                     if (recording && !glSurfaceRecording) {
+                        glView.setCapturePurpose(FaceWarpRenderer.CapturePurpose.VIDEO)
                         glView.setCaptureEnabled(true)
                         glView.setCaptureMaxEdge(RECORD_GL_EDGE)
                     }

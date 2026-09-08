@@ -121,6 +121,7 @@ class ArBeautyVideoCapturer : VideoCapturer {
         mainHandler.post {
             try {
                 gl.setCaptureEnabled(true)
+                gl.setCapturePurpose(FaceWarpRenderer.CapturePurpose.LIVE_PUBLISH)
                 gl.setCaptureMaxEdge(1280)
                 gl.requestCaptureNow()
                 mainHandler.postDelayed({ gl.requestCaptureNow() }, 50L)
@@ -217,6 +218,7 @@ class ArBeautyVideoCapturer : VideoCapturer {
             try {
                 val gl = ArCameraBridge.warpGlView ?: return@post
                 gl.setCaptureEnabled(true)
+                gl.setCapturePurpose(FaceWarpRenderer.CapturePurpose.LIVE_PUBLISH)
                 gl.setCaptureMaxEdge(1280)
                 gl.requestCaptureNow()
             } catch (_: Throwable) {

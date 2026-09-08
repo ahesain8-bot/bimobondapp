@@ -329,6 +329,10 @@ class FaceWarpGlView @JvmOverloads constructor(
         renderer.captureMaxEdge = maxEdge.coerceAtLeast(2)
     }
 
+    fun setCapturePurpose(purpose: FaceWarpRenderer.CapturePurpose) {
+        renderer.capturePurpose = purpose
+    }
+
     fun setEncoderSurface(surface: Surface?, width: Int, height: Int) {
         ensureGlInitialized()
         queueEvent {
