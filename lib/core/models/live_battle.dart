@@ -32,6 +32,7 @@ class LiveBattle extends Equatable {
     this.wins2,
     this.powerUps,
     this.hasRosterPayload = false,
+    this.presentFields,
   });
 
   final String id;
@@ -83,6 +84,10 @@ class LiveBattle extends Equatable {
   /// that is still seated. It is deliberately not part of [props]: it describes
   /// the payload, not the battle.
   final bool hasRosterPayload;
+
+  /// Wire keys retained to distinguish omitted values from explicit null/zero.
+  /// Null denotes a complete snapshot constructed directly in Dart.
+  final Set<String>? presentFields;
 
   bool get isTeamMode => mode == LiveBattleMode.team;
 
@@ -162,7 +167,8 @@ class LiveBattle extends Equatable {
   LiveBattle normalizedForUpdate({String? updateType}) {
     final type = (updateType ?? '').toLowerCase();
     final typeSaysEnded =
-        type.contains('finish') ||
+        type == 'finished' ||
+        type == 'finish' ||
         type == 'ended' ||
         type == 'end' ||
         type == 'result' ||
@@ -174,13 +180,23 @@ class LiveBattle extends Equatable {
     return this;
   }
 
-  String opponentLiveId(String currentLiveId) =>
-      live1Id == currentLiveId ? live2Id : live1Id;
+  String opponentLiveId(String currentLiveId) => switch (teamOf(currentLiveId)) {
+    1 => live2Id,
+    2 => live1Id,
+    _ => '',
+  };
 
-  int scoreFor(String liveId) => live1Id == liveId ? live1Score : live2Score;
+  int scoreFor(String liveId) => switch (teamOf(liveId)) {
+    1 => live1Score,
+    2 => live2Score,
+    _ => 0,
+  };
 
-  int opponentScoreFor(String liveId) =>
-      live1Id == liveId ? live2Score : live1Score;
+  int opponentScoreFor(String liveId) => switch (teamOf(liveId)) {
+    1 => live2Score,
+    2 => live1Score,
+    _ => 0,
+  };
 
   Duration remaining([DateTime? now]) {
     final end = endTime;
@@ -193,6 +209,11 @@ class LiveBattle extends Equatable {
     final nested = _map(json['battle']);
     final source = nested ?? json;
     return LiveBattle(
+      presentFields: Set.unmodifiable({
+        ...source.keys,
+        if (_map(_map(source['teams'])?['team1'])?.containsKey('teammateLiveId') == true) 'live3Id',
+        if (_map(_map(source['teams'])?['team2'])?.containsKey('teammateLiveId') == true) 'live4Id',
+      }),
       id: source['id']?.toString() ?? '',
       live1Id: source['live1Id']?.toString() ?? '',
       live2Id: source['live2Id']?.toString() ?? '',
@@ -254,6 +275,11 @@ class LiveBattle extends Equatable {
     bool? hasRosterPayload,
   }) {
     return LiveBattle(
+      presentFields: presentFields == null ? null : Set.unmodifiable({
+        ...presentFields!,
+        if (status != null) 'status',
+        if (phase != null) 'phase',
+      }),
       id: id,
       live1Id: live1Id,
       live2Id: live2Id,
@@ -283,47 +309,66 @@ class LiveBattle extends Equatable {
     );
   }
 
-  /// Keeps timing fields that partial multiplier/end responses omit.
-  ///
-  /// Never resurrects a finished battle from a score tick that omitted
-  /// `status`, and never keeps ACTIVE when the new phase/type says ended.
+  /// Merges a server patch without turning absence into zero, SOLO or null.
   LiveBattle withTimingFrom(LiveBattle? previous, {String? updateType}) {
     final incoming = normalizedForUpdate(updateType: updateType);
-    if (previous == null || previous.id != incoming.id) return incoming;
-
-    // Finished snapshots win over partial ACTIVE leftovers.
-    if (incoming.isFinished) return incoming;
-    if (previous.isFinished && incoming.status.isEmpty) {
-      return previous.normalizedForUpdate();
+    if (previous == null) return incoming;
+    if (previous.id != incoming.id) {
+      // A delta for another battle is not evidence that a new match started.
+      if (updateType != null &&
+          !const {'started', 'start', 'snapshot'}.contains(updateType.toLowerCase())) {
+        return previous;
+      }
+      if (previous.startTime != null && incoming.startTime != null &&
+          incoming.startTime!.isBefore(previous.startTime!)) return previous;
+      return incoming;
     }
+    if (previous.isFinished && !incoming.isFinished) return previous;
+    if (previous.roundNumber != null && incoming.roundNumber != null &&
+        incoming.roundNumber! < previous.roundNumber!) return previous;
 
-    // A `score` tick carries no roster. Keeping the previous team seats stops
-    // a 2v2 from collapsing into a 1v1 between two score updates.
-    final keepRoster = !incoming.hasRosterPayload && previous.hasRosterPayload;
-    return incoming
-        .copyWith(
-          status: incoming.status.isEmpty ? previous.status : incoming.status,
-          startTime: incoming.startTime ?? previous.startTime,
-          endTime: incoming.endTime ?? previous.endTime,
-          multiplierEndsAt:
-              incoming.multiplierEndsAt ?? previous.multiplierEndsAt,
-          mode: keepRoster ? previous.mode : incoming.mode,
-          live3Id: keepRoster ? previous.live3Id : incoming.live3Id,
-          live4Id: keepRoster ? previous.live4Id : incoming.live4Id,
-          openSlots: keepRoster ? previous.openSlots : incoming.openSlots,
-          hasRosterPayload:
-              incoming.hasRosterPayload || previous.hasRosterPayload,
-          // Series state and scoring rules also only arrive on fuller payloads.
-          scoringMode: incoming.scoringMode ?? previous.scoringMode,
-          scoringGiftId: incoming.scoringGiftId ?? previous.scoringGiftId,
-          bestOf: incoming.bestOf > 1 ? incoming.bestOf : previous.bestOf,
-          roundNumber: incoming.roundNumber ?? previous.roundNumber,
-          wins1: incoming.wins1 ?? previous.wins1,
-          wins2: incoming.wins2 ?? previous.wins2,
-          powerUps: incoming.powerUps ?? previous.powerUps,
-        )
+    final patch = incoming._snapshotJson();
+    final keys = incoming.presentFields;
+    if (keys != null) patch.removeWhere((key, _) => !keys.contains(key));
+    final oldPowerUps = previous.powerUps;
+    final newPowerUps = incoming.powerUps;
+    if (patch.containsKey('powerUps') && oldPowerUps != null && newPowerUps != null) {
+      final powerPatch = newPowerUps._snapshotJson();
+      final powerKeys = newPowerUps.presentFields;
+      if (powerKeys != null) powerPatch.removeWhere((key, _) => !powerKeys.contains(key));
+      patch['powerUps'] = {...oldPowerUps._snapshotJson(), ...powerPatch};
+    }
+    return LiveBattle.fromJson({...previous._snapshotJson(), ...patch})
         .normalizedForUpdate(updateType: updateType);
   }
+
+  Map<String, dynamic> _snapshotJson() => {
+    'id': id,
+    'live1Id': live1Id,
+    'live2Id': live2Id,
+    'live1Score': live1Score,
+    'live2Score': live2Score,
+    'status': status,
+    'phase': phase,
+    'multiplier': multiplier,
+    'winnerLiveId': winnerLiveId,
+    'live3Id': live3Id,
+    'live4Id': live4Id,
+    'openSlots': openSlots,
+    'likeScore1': likeScore1,
+    'likeScore2': likeScore2,
+    'scoringMode': scoringMode,
+    'scoringGiftId': scoringGiftId,
+    'bestOf': bestOf,
+    'roundNumber': roundNumber,
+    'wins1': wins1,
+    'wins2': wins2,
+    'mode': mode.wireValue,
+    'startTime': startTime?.toIso8601String(),
+    'endTime': endTime?.toIso8601String(),
+    'multiplierEndsAt': multiplierEndsAt?.toIso8601String(),
+    'powerUps': powerUps?._snapshotJson(),
+  };
 
   @override
   List<Object?> get props => [
@@ -390,16 +435,26 @@ class LiveBattlePowerUps extends Equatable {
     this.stunEndsAt,
     this.gloveTeam,
     this.gloveCharges,
+    this.presentFields,
   });
 
   final int? stunTeam;
   final DateTime? stunEndsAt;
   final int? gloveTeam;
   final int? gloveCharges;
+  final Set<String>? presentFields;
+
+  Map<String, dynamic> _snapshotJson() => {
+    'stunTeam': stunTeam,
+    'stunEndsAt': stunEndsAt?.toIso8601String(),
+    'gloveTeam': gloveTeam,
+    'gloveCharges': gloveCharges,
+  };
 
   static LiveBattlePowerUps? fromJson(Map<String, dynamic>? json) {
     if (json == null || json.isEmpty) return null;
     return LiveBattlePowerUps(
+      presentFields: Set.unmodifiable(json.keys),
       stunTeam: _integerOrNull(json['stunTeam']),
       stunEndsAt: _date(json['stunEndsAt']),
       gloveTeam: _integerOrNull(json['gloveTeam']),
@@ -501,8 +556,7 @@ String? _seat(
   String flatKey, {
   required String teamKey,
 }) {
-  final flat = _text(source[flatKey]);
-  if (flat != null) return flat;
+  if (source.containsKey(flatKey)) return _text(source[flatKey]);
   final teams = _map(source['teams']);
   final team = teams == null ? null : _map(teams[teamKey]);
   return team == null ? null : _text(team['teammateLiveId']);

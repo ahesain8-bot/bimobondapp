@@ -111,3 +111,16 @@
 ### ملفات مرجعية مطلوبة وغير موجودة محليًا
 
 لم أدّعِ قراءتها: **لا يوجد** `features-ar` في `~/Downloads` ولا داخل شجرة المشروع، ولا مجلد `../promotions/` الذي تشير إليه `live-promotions.md`، ولا نسخة من `Archive(4).zip` محليًا. الملفات الموجودة فعليًا هي المذكورة أعلاه في `tiktok/lives/`.
+
+## استئناف الميزة 20 — 2026-09-08 — مرحلة التحقق
+
+- المرجع المحلي: فرع `bashar`، HEAD `ce411b85624b5eb82d63cdc158c513b72699e86c`. عند البدء لا ملفات جديدة والتعديل الوحيد السابق `ios/Podfile.lock` (GoogleUtilities 8.1.2 → 8.1.3)، تُرك كما هو. لم تنفذ عمليات استعادة Git أو تبديل فرع أو commit/push.
+- Flutter 3.44.8 / Dart 3.12.2؛ نقطة الدخول `lib/main.dart`. `/create-live` يبني Host LiveRoomPage وفيه DI محلي للمستودع وSocket وLiveRoomBloc؛ `/lives` يستخدم LiveViewerEntry وlive_viewer_injector.
+- قُرئت وثيقة الاستعادة وهذا السجل، وأقسام PK والهدايا والتوكنات كاملة من `lives/mobile-api.md` و`logic.md` و`endpoints.md`. لم توجد AGENTS.md/CLAUDE.md في الشجرة أو المسارات العليا المفحوصة. وجدت `/Users/macbookair/Desktop/app_like_tiktok.zip` وفُحصت محتوياته دون استبدال الشجرة: نموذح LiveBattle ووثيقة الاستعادة مطابقان محليًا؛ features-ar/endpoints2/P1/P2 غير موجودة داخله أيضًا. ادعاءات التوثيق السابق لا تثبت العقد المفقود.
+- baseline: `flutter test --no-pub test/live_team_battle_test.dart test/live_battle_test.dart test/live_battle_media_serialization_test.dart test/live_battle_layout_rebuild_test.dart test/live_competition_request_test.dart test/live_socket_payload_test.dart` = **95 Passed** (`/tmp/pk-baseline.log`).
+- baseline إضافي: `flutter test --no-pub test/live_room_stage_test.dart test/live_pk_rtl_layout_test.dart test/live_viewer_ui_test.dart test/live_ticket_service_test.dart` = **18 Passed** (`/tmp/pk-baseline-room.log`).
+- خريطة الربط: زر خيارات PK → LiveRoomBattleOpponentsSheet → repository.startBattle (الإعداد الفردي فقط) → POST /lives/:id/battle → LiveRoomBattleChanged؛ liveBattle/liveBattlePhase → datasource/SocketMapper → Bloc → battle state → LiveRoomStage أو viewer LiveRoomPage → بث أساسي + opponent room وشريط النقاط. TEAM/join/invite/leave/power-up موجودة بالمستودع بلا مستهلك UI؛ LiveCohostTiles بلا تركيب؛ cohostRooms متاح بالتطبيق فقط، ولا ربط TEAM للمضيف/المشاهد.
+- مصدر opponent token الحالي: POST join للمضيف وJoinLiveUseCase للمشاهد؛ الوثيقة تقول إن join لغير المضيف يفتح viewer session ويزيد viewers. لذلك لا يصلح تعميمه ثلاث مرات دون عقد مستقل؛ لا توجد توكنات TEAM موثقة في الملفات المتاحة.
+- الأجهزة: adb فارغ، لا simctl booted؛ Flutter يرى iPhone واحدًا لاسلكيًا. Android package الحالي `com.dubai.bimobondapp` وiOS `com.example.bimobondapp`. توجد عملية build/run من IDE بدأت قبل عمل هذه الجولة؛ لا تُنسب لهذه الجولة ولا تُوقف تلقائيًا. قبول الأربعة أطراف **Not run**.
+- طُلبت دفعة واحدة الوثائق الأحدث وعقد توكنات المشاهدة وهوية المضيف والتجديد والإلغاء وأثر العداد، والتنسيق مع مايا لتغييرات LiveRoomBloc/Socket/LiveKit، وموارد وتفويض الاختبار. لم يصل الرد بعد؛ تستمر إصلاحات PK المستقلة.
+- ثمانية اختبارات انحدار جديدة `live_battle_patch_test.dart` فشلت جميعها قبل إصلاح النموذج: انتماء الزميل، patch roster، null/zero، النهاية الجزئية، ACTIVE المتأخر، جولة أقدم، round_finished، وأولوية null للمقعد. الإصلاح قيد التحقق؛ لا يُعد PK مكتملًا.
