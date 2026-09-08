@@ -54,6 +54,12 @@ import GoogleMaps
                   ArCameraController.shared.setFlash(enabled) { ok in
                       result(ok)
                   }
+              case "suspendPreview":
+                  ArCameraController.shared.suspendPreview()
+                  result(nil)
+              case "resumePreview":
+                  ArCameraController.shared.resumePreview()
+                  result(nil)
               default:
                   result(FlutterMethodNotImplemented)
               }

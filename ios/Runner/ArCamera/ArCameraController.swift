@@ -48,7 +48,10 @@ final class ArCameraController: NSObject {
 
     func stop() {
         sessionQueue.async { [weak self] in
-            self?.session.stopRunning()
+            guard let self else { return }
+            self.session.stopRunning()
+            self.isFlashOn = false
+            self.applyFlashForCurrentCamera()
         }
     }
 
@@ -74,7 +77,43 @@ final class ArCameraController: NSObject {
             guard let self else { return }
             self.isFrontCamera.toggle()
             let ok = self.configureInput(front: self.isFrontCamera)
+            if ok {
+                self.applyFlashForCurrentCamera()
+            }
             DispatchQueue.main.async { completion(ok) }
+        }
+    }
+
+    
+    private func applyFlashForCurrentCamera() {
+        if isFrontCamera {
+            applyScreenFlash(isFlashOn)
+            
+        }
+        else {applyScreenFlash(false)
+            if let device = currentInput?.device, device.hasTorch {
+                try? device.lockForConfiguration()
+                device.torchMode = .off
+                device.unlockForConfiguration()
+            }
+        }
+    
+    }
+
+    private var previousScreenBrightness: CGFloat?
+
+    private func applyScreenFlash(_ enabled: Bool) {
+        DispatchQueue.main.async {
+            let screen = UIScreen.main
+            if enabled {
+                if self.previousScreenBrightness == nil {
+                    self.previousScreenBrightness = screen.brightness
+                }
+                screen.brightness = 1.0
+            } else if let previous = self.previousScreenBrightness {
+                screen.brightness = previous
+                self.previousScreenBrightness = nil
+            }
         }
     }
 
@@ -131,6 +170,7 @@ final class ArCameraController: NSObject {
         sessionQueue.async { [weak self] in
             guard let self else { return }
             self.isFlashOn = enabled
+            self.applyFlashForCurrentCamera()
             DispatchQueue.main.async { completion?(true) }
         }
     }
@@ -142,11 +182,13 @@ final class ArCameraController: NSObject {
         } else {
             settings.isHighResolutionPhotoEnabled = true
         }
+        settings.photoQualityPrioritization = photoOutput.maxPhotoQualityPrioritization
+        //
         if !isFrontCamera, isFlashOn, photoOutput.supportedFlashModes.contains(.on) {
-              settings.flashMode = .on
-          } else {
-              settings.flashMode = .off
-          }
+        settings.flashMode = .on
+        } else {
+        settings.flashMode = .off
+        }
         let delegate = PhotoCaptureDelegate { path in
             completion(path, path == nil ? "photo_failed" : nil)
         }
@@ -182,6 +224,7 @@ final class ArCameraController: NSObject {
         }
 
         for preset: AVCaptureSession.Preset in [
+            .photo,
             .hd4K3840x2160,
             .hd1920x1080,
             .high
@@ -211,9 +254,10 @@ final class ArCameraController: NSObject {
         }
 
         if #available(iOS 16.0, *) {
-            photoOutput.maxPhotoDimensions =
-                device.activeFormat.supportedMaxPhotoDimensions.last
-                ?? photoOutput.maxPhotoDimensions
+            let dims = device.activeFormat.supportedMaxPhotoDimensions
+            if let best = dims.max(by: { Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height) }) {
+                photoOutput.maxPhotoDimensions = best
+            }
         } else {
             photoOutput.isHighResolutionCaptureEnabled = true
         }

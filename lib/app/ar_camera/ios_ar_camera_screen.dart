@@ -24,13 +24,16 @@ class _IosArCameraScreenState extends State<IosArCameraScreen> {
   bool _isFlipping = false;
   bool _isFrontCamera = true;
   bool _isFlashOn = false;
-  bool _showScreenFlash = false;
 
   Future<void> _flip() async {
     if (_isFlipping) return;
     setState(() => _isFlipping = true);
-    await ArCameraBridge.flipCamera();
-    if (mounted) setState(() => _isFlipping = false);
+    final isFront = await ArCameraBridge.flipCamera();
+    if (!mounted) return;
+    setState(() {
+      _isFlipping = false;
+      _isFrontCamera = isFront;
+    });
   }
 
   Future<void> _toggleFlash() async {
@@ -42,13 +45,8 @@ class _IosArCameraScreenState extends State<IosArCameraScreen> {
   Future<void> _capture() async {
     if (_isCapturing) return;
     setState(() => _isCapturing = true);
-    if (_isFrontCamera && _isFlashOn) {
-      setState(() => _showScreenFlash = true);
-      await Future.delayed(const Duration(milliseconds: 120));
-    }
     try {
       final path = await ArCameraBridge.takePhoto();
-      if (mounted) setState(() => _showScreenFlash = false);
       if (!mounted) return;
       if (path == null || path.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -64,10 +62,7 @@ class _IosArCameraScreenState extends State<IosArCameraScreen> {
       ).showSnackBar(SnackBar(content: Text('camera_capture_error: $e')));
     } finally {
       if (mounted) {
-        setState(() {
-          _isCapturing = false;
-          _showScreenFlash = false;
-        });
+        setState(() => _isCapturing = false);
       }
     }
   }
@@ -129,7 +124,11 @@ class _IosArCameraScreenState extends State<IosArCameraScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.close, color: Colors.white,size:35),
+                    icon: const Icon(
+                      Icons.close,
+                      color: Colors.white,
+                      size: 35,
+                    ),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                   Column(
@@ -138,7 +137,7 @@ class _IosArCameraScreenState extends State<IosArCameraScreen> {
                         icon: const Icon(
                           Icons.autorenew_rounded,
                           color: Colors.white,
-                          size:35
+                          size: 35,
                         ),
                         onPressed: _isFlipping ? null : _flip,
                       ),
@@ -146,7 +145,7 @@ class _IosArCameraScreenState extends State<IosArCameraScreen> {
                         icon: Icon(
                           _isFlashOn ? Icons.flash_on : Icons.flash_off,
                           color: Colors.white,
-                          size:35
+                          size: 35,
                         ),
                         onPressed: _toggleFlash,
                       ),
@@ -176,10 +175,6 @@ class _IosArCameraScreenState extends State<IosArCameraScreen> {
               ),
             ),
           ),
-          if (_showScreenFlash)
-            const Positioned.fill(
-              child: IgnorePointer(child: ColoredBox(color: Colors.white)),
-            ),
         ],
       ),
     );
