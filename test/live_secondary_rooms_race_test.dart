@@ -76,11 +76,21 @@ class TestPublication extends Fake
 }
 
 class TestParticipant extends Fake implements RemoteParticipant {
-  TestParticipant(this.identity, this.videoTrackPublications);
+  TestParticipant(
+    this.identity,
+    this.videoTrackPublications, {
+    Map<String, String> attributes = const {},
+    this.metadata,
+  }) : attributes = UnmodifiableMapView(attributes);
   @override
   final String identity;
   @override
   final List<RemoteTrackPublication<RemoteVideoTrack>> videoTrackPublications;
+  // Read by liveKitParticipantMatches when the identity is not a literal match.
+  @override
+  final UnmodifiableMapView<String, String> attributes;
+  @override
+  final String? metadata;
 }
 
 LiveCohostRoom target(String id) => LiveCohostRoom(
@@ -313,6 +323,71 @@ void main() {
       expect(
         manager.videoTrackFor('live-id', hostIdentity: 'host-identity'),
         same(hostVideo),
+      );
+      await manager.disconnectAll();
+      manager.dispose();
+    },
+  );
+
+  test('a partner tile resolves from the documented host user id', () async {
+    // `cohosts[]` carries `host: { id }`, not a LiveKit identity
+    // (lives/live-p2-parity.md §2). Requiring an identity the envelope never
+    // sends left every partner tile blank.
+    final hostVideo = TestVideo();
+    final hostPublication = TestPublication(hostVideo);
+    final host = TestParticipant('host-user-1', [hostPublication]);
+    final stranger = TestParticipant('someone-else', [
+      TestPublication(TestVideo()),
+    ]);
+    final room = TestRoom()
+      ..participants.addAll({'host-user-1': host, 'other': stranger});
+    final manager = LiveSecondaryRooms(roomFactory: () => room);
+    await manager.connect(target('live-id'));
+    expect(
+      manager.videoTrackFor('live-id', hostId: 'host-user-1'),
+      same(hostVideo),
+    );
+    // A host id nobody published under still renders nothing.
+    expect(manager.videoTrackFor('live-id', hostId: 'ghost'), isNull);
+    // An explicit identity from the payload still wins over the user id.
+    expect(
+      manager.videoTrackFor(
+        'live-id',
+        hostIdentity: 'host-user-1',
+        hostId: 'ghost',
+      ),
+      same(hostVideo),
+    );
+    // Blank values are not a wildcard.
+    expect(manager.videoTrackFor('live-id', hostId: '  '), isNull);
+    await manager.disconnectAll();
+    manager.dispose();
+  });
+
+  test(
+    'a prefixed identity or an attribute still identifies the partner host',
+    () async {
+      final byPrefix = TestVideo();
+      final byAttribute = TestVideo();
+      final prefixed = TestParticipant('live_room:host-user-1', [
+        TestPublication(byPrefix),
+      ]);
+      final attributed = TestParticipant(
+        'opaque-sid',
+        [TestPublication(byAttribute)],
+        attributes: const {'userId': 'host-user-2'},
+      );
+      final room = TestRoom()
+        ..participants.addAll({'a': prefixed, 'b': attributed});
+      final manager = LiveSecondaryRooms(roomFactory: () => room);
+      await manager.connect(target('live-id'));
+      expect(
+        manager.videoTrackFor('live-id', hostId: 'host-user-1'),
+        same(byPrefix),
+      );
+      expect(
+        manager.videoTrackFor('live-id', hostId: 'host-user-2'),
+        same(byAttribute),
       );
       await manager.disconnectAll();
       manager.dispose();

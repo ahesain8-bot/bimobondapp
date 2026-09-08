@@ -2,8 +2,13 @@ import 'package:bimobondapp/app/calls/data/models/call_model.dart';
 import 'package:bimobondapp/app/notifications/domain/entities/notification_entity.dart';
 import 'package:bimobondapp/app/notifications/presentation/utils/notification_admin_helper.dart';
 import 'package:bimobondapp/app/posts/domain/entities/post_entity.dart';
+import 'package:bimobondapp/app/auth/domain/usecases/get_user_by_id_usecase.dart';
+import 'package:bimobondapp/app/auth/presentation/di/auth_injector.dart'
+    as auth_di;
+import 'package:bimobondapp/core/constants/live_traffic_source.dart';
 import 'package:bimobondapp/core/constants/traffic_source.dart';
 import 'package:bimobondapp/core/navigation/post_navigation.dart';
+import 'package:bimobondapp/features/live_viewer/presentation/utils/open_profile_live.dart';
 import 'package:bimobondapp/core/navigation/story_user_navigation.dart';
 import 'package:bimobondapp/app/calls/presentation/bloc/call_bloc.dart';
 import 'package:bimobondapp/app/calls/presentation/bloc/call_event.dart';
@@ -35,11 +40,7 @@ Future<void> navigateFromNotification(
       final postId = notification.postId ?? notification.post?.id;
       if (postId == null || postId.isEmpty) return;
       if (post != null) {
-        openPost(
-          context,
-          post,
-          trafficSource: TrafficSource.notification,
-        );
+        openPost(context, post, trafficSource: TrafficSource.notification);
         return;
       }
       await openPostById(
@@ -94,10 +95,7 @@ Future<void> navigateFromNotification(
       if (post != null && post.isAuctionable) {
         context.pushNamed(
           'live_details',
-          extra: {
-            'post': post,
-            'trafficSource': TrafficSource.notification,
-          },
+          extra: {'post': post, 'trafficSource': TrafficSource.notification},
         );
         return;
       }
@@ -115,7 +113,9 @@ Future<void> navigateFromNotification(
       if (context.mounted) {
         final data = notification.data ?? {};
         final callModel = CallModel.fromJson(data);
-        context.read<CallBloc>().add(IncomingCallReceivedEvent(call: callModel));
+        context.read<CallBloc>().add(
+          IncomingCallReceivedEvent(call: callModel),
+        );
       }
       return;
     case 'CALL_MISSED':
@@ -123,6 +123,30 @@ Future<void> navigateFromNotification(
       if (chatId != null && chatId.isNotEmpty && context.mounted) {
         context.pushNamed('chat', extra: {'chatId': chatId});
       }
+      return;
+    case 'LIVE_STARTED':
+      // A host going live notifies their followers (lives/mobile-api.md §6).
+      // The payload documents no live id, so the host's profile is the
+      // authority: GET /users/:id carries `isLive` and `currentLive`
+      // (lives/live-p3-parity.md §7). Opening through the shared helper keeps
+      // the age and ticket gates in front of join, and marks the visit
+      // NOTIFICATION for the host's end-of-live report.
+      final hostId = notification.actorId ?? notification.actor?.id;
+      if (hostId == null || hostId.isEmpty) return;
+      final result = await auth_di.sl<GetUserByIdUseCase>()(
+        GetUserByIdParams(hostId),
+      );
+      if (!context.mounted) return;
+      await result.fold(
+        // A stream that already ended, or a profile we cannot read, simply
+        // opens nothing. Never guess a live id from the notification.
+        (_) async {},
+        (user) => openProfileCurrentLive(
+          context,
+          user,
+          trafficSource: LiveTrafficSource.notification,
+        ),
+      );
       return;
     case 'ADMIN_MESSAGE':
     case 'BROADCAST':

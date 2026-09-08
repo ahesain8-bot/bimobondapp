@@ -43,6 +43,7 @@ class LiveCohostTiles extends StatelessWidget {
                       track: rooms.videoTrackFor(
                         partner.liveId,
                         hostIdentity: partner.hostIdentity,
+                        hostId: partner.hostId,
                       ),
                       connecting: rooms.isConnecting(partner.liveId),
                     ),

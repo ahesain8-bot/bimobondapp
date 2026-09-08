@@ -16,10 +16,17 @@ import '../widgets/live_room_page.dart';
 /// Opens the user's current LIVE from a profile indicator using the existing
 /// viewer join pipeline. No-ops when `isLive` is false or `currentLive` has
 /// no id.
+///
+/// [trafficSource] is the documented bucket for the screen the open came from
+/// (`lives/live-p0-parity.md` §5). It defaults to `PROFILE` because that is
+/// where the LIVE badge lives; a `LIVE_STARTED` notification passes
+/// `NOTIFICATION` instead. An unrecognised value is dropped rather than sent,
+/// so the host's report is never polluted with an invented bucket.
 Future<void> openProfileCurrentLive(
   BuildContext context,
-  UserEntity user,
-) async {
+  UserEntity user, {
+  String trafficSource = LiveTrafficSource.profile,
+}) async {
   if (user.isLive != true) return;
   final live = LiveMapper.fromProfileCurrentLive(
     isLive: user.isLive,
@@ -30,14 +37,21 @@ Future<void> openProfileCurrentLive(
   );
   if (live == null || live.id.isEmpty) return;
   await Navigator.of(context).push(
-    MaterialPageRoute<void>(builder: (_) => _ProfileLiveWatchPage(live: live)),
+    MaterialPageRoute<void>(
+      builder: (_) =>
+          _ProfileLiveWatchPage(live: live, trafficSource: trafficSource),
+    ),
   );
 }
 
 class _ProfileLiveWatchPage extends StatefulWidget {
-  const _ProfileLiveWatchPage({required this.live});
+  const _ProfileLiveWatchPage({
+    required this.live,
+    required this.trafficSource,
+  });
 
   final LiveEntity live;
+  final String trafficSource;
 
   @override
   State<_ProfileLiveWatchPage> createState() => _ProfileLiveWatchPageState();
@@ -50,13 +64,13 @@ class _ProfileLiveWatchPageState extends State<_ProfileLiveWatchPage> {
   void initState() {
     super.initState();
     _bloc = di.sl<LiveViewerBloc>();
-    // Entering from a profile badge uses the same activation event as the feed,
-    // so the ticket and age gates run before join. The room page never joins on
-    // its own. PROFILE is the documented traffic bucket for this entry.
+    // Entering from a profile badge or a LIVE notification uses the same
+    // activation event as the feed, so the ticket and age gates run before
+    // join. The room page never joins on its own.
     _bloc.add(
       LiveViewerActivated(
         widget.live,
-        trafficSource: LiveTrafficSource.profile,
+        trafficSource: LiveTrafficSource.normalise(widget.trafficSource),
       ),
     );
     LiveScreenWakelock.enable();

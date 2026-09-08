@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:livekit_client/livekit_client.dart';
 
 import '../../../../core/services/live_audio_session.dart';
+import '../../../../core/utils/livekit_participant_match.dart';
 import '../../domain/entities/live_cohost.dart';
 
 /// Subscribe-only LiveKit rooms this client tiles beside its own: co-host
@@ -61,15 +62,30 @@ class LiveSecondaryRooms extends ChangeNotifier {
 
   bool isConnecting(String liveId) => _slots[liveId]?.connecting ?? false;
 
-  /// Only a camera published by the verified LiveKit host identity is eligible.
-  /// The caller must obtain that identity from the room credential contract;
-  /// neither liveId nor a guessed first participant is an identity source.
-  RemoteVideoTrack? videoTrackFor(String liveId, {String? hostIdentity}) {
-    if (hostIdentity == null || hostIdentity.isEmpty) return null;
+  /// Only a camera published by the partner host is eligible; a guessed first
+  /// participant is never an identity source.
+  ///
+  /// [hostIdentity] is an exact LiveKit identity and wins when the payload
+  /// carries one. The documented `cohosts[]` envelope instead carries
+  /// `host: { id }` — the backend user id (`lives/live-p2-parity.md` §2) — so
+  /// [hostId] is resolved with [liveKitParticipantMatches], the same matcher
+  /// the primary room and the viewer stage already use for guest cameras.
+  /// With neither value the tile waits rather than rendering a stranger.
+  RemoteVideoTrack? videoTrackFor(
+    String liveId, {
+    String? hostIdentity,
+    String? hostId,
+  }) {
+    final identity = hostIdentity?.trim() ?? '';
+    final userId = hostId?.trim() ?? '';
+    if (identity.isEmpty && userId.isEmpty) return null;
     final room = roomFor(liveId);
     if (room == null) return null;
     for (final participant in room.remoteParticipants.values) {
-      if (participant.identity != hostIdentity) continue;
+      final matches = identity.isNotEmpty
+          ? participant.identity == identity
+          : liveKitParticipantMatches(participant, userId);
+      if (!matches) continue;
       for (final publication in participant.videoTrackPublications) {
         final track = publication.track;
         if (track is RemoteVideoTrack &&
