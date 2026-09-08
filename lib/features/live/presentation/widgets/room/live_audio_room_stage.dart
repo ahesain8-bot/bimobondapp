@@ -10,6 +10,7 @@ class LiveAudioRoomStage extends StatelessWidget {
     this.coverUrl,
     this.speakers = const [],
     this.paused = false,
+    this.onRaiseHand,
   });
 
   final String hostName;
@@ -17,6 +18,10 @@ class LiveAudioRoomStage extends StatelessWidget {
   final String? coverUrl;
   final List<LiveAudioSpeaker> speakers;
   final bool paused;
+
+  /// Viewer-only. Host / start-live omit this so the Arabic copy stays a
+  /// label, not a guest-request button.
+  final VoidCallback? onRaiseHand;
 
   @override
   Widget build(BuildContext context) {
@@ -43,13 +48,7 @@ class LiveAudioRoomStage extends StatelessWidget {
                   ),
                   const SizedBox(height: 28),
                   if (speakers.isEmpty)
-                    Text(
-                      'ارفع يدك للحديث',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.7),
-                        fontSize: 14,
-                      ),
-                    )
+                    _RaiseHandPrompt(onTap: onRaiseHand)
                   else
                     Wrap(
                       spacing: 18,
@@ -70,6 +69,37 @@ class LiveAudioRoomStage extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _RaiseHandPrompt extends StatelessWidget {
+  const _RaiseHandPrompt({this.onTap});
+
+  final VoidCallback? onTap;
+
+  static const _label = Text(
+    'ارفع يدك للحديث',
+    style: TextStyle(
+      color: Color(0xB3FFFFFF),
+      fontSize: 14,
+    ),
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    if (onTap == null) return _label;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        key: const ValueKey('audio_raise_hand_cta'),
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: _label,
+        ),
       ),
     );
   }

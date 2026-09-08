@@ -437,7 +437,7 @@ class _LiveRoomBody extends StatelessWidget {
             fit: StackFit.expand,
             children: [
               const LiveRoomCameraLayer(),
-              const VignetteLayer(),
+              const IgnorePointer(child: VignetteLayer()),
               LiveStartingIndicator(
                 deadline: startIndicatorDeadline,
                 isPublished: false,
@@ -459,7 +459,7 @@ class _LiveRoomBody extends StatelessWidget {
               topInset:
                   MediaQuery.paddingOf(context).top + AppSpacing.roomStageTop,
             ),
-            const VignetteLayer(),
+            const IgnorePointer(child: VignetteLayer()),
             LiveStartingIndicator(
               deadline: startIndicatorDeadline,
               isPublished: state is LiveRoomReady && state.isMediaConnected,

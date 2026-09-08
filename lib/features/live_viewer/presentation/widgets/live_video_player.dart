@@ -20,12 +20,16 @@ class LiveVideoPlayer extends StatefulWidget {
 
   final BoxFit fit;
 
+  /// AUDIO viewer canvas. Host/start-live stages omit this.
+  final VoidCallback? onRaiseHand;
+
   const LiveVideoPlayer({
     super.key,
     required this.live,
     this.isActive = true,
     this.liveKitOnly = false,
     this.fit = BoxFit.cover,
+    this.onRaiseHand,
   });
 
   @override
@@ -496,6 +500,7 @@ class _LiveVideoPlayerState extends State<LiveVideoPlayer> {
         hostAvatarUrl: widget.live.hostAvatar,
         coverUrl: widget.live.thumbnailUrl,
         paused: widget.live.paused,
+        onRaiseHand: widget.onRaiseHand,
       );
     }
     final room = widget.isActive ? _room : null;

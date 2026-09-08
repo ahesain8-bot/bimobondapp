@@ -904,6 +904,13 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                   key: ValueKey('viewer_primary_${live.id}'),
                   live: live,
                   isActive: widget.isActive && connected,
+                  onRaiseHand:
+                      widget.isActive &&
+                          isThisRoom &&
+                          !state.isOnStage &&
+                          !live.paused
+                      ? () => _openGuestRequest(live)
+                      : null,
                 ),
               IgnorePointer(
                 child: Align(

@@ -28,12 +28,26 @@ class LiveScreenShareService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
-            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSharingForeground()
             stopSelf()
             return START_NOT_STICKY
         }
         startInForeground()
         return START_STICKY
+    }
+
+    override fun onDestroy() {
+        stopSharingForeground()
+        super.onDestroy()
+    }
+
+    private fun stopSharingForeground() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+        } else {
+            @Suppress("DEPRECATION")
+            stopForeground(true)
+        }
     }
 
     private fun startInForeground() {
@@ -82,7 +96,14 @@ class LiveScreenShareService : Service() {
         fun stop(context: Context) {
             val intent =
                 Intent(context, LiveScreenShareService::class.java).setAction(ACTION_STOP)
-            context.stopService(intent)
+            // stopService() never delivers ACTION_STOP to onStartCommand, so
+            // stopForeground() would be skipped. startService() hits the
+            // ACTION_STOP branch (stopForeground + stopSelf).
+            try {
+                context.startService(intent)
+            } catch (_: Exception) {
+                context.stopService(Intent(context, LiveScreenShareService::class.java))
+            }
         }
     }
 }

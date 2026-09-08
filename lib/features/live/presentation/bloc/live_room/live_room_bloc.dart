@@ -2674,6 +2674,9 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         next.dualCameraEnabled == previousScene.dualCameraEnabled) {
       return;
     }
+    final stoppingShare =
+        next.isCamera && (previousScene.isScreen || previousScene.isDual);
+    var screenShareStopped = false;
     _cameraOpInFlight = true;
     try {
       debugPrint(
@@ -2682,6 +2685,22 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         ' after=${next.scene}'
         ' phase=beforeApply',
       );
+      if (stoppingShare) {
+        _sessionRepository.pauseOutboundMediaHealthCheck();
+        try {
+          await _sessionRepository.setScreenShareEnabled(false);
+        } finally {
+          _sessionRepository.resumeOutboundMediaHealthCheck();
+        }
+        screenShareStopped = true;
+        await _finishCameraAfterScreenStop(
+          current: current,
+          next: next,
+          liveId: liveId,
+          emit: emit,
+        );
+        return;
+      }
       // Capture must succeed before PATCH /scene. Committing SCREEN/DUAL
       // first left the backend on a scene the host never actually published,
       // and Android MediaProjection crashed the process before revert.
@@ -2723,32 +2742,91 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
         );
       }
     } on ApiException catch (e) {
-      await _revertSceneMedia(previousScene);
+      if (!screenShareStopped) {
+        await _revertSceneMedia(previousScene);
+      }
       if (!isClosed) {
         emit(
           (_readyOrNull ?? current).copyWith(
-            session: current.session.copyWith(scene: previousScene),
-            localScreenShareTrack:
-                _sessionRepository.localScreenShareTrack as VideoTrack?,
+            session: screenShareStopped
+                ? current.session.copyWith(scene: next)
+                : current.session.copyWith(scene: previousScene),
+            localScreenShareTrack: screenShareStopped
+                ? null
+                : _sessionRepository.localScreenShareTrack as VideoTrack?,
             actionMessage: e.message,
           ),
         );
       }
     } catch (e) {
-      await _revertSceneMedia(previousScene);
+      if (!screenShareStopped) {
+        await _revertSceneMedia(previousScene);
+      }
       if (!isClosed) {
         emit(
           (_readyOrNull ?? current).copyWith(
-            session: current.session.copyWith(scene: previousScene),
-            localScreenShareTrack:
-                _sessionRepository.localScreenShareTrack as VideoTrack?,
-            actionMessage: 'تعذر بدء مشاركة الشاشة',
+            session: screenShareStopped
+                ? current.session.copyWith(scene: next)
+                : current.session.copyWith(scene: previousScene),
+            localScreenShareTrack: screenShareStopped
+                ? null
+                : _sessionRepository.localScreenShareTrack as VideoTrack?,
+            actionMessage: screenShareStopped
+                ? 'تعذر استعادة الكاميرا بعد إيقاف مشاركة الشاشة'
+                : 'تعذر بدء مشاركة الشاشة',
           ),
         );
       }
     } finally {
       _cameraOpInFlight = false;
     }
+  }
+
+  /// Camera unmute/restore + PATCH CAMERA after screen share is already off.
+  Future<void> _finishCameraAfterScreenStop({
+    required LiveRoomReady current,
+    required LiveScene next,
+    required String liveId,
+    required Emitter<LiveRoomState> emit,
+  }) async {
+    if (isClosed) return;
+    final afterStop = _readyOrNull ?? current;
+    emit(
+      afterStop.copyWith(
+        localScreenShareTrack: null,
+        clearActionMessage: true,
+      ),
+    );
+
+    String? cameraError;
+    _sessionRepository.pauseOutboundMediaHealthCheck();
+    try {
+      await _sessionRepository.setCameraEnabled(true);
+    } catch (e) {
+      debugPrint('Camera restore after screen stop failed: $e');
+      cameraError = 'تعذر استعادة الكاميرا بعد إيقاف مشاركة الشاشة';
+    } finally {
+      _sessionRepository.resumeOutboundMediaHealthCheck();
+    }
+    if (isClosed) return;
+
+    final saved = await _sessionRepository.updateScene(
+      liveId: liveId,
+      scene: next,
+    );
+    if (isClosed) return;
+    final ready = _readyOrNull ?? current;
+    emit(
+      ready.copyWith(
+        session: ready.session.copyWith(scene: saved),
+        localScreenShareTrack: null,
+        localVideoTrack: _sessionRepository.localPreviewTrack as VideoTrack?,
+        isMediaConnected: true,
+        actionMessage: cameraError,
+        clearActionMessage: cameraError == null,
+      ),
+    );
+    add(const LiveRoomGuestsChanged());
   }
 
   Future<void> _revertSceneMedia(LiveScene previous) async {
@@ -2765,8 +2843,13 @@ class LiveRoomBloc extends Bloc<LiveRoomEvent, LiveRoomState> {
     if (ready.session.isAudioOnly) return;
     try {
       if (scene.isCamera) {
-        await _sessionRepository.setScreenShareEnabled(false);
-        await _sessionRepository.setCameraEnabled(true);
+        _sessionRepository.pauseOutboundMediaHealthCheck();
+        try {
+          await _sessionRepository.setScreenShareEnabled(false);
+          await _sessionRepository.setCameraEnabled(true);
+        } finally {
+          _sessionRepository.resumeOutboundMediaHealthCheck();
+        }
       } else if (scene.isScreen) {
         await _sessionRepository.setScreenShareEnabled(true);
         await _sessionRepository.setCameraEnabled(false);

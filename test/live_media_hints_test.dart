@@ -49,6 +49,25 @@ void main() {
       expect(hints.canPublish, isTrue);
       expect(hints.maxVideoResolution, '480p');
       expect(hints.maxBitrateKbps, 1200);
+      expect(hints.audioOnly, isFalse);
+    });
+
+    test('forGuestPublish forces audioOnly even when the token omits it', () {
+      final omitted = LiveMediaHints.forGuestPublish(
+        incoming: null,
+        role: 'guest',
+        audioOnly: true,
+      );
+      expect(omitted.audioOnly, isTrue);
+      expect(omitted.canPublish, isTrue);
+
+      final video = LiveMediaHints.forGuestPublish(
+        incoming: LiveMediaHints.defaultsForRole('guest'),
+        role: 'guest',
+        audioOnly: false,
+      );
+      expect(video.audioOnly, isFalse);
+      expect(video.canPublish, isTrue);
     });
   });
 

@@ -47,6 +47,17 @@ class LiveMediaHints {
     );
   }
 
+  /// Guest publish hints. AUDIO lives always skip camera even if the token
+  /// omitted `mediaHints.audioOnly`.
+  static LiveMediaHints forGuestPublish({
+    LiveMediaHints? incoming,
+    String role = 'guest',
+    required bool audioOnly,
+  }) {
+    final base = incoming ?? LiveMediaHints.defaultsForRole(role);
+    return audioOnly ? base.copyWith(audioOnly: true) : base;
+  }
+
   String get preferredCodec {
     for (final codec in codecPreference) {
       final value = codec.toLowerCase();
