@@ -243,3 +243,26 @@
 | الباقي (16، 29، 28، 10، 21، 22، 18، 19، 3، 24، 25) | Complete | بلا تغيير | لم تُعد كتابتها |
 
 **قبول الأجهزة ما زال Not run في الصفوف السبعة عشر جميعها.** نجاح 450 اختبارًا لا يمثل بثًا حيًا ولا صرف رصيد ولا أربعة ناشرين.
+
+
+### دليل الجهاز — بث حقيقي على iPhone — 2026-09-08
+
+بثّ حقيقي كامل من `Bashar’s iPhone` (iOS 26.6.1) على الخادم المنشور `159.65.227.87`: إنشاء ← نشر ← إنهاء ← تقرير ← فتح شاشة الترويج. هذا **أول دليل جهاز** في هذا الملف؛ ما يلي مقروء من كونسول التشغيل نفسه لا من اختبار.
+
+| # | ما أثبته اللوق |
+|---|---|
+| 1 | `POST /lives` → 201؛ `connectAndPublish` نجح: صوت + فيديو 720p (`vp8`، simulcast، `1280x720@30fps/2500kbps`)؛ `LivePerf: room_ready=4985ms`؛ `POST /lives/:id/end` → 201 |
+| 29 | `GET /leaderboard/hourly` → `{"rank":2,"score":0.5,"isPopular":true,"popularReason":"…"}` — الترتيب وشارة Popular يصلان فعلًا |
+| 26 | `GET /summary` → `durationSeconds`، `peakViewers`، `totalViewerSessions`، `uniqueViewers`، `topGifters`، `host.hostLeagueTier` |
+| 21 | `treasure-boxes` → `[]`، `qa` → `[]`، `polls/active` → **body فارغ (null) بلا content-type**؛ `getActivePoll` يتعامل معه بسلام ويعيد null |
+| 17 · 19 · 13 · 20 | `auctions/active` → `{"data":[]}`، `gallery` → `{"pinnedCount":0,"data":[]}`، `guests` → `{"data":[]}`، `battle` → `{"battle":null}` |
+| 6 · 24 | `studio` → `streamKey` + `ingressId` + `recording:{status,egressId:null,autoRecord:true}` — التسجيل التلقائي مسلّح |
+| 30 | `GET /promotions/lives/options` → **200** ومتابعة الشاشة. قبل هذه الجولة كانت الاستجابة نفسها 200 ثم يسقط التحليل. اللوق انقطع قبل نتيجة العرض، فالقبول النهائي للميزة 30 **ما زال بانتظار بقية الأسطر**. |
+
+**عيبان كشفهما الجهاز ولم يكشفهما أي اختبار:**
+
+1. **تقرير نهاية البث يُفتح مرتين — أُصلح.** المستمع في `live_room_page.dart` (المضيف) كان `listenWhen: (previous, current) => current is LiveRoomEnded` بلا فحص انتقال. `_onEnd` (إنهاء المضيف) و`_onRemoteEnded` (حدث `liveEnded`) معالِجان منفصلان، وكلاهما يجتاز حارس `_readyOrNull` قبل أن يُصدر أيٌّ منهما الحالة، فيُصدران `LiveRoomEnded` مرتين. النتيجة في اللوق: `#31` و`#32` طلبا `GET /summary` معًا، وعلى الشاشة تقريران مكدّسان يغلقهما المضيف مرتين. صار الشرط `previous is! LiveRoomEnded && current is LiveRoomEnded`، مطابقًا للمستمع الشقيق تحته مباشرة. لا اختبار وحدة له: المسار يحتاج `LiveRoomPage` كاملة بحقن ثقيل؛ دليله كونسول الجهاز أعلاه.
+
+2. **التعليقات تُجلب مرتين — تُركت عمدًا.** `#21` من إعادة مزامنة السوكِت عند أول اتصال، و`#22` ضمن دفعة `_enrichSession`. حذف الأولى يوفّر طلبًا واحدًا لكل فتح غرفة، لكن `_enrichSession` يستخدم `Future.wait` **بلا try**: فشل أي عضو في الدفعة يترك خلاصة التعليقات فارغة، وإعادة المزامنة هي شبكة الأمان الوحيدة عندها. الرصيد سلبي، فلم تُحذف.
+
+المجموعة الكاملة بعد إصلاح التقرير: **450 Passed / 0 Failed**. التحليل على الملفات المعدّلة: **No issues found**.

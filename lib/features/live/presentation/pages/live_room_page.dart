@@ -232,7 +232,14 @@ class _LiveRoomPageState extends State<LiveRoomPage>
             child: MultiBlocListener(
               listeners: [
                 BlocListener<LiveRoomBloc, LiveRoomState>(
-                  listenWhen: (previous, current) => current is LiveRoomEnded,
+                  // Only the transition into the ended state opens the recap.
+                  // The host's own end and the `liveEnded` socket event are
+                  // separate handlers that can both pass their ready-state
+                  // guard before either emits, so `current is LiveRoomEnded`
+                  // alone pushed two recap routes and fetched the summary
+                  // twice.
+                  listenWhen: (previous, current) =>
+                      previous is! LiveRoomEnded && current is LiveRoomEnded,
                   listener: (context, state) async {
                     // The recap sits on top of the finished room and the room
                     // still leaves through its usual exit once it is dismissed.
@@ -262,7 +269,9 @@ class _LiveRoomPageState extends State<LiveRoomPage>
                           previous.session.id != current.session.id),
                   listener: (context, state) {
                     context.read<LiveInteractiveBloc>().add(
-                      LiveInteractiveStarted((state as LiveRoomReady).session.id),
+                      LiveInteractiveStarted(
+                        (state as LiveRoomReady).session.id,
+                      ),
                     );
                   },
                 ),
